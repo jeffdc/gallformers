@@ -3,7 +3,7 @@ defmodule Gallformers.Places.Place do
   Ecto schema for the place table.
 
   Represents a geographic location (state, province, region).
-  Used to track where species are found.
+  Used to track where plants and Galls are found.
   """
   use Ecto.Schema
 
@@ -30,16 +30,6 @@ defmodule Gallformers.Places.Place do
     many_to_many :parents, __MODULE__,
       join_through: "place_hierarchy",
       join_keys: [place_id: :id, parent_id: :id]
-
-    # Host species that grow in this place
-    many_to_many :host_species, Gallformers.Species.Species,
-      join_through: "host_range",
-      join_keys: [place_id: :id, species_id: :id]
-
-    # Gall species that occur in this place
-    many_to_many :gall_species, Gallformers.Species.Species,
-      join_through: "gall_range",
-      join_keys: [place_id: :id, species_id: :id]
   end
 
   @impl Gallformers.SchemaFields

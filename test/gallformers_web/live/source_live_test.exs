@@ -32,6 +32,15 @@ defmodule GallformersWeb.SourceLiveTest do
       assert page_title(view) =~ "Cynipid galls of the seed slope"
     end
 
+    test "an admin gets a link to the Source editor; a visitor does not", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/source/59")
+      refute has_element?(view, "a[href='/admin/sources/59']")
+
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/source/59")
+      assert has_element?(view, "a[href='/admin/sources/59']")
+    end
+
     test "lists the Galls it cites, linking to their Source entry", %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/source/59")
 
@@ -76,7 +85,7 @@ defmodule GallformersWeb.SourceLiveTest do
 
       {:ok, _image} =
         Images.create_image(%{
-          species_id: 300,
+          gall_id: 300,
           source_id: source.id,
           path: "gall/300/300_source_original.jpg",
           creator: "Source Photographer",

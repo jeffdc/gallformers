@@ -2,47 +2,72 @@ defmodule Gallformers.Ranges do
   @moduledoc """
   The Ranges context.
 
-  Manages geographic range data for species:
-  - **Host ranges** (host_range table): Where host plants exist geographically
-  - **Gall ranges** (gall_range table): Curated stored range for gall species
+  Manages the Host ranges of plant taxa (the `host_range` table, by
+  `taxon_id`): where host plants grow.
 
-  A Gall's range on the new back-end is `Gallformers.Catalog.potential_range/1`
-  (its Hosts' ranges, read by `host_range.taxon_id`); its map split comes
-  from `get_display_range_for_taxa/1`. The old admin still reads and writes
-  `gall_range`.
+  A Gall's range is `Gallformers.Catalog.potential_range/1` (its Hosts'
+  ranges); its map split comes from `get_display_range_for_taxa/1`. The old
+  model's stored Gall range (`gall_range`) is read only by the data
+  migration and the old ID filter (`Gallformers.Galls.Identification`).
 
   See `docs/architecture/range-system.md` for the full range system architecture.
   """
   use Boundary,
     deps: [
+      Gallformers.Audit,
       Gallformers.Repo,
       Gallformers.ChangesetHelpers,
       Gallformers.SchemaFields,
-      Gallformers.Species,
-      Gallformers.Places
+      Gallformers.Places,
+      Gallformers.Taxa,
+      Gallformers.TextMatch,
+      Gallformers.Wcvp
     ],
     exports: :all
 
   import Ecto.Query
 
+  alias Gallformers.Audit
+  alias Gallformers.Audit.Actor
   alias Gallformers.Places
   alias Gallformers.Places.Place
-  alias Gallformers.Ranges.{DisplayRange, GallRange, HostRange}
+  alias Gallformers.Ranges.{DisplayRange, HostRange}
   alias Gallformers.Repo
+  alias Gallformers.Taxa
+  alias Gallformers.Taxa.Event
+  alias Gallformers.Taxa.Events
 
   # ============================================
-  # Host Range Queries
+  # Host Ranges by taxon
   # ============================================
+
+  @typedoc "A Host range row as the range editor reads it."
+  @type place_entry :: %{
+          code: String.t(),
+          precision: String.t(),
+          place_id: integer(),
+          distribution_type: String.t()
+        }
+
+  @typedoc """
+  A place for `update_taxon_places/3`: `{place_id, precision,
+  distribution_type}`, `{place_id, precision}` (native) or a place ID
+  (exact, native).
+  """
+  @type taxon_place ::
+          {integer(), String.t(), String.t()} | {integer(), String.t()} | integer()
 
   @doc """
-  Gets place codes, precision, and distribution type for a host species.
+  A plant taxon's `host_range` rows, by `taxon_id`: each place's code,
+  precision, ID and distribution type.
   """
-  @spec get_places_for_host_with_precision(integer()) :: [map()]
-  def get_places_for_host_with_precision(host_species_id) do
+  @spec get_places_for_taxon_with_precision(integer()) :: [place_entry()]
+  def get_places_for_taxon_with_precision(taxon_id) when is_integer(taxon_id) do
     from(hr in HostRange,
       join: p in Place,
       on: hr.place_id == p.id,
-      where: hr.species_id == ^host_species_id,
+      where: hr.taxon_id == ^taxon_id,
+      order_by: p.code,
       select: %{
         code: p.code,
         precision: hr.precision,
@@ -53,120 +78,95 @@ defmodule Gallformers.Ranges do
     |> Repo.all()
   end
 
-  # ============================================
-  # Host Range Management
-  # ============================================
-
   @doc """
-  Adds a place to a host's range with optional precision and distribution type.
+  Replaces a plant taxon's Host range (`host_range` by `taxon_id`) with
+  `entries` (`t:taxon_place/0`), as `actor`. A place given twice is kept
+  once, native first. A migrated plant (one with a `species` row of the
+  same ID) keeps its species ID on the rows, for today's code; a plant
+  created since has none.
+
+  `host_range` is not an audited table (Carbonite would record every row of
+  ~1M on each data migration run): the write runs in an audit transaction
+  naming `actor`, and the taxonomy admin's write path
+  (`Gallformers.Import.record_taxonomy_edit/2`, `:set_host_range`) logs the
+  whole new range in the audited replay log.
+
+  The Galls whose potential range reads the taxon's rows — those with it,
+  or a genus or section above it, as a Host — get their ID tool rows
+  refreshed: a `:host_range` "taxon changed" event
+  (`Gallformers.Taxa.Events`). Returns how many rows the taxon now has.
   """
-  @spec add_place_to_host(integer(), integer(), String.t(), String.t()) ::
-          {:ok, Ecto.Schema.t()} | {:error, Ecto.Changeset.t()}
-  def add_place_to_host(
-        host_species_id,
-        place_id,
-        precision \\ "exact",
-        distribution_type \\ "native"
-      ) do
-    result =
-      %HostRange{}
-      |> HostRange.changeset(%{
-        species_id: host_species_id,
-        place_id: place_id,
-        precision: precision,
-        distribution_type: distribution_type
-      })
-      |> Repo.insert(on_conflict: :nothing)
+  @spec update_taxon_places(Actor.t(), Taxa.taxon_ref(), [taxon_place()]) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  def update_taxon_places(%Actor{} = actor, taxon, entries) when is_list(entries) do
+    taxon_id = taxon_ref_id(taxon)
 
-    result
-  end
+    Audit.transaction(actor, "ranges.update_taxon_places", fn ->
+      species_id = migrated_species_id(taxon_id)
 
-  @doc """
-  Toggles a place in a host's range (add if not present, remove if present).
-  Returns {:added, place_id} or {:removed, place_id}.
-  """
-  @spec toggle_place_for_host(integer(), integer()) ::
-          {:added, integer()} | {:removed, integer()} | {:error, term()}
-  def toggle_place_for_host(host_species_id, place_id) do
-    result =
-      Repo.transaction(fn ->
-        query =
-          from(hr in HostRange,
-            where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
-          )
-
-        case Repo.one(query) do
-          nil ->
-            %HostRange{}
-            |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
-            |> Repo.insert!()
-
-            {:added, place_id}
-
-          _existing ->
-            Repo.delete_all(query)
-            {:removed, place_id}
+      rows =
+        for {place_id, precision, distribution_type} <- normalize_taxon_places(entries) do
+          %{
+            taxon_id: taxon_id,
+            species_id: species_id,
+            place_id: place_id,
+            precision: precision,
+            distribution_type: distribution_type
+          }
         end
-      end)
-      |> case do
-        {:ok, result} -> result
-        {:error, reason} -> {:error, reason}
-      end
 
-    result
+      from(hr in HostRange, where: hr.taxon_id == ^taxon_id) |> Repo.delete_all()
+
+      # A migrated plant's rows written by today's code without a taxon.
+      if species_id,
+        do:
+          from(hr in HostRange, where: hr.species_id == ^species_id and is_nil(hr.taxon_id))
+          |> Repo.delete_all()
+
+      {count, _} = Repo.insert_all(HostRange, rows)
+      :ok = Events.dispatch(%Event{type: :host_range, taxon_id: taxon_id})
+      count
+    end)
   end
 
-  @doc """
-  Bulk updates all places for a host (replaces existing).
+  defp taxon_ref_id(%{id: id}), do: id
+  defp taxon_ref_id(id) when is_integer(id), do: id
 
-  Accepts either plain place IDs or `{place_id, precision}` tuples.
-  """
-  @spec update_host_places(
-          integer(),
-          [{integer(), String.t(), String.t()} | {integer(), String.t()} | integer()]
-        ) :: {:ok, :ok}
-  def update_host_places(host_species_id, place_entries) do
-    entries =
-      host_species_id
-      |> normalize_entries(place_entries, distribution_type: true)
-      |> dedup_by_place_id()
-
-    result =
-      Repo.transaction(fn ->
-        from(hr in HostRange, where: hr.species_id == ^host_species_id) |> Repo.delete_all()
-        if entries != [], do: Repo.insert_all(HostRange, entries)
-        :ok
-      end)
-
-    result
-  end
-
-  # ============================================
-  # Gall Range Queries (from gall_range table)
-  # ============================================
-
-  @doc """
-  Gets host ranges with precision for a list of host species IDs.
-  Returns the union of all ranges with precision metadata.
-  """
-  @spec get_host_ranges_with_precision_for_species_ids([integer()]) :: [map()]
-  def get_host_ranges_with_precision_for_species_ids([]), do: []
-
-  def get_host_ranges_with_precision_for_species_ids(host_species_ids) do
-    from(hr in HostRange,
-      join: p in Place,
-      on: hr.place_id == p.id,
-      where: hr.species_id in ^host_species_ids,
-      distinct: true,
-      select: %{
-        code: p.code,
-        precision: hr.precision,
-        place_id: p.id,
-        distribution_type: hr.distribution_type
-      }
+  # Plant taxa keep their species IDs through the data migration.
+  defp migrated_species_id(taxon_id) do
+    Repo.one(
+      from(s in "species",
+        where: s.id == ^taxon_id and s.taxoncode == "plant",
+        select: s.id
+      )
     )
-    |> Repo.all()
   end
+
+  @doc """
+  `update_taxon_places/3`'s entries as it writes them: each
+  `{place_id, precision, distribution_type}`, a place given twice kept once
+  (native first), in the order given.
+  """
+  @spec normalize_taxon_places([taxon_place()]) :: [{integer(), String.t(), String.t()}]
+  def normalize_taxon_places(entries) when is_list(entries) do
+    entries
+    |> Enum.map(fn
+      {place_id, precision, distribution_type} -> {place_id, precision, distribution_type}
+      {place_id, precision} -> {place_id, precision, "native"}
+      place_id when is_integer(place_id) -> {place_id, "exact", "native"}
+    end)
+    |> Enum.with_index()
+    |> Enum.sort_by(fn {{_place, _precision, distribution}, i} ->
+      {distribution != "native", i}
+    end)
+    |> Enum.uniq_by(fn {{place_id, _, _}, _i} -> place_id end)
+    |> Enum.sort_by(&elem(&1, 1))
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  # ============================================
+  # Range entries expanded to leaf places
+  # ============================================
 
   @doc """
   Expands raw range entries into effective leaf-level coverage.
@@ -371,120 +371,5 @@ defmodule Gallformers.Ranges do
       end
 
     {exact_codes, inherited_codes}
-  end
-
-  # ============================================
-  # Gall Range Queries
-  # ============================================
-
-  @doc """
-  Gets gall range entries with precision and place metadata.
-  """
-  @spec get_gall_range_with_precision(integer()) :: [map()]
-  def get_gall_range_with_precision(gall_species_id) do
-    from(gr in GallRange,
-      join: p in Place,
-      on: gr.place_id == p.id,
-      where: gr.species_id == ^gall_species_id,
-      select: %{code: p.code, precision: gr.precision, place_id: p.id}
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets gall range place codes for a gall species.
-  """
-  @spec get_gall_range_codes(integer()) :: [String.t()]
-  def get_gall_range_codes(gall_species_id) do
-    from(gr in GallRange,
-      join: p in Place,
-      on: gr.place_id == p.id,
-      where: gr.species_id == ^gall_species_id,
-      select: p.code
-    )
-    |> Repo.all()
-  end
-
-  # ============================================
-  # Gall Range Management
-  # ============================================
-
-  @doc """
-  Replaces all gall_range entries for a gall species.
-
-  Accepts a list of `{place_id, precision}` tuples or plain place_ids
-  (which default to "exact" precision).
-  """
-  @spec set_gall_range(integer(), [{integer(), String.t()} | integer()]) :: {:ok, :ok}
-  def set_gall_range(gall_species_id, place_entries) do
-    entries =
-      Enum.map(place_entries, fn
-        {place_id, precision} ->
-          %{species_id: gall_species_id, place_id: place_id, precision: precision}
-
-        place_id when is_integer(place_id) ->
-          %{species_id: gall_species_id, place_id: place_id, precision: "exact"}
-      end)
-
-    Repo.transaction(fn ->
-      from(gr in GallRange, where: gr.species_id == ^gall_species_id) |> Repo.delete_all()
-      if entries != [], do: Repo.insert_all(GallRange, entries)
-      :ok
-    end)
-  end
-
-  # ============================================
-  # Utility
-  # ============================================
-
-  @doc """
-  Gets a place ID by its code.
-  """
-  @spec get_place_id_by_code(String.t()) :: integer() | nil
-  def get_place_id_by_code(code) do
-    from(p in Place,
-      where: p.code == ^code,
-      select: p.id
-    )
-    |> Repo.one()
-  end
-
-  # ============================================
-  # Private helpers
-  # ============================================
-
-  # Deduplicates entries by place_id. Multiple TDWG botanical regions can map to
-  # the same ISO place code (219 cases), so WCVP sync can produce the same
-  # place_id with conflicting distribution types. Native wins over introduced.
-  defp dedup_by_place_id(entries) do
-    entries
-    |> Enum.sort_by(fn entry -> if entry[:distribution_type] == "native", do: 0, else: 1 end)
-    |> Enum.uniq_by(& &1.place_id)
-  end
-
-  defp normalize_entries(species_id, entries, opts) do
-    include_dt = Keyword.get(opts, :distribution_type, false)
-
-    Enum.map(entries, fn entry ->
-      base = normalize_entry(species_id, entry)
-      if include_dt, do: Map.put_new(base, :distribution_type, "native"), else: base
-    end)
-  end
-
-  defp normalize_entry(species_id, {place_id, precision, distribution_type}) do
-    %{
-      species_id: species_id,
-      place_id: place_id,
-      precision: precision,
-      distribution_type: distribution_type
-    }
-  end
-
-  defp normalize_entry(species_id, {place_id, precision}) do
-    %{species_id: species_id, place_id: place_id, precision: precision}
-  end
-
-  defp normalize_entry(species_id, place_id) when is_integer(place_id) do
-    %{species_id: species_id, place_id: place_id, precision: "exact"}
   end
 end

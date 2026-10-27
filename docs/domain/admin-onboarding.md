@@ -11,15 +11,20 @@ A task-oriented guide for Gallformers admins. Whether you're brand new or return
 3. Fill in your display name and any optional info (bio, iNaturalist username, website). Toggle **Show on About Page** if you'd like to appear on the public About page.
 4. You'll land on the **Dashboard** — this is home base.
 
+### The Admin Navigation
+
+The bar at the top of every admin page leads to: **Dashboard**, **Queue** (the review queue), **Galls**, **Taxonomy** (taxa of every rank, plants and their Host ranges included), **Sources**, then the content screens **Glossary**, **Articles** and **Keys**. **My Profile** is on the right; operators also see **Ops**.
+
 ### The Dashboard
 
 The dashboard is organized into sections:
 
-- **Quick Actions** — the things you'll do most often (create galls, hosts, sources, manage associations)
-- **Taxonomy** — create families, genera, intermediates, and sections
+- **Quick Actions** — review the queue, find a Gall, find a Source, review Host ranges
+- **Review Queue** — how many queue items are open, in all and by kind; each count opens the queue filtered to it
+- **Taxonomy** — create a new Host (a plant) or a new taxon, browse the taxonomy
 - **Content & Reference** — articles, identification keys, glossary entries
-- **Super Admin** — user management, filter terms (only visible to superadmins)
-- **Stats** — current counts for galls, hosts, sources, and images (clickable to browse each list)
+- **Super Admin** — user management, the jobs dashboard and the live dashboard (only visible to superadmins)
+- **Stats** — current counts for Galls, Hosts, Sources and images; the first three open their lists
 
 There's also a **Discord** link and a link to this help doc in the top right for help.
 
@@ -27,119 +32,163 @@ There's also a **Discord** link and a link to this help doc in the top right for
 
 Before diving in, a few things that apply everywhere in the admin:
 
-**Deferred saves.** Most forms don't save changes as you make them. You build up your edits (adding aliases, hosts, filter values, etc.) and everything saves in one batch when you click **Save**. If you navigate away without saving, changes are lost — you'll get a confirmation prompt.
+**Most data arrives as imports.** Galls, their Hosts, Traits and common names, and what Sources say about them, come into Gallformers as **import packages**: batches of statements extracted from Sources. A package is checked and matched against what Gallformers already knows; whatever can't be settled on its own (an ambiguous name, an unknown Host, a dispute) becomes an item in the **review queue**, and a package needing review waits there for an admin to approve or deny it. The admin screens are for that review and for what is Gallformers' own: Gall editorial fields, the Gallformers note, range exclusions, the taxonomy, Sources' details and images.
 
-**Data completeness.** Species and sources have a "data complete" flag (green checkmark vs red X in lists). This tracks whether a record has all expected information filled in. It's a signal to other admins about what still needs work. For galls, the system enforces two rules: a gall **without sources** cannot be marked complete, and an **undescribed gall** cannot be marked complete. When either condition applies, the checkbox is locked with an explanation.
+**Every edit is yours.** Saves are recorded under your name in the audit history, and edits that must survive a re-import (taxonomy edits, Source edits, queue decisions) are also kept in the replay log.
 
-**Aliases.** Galls can have multiple names: scientific synonyms and common names. Aliases make species findable by any of their names in search.
+**Saving.** Pages are split into sections (cards), each with its own **Save** button that saves just that section. On forms with a **Cancel** button, leaving with unsaved changes asks you to confirm.
 
-**Real-time updates.** Pages update in real-time — if another admin creates or edits a record, you'll see the change without refreshing.
+**Data completeness.** Galls and plants have a "data complete" flag (green checkmark vs red X on public pages). It tells visitors and other admins whether everything relevant has been added. For Galls the system enforces two rules: a Gall **without Sources** cannot be marked complete, and an **undescribed Gall** cannot be marked complete. When either applies, the checkbox is locked with the reason.
 
-**Edit shortcuts on public pages.** When you're logged in as an admin, small pencil icons appear throughout the public site — next to the species name, the host list, individual source mappings, and more. Clicking one takes you straight to the relevant admin page. This is often the fastest way to edit something: find it on the public site, click the pencil.
+**Edit shortcuts on public pages.** When you're logged in as an admin, small pencil icons appear on the public site: next to a Gall's name (its Gall page in admin), a Host's or a rank page's name (its taxon page in admin), a Source's title (the Source editor), each Gall in a Host's table, and on image galleries (the images section of the Gall or taxon page; **Add images** when there are none). This is often the fastest way to edit something: find it on the public site, click the pencil.
 
-**Range review indicators.** On gall public pages, if the gall's range hasn't been confirmed by an admin, an amber **"Needs review"** link appears next to "Possible Range." Clicking it takes you directly to the gall-host admin page to curate and confirm the range. This makes it easy to spot galls that need attention while browsing the site.
-
-**View links on admin pages.** Going the other direction, admin list pages have a **View** button (arrow icon) on each record that opens its public page. Use this to check how your edits look to visitors.
+**Old links.** Links to the old admin screens still work where a new screen replaces them: `/admin/hosts…` and `/admin/section…` go to the taxonomy admin, `/admin/species-sources…` to the Source editor, `/admin/gallhost?id=…` to that Gall's page, and `/admin/images?species_id=…` to the images of that Gall's or taxon's page. Other old admin URLs are gone.
 
 ---
 
-## How Do I Add a New Gall?
+## How Do I Work the Review Queue?
 
-Use this when a gall species is formally described in the literature.
+Go to **Queue** (`/admin/queue`). The page has two parts.
 
-1. From the dashboard, click **Create a New Gall** (or go to `/admin/galls/new`).
-2. Start typing the species name in the search field. If it already exists, you'll see it — click to edit instead.
-3. Fill in taxonomy: **Family**, **Genus**, and **specific epithet**.
-4. Set **Abundance** (how common the gall is).
-5. Set **Detachable** type: Integral (can't detach), Detachable (falls off), Both, or Unknown.
-6. Add a **Description** — a brief text describing the gall.
-7. **Morphological filters** — select all that apply for colors, shapes, textures, alignments, walls, cells, forms, seasons, and plant parts. These power the ID tool's filtering.
-8. **Aliases** — add common names, scientific synonyms, or colloquial names as needed.
-9. Click **Save** to create the gall with all its associations in one transaction.
+### Open items
 
-**After creating:** You'll probably want to also:
-- [Add images](#how-do-i-manage-images)
-- [Map host plants](#how-do-i-manage-gall-host-associations)
-- [Map sources](#how-do-i-map-species-to-sources)
+Everything imports could not settle on their own, oldest first, filtered by kind with a count for each:
 
-### Quick Links (Edit Mode)
+| Kind | What you decide |
+|---|---|
+| **Ambiguous match** | A name matched more than one taxon, Gall or Source: pick the right candidate (or another taxon by ID), or skip it. A Gall can also be new. |
+| **Unresolved name** / **Unresolved Host** | A name or Host matched nothing: pick a taxon, or skip. Add the missing taxon in the [taxonomy admin](#how-do-i-create-or-edit-taxonomy) first if needed, then re-resolve the package. |
+| **Undescribed-Gall candidate** | A statement may be about an undescribed Gall: pick one, make it new, or skip. |
+| **Dispute** | A statement contradicts what Gallformers holds: keep or drop the statement. |
+| **Same-date conflict**, **Taxonomy disagreement**, **Generation outside its group** | Acknowledge, with a note. |
+| **Gall rename proposal** | A taxonomy change would rename a Gall (from → to, with any name collision shown): accept or reject. These come from taxonomy edits, not from a package. |
 
-When editing an existing gall, links appear at the top of the form:
-- **Manage Images** — jump to the image manager for this gall
-- **Gall-Host Mappings** — go to the gall-host associations page with this gall pre-selected
-- **Species-Source Mappings** — find existing source mappings
-- **Add Source Mapping** — add a new source mapping
+Any decision can carry a note. Items that hold up a package's approval can be decided here or on the package's page.
 
----
+### Packages
 
-## How Do I Add an Undescribed Gall?
+The delivered import packages, newest first, filtered by status. Open one (`/admin/queue/packages/:id`) to see:
 
-Use this when you've found a gall that hasn't been formally described yet — you might not know the exact species.
+- the package — its status, who submitted it, its Source, any validation problems;
+- its open queue items, with their decision controls;
+- its batches — type, mode and status — with each statement and how it resolved (to what, among which candidates, and once applied what it changed), and the entries that mapped to nothing.
 
-1. From the dashboard, click **Add an Undescribed Gall** (or go to `/admin/galls/undescribed`).
-2. **Do you know the genus?**
-   - **Yes** — pick the genus, and the family fills in automatically.
-   - **No** — pick just the family. An "Unknown" genus under that family will be used (or created automatically).
-3. **Pick the type host** — the plant this gall was found on.
-4. **Enter a short description** — a few adjectives separated by dashes (e.g., `red-bead-gall`).
-5. The **name generates automatically** based on your choices, e.g., `Unknown (Cynipidae) q-alba-red-bead-gall`. You can edit it if needed.
-6. Click **Continue** to go to the full gall form with your choices pre-filled.
-7. Add morphological filters, description, etc. and **Save**.
+Then:
 
-**Important:**
-- Galls in an Unknown genus are **automatically marked undescribed** — you can't override this.
-- A **Gallformers Code** is automatically derived from the descriptive part of the name and stored on the gall record. This code is used for iNaturalist cross-referencing.
-- Gallformers Codes must be unique — the system enforces this with a uniqueness constraint.
+- **Approve** applies the package. If something still holds it (open items, a blocked batch), the page says what.
+- **Deny** the package, or a single batch, with a reason.
+- **Resolve again** after you've fixed what held it, e.g. added a missing name to the taxonomy.
 
 ---
 
-## How Do I Rename or Reclassify a Species?
+## How Do I Edit a Gall?
 
-Use this when a species has been formally re-described, moved to a different genus, or when an undescribed gall gets a real name.
+Galls are not created or deleted by hand: new Galls arrive with imports, and mistakes or duplicates wait for the merge workflow. To edit one:
 
-1. Open the species edit page (either gall or host).
-2. Click the **Rename/Reclassify** button.
-3. The modal opens pre-filled with the current family, genus, and epithet.
-4. **To rename:** Change the specific epithet.
-5. **To reclassify:** Change the family and/or genus. Changing the family filters the genus picker to only show genera in that family.
-6. **"Add scientific synonym alias"** (on by default) — saves the old name as a searchable alias so people can still find this species by its former name.
-7. Click **Save** — changes apply immediately. All hosts, sources, images, and traits are preserved.
+1. Go to **Galls** (`/admin/galls`) and search by name, alias or the Inducer's names — or click the pencil next to the Gall's name on its public page.
+2. The Gall page (`/admin/galls/:id`) has these sections, each saved on its own:
+   - **Editorial fields** — the **Gallformers Code** (checked for uniqueness as you type), **Abundance**, the **Lead Source** (one of the Gall's Sources; the public page leads with it) and **data complete** (locked off for an undescribed Gall or one with no Sources). Click **Save editorial fields**.
+   - **Name** — the name parts: the **Host qualifier** (the plant written "on …"), the **Form label**, the **Descriptor** (for undescribed Galls) and a **Name override**. The name they make, and any collision with another Gall's name, show as you type. Click **Save name**.
+   - **Images** — see [How Do I Manage Images?](#how-do-i-manage-images)
+   - **Gallformers note** — Gallformers' own description of the Gall, in Markdown. Each save is a new version dated today; earlier versions are listed below it. Click **Save note**.
+   - **Range exclusions** — see below.
 
-**If the family or genus you need doesn't exist yet**, use the link in the modal to go create it in taxonomy admin first.
+Hosts, Traits and common names come from imports and are not edited here.
 
-**For undescribed galls being formally described:** The Gallformers Code is preserved on the gall record. After reclassifying, the public page continues to show "Formerly tracked as..." with a link to iNat observations tagged with the original code. The old name is saved as a scientific synonym alias.
+### Excluding Places from a Gall's Range
+
+A Gall's range is computed from its Hosts' ranges: its **potential range**. When there's evidence the Gall doesn't occur somewhere its Hosts grow, exclude that place:
+
+1. In the **Range exclusions** section, the map shows the potential range with the current exclusions. (A Gall whose Hosts have no range data can be excluded anywhere.)
+2. Click a place to exclude it, or click an excluded one to restore it. Click a country to open the drill-down panel for its subdivisions, with **Select All** / **Deselect All**.
+3. Write a short **statement** saying why, in plain words (required).
+4. Click **Save exclusions**.
+
+The change is saved as a Gallformers statement and goes through the import path like any other, so it is audited and attributed to Gallformers. The page shows the outcome: applied, or waiting in the review queue (with a link to its package).
 
 ---
 
 ## How Do I Add a New Host Plant?
 
-1. From the dashboard, click **Create a New Host** (or go to `/admin/hosts/new`).
-2. **WCVP pre-fill (recommended):** If the host exists in the World Checklist of Vascular Plants, use the WCVP search card at the top of the form. Search by name, select a match, and the form auto-fills the species name, family (created if it doesn't exist yet), and geographic range. **By default, only native distributions are included.** Check "Include introduced range" to also add regions where the host has been introduced by human activity. Be thoughtful about this — introduced host ranges can inflate a gall's apparent range if the gall hasn't followed the host to those regions.
-3. **Or fill in manually:** Select **Family** and **Genus**, enter the **specific epithet**.
-4. Optionally assign a **Section** (for genera that have them, like *Quercus*).
-5. Add **common names** as aliases.
-6. Set **Abundance**.
-7. **Edit the range map** — click states/provinces to toggle them in or out of range. Click a country to open the drill-down panel for sub-national editing. Colors: dark green = exact, light green = country-level, white = not in range. If you included introduced ranges, those regions show a diagonal hatching overlay so you can distinguish native from introduced presence.
-8. Click **Save**.
+Plants are taxa, managed in the taxonomy admin.
 
-**After creating:** You'll probably want to [map galls to this host](#how-do-i-manage-gall-host-associations).
+1. From the dashboard, click **Create a New Host** (or go to `/admin/taxonomy/new`).
+2. **From POWO-WCVP (recommended):** search the World Checklist of Vascular Plants by name and pick the record. Its name, family and genus are filled in (WCVP is authoritative for a plant's family; a missing family or genus is created) and its range is drawn. **By default only the native range is included**; check the option to include the introduced range too. Be thoughtful about this — introduced Host ranges widen the potential range of every Gall on the Host.
+3. **Or by name:** enter the name, the rank and the parent. A plant (Plantae, species rank or below) needs a Host range: draw it on the map.
+4. Possible duplicates are flagged — the same name, a synonym or common name of another taxon, the same WCVP record — each linking to the existing taxon.
+5. Save. You land on the new taxon's page.
 
-### Refreshing Host Range from WCVP
+### Editing a Host's Range
 
-When editing an existing host, the **Refresh from POWO-WCVP** button (below the section/abundance row) compares the current range against WCVP data and shows a diff:
+On a plant's taxon page, the **Host range** section has the range map:
+
+- Click a state or province to cycle it **native → introduced → removed**. Click a country to open the drill-down panel for its subdivisions.
+- Colors: dark green = exact, light green = country-level, white = not in range; introduced places have a diagonal hatching.
+- Changes are saved when you click **Save**.
+
+### Refreshing a Host's Range from WCVP
+
+On a plant linked to WCVP, **Refresh from POWO-WCVP** compares the current range with WCVP's and shows the differences:
 
 - **Green (to add)** — places in WCVP but not in the current range
 - **Red (to remove)** — places in the current range but not in WCVP
-- **Amber (introduced)** — introduced distributions you can individually select or deselect
+- **Amber (introduced)** — introduced distributions you can select or deselect one by one
 
-Each item can be toggled independently. For introduced distributions, consider whether the gall is known to occur in those regions before including them. Click **Apply Selected Changes** to stage the updates. Changes aren't saved until you click **Save**.
+Toggle each item, then **Apply Selected Changes** to stage them on the map. Nothing is saved until you click **Save**.
 
-### Quick Links (Edit Mode)
+The **POWO-WCVP link** section shows the plant's WCVP record and lets you match it to a record, sync from it, or mark it ignored.
 
-When editing an existing host, links appear at the top of the form:
-- **Manage Images** — jump to the image manager for this host
-- **Species-Source Mappings** — find existing source mappings
-- **Add Source Mapping** — add a new source mapping
+### Reviewing Host Ranges in Bulk
+
+**Review Host Ranges** on the dashboard (`/admin/host-range`) lists plants whose range needs review, with bulk range confirmation and bulk WCVP match / sync / ignore. Matching all filtered plants at once is for superadmins only.
+
+---
+
+## How Do I Create or Edit Taxonomy?
+
+Every taxon — family, intermediate ranks (subfamily, tribe, …), genus, section, species and below, for animals, fungi and plants alike — lives in the taxonomy admin.
+
+### Finding a Taxon
+
+Go to **Taxonomy** (`/admin/taxonomy`). **Search** by accepted name, synonym or common name, or **browse** the tree from its roots down: click a taxon's children to go a level deeper; the breadcrumb leads back up.
+
+### Moving Taxa
+
+While browsing a taxon's children, select several with the checkboxes and click **Move** to put them under another parent at once (the old "move genera").
+
+### Creating a New Taxon
+
+1. Go to `/admin/taxonomy/new` (or click **Create a New Taxon** on the dashboard).
+2. Enter the **name**, pick the **rank** and the **parent** (a root needs a kingdom).
+3. A rank above species can take some of the parent's children under it — an **intermediate rank needs at least one**.
+4. Save.
+
+### A Taxon's Page
+
+Each taxon's page (`/admin/taxonomy/:id`) has sections for:
+
+- **Name** — rename it. The old accepted name stays a synonym. Galls whose names derive from it and would change get **rename proposals** in the review queue, which you accept or reject there.
+- **Placement** — move it under a new parent.
+- **Plants in this section** (sections) — the section's member plants, all in the section's genus.
+- **Synonyms** and **Common names** — add and remove.
+- **Plant details** (plants) — data complete and abundance.
+- **Host range** and **POWO-WCVP link** (plants) — see [Adding a Host](#how-do-i-add-a-new-host-plant).
+- **Images** — see [How Do I Manage Images?](#how-do-i-manage-images)
+- **Delete** — only for a taxon nothing refers to (no children, Facts, Galls, Host ranges, images). You type its name to confirm. Otherwise the page lists what refers to it.
+
+Every taxonomy edit is audited and kept in the replay log.
+
+---
+
+## How Do I Edit a Source?
+
+Sources arrive with imports; there is no "new" and no delete (Facts and citations refer to them).
+
+1. Go to **Sources** (`/admin/sources`) and search by title or author — or click the pencil next to a Source's title on its public page.
+2. On the Source editor (`/admin/sources/:id`), edit its **details**: title, authors, date, DOI, URL, ISBN, license (a license with a canonical link fills the link in), citation and the data complete flag. Save.
+3. **Retract** a Source when a retraction notice withdraws it: pick the notice (another Source, by search) and the date. **Undo the retraction** if it was a mistake. Either recomputes the standing of every statement the Source supports.
+
+Every Source edit is audited and kept in the replay log.
 
 ---
 
@@ -185,24 +234,21 @@ If an image is licensed "All Rights Reserved," you **cannot use it without expli
 
 ## How Do I Manage Images?
 
+Images belong to a Gall or to a taxon (usually a plant) and are managed in the **Images** section of the Gall page or the taxon page. From a public page, the ✎ button under the image gallery (or **Add images** when there are none) takes you there.
+
 ### Uploading Images
 
-1. Go to `/admin/images` (or click **Edit Images** from a species' list entry).
-2. Search for and select the species.
-3. **Drag and drop** images into the upload area, or click to browse.
-4. Once uploaded, fill in the required metadata for each image (see [Image Licensing and Attribution](#image-licensing-and-attribution) above).
-5. Click **Save** for each image's metadata.
+1. **Drag and drop** images into the upload area, or click to browse, then **Upload Images**. They are added after the existing images.
+2. Fill in each image's metadata (see [Image Licensing and Attribution](#image-licensing-and-attribution)). A save must leave the image attributed: a license, and a creator unless the license is Public Domain / CC0 or the image comes from a licensed Source. Picking a Source fills in the license, its link and the creator.
+3. An image that isn't properly attributed carries a warning until it is fixed.
 
 ### Reordering Images
 
-Drag and drop images in the grid to change their display order. The first image is the one shown on the species' public page.
+Drag images in the grid to change their order. The first image is the default one, shown first on the public page and in the ID tool.
 
-### Copying Images Between Species
+### Copying Metadata and Deleting
 
-1. Click the **Copy** button to enter copy mode.
-2. Select the images you want to copy.
-3. Search for and select the destination species.
-4. Confirm the copy in the modal.
+In **Table** view you can copy one image's metadata to the selected images — handy after uploading several photos from the same photographer. Deleting an image removes it and its sizes from storage.
 
 ### View Modes
 
@@ -212,118 +258,15 @@ Toggle between **Grid** and **Table** view. Table view is useful when you need t
 
 ## How Do I Import Images from iNaturalist?
 
-1. Go to the images page (`/admin/images`) and select a species.
-2. Click the **iNaturalist Import** button.
-3. Enter an **iNaturalist observation ID** (the number from the observation URL).
-4. The system fetches the observation and shows available photos.
-5. Select which photos to import — pay attention to the license shown for each photo.
-6. License and credit information are pulled automatically from iNaturalist.
-7. Click **Import** — images are uploaded to S3 and linked to the species.
+1. In the Images section of a Gall or taxon page, find **Import from iNaturalist**.
+2. Enter the **iNaturalist observation URL** (or its ID) and fetch it.
+3. The observation's photos are shown with their licenses. Select the ones to import.
+4. License, credit ("login - name") and the observation link are filled in from iNaturalist.
+5. Import — the photos are uploaded and added to the Gall's or taxon's images.
 
 **Tips:**
-- Only import photos with [appropriate licenses](#accepted-licenses). The system shows the license for each photo before you import.
-- Credit is set automatically from the iNat observation.
+- Only import photos with [appropriate licenses](#accepted-licenses). The license of each photo is shown before you import.
 - If an iNat photo is "All Rights Reserved," do not import it unless you've gotten permission from the photographer.
-
----
-
-## How Do I Add a Source (Paper/Reference)?
-
-1. From the dashboard, click **Create a New Source** (or go to `/admin/sources/new`).
-2. Fill in: **Title**, **Author**, **Publication Year**, **Type**.
-3. Add **DOI**, **ISBN**, or **URL** if available.
-4. Add any **body text** or notes.
-5. Set the **Data Complete** flag if you've entered all relevant information.
-6. Click **Save**.
-
----
-
-## How Do I Map Species to Sources?
-
-There are two workflows depending on your starting point.
-
-### "I have a new paper and want to add all the species it covers"
-
-1. From the dashboard, click **Bulk Add Species Descriptions from Sources** (or go to `/admin/species-sources/add`).
-2. **Select the source** first — it stays pinned at the top.
-3. For each species in the paper:
-   - Search for and select the species.
-   - Enter the **description** (the relevant text from the paper).
-   - Add an **external link** if the paper provides one.
-   - Toggle **Use as default** if this should be the primary description shown on the public page.
-   - Click **Save & Add Another** to continue with the next species.
-4. Already-mapped species for the current source are shown so you can see your progress.
-
-### "I want to find or edit an existing mapping"
-
-1. From the dashboard, click **Find and Edit Species-Source Mappings** (or go to `/admin/species-sources/find`).
-2. Search by **species name**, **source title**, or **description text**.
-3. Click a result to open the inline edit modal.
-4. Edit the description, external link, or default flag.
-5. Click **Save** or **Delete** as needed.
-
----
-
-## How Do I Manage Gall-Host Associations?
-
-This dedicated page manages which galls form on which host plants and lets you curate the gall's geographic range. This is where range curation happens — an important admin responsibility, since gall ranges don't compute themselves.
-
-1. From the dashboard, click **Manage Gall-Host Associations** (or go to `/admin/gallhost`).
-2. **Select a gall** using the typeahead search (or arrive via a link from the gall form/list, which pre-selects it). Quick links next to the gall name open the public page or the gall edit form.
-3. The current hosts are shown. **Add hosts** by searching the dropdown, or **remove** them with the remove button.
-4. The **range map** shows two layers: the gall's confirmed range (dark green) and the host range canvas — everywhere the hosts grow. Places in the host range but not yet in the gall range appear in light red ("host only"). A summary line shows counts of confirmed, country-level, host-only, and total places.
-5. **Curate the range:** Click a state/province on the map to toggle it in or out of the gall's range. Click a country to open the range drill-down panel showing its subdivisions. Use checkboxes to include or exclude individual states, or "Select All" / "Deselect All" for bulk changes. Green = in gall range, red = host only.
-6. **Introduced ranges:** If any hosts have introduced distributions included (see [Adding a Host](#how-do-i-add-a-new-host-plant)), those regions show a **diagonal hatching overlay** on the map and an amber **"intro" badge** in the drill-down panel. This helps you distinguish native from introduced host presence when deciding which places belong in the gall's range. Remember: introduced host ranges are opt-in per host — if you don't see hatching where you expect it, the host's introduced ranges may not have been included during creation or WCVP refresh.
-7. The map updates live as you add/remove hosts or change the range.
-8. **Saving:**
-   - **Save** — saves host changes and any range edits.
-   - **Save & Confirm Range** — saves everything and marks the gall's range as confirmed. This signals to other admins that the range has been intentionally reviewed, not just left as a default from host data.
-
-### Range Confirmation Status
-
-The gall edit form and gall-host page both show whether a gall's range has been confirmed. Unconfirmed galls need admin attention — their range is derived from hosts but hasn't been curated yet. After adding or removing hosts, the range should be re-reviewed and re-confirmed.
-
-The typical workflow is: assign hosts → curate range on the map → Save & Confirm Range.
-
----
-
-## How Do I Create or Edit Taxonomy?
-
-Taxonomy follows the hierarchy: **Family > [Intermediate ranks] > Genus > Section**. Intermediate ranks and sections are optional.
-
-### Creating a New Taxon
-
-1. Go to `/admin/taxonomy/new` (or click **Create a New Taxon** on the dashboard).
-2. Select the **type**: Family, Genus, Intermediate, or Section.
-3. Enter the **name**.
-4. **Family** — select the organism type (Wasp, Midge, Plant, etc.) from the description dropdown.
-5. **Genus** — select its parent (a family or an intermediate rank) using the typeahead. The search shows full ancestry paths like "Cynipidae / Subfamily: Cynipinae".
-6. **Intermediate** — select a **rank** (Subfamily, Tribe, etc.), select its parent (a family or another intermediate), and use the **children tree** to pick which genera or intermediates should be re-parented under this new rank. At least one child is required.
-7. **Section** — select its parent **genus** (plant genera only).
-8. Click **Save**.
-
-**Note:** A taxon's type cannot be changed after creation.
-
-### Browsing and Editing Taxonomy
-
-1. Go to `/admin/taxonomy` to see the full list.
-2. **Search** by name, **filter** by type (family/genus/intermediate/section), or **sort** by any column.
-3. Click a taxon to edit it.
-
-### Moving Genera Between Families
-
-1. On the taxonomy list page, use the checkboxes to select one or more genera.
-2. Click the **Move** button that appears.
-3. Select the destination family in the modal.
-4. Confirm the move.
-
-### Deleting Taxonomy
-
-Deleting a taxon shows a confirmation modal with the impact count (how many children and species are affected). For intermediates, deletion "collapses upward" — children are re-parented to the intermediate's own parent, so the tree heals itself.
-
-### Hiding Empty Unknown Genera
-
-Toggle the filter to hide "Unknown" genera that have no undescribed galls in them — this keeps the list cleaner.
 
 ---
 
@@ -356,17 +299,6 @@ Toggle the filter to hide "Unknown" genera that have no undescribed galls in the
 
 ---
 
-## How Do I Audit Images?
-
-The image audit tool (`/admin/image-audit`) helps find problems:
-
-- **Orphans** — files in S3 storage with no matching database record. You can delete them or assign them to a species.
-- **Unattributed** — images missing required metadata (source, license, credit). You can edit them inline to add the missing info.
-
-Check this periodically to keep the image library clean.
-
----
-
 ## SuperAdmin-Only Features
 
 These are only available to users with the superadmin role.
@@ -375,20 +307,18 @@ These are only available to users with the superadmin role.
 - View all registered users.
 - Clean up access and display when admin privileges are revoked.
 
-### Place Management (`/admin/places`)
-- Create and edit geographic places used for gall/host range tracking.
-- Full CRUD — search, list, create, edit, delete.
+### Jobs and Live Dashboards
+- **Jobs Dashboard** (`/admin/jobs`) — background jobs (imports, rollups, image processing).
+- **Live Dashboard** (`/admin/dashboard`) — the running application's metrics.
 
-### Filter Terms (`/admin/filter-terms`)
-- Manage the filterable gall characteristics used throughout the system.
-- Organized by type: alignments, cells, colors, forms, plant parts, seasons, shapes, textures, walls.
-- Create, edit, or delete terms (deletion is blocked if the term is in use by any gall).
+### Host Range Review
+- On **Review Host Ranges**, matching all filtered plants to WCVP at once.
 
 ---
 
 ## Tips and Gotchas
 
-- **Search everywhere.** Before creating anything new, search first — the species, source, or taxon might already exist under a different name or spelling.
-- **Aliases are searchable.** When you add aliases to a species, all of those names become findable in search across the site.
-- **Deferred saves mean you can experiment.** Add and remove things freely — nothing is committed until you click Save.
+- **Search everywhere.** Before adding a taxon, search first — it might already exist under a synonym or common name; the new-taxon form warns you too.
+- **Fix the tree, then resolve again.** When a package is held by an unresolved name, add the missing taxon in the taxonomy admin, then **Resolve again** on the package.
+- **Renames ripple.** Renaming or moving a genus can propose new names for the Galls under it; look in the review queue for the rename proposals.
 - **Discord is your friend.** If something seems wrong or confusing, ask in the Discord channel. The link is on the dashboard.

@@ -8,7 +8,8 @@ defmodule Gallformers.Import.Batch do
     * `status` — `:pending` (validated, not yet resolved), `:blocked`
       (waiting: a gall batch waits for its taxonomy batch and for every Host
       name to resolve), `:ready` (resolved, nothing waiting), `:applied`
-      (with `applied_at`), `:denied`.
+      (with `applied_at`), `:denied` (with `denied_reason`;
+      `Gallformers.Import.deny_batch/3`).
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -30,6 +31,7 @@ defmodule Gallformers.Import.Batch do
           content: map() | nil,
           status: status() | nil,
           applied_at: DateTime.t() | nil,
+          denied_reason: String.t() | nil,
           package: Package.t() | Ecto.Association.NotLoaded.t(),
           statements: [BatchStatement.t()] | Ecto.Association.NotLoaded.t(),
           unmapped: [BatchUnmapped.t()] | Ecto.Association.NotLoaded.t(),
@@ -50,6 +52,7 @@ defmodule Gallformers.Import.Batch do
       default: :pending
 
     field :applied_at, :utc_datetime
+    field :denied_reason, :string
 
     belongs_to :package, Package
     has_many :statements, BatchStatement
@@ -83,4 +86,14 @@ defmodule Gallformers.Import.Batch do
     do: change(batch, status: :applied, applied_at: DateTime.utc_now(:second))
 
   def status_changeset(batch, status), do: change(batch, status: status)
+
+  @doc "A changeset denying the batch, `reason` (trimmed) required."
+  @spec deny_changeset(t(), String.t() | nil) :: Ecto.Changeset.t()
+  def deny_changeset(batch, reason) do
+    batch
+    |> cast(%{denied_reason: reason && String.trim(reason)}, [:denied_reason])
+    |> validate_required([:denied_reason])
+    |> put_change(:status, :denied)
+    |> check_constraint(:denied_reason, name: :import_batches_denied_check)
+  end
 end

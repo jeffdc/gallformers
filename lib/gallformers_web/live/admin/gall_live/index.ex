@@ -1,277 +1,122 @@
 defmodule GallformersWeb.Admin.GallLive.Index do
   @moduledoc """
-  Admin page for listing and searching galls.
+  The Gall page's search (matter a856, Task 7): Galls found as the global
+  search finds them (`Gallformers.Catalog.search_galls/2` — the name shown,
+  aliases, the Inducer's names), a page at a time, each linking to its Gall
+  page (`GallformersWeb.Admin.GallLive.Edit`). The query is kept in the URL
+  (`?q=`). Galls arrive with imports: there is no "new" and no delete.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Galls
-  alias Gallformers.Species
+  alias Gallformers.Catalog
 
-  @page_size 50
+  @page_size 25
 
   @impl true
-  def mount(_params, session, socket) do
-    current_user = session["current_user"]
-
-    if connected?(socket), do: Species.subscribe()
-
-    socket =
-      socket
-      |> assign(:current_user, current_user)
-      |> assign(:page_title, "Galls")
-      |> assign(:search_query, "")
-      |> assign(:current_page, 1)
-      |> assign(:page_size, @page_size)
-      |> assign(:delete_gall, nil)
-      |> assign(:delete_confirmation, "")
-      |> load_galls()
-
-    {:ok, socket}
+  def mount(_params, _session, socket) do
+    {:ok,
+     socket
+     |> assign(:page_title, "Galls")
+     |> assign(:page_size, @page_size)
+     |> assign(:page, 1)}
   end
 
   @impl true
   def handle_params(params, _url, socket) do
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
-  end
+    query = params["q"] || ""
 
-  defp apply_action(socket, :index, _params) do
-    socket
-    |> assign(:page_title, "Galls")
+    {:noreply,
+     socket
+     |> assign(:query, query)
+     |> assign(:page, 1)
+     |> assign(:results, Catalog.search_galls(query))}
   end
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    {:noreply,
-     socket
-     |> assign(:search_query, query)
-     |> assign(:current_page, 1)
-     |> load_galls()}
+    {:noreply, push_patch(socket, to: ~p"/admin/galls?#{[q: query]}", replace: true)}
   end
 
-  @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    page = max(1, min(page, total_pages(socket)))
-    {:noreply, socket |> assign(:current_page, page) |> load_galls()}
+    page = page |> max(1) |> min(total_pages(length(socket.assigns.results)))
+    {:noreply, assign(socket, :page, page)}
   end
 
-  @impl true
-  def handle_event("delete", %{"id" => id}, socket) do
-    case Species.get_species(String.to_integer(id)) do
-      nil ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Gall already deleted")
-         |> load_galls()}
+  defp total_pages(total), do: max(1, ceil(total / @page_size))
 
-      gall ->
-        {:noreply,
-         socket
-         |> assign(:delete_gall, gall)
-         |> assign(:delete_confirmation, "")}
-    end
-  end
-
-  @impl true
-  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :delete_confirmation, value)}
-  end
-
-  @impl true
-  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
-    selected_gall = socket.assigns.delete_gall
-
-    case selected_gall && Species.get_species(selected_gall.id) do
-      nil ->
-        {:noreply,
-         socket
-         |> assign(:delete_gall, nil)
-         |> assign(:delete_confirmation, "")
-         |> put_flash(:info, "Gall already deleted")
-         |> load_galls()}
-
-      gall when confirmation != gall.name ->
-        {:noreply, put_flash(socket, :error, "Name does not match. Type the exact gall name.")}
-
-      gall ->
-        case Species.delete_species(gall) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> assign(:delete_gall, nil)
-             |> assign(:delete_confirmation, "")
-             |> put_flash(:info, "Gall deleted successfully")
-             |> load_galls()}
-
-          {:error, _changeset} ->
-            {:noreply, put_flash(socket, :error, "Failed to delete gall")}
-        end
-    end
-  end
-
-  @impl true
-  def handle_event("cancel_delete", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:delete_gall, nil)
-     |> assign(:delete_confirmation, "")}
-  end
-
-  @impl true
-  def handle_info({event, _species}, socket)
-      when event in [:species_created, :species_updated, :species_deleted] do
-    {:noreply, load_galls(socket)}
-  end
-
-  defp load_galls(socket) do
-    %{search_query: query, current_page: page, page_size: page_size} = socket.assigns
-    offset = (page - 1) * page_size
-
-    case query do
-      "" ->
-        socket
-        |> assign(:total_count, Galls.count_galls())
-        |> assign(:gall_list, Galls.list_galls_paginated(page_size, offset))
-
-      query ->
-        results =
-          Species.search_species(query, 500)
-          |> Enum.filter(&(&1.taxoncode == "gall"))
-
-        socket
-        |> assign(:total_count, length(results))
-        |> assign(:gall_list, Enum.drop(results, offset) |> Enum.take(page_size))
-    end
-  end
-
-  defp total_pages(socket) do
-    max(1, ceil(socket.assigns.total_count / socket.assigns.page_size))
-  end
+  defp page_of(results, page),
+    do: results |> Enum.drop((page - 1) * @page_size) |> Enum.take(@page_size)
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :total, length(assigns.results))
+
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} page_title="Galls">
       <div class="space-y-6">
-        <%!-- Header with search and new button --%>
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex-1 max-w-xl">
-            <form phx-change="search" phx-submit="search" id="gall-search-form">
-              <.search_input
-                id="gall-search"
-                name="query"
-                value={@search_query}
-                placeholder="Filter galls by name or alias..."
-                phx-debounce="300"
-              />
-            </form>
-          </div>
-          <.link navigate={~p"/admin/galls/new"} class="gf-btn gf-btn-primary">
-            New Gall
-          </.link>
+        <p class="text-sm text-gray-600">
+          Galls arrive with imports. Find one here to edit its editorial fields, its name, its
+          images, its Gallformers note and its range exclusions.
+        </p>
+
+        <div class="max-w-xl">
+          <form id="gall-search-form" phx-change="search" phx-submit="search">
+            <.search_input
+              id="gall-search"
+              name="query"
+              value={@query}
+              placeholder="Search galls by name, alias or inducer..."
+              phx-debounce="300"
+            />
+          </form>
         </div>
 
-        <%!-- Gall list table --%>
         <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table class="gf-table gf-table-dark gf-table-compact">
+          <table id="galls-table" class="gf-table gf-table-dark">
             <thead>
               <tr>
                 <th>Name</th>
-                <th class="text-center w-32">Data Complete</th>
-                <th class="text-center">Actions</th>
+                <th>Also known as</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr :for={gall <- @gall_list}>
+              <tr :for={gall <- page_of(@results, @page)} id={"gall-#{gall.id}"}>
                 <td>
                   <.link
                     navigate={~p"/admin/galls/#{gall.id}"}
-                    class="hover:underline font-medium"
+                    class="hover:underline font-medium italic"
                   >
-                    <.taxon_name name={gall.name} />
+                    {gall.name}
                   </.link>
                 </td>
-                <td class="text-center">
-                  <%= if gall.datacomplete in [true, 1] do %>
-                    <span class="text-green-600">
-                      <.icon name="ph-check" class="size-5 inline-block" />
-                    </span>
-                  <% else %>
-                    <span class="text-red-500">
-                      <.icon name="ph-x" class="size-5 inline-block" />
-                    </span>
-                  <% end %>
-                </td>
-                <td class="text-center">
-                  <.table_actions>
-                    <.action_button
-                      icon="ph-pencil-simple"
-                      label="Edit"
-                      navigate={~p"/admin/galls/#{gall.id}"}
-                      variant="primary"
-                    />
-                    <.action_button
-                      icon="ph-image"
-                      label="Edit Images"
-                      navigate={~p"/admin/images?species_id=#{gall.id}"}
-                    />
-                    <.action_button
-                      icon="gf-host"
-                      label="Map Hosts"
-                      navigate={~p"/admin/gallhost?id=#{gall.id}"}
-                    />
-                    <.action_button
-                      icon="gf-source"
-                      label="Map Sources"
-                      navigate={~p"/admin/species-sources/find?species_id=#{gall.id}"}
-                    />
-                    <.action_button
-                      icon="ph-arrow-square-out"
-                      label="View"
-                      navigate={~p"/gall/#{gall.id}"}
-                    />
-                    <.action_button
-                      icon="ph-trash"
-                      label="Delete"
-                      variant="danger"
-                      phx-click="delete"
-                      phx-value-id={gall.id}
-                    />
-                  </.table_actions>
+                <td class="text-gray-500">{Enum.join(gall.aliases, ", ")}</td>
+                <td>
+                  <.badge :if={gall.undescribed} variant="warning">Undescribed</.badge>
                 </td>
               </tr>
-              <tr :if={@gall_list == []}>
+              <tr :if={@results == []}>
                 <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                  No galls found. Try a different search term.
+                  {if String.trim(@query) == "",
+                    do: "Search for a gall to edit.",
+                    else: "No galls found. Try a different search term."}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <%= if ceil(@total_count / @page_size) > 1 do %>
-          <.pagination
-            page={@current_page}
-            total_pages={ceil(@total_count / @page_size)}
-            total_items={@total_count}
-            page_size={@page_size}
-            on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
-          />
-        <% else %>
-          <p class="text-sm text-gray-500">
-            Showing {@total_count} galls
-          </p>
-        <% end %>
-        <.dangerous_delete_modal
-          :if={@delete_gall}
-          show
-          item_type="gall"
-          item_name={@delete_gall.name}
-          consequences={[
-            "All uploaded images will be deleted from storage.",
-            "Host, source, taxonomy, range, alias, and trait records associated with this gall will be removed."
-          ]}
-          confirmation_value={@delete_confirmation}
+        <.pagination
+          :if={total_pages(@total) > 1}
+          page={@page}
+          total_pages={total_pages(@total)}
+          total_items={@total}
+          page_size={@page_size}
+          on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
         />
+        <p :if={@total > 0 and total_pages(@total) <= 1} class="text-sm text-gray-500">
+          Showing {@total} galls
+        </p>
       </div>
     </Layouts.admin>
     """

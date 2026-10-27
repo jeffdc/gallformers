@@ -46,12 +46,12 @@ defmodule GallformersWeb.E2E.AdminTest do
   #   end
   # end
 
-  # describe "admin host management" do
-  #   test "can view hosts list", %{conn: conn} do
+  # describe "admin taxonomy management" do
+  #   test "can view the taxonomy admin", %{conn: conn} do
   #     conn
   #     |> visit("/auth/test/admin")
-  #     |> visit("/admin/hosts")
-  #     |> assert_has("h1", text: "Hosts")
+  #     |> visit("/admin/taxonomy")
+  #     |> assert_has("h1", text: "Taxonomy")
   #   end
   # end
 end

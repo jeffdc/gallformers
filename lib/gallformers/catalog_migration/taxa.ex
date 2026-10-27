@@ -32,7 +32,10 @@ defmodule Gallformers.CatalogMigration.Taxa do
       stand for their genus taxon, with a `:genus_placeholder` crosswalk
       entry (their species ID → the genus) for their old `/host/:id` URLs.
     * **`host_range`** is re-keyed by `taxon_id`: a plant's rows to its own
-      ID, a genus placeholder's rows to its genus taxon.
+      ID, a genus placeholder's rows to its genus taxon (one row per place:
+      a place two placeholders of one genus both give is re-keyed once).
+    * **WCVP links** — a plant's `host_traits` row (WCVP link, range
+      review) is carried to its taxon's `taxon_wcvp` row.
 
   Taxa are created through `Gallformers.Taxa.create_taxon/2`, which keeps
   the ancestry closure (depth-0 rows included) and validates each parent.
@@ -110,6 +113,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
     {ctx, report} = higher_taxa(actor, decisions, report)
     {ctx, report} = plants(actor, ctx, report)
     report = rekey_host_range(ctx, report)
+    report = carry_wcvp_links(report)
     {ctx, report}
   end
 
@@ -522,11 +526,24 @@ defmodule Gallformers.CatalogMigration.Taxa do
       end
       |> Enum.unzip()
 
+    # A taxon holds a place once (`host_range_taxon_id_place_id_index`): of
+    # the rows several placeholders of one genus give a place, one is
+    # re-keyed (native, then exact, then the lowest species ID).
     Repo.query!(
       """
-      UPDATE host_range hr SET taxon_id = m.taxon_id
-      FROM unnest($1::bigint[], $2::bigint[]) AS m(species_id, taxon_id)
-      WHERE hr.species_id = m.species_id
+      UPDATE host_range hr SET taxon_id = pick.taxon_id
+      FROM (
+        SELECT DISTINCT ON (m.taxon_id, r.place_id) r.species_id, r.place_id, m.taxon_id
+        FROM host_range r
+        JOIN unnest($1::bigint[], $2::bigint[]) AS m(species_id, taxon_id)
+          ON r.species_id = m.species_id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM host_range k WHERE k.taxon_id = m.taxon_id AND k.place_id = r.place_id
+        )
+        ORDER BY m.taxon_id, r.place_id, (r.distribution_type = 'native') DESC,
+                 (r.precision = 'exact') DESC, r.species_id
+      ) pick
+      WHERE hr.species_id = pick.species_id AND hr.place_id = pick.place_id
       """,
       [species_ids, taxon_ids],
       timeout: :infinity
@@ -535,9 +552,19 @@ defmodule Gallformers.CatalogMigration.Taxa do
     total = Old.count("SELECT count(*) FROM host_range")
     keyed = Old.count("SELECT count(*) FROM host_range WHERE taxon_id IS NOT NULL")
 
+    duplicates =
+      Old.count(
+        """
+        SELECT count(*) FROM host_range
+        WHERE species_id = ANY($1::bigint[]) AND taxon_id IS NULL
+        """,
+        [species_ids]
+      )
+
     report
     |> Report.reconcile("Host range rows (re-keyed by taxon)", total, keyed, [
-      {"left without a taxon", total - keyed}
+      {"a placeholder's place its genus already has", duplicates},
+      {"left without a taxon", total - keyed - duplicates}
     ])
     |> Report.count(
       "Host range rows moved from genus placeholders to their genus",
@@ -545,6 +572,40 @@ defmodule Gallformers.CatalogMigration.Taxa do
         "SELECT count(*) FROM host_range WHERE taxon_id IS NOT NULL AND taxon_id <> species_id"
       )
     )
+  end
+
+  # -- WCVP links ------------------------------------------------------------------
+
+  # A plant's `host_traits` row (WCVP link, range review) becomes its
+  # taxon's `taxon_wcvp` row: plants keep their species IDs. A genus
+  # placeholder is no plant taxon, so its row is not carried.
+  defp carry_wcvp_links(report) do
+    Repo.query!(
+      """
+      INSERT INTO taxon_wcvp (taxon_id, wcvp_id, powo_id, wcvp_match_status, range_confirmed,
+                              wcvp_synced_at, inserted_at, updated_at)
+      SELECT ht.species_id, NULLIF(ht.wcvp_id, ''), NULLIF(ht.powo_id, ''),
+             NULLIF(ht.wcvp_match_status, ''), COALESCE(ht.range_confirmed, false),
+             ht.wcvp_synced_at, now()::timestamp(0), now()::timestamp(0)
+      FROM host_traits ht JOIN taxa t ON t.id = ht.species_id
+      """,
+      [],
+      timeout: :infinity
+    )
+
+    total = Old.count("SELECT count(*) FROM host_traits")
+    carried = Old.count("SELECT count(*) FROM taxon_wcvp")
+
+    placeholders =
+      Old.count("""
+      SELECT count(*) FROM host_traits ht JOIN species s ON s.id = ht.species_id
+      WHERE s.genus_placeholder AND NOT EXISTS (SELECT 1 FROM taxa t WHERE t.id = ht.species_id)
+      """)
+
+    Report.reconcile(report, "WCVP links (host_traits by taxon)", total, carried, [
+      {"genus placeholders", placeholders},
+      {"no plant taxon", total - carried - placeholders}
+    ])
   end
 
   # -- helpers ---------------------------------------------------------------------

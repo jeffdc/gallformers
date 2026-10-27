@@ -121,4 +121,40 @@ defmodule Gallformers.Catalog.ReadModels.Current do
     ]
     |> Enum.reduce(select(relationships, [r], r.object_gall_id), &union_all(&2, ^&1))
   end
+
+  @doc """
+  The IDs of the Sources attributing current Facts about Gall `gall_id` (a
+  query selecting Source IDs, each once): the converse of
+  `gall_ids_attributed_by/1` — every gall Fact kind of the Gall, each
+  Relationship naming it (subject, object, context), and the qualifiers of
+  those Relationships.
+  """
+  @spec source_ids_attributing(integer()) :: Ecto.Query.t()
+  def source_ids_attributing(gall_id) do
+    relationships =
+      from(r in RelationshipFact,
+        where:
+          r.subject_gall_id == ^gall_id or r.object_gall_id == ^gall_id or
+            r.gall_context_id == ^gall_id,
+        select: r.fact_id
+      )
+
+    qualifiers =
+      from(q in QualifierFact, where: q.of_fact_id in subquery(relationships), select: q.fact_id)
+
+    fact_ids =
+      for schema <- [TraitFact, RangeFact, OccurrenceFact, AliasFact, DescriptionFact],
+          reduce: union_all(relationships, ^qualifiers) do
+        query ->
+          union_all(query, ^from(t in schema, where: t.gall_id == ^gall_id, select: t.fact_id))
+      end
+
+    from(a in Attribution,
+      join: f in Fact,
+      on: f.id == a.fact_id,
+      where: f.standing == :current and a.fact_id in subquery(fact_ids),
+      distinct: true,
+      select: a.source_id
+    )
+  end
 end

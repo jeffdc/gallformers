@@ -44,7 +44,10 @@ defmodule Gallformers.Facts.EventsTest do
       })
 
     {:ok, source} =
-      Sources.update_source_details(source, %{kind: "publication", authored: authored})
+      Sources.update_source_details(test_actor(), source, %{
+        kind: "publication",
+        authored: authored
+      })
 
     source
   end

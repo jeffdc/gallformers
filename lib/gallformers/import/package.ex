@@ -5,7 +5,8 @@ defmodule Gallformers.Import.Package do
 
     * `status` — `:received` (registered) → `:validated` (phase 4 and the
       readiness gate passed; `:invalid` when they did not) → `:resolving` →
-      `:awaiting_review` → `:approved` or `:denied`.
+      `:awaiting_review` → `:approved` or `:denied` (with `denied_reason`;
+      `Gallformers.Import.deny_package/3`).
     * `problems` — the last validation's problems, as
       `%{"level", "file", "message"}` maps (warnings included).
     * `source_id` — the Source, once matched or created (Task 13).
@@ -34,6 +35,7 @@ defmodule Gallformers.Import.Package do
           submitter_name: String.t() | nil,
           problems: [map()],
           validated_at: DateTime.t() | nil,
+          denied_reason: String.t() | nil,
           batches: [Batch.t()] | Ecto.Association.NotLoaded.t(),
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
@@ -50,6 +52,7 @@ defmodule Gallformers.Import.Package do
     field :submitter_name, :string
     field :problems, {:array, :map}, default: []
     field :validated_at, :utc_datetime
+    field :denied_reason, :string
 
     has_many :batches, Batch
 
@@ -91,4 +94,14 @@ defmodule Gallformers.Import.Package do
   @doc "A changeset changing the package's status."
   @spec status_changeset(t(), status()) :: Ecto.Changeset.t()
   def status_changeset(package, status), do: change(package, status: status)
+
+  @doc "A changeset denying the package, `reason` (trimmed) required."
+  @spec deny_changeset(t(), String.t() | nil) :: Ecto.Changeset.t()
+  def deny_changeset(package, reason) do
+    package
+    |> cast(%{denied_reason: reason && String.trim(reason)}, [:denied_reason])
+    |> validate_required([:denied_reason])
+    |> put_change(:status, :denied)
+    |> check_constraint(:denied_reason, name: :import_packages_denied_check)
+  end
 end

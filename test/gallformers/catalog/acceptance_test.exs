@@ -83,7 +83,7 @@ defmodule Gallformers.Catalog.AcceptanceTest do
     assert standing(only_retracted.fact.id) == :current
 
     notice = source_fixture("Retraction notice", "2021")
-    {:ok, _} = Sources.retract_source(retracted, notice, ~D[2021-06-01])
+    {:ok, _} = Sources.retract_source(test_actor(), retracted, notice, ~D[2021-06-01])
     {:ok, []} = Facts.recompute_for_source(test_actor(), retracted.id)
 
     assert standing(denied.fact.id) == :current

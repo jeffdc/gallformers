@@ -13,7 +13,19 @@ defmodule Gallformers.Sources.Source do
   alias Gallformers.Licenses
   alias Gallformers.Sources.PartialDate
 
-  @required_fields [:title, :author, :pubyear, :link, :citation, :license]
+  @required_fields [:title, :author, :pubyear, :citation, :license]
+
+  # Today's columns, as the old pages wrote them.
+  @citation_fields [
+    :title,
+    :author,
+    :pubyear,
+    :link,
+    :citation,
+    :datacomplete,
+    :license,
+    :licenselink
+  ]
 
   @kinds [:publication, :website, :database, :unpublished, :research_data, :gallformers]
 
@@ -71,7 +83,6 @@ defmodule Gallformers.Sources.Source do
     belongs_to :retracted_by, __MODULE__
 
     has_many :images, Gallformers.Images.Image
-    has_many :species_sources, Gallformers.Species.SpeciesSource
 
     timestamps(type: :utc_datetime)
   end
@@ -80,22 +91,25 @@ defmodule Gallformers.Sources.Source do
   def required_fields, do: @required_fields
 
   @doc """
-  Creates a changeset for a source.
+  Creates the changeset of the Source editor: today's columns (`title`,
+  `author`, `pubyear`, `link`, `citation`, `datacomplete`, `license`,
+  `licenselink`) and the new descriptive fields (`details_changeset/2`)
+  together.
+
+  Today's rules hold: title, author, year, citation and license are
+  required, the year has four digits, links are URLs, titles are unique and
+  a CC license needs its link. A license with a canonical, read-only link
+  (`Gallformers.Licenses.url_readonly?/1`) gets that link whatever was
+  given. `link` may be empty, as on an imported Source that names no URL or
+  DOI. The license is one value: `license_value` follows `license`.
   """
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(source, attrs) do
     source
-    |> cast(attrs, [
-      :title,
-      :author,
-      :pubyear,
-      :link,
-      :citation,
-      :datacomplete,
-      :license,
-      :licenselink
-    ])
+    |> cast(attrs, @citation_fields)
     |> trim_strings()
-    |> normalize_empty_strings([:licenselink])
+    |> put_canonical_license_link()
+    |> normalize_empty_strings([:link, :licenselink])
     |> validate_required(@required_fields)
     |> validate_length(:title, min: 1, max: 500)
     |> validate_format(:pubyear, ~r/^[12][0-9]{3}$/, message: "must be a valid 4-digit year")
@@ -106,6 +120,10 @@ defmodule Gallformers.Sources.Source do
       message: "a source with this title already exists"
     )
     |> unique_constraint(:title, message: "a source with this title already exists")
+    |> then(&details_changeset(&1, Map.drop(attrs, [:license_value, "license_value"])))
+    |> trim_strings()
+    |> validate_url(:url)
+    |> put_license_value()
   end
 
   @doc """
@@ -198,6 +216,20 @@ defmodule Gallformers.Sources.Source do
   end
 
   @doc """
+  Creates a changeset undoing `source`'s retraction: the notice and the date
+  are cleared. A Source that is not retracted is an error.
+  """
+  @spec unretract_changeset(t()) :: Ecto.Changeset.t()
+  def unretract_changeset(%__MODULE__{retracted_by_id: nil} = source) do
+    source
+    |> change()
+    |> add_error(:retracted_by_id, "is not retracted")
+  end
+
+  def unretract_changeset(%__MODULE__{} = source),
+    do: change(source, retracted_by_id: nil, retracted_on: nil)
+
+  @doc """
   The authored date as the partial date it was given (`"1897"`), or nil.
   """
   @spec authored(t()) :: String.t() | nil
@@ -231,6 +263,24 @@ defmodule Gallformers.Sources.Source do
         _ -> cs
       end
     end)
+  end
+
+  defp put_canonical_license_link(changeset) do
+    license = get_field(changeset, :license)
+
+    if Licenses.url_readonly?(license),
+      do: put_change(changeset, :licenselink, Licenses.url(license)),
+      else: changeset
+  end
+
+  defp put_license_value(changeset) do
+    case get_field(changeset, :license) do
+      license when is_binary(license) and license != "" ->
+        put_change(changeset, :license_value, license)
+
+      _ ->
+        changeset
+    end
   end
 
   defp validate_license_link(changeset) do

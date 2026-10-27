@@ -241,6 +241,20 @@ defmodule Gallformers.Catalog.GallIndexTest do
       assert row(gall).host_taxon_ids == [t.oak.id]
     end
 
+    test "a change to a Gall's images refreshes its default image" do
+      gall = gall_fixture()
+      first = image!(gall, 0)
+      refute row(gall)
+
+      assert :ok = Catalog.gall_images_changed(gall.id)
+      assert row(gall).image_id == first
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = Catalog.gall_images_changed(gall.id)
+        assert_enqueued(worker: GallIndexWorker, args: %{gall_id: gall.id}, queue: :catalog)
+      end)
+    end
+
     test "a Host made current, then denied, comes and goes", %{source: source} do
       t = tree()
       gall = gall_fixture()

@@ -23,6 +23,7 @@ defmodule Gallformers.CatalogFixtures do
   alias Gallformers.Catalog
   alias Gallformers.Repo
   alias Gallformers.Sources
+  alias Gallformers.Sources.Source
 
   @doc "Loads the Catalog vocabularies (`Gallformers.Catalog.load_vocab/1`)."
   def load_vocab! do
@@ -149,11 +150,14 @@ defmodule Gallformers.CatalogFixtures do
         license: "Public Domain / Copyright Expired"
       })
 
-    {:ok, source} =
-      Sources.update_source_details(source, %{kind: "publication", authored: authored})
-
-    source
+    set_details!(source, %{kind: "publication", authored: authored})
   end
+
+  # The descriptive fields, written directly rather than through the audited
+  # `Sources.update_source_details/3`, so the fixture names no actor and a
+  # LiveView test can still write as its signed-in user.
+  defp set_details!(source, attrs),
+    do: source |> Source.details_changeset(attrs) |> Repo.update!()
 
   @doc """
   The Gallformers Source. Only one Source may be kind `gallformers`, so a
@@ -171,8 +175,7 @@ defmodule Gallformers.CatalogFixtures do
       })
 
     Repo.query!("UPDATE source SET kind = NULL WHERE kind = 'gallformers'")
-    {:ok, source} = Sources.update_source_details(source, %{kind: "gallformers"})
-    source
+    set_details!(source, %{kind: "gallformers"})
   end
 
   @doc "Attribution attrs for `source` confirming, merged with `extra`."

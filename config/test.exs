@@ -7,11 +7,6 @@ config :gallformers, Oban, testing: :inline
 # Tiles URL for test — matches dev (local file, though tests don't render maps)
 config :gallformers, tiles_url: "/data/boundaries.pmtiles"
 
-# The old-domain admin screens stay on in test so their LiveView and e2e tests
-# keep running until the screens are deleted (matter a856). Off in dev and prod
-# (config.exs). Tests that need them off flip it with Application.put_env/3.
-config :gallformers, legacy_admin_enabled: true
-
 # Run async tasks synchronously to avoid sandbox connection issues
 config :gallformers, async_tasks: false
 

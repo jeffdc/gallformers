@@ -6,14 +6,32 @@ defmodule Gallformers.Import.ReplayEntry do
   be replayed after the cutover data migration (Task 14).
 
   Kinds: `:batch_applied`, `:queue_decision`, `:synonym_added`,
-  `:plant_added`, `:taxonomy_edit`. The log is ordered by `id`.
+  `:plant_added`, `:taxonomy_edit`, `:package_denied`, `:batch_denied`,
+  `:source_edit`. The log is ordered by `id`.
   """
   use Ecto.Schema
   import Ecto.Changeset
 
-  @kinds [:batch_applied, :queue_decision, :synonym_added, :plant_added, :taxonomy_edit]
+  @kinds [
+    :batch_applied,
+    :queue_decision,
+    :synonym_added,
+    :plant_added,
+    :taxonomy_edit,
+    :package_denied,
+    :batch_denied,
+    :source_edit
+  ]
 
-  @type kind :: :batch_applied | :queue_decision | :synonym_added | :plant_added | :taxonomy_edit
+  @type kind ::
+          :batch_applied
+          | :queue_decision
+          | :synonym_added
+          | :plant_added
+          | :taxonomy_edit
+          | :package_denied
+          | :batch_denied
+          | :source_edit
 
   @type t :: %__MODULE__{
           id: integer() | nil,

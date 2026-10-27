@@ -6,6 +6,8 @@ defmodule Gallformers.Wcvp.LookupStub do
     - "500" / "Zzyzx wcvponly" — no-match species for search tests (no distributions)
     - "600" / "Thymus alpinus" — matches seed host 6, with NWY native + ALB introduced
     - "700" / "Wcvptestus alpinus" — for tests that create their own host data
+    - "800" / "Wcvpseedus rangeus" — regions that map to seeded places: California
+      (US-CA) native, Alberta (CA-AB) introduced
   """
   @behaviour Gallformers.Wcvp.LookupBehaviour
 
@@ -47,6 +49,18 @@ defmodule Gallformers.Wcvp.LookupStub do
       taxon_status: "Accepted",
       native_distribution: ["NWY"],
       introduced_distribution: ["ALB"]
+    },
+    "800" => %WcvpName{
+      plant_name_id: "800",
+      taxon_name: "Wcvpseedus rangeus",
+      family: "Seedaceae",
+      genus: "Wcvpseedus",
+      species: "rangeus",
+      taxon_authors: "Test",
+      powo_id: "urn:lsid:ipni.org:names:test800",
+      taxon_status: "Accepted",
+      native_distribution: ["CAL"],
+      introduced_distribution: ["ABT"]
     }
   }
 

@@ -66,6 +66,25 @@ defmodule Gallformers.Taxa.TreePagesTest do
     assert Taxa.children_with_ranks(10) == []
   end
 
+  test "root_taxa/0: the taxa without a parent by name, with ranks and common names" do
+    root = taxon_fixture(name: "Aaaroot#{System.unique_integer([:positive])}", rank: :family)
+    {:ok, _} = Taxa.add_common_name(test_actor(), root, "roots")
+    _child = taxon_fixture(name: "Aaachild", rank: :genus, parent: root)
+
+    roots = Taxa.root_taxa()
+
+    assert %{
+             taxon_id: root.id,
+             name: Taxa.accepted_name(root),
+             rank: :family,
+             common_names: ["roots"]
+           } in roots
+
+    names = Enum.map(roots, & &1.name)
+    assert "Cynipidae" in names
+    refute "Aaachild" in names
+  end
+
   test "count_plants_under/1: plants at species rank or below in each subtree" do
     variety = plant_fixture(name: "Notholithocarpus densiflorus var. echinoides", rank: :variety)
     {:ok, _} = Taxa.place(test_actor(), variety, 10)

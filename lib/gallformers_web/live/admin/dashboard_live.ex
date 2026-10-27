@@ -5,9 +5,9 @@ defmodule GallformersWeb.Admin.DashboardLive do
 
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Galls, Images, Sources}
-  alias Gallformers.Plants
-  alias GallformersWeb.LegacyAdmin
+  alias Gallformers.{Catalog, Images, Import, Sources, Taxa}
+  alias Gallformers.Import.QueueItem
+  alias GallformersWeb.Admin.QueueLive.ItemDecision
 
   @impl true
   def mount(_params, session, socket) do
@@ -16,10 +16,7 @@ defmodule GallformersWeb.Admin.DashboardLive do
     socket =
       socket
       |> assign(:current_user, current_user)
-      # The old-domain screens' cards show as being rebuilt while they are
-      # disabled (matter a856).
-      |> assign(:legacy_off, not LegacyAdmin.enabled?())
-      |> assign(:rebuilt, LegacyAdmin.disabled_message())
+      |> assign_queue()
       |> assign_stats()
 
     {:ok, socket}
@@ -51,74 +48,51 @@ defmodule GallformersWeb.Admin.DashboardLive do
         <h2 class="text-sm font-medium text-gray-500 mb-3">
           Quick Actions
         </h2>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div id="admin-quick-actions" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <.action_card
-            label="Create a New Gall"
-            href="/admin/galls/new"
+            label="Review the Queue"
+            href="/admin/queue"
+            icon="ph-check-circle"
+          />
+          <.action_card
+            label="Find a Gall"
+            href="/admin/galls"
             icon="gf-gall"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
+            accent="blue"
           />
           <.action_card
-            label="Add an Undescribed Gall"
-            href="/admin/galls/undescribed"
-            icon="gf-gall"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
-          />
-          <.action_card
-            label="Create a New Host"
-            href="/admin/hosts/new"
-            icon="gf-host"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
-          />
-          <.action_card
-            label="Create a New Source"
-            href="/admin/sources/new"
+            label="Find a Source"
+            href="/admin/sources"
             icon="gf-source"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
-          />
-          <.action_card
-            label="Manage Gall-Host Associations"
-            href="/admin/gallhost"
-            icon="ph-arrows-left-right"
             accent="blue"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
-          />
-          <.action_card
-            label="Review Gall Ranges"
-            href="/admin/gall-range"
-            icon="ph-map-trifold"
-            accent="blue"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
           />
           <.action_card
             label="Review Host Ranges"
             href="/admin/host-range"
             icon="ph-map-trifold"
             accent="blue"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
           />
-          <.action_card
-            label="Bulk Add Species Descriptions from Sources"
-            href="/admin/species-sources/add"
-            icon="gf-source"
-            accent="blue"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
+        </div>
+      </div>
+
+      <%!-- Review queue: the open items, by kind --%>
+      <div class="mt-8">
+        <h2 class="text-sm font-medium text-gray-500 mb-3">
+          Review Queue
+        </h2>
+        <div id="admin-queue" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <.stat_card
+            title="Open items"
+            value={@queue_total}
+            icon="ph-check-circle"
+            href="/admin/queue"
           />
-          <.action_card
-            label="Find and Edit Species-Source Mappings"
-            href="/admin/species-sources/find"
-            icon="ph-magnifying-glass"
-            accent="blue"
-            disabled={@legacy_off}
-            disabled_message={@rebuilt}
+          <.stat_card
+            :for={{kind, count} <- @queue_counts}
+            title={ItemDecision.kind_label(kind)}
+            value={count}
+            icon="ph-warning-circle"
+            href={"/admin/queue?kind=#{kind}"}
           />
         </div>
       </div>
@@ -132,20 +106,22 @@ defmodule GallformersWeb.Admin.DashboardLive do
           </h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <.action_card
+              label="Create a New Host"
+              href="/admin/taxonomy/new"
+              icon="gf-host"
+              accent="amber"
+            />
+            <.action_card
               label="Create a New Taxon"
               href="/admin/taxonomy/new"
               icon="gf-taxon"
               accent="amber"
-              disabled={@legacy_off}
-              disabled_message={@rebuilt}
             />
             <.action_card
-              label="Section Species"
-              href={~p"/admin/section"}
+              label="Browse Taxonomy"
+              href="/admin/taxonomy"
               icon="gf-taxon"
               accent="amber"
-              disabled={@legacy_off}
-              disabled_message={@rebuilt}
             />
           </div>
         </div>
@@ -174,18 +150,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
               icon="gf-entry"
               accent="green"
             />
-            <.action_card
-              label="Audit Images"
-              href="/admin/image-audit"
-              icon="ph-detective"
-              accent="green"
-              disabled={true}
-              disabled_message={
-                if @legacy_off,
-                  do: @rebuilt,
-                  else: "Disabled for a bit while Jeff looks into performance issues related to it."
-              }
-            />
           </div>
         </div>
       </div>
@@ -201,15 +165,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
               icon="ph-users-three"
               accent="slate"
               small
-            />
-            <.action_card
-              label="Filter Terms"
-              href="/admin/filter-terms"
-              icon="ph-funnel"
-              accent="slate"
-              small
-              disabled={@legacy_off}
-              disabled_message={@rebuilt}
             />
             <.action_card
               label="Jobs Dashboard"
@@ -229,32 +184,31 @@ defmodule GallformersWeb.Admin.DashboardLive do
         </div>
       <% end %>
 
-      <%!-- Stats --%>
-      <%!-- The counts link to the old-domain screens only while those are enabled --%>
+      <%!-- Stats: each links to its list (images have none; they are edited
+           on their Gall's or taxon's page) --%>
       <div id="admin-stats" class="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <.stat_card
           title="Galls"
           value={@stats.gall_count}
           icon="gf-gall"
-          href={if not @legacy_off, do: "/admin/galls"}
+          href="/admin/galls"
         />
         <.stat_card
           title="Hosts"
           value={@stats.host_count}
           icon="gf-host"
-          href={if not @legacy_off, do: "/admin/hosts"}
+          href="/admin/taxonomy"
         />
         <.stat_card
           title="Sources"
           value={@stats.source_count}
           icon="gf-source"
-          href={if not @legacy_off, do: "/admin/sources"}
+          href="/admin/sources"
         />
         <.stat_card
           title="Images"
           value={@stats.image_count}
           icon="ph-image"
-          href={if not @legacy_off, do: "/admin/images"}
         />
       </div>
     </Layouts.admin>
@@ -403,10 +357,21 @@ defmodule GallformersWeb.Admin.DashboardLive do
     """
   end
 
+  # The open queue items' total and their counts by kind, in the kinds' order.
+  defp assign_queue(socket) do
+    counts = Import.count_open_queue_items()
+
+    assign(socket,
+      queue_total: counts |> Map.values() |> Enum.sum(),
+      queue_counts:
+        for(kind <- QueueItem.kinds(), Map.has_key?(counts, kind), do: {kind, counts[kind]})
+    )
+  end
+
   defp assign_stats(socket) do
     stats = %{
-      gall_count: Galls.count_galls(),
-      host_count: Plants.count_hosts(),
+      gall_count: Catalog.count_galls(),
+      host_count: Taxa.count_plants(),
       source_count: Sources.count_sources(),
       image_count: Images.count_images()
     }

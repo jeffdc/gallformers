@@ -106,6 +106,42 @@ defmodule GallformersWeb.GallLiveTest do
     end
   end
 
+  describe "the admin link" do
+    test "an admin gets a link to the Gall page in admin; a visitor does not", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
+      refute has_element?(view, "a[href='/admin/galls/300']")
+
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/gall/300")
+      assert has_element?(view, "a[href='/admin/galls/300']")
+    end
+
+    test "an admin's image edit link goes to the Gall page's images", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
+      refute has_element?(view, "a[href='/admin/galls/300#images']")
+
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/gall/300")
+      assert has_element?(view, "#gall-images a[href='/admin/galls/300#images']")
+    end
+
+    test "a Gall with no images offers an admin to add them on the Gall page", %{conn: conn} do
+      gall = Gallformers.CatalogFixtures.gall_fixture()
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/gall/#{gall.id}")
+
+      assert has_element?(view, "a[href='/admin/galls/#{gall.id}#images']", "Add images")
+    end
+
+    test "no admin link goes to a deleted old screen", %{conn: conn} do
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/gall/300")
+
+      refute has_element?(view, "a[href^='/admin/gallhost']")
+      refute has_element?(view, "a[href^='/admin/images']")
+    end
+  end
+
   describe "undescribed Galls" do
     test "show the undescribed notice, the Code and its iNaturalist link", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/gall/304")

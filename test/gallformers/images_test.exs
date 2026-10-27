@@ -4,6 +4,7 @@ defmodule Gallformers.ImagesTest do
   """
   use Gallformers.DataCase, async: true
 
+  alias Gallformers.CatalogFixtures
   alias Gallformers.Images
   alias Gallformers.Images.Image
 
@@ -22,155 +23,37 @@ defmodule Gallformers.ImagesTest do
     end
   end
 
-  describe "requires_attribution?/1" do
-    test "returns false for Public Domain / CC0" do
-      refute Images.requires_attribution?("Public Domain / CC0")
-    end
-
-    test "returns false for nil" do
-      refute Images.requires_attribution?(nil)
-    end
-
-    test "returns true for CC-BY licenses" do
-      assert Images.requires_attribution?("CC-BY") == true
-      assert Images.requires_attribution?("CC-BY-SA") == true
-      assert Images.requires_attribution?("CC-BY-NC") == true
-      assert Images.requires_attribution?("CC-BY-NC-SA") == true
-      assert Images.requires_attribution?("CC-BY-ND") == true
-      assert Images.requires_attribution?("CC-BY-NC-ND") == true
-    end
-
-    test "returns true for All Rights Reserved" do
-      assert Images.requires_attribution?("All Rights Reserved") == true
-    end
-
-    test "returns false for invalid license strings" do
-      refute Images.requires_attribution?("invalid")
-      refute Images.requires_attribution?("cc-by")
-    end
-  end
-
-  describe "image_attributed?/1" do
-    test "returns true for Public Domain / CC0 without creator" do
-      image = %Image{
-        license: "Public Domain / CC0",
-        creator: nil,
-        source_id: nil,
-        source: nil
-      }
-
-      assert Images.image_attributed?(image) == true
-    end
-
-    test "returns true for CC-BY with creator" do
-      image = %Image{
-        license: "CC-BY",
-        creator: "John Doe",
-        source_id: nil,
-        source: nil
-      }
-
-      assert Images.image_attributed?(image) == true
-    end
-
-    test "returns false for CC-BY without creator" do
-      image = %Image{
-        license: "CC-BY",
-        creator: nil,
-        source_id: nil,
-        source: nil
-      }
-
-      refute Images.image_attributed?(image)
-    end
-
-    test "returns false for CC-BY with empty creator" do
-      image = %Image{
-        license: "CC-BY",
-        creator: "",
-        source_id: nil,
-        source: nil
-      }
-
-      refute Images.image_attributed?(image)
-    end
-
-    test "returns false for CC-BY with whitespace-only creator" do
-      image = %Image{
-        license: "CC-BY",
-        creator: "   ",
-        source_id: nil,
-        source: nil
-      }
-
-      refute Images.image_attributed?(image)
-    end
-
-    test "returns false for no license" do
-      image = %Image{
-        license: nil,
-        creator: "John Doe",
-        source_id: nil,
-        source: nil
-      }
-
-      refute Images.image_attributed?(image)
-    end
-
-    test "returns true for image with source that has license" do
-      source = %Gallformers.Sources.Source{
-        id: 1,
-        license: "CC-BY"
-      }
-
-      image = %Image{
-        license: nil,
-        creator: nil,
-        source_id: 1,
-        source: source
-      }
-
-      assert Images.image_attributed?(image) == true
-    end
-  end
-
-  describe "list_unattributed_images/1" do
-    test "returns empty list and zero count with no images seeded" do
-      {images, count} = Images.list_unattributed_images()
-      assert images == []
-      assert count == 0
-    end
-
-    test "respects pagination options" do
-      {images, _count} = Images.list_unattributed_images(page: 1, per_page: 5)
-      assert length(images) <= 5
-    end
-  end
-
-  describe "count_unattributed_images/0" do
-    test "returns zero with no images seeded" do
-      assert Images.count_unattributed_images() == 0
-    end
-  end
-
-  describe "finalize_upload/3,4" do
+  describe "finalize_upload/4 for an owner" do
     setup do
-      species = Gallformers.Repo.one!(from s in Gallformers.Species.Species, limit: 1)
-      %{species: species}
+      %{gall: CatalogFixtures.gall_fixture(), plant: CatalogFixtures.plant_fixture()}
     end
 
-    test "creates image record with correct attributes", %{species: species} do
-      path = "gall/#{species.id}/#{species.id}_123_456_original.jpg"
+    test "creates a Gall's image with no species", %{gall: gall} do
+      path = "gall/#{gall.id}/#{gall.id}_123_456_original.jpg"
 
-      assert {:ok, image} = Images.finalize_upload(path, species.id, "testuser")
+      assert {:ok, image} = Images.finalize_upload(path, {:gall, gall.id}, "testuser")
       assert image.path == path
-      assert image.species_id == species.id
+      assert image.gall_id == gall.id
+      assert image.taxon_id == nil
+      assert image.species_id == nil
       assert image.uploader == "testuser"
       assert image.lastchangedby == "testuser"
+      assert [%{id: id}] = Images.list_images_for_gall(gall.id)
+      assert id == image.id
     end
 
-    test "accepts extra metadata attrs", %{species: species} do
-      path = "gall/#{species.id}/#{species.id}_123_456_original.jpg"
+    test "creates a taxon's image", %{plant: plant} do
+      path = "gall/#{plant.id}/#{plant.id}_123_456_original.jpg"
+
+      assert {:ok, image} = Images.finalize_upload(path, {:taxon, plant.id}, "testuser")
+      assert image.taxon_id == plant.id
+      assert image.gall_id == nil
+      assert [%{id: id}] = Images.list_images_for_taxon(plant.id)
+      assert id == image.id
+    end
+
+    test "accepts extra metadata attrs", %{gall: gall} do
+      path = "gall/#{gall.id}/#{gall.id}_123_456_original.jpg"
 
       attrs = %{
         creator: "janedoe - Jane Doe",
@@ -179,33 +62,104 @@ defmodule Gallformers.ImagesTest do
         sourcelink: "https://www.inaturalist.org/observations/12345"
       }
 
-      assert {:ok, image} = Images.finalize_upload(path, species.id, "testuser", attrs)
+      assert {:ok, image} = Images.finalize_upload(path, {:gall, gall.id}, "testuser", attrs)
       assert image.creator == "janedoe - Jane Doe"
       assert image.license == "CC-BY-NC"
       assert image.sourcelink == "https://www.inaturalist.org/observations/12345"
     end
 
-    test "assigns next sort_order", %{species: species} do
-      path1 = "gall/#{species.id}/#{species.id}_1_1_original.jpg"
-      path2 = "gall/#{species.id}/#{species.id}_2_2_original.jpg"
+    test "appends to its owner's images only", %{gall: gall, plant: plant} do
+      other = CatalogFixtures.gall_fixture()
 
-      {:ok, img1} = Images.finalize_upload(path1, species.id, "testuser")
-      {:ok, img2} = Images.finalize_upload(path2, species.id, "testuser")
+      {:ok, first} = Images.finalize_upload(unique_path(gall.id), {:gall, gall.id}, "u")
+      {:ok, second} = Images.finalize_upload(unique_path(gall.id), {:gall, gall.id}, "u")
+      {:ok, other_first} = Images.finalize_upload(unique_path(other.id), {:gall, other.id}, "u")
+      {:ok, plant_first} = Images.finalize_upload(unique_path(plant.id), {:taxon, plant.id}, "u")
 
-      assert img2.sort_order > img1.sort_order
+      assert {first.sort_order, second.sort_order} == {0, 1}
+      assert other_first.sort_order == 0
+      assert plant_first.sort_order == 0
+    end
+
+    test "fails for an owner that does not exist" do
+      assert {:error, changeset} =
+               Images.finalize_upload(unique_path(1), {:gall, 999_999_999}, "u")
+
+      assert %{gall_id: [_]} = errors_on(changeset)
     end
   end
 
+  describe "an image's owner" do
+    setup do
+      %{gall: CatalogFixtures.gall_fixture(), plant: CatalogFixtures.plant_fixture()}
+    end
+
+    test "create_image/1 takes the owner from gall_id or taxon_id", %{gall: gall, plant: plant} do
+      assert {:ok, %{gall_id: gall_id}} =
+               Images.create_image(%{gall_id: gall.id, path: unique_path(gall.id)})
+
+      assert {:ok, %{taxon_id: taxon_id}} =
+               Images.create_image(%{taxon_id: plant.id, path: unique_path(plant.id)})
+
+      assert {gall_id, taxon_id} == {gall.id, plant.id}
+    end
+
+    test "create_image/1 refuses an image with no owner" do
+      assert {:error, changeset} = Images.create_image(%{path: unique_path(1)})
+      assert %{gall_id: ["must belong to exactly one Gall or taxon"]} = errors_on(changeset)
+    end
+
+    test "create_image/1 refuses an image with two owners", %{gall: gall, plant: plant} do
+      assert {:error, changeset} =
+               Images.create_image(%{
+                 gall_id: gall.id,
+                 taxon_id: plant.id,
+                 path: unique_path(gall.id)
+               })
+
+      assert %{gall_id: ["must belong to exactly one Gall or taxon"]} = errors_on(changeset)
+    end
+
+    test "Image.changeset/2 requires exactly one owner but no species", %{gall: gall} do
+      assert %{valid?: true} = Image.changeset(%Image{}, %{gall_id: gall.id, path: "p"})
+      refute Image.changeset(%Image{}, %{path: "p"}).valid?
+      refute Image.changeset(%Image{}, %{gall_id: gall.id, taxon_id: gall.id, path: "p"}).valid?
+    end
+
+    test "list_images/1 lists by owner", %{gall: gall, plant: plant} do
+      {:ok, gall_image} = Images.finalize_upload(unique_path(gall.id), {:gall, gall.id}, "u")
+      {:ok, plant_image} = Images.finalize_upload(unique_path(plant.id), {:taxon, plant.id}, "u")
+
+      assert Enum.map(Images.list_images({:gall, gall.id}), & &1.id) == [gall_image.id]
+      assert Enum.map(Images.list_images({:taxon, plant.id}), & &1.id) == [plant_image.id]
+    end
+
+    test "reorder_images/2 orders the owner's images and leaves others alone", %{gall: gall} do
+      other = CatalogFixtures.gall_fixture()
+      {:ok, a} = Images.finalize_upload(unique_path(gall.id), {:gall, gall.id}, "u")
+      {:ok, b} = Images.finalize_upload(unique_path(gall.id), {:gall, gall.id}, "u")
+      {:ok, foreign} = Images.finalize_upload(unique_path(other.id), {:gall, other.id}, "u")
+
+      assert :ok = Images.reorder_images({:gall, gall.id}, [b.id, foreign.id, a.id])
+
+      assert Enum.map(Images.list_images({:gall, gall.id}), &{&1.id, &1.sort_order}) ==
+               [{b.id, 0}, {a.id, 2}]
+
+      assert Images.get_image!(foreign.id).sort_order == 0
+    end
+  end
+
+  defp unique_path(id), do: "gall/#{id}/#{id}_#{System.unique_integer([:positive])}_original.jpg"
+
   describe "copy_metadata/3" do
     setup do
-      # Get a real species from test seeds
-      species = Gallformers.Repo.one!(from s in Gallformers.Species.Species, limit: 1)
+      gall = CatalogFixtures.gall_fixture()
 
       # Create source image with full metadata
       {:ok, source} =
         Images.create_image(%{
-          species_id: species.id,
-          path: "gall/#{species.id}/#{species.id}_source_original.jpg",
+          gall_id: gall.id,
+          path: "gall/#{gall.id}/#{gall.id}_source_original.jpg",
           creator: "Source Creator",
           license: "CC-BY",
           licenselink: "https://creativecommons.org/licenses/by/4.0/",
@@ -219,16 +173,16 @@ defmodule Gallformers.ImagesTest do
       # Create target images with no metadata
       {:ok, target1} =
         Images.create_image(%{
-          species_id: species.id,
-          path: "gall/#{species.id}/#{species.id}_target1_original.jpg",
+          gall_id: gall.id,
+          path: "gall/#{gall.id}/#{gall.id}_target1_original.jpg",
           uploader: "test",
           lastchangedby: "test"
         })
 
       {:ok, target2} =
         Images.create_image(%{
-          species_id: species.id,
-          path: "gall/#{species.id}/#{species.id}_target2_original.jpg",
+          gall_id: gall.id,
+          path: "gall/#{gall.id}/#{gall.id}_target2_original.jpg",
           uploader: "test",
           lastchangedby: "test"
         })

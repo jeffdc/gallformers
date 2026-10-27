@@ -41,6 +41,24 @@ defmodule Gallformers.Taxa.ReadModels.Browse do
     )
   end
 
+  @doc "The taxa with no parent (the tree's roots), by name, as `children_with_ranks/1` gives taxa."
+  @spec roots() :: [child()]
+  def roots do
+    roots =
+      Repo.all(
+        from(t in Taxon,
+          join: n in TaxonName,
+          on: n.taxon_id == t.id and n.status == :accepted,
+          where: is_nil(t.parent_id),
+          order_by: [n.name, t.id],
+          select: %{taxon_id: t.id, name: n.name, rank: t.rank}
+        )
+      )
+
+    names = roots |> Enum.map(& &1.taxon_id) |> common_names()
+    Enum.map(roots, &Map.put(&1, :common_names, Map.get(names, &1.taxon_id, [])))
+  end
+
   @doc "The taxa directly under `taxon_id`, by name, with their ranks and common names."
   @spec children_with_ranks(integer()) :: [child()]
   def children_with_ranks(taxon_id) when is_integer(taxon_id),

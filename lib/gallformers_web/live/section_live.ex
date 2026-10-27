@@ -111,6 +111,10 @@ defmodule GallformersWeb.SectionLive do
                 <h1 class="text-2xl font-bold text-gf-maroon">
                   Section {format_full_name(@section.name, @section.description)}
                 </h1>
+                <RankPageComponents.admin_edit_link
+                  current_user={@current_user}
+                  taxon_id={@section.id}
+                />
               </div>
             </div>
 

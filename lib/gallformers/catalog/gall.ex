@@ -14,7 +14,8 @@ defmodule Gallformers.Catalog.Gall do
       taxon, rendered "(on Quercus douglasii)") and `descriptor` (an
       undescribed Gall's, e.g. `q-havardii-cup-gall`).
     * `gallformers_code`, `abundance_id`, `datacomplete` — editorial
-      carry-overs from today's gall rows.
+      carry-overs from today's gall rows, edited with
+      `Gallformers.Catalog.update_gall_editorial/3`.
     * `default_source_id` — the Source the Gall page leads with (`803b`
       decision 3): today's default description (`useasdefault`), a
       citation or the Gallformers note alike. Editorial, nullable.
@@ -109,6 +110,24 @@ defmodule Gallformers.Catalog.Gall do
     |> trim_names()
     |> validate_host_qualifier()
     |> name_constraints()
+  end
+
+  @doc """
+  A changeset for a deliberate edit of a Gall's editorial fields
+  (`gallformers_code`, `abundance_id`, `datacomplete`, `default_source_id`);
+  nothing else. A blank code is nil. The caller enforces the rules that
+  need the Gall's Facts and Sources
+  (`Gallformers.Catalog.update_gall_editorial/3`).
+  """
+  @spec editorial_changeset(t(), map()) :: Ecto.Changeset.t()
+  def editorial_changeset(gall, attrs) do
+    gall
+    |> cast(attrs, [:gallformers_code, :abundance_id, :datacomplete, :default_source_id])
+    |> update_change(:gallformers_code, &trim/1)
+    |> validate_required([:datacomplete])
+    |> unique_constraint(:gallformers_code, name: :galls_gallformers_code_index)
+    |> foreign_key_constraint(:abundance_id)
+    |> foreign_key_constraint(:default_source_id)
   end
 
   @doc """

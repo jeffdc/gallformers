@@ -5,7 +5,6 @@ defmodule Gallformers.SourcesTest do
   use Gallformers.DataCase, async: true
 
   alias Gallformers.Sources
-  alias Gallformers.Species.Species
 
   describe "list_sources_by_id/1" do
     test "the Sources with the given IDs, by ID; unknown IDs are left out" do
@@ -14,46 +13,35 @@ defmodule Gallformers.SourcesTest do
     end
   end
 
-  describe "has_sources?/1" do
-    test "returns false when species has no sources" do
-      {:ok, species} =
-        Repo.insert(%Species{
-          name: "Sourceless species",
-          taxoncode: "gall",
-          datacomplete: false
-        })
+  describe "list_sources_page/1" do
+    test "a page of the Sources whose title or author matches, by title, and the count" do
+      prefix = "Paged #{System.unique_integer([:positive])}"
 
-      refute Sources.has_sources?(species.id)
-    end
+      for n <- [3, 1, 2] do
+        {:ok, _} =
+          Sources.create_source(%{
+            title: "#{prefix} #{n}",
+            author: "Author #{n}",
+            pubyear: "2024",
+            citation: "Citation #{n}",
+            license: "All Rights Reserved"
+          })
+      end
 
-    test "returns true when species has at least one source" do
-      {:ok, species} =
-        Repo.insert(%Species{
-          name: "Sourced species",
-          taxoncode: "gall",
-          datacomplete: false
-        })
+      assert %{entries: [first, second], total: 3} =
+               Sources.list_sources_page(query: prefix, page: 1, page_size: 2)
 
-      {:ok, source} =
-        Sources.create_source(%{
-          title: "Test Source",
-          author: "Author",
-          pubyear: "2024",
-          link: "http://example.com",
-          citation: "Test citation",
-          license: "CC BY"
-        })
+      assert {first.title, second.title} == {"#{prefix} 1", "#{prefix} 2"}
 
-      {:ok, _} =
-        Sources.create_species_source(%{
-          species_id: species.id,
-          source_id: source.id,
-          description: "",
-          externallink: "",
-          useasdefault: false
-        })
+      assert %{entries: [third], total: 3} =
+               Sources.list_sources_page(
+                 query: " #{String.upcase(prefix)} ",
+                 page: 2,
+                 page_size: 2
+               )
 
-      assert Sources.has_sources?(species.id) == true
+      assert third.title == "#{prefix} 3"
+      assert %{total: 0} = Sources.list_sources_page(query: "#{prefix} nothing")
     end
   end
 end

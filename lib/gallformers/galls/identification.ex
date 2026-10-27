@@ -5,20 +5,17 @@ defmodule Gallformers.Galls.Identification do
 
   The ID tool reads `Gallformers.Catalog.identify/1` now; this filter is
   kept only for `mix gallformers.catalog.id_parity`, which compares the two
-  until the cutover. All public access goes through `Gallformers.Galls`.
+  until the cutover. The old domain's schemas are gone, so it reads the old
+  tables (`species`, `gall_traits`, `gallhost`, `species_taxonomy`,
+  `taxonomy`, the trait junction tables, `gall_range`, `host_range`,
+  `image`) by name.
   """
 
   import Ecto.Query
 
-  alias Gallformers.FilterFields.Form
-  alias Gallformers.Galls
-  alias Gallformers.Galls.{GallHost, GallTraits}
   alias Gallformers.Images.Image
   alias Gallformers.Places
-  alias Gallformers.Ranges
   alias Gallformers.Repo
-  alias Gallformers.Species.Species, as: SpeciesSchema
-  alias Gallformers.Taxonomy.Tree
 
   @doc """
   Filters galls based on the provided criteria.
@@ -74,8 +71,8 @@ defmodule Gallformers.Galls.Identification do
   # Private helpers
 
   defp base_query do
-    from s in SpeciesSchema,
-      join: gt in GallTraits,
+    from s in "species",
+      join: gt in "gall_traits",
       on: gt.species_id == s.id,
       where: s.taxoncode == "gall",
       distinct: true
@@ -100,7 +97,7 @@ defmodule Gallformers.Galls.Identification do
 
   defp apply_host_filter(query, host_ids) do
     from [s, gt] in query,
-      join: h in GallHost,
+      join: h in "gallhost",
       on: h.gall_species_id == s.id,
       where: h.host_species_id in ^host_ids
   end
@@ -109,9 +106,9 @@ defmodule Gallformers.Galls.Identification do
 
   defp apply_genus_filter(query, genus_id) do
     from [s, gt] in query,
-      join: h in GallHost,
+      join: h in "gallhost",
       on: h.gall_species_id == s.id,
-      join: host_species in SpeciesSchema,
+      join: host_species in "species",
       on: h.host_species_id == host_species.id,
       join: st in "species_taxonomy",
       on: st.species_id == host_species.id,
@@ -121,12 +118,33 @@ defmodule Gallformers.Galls.Identification do
   defp apply_family_filter(query, nil), do: query
 
   defp apply_family_filter(query, family_id) do
-    genus_ids = Tree.genus_ids_for_family(family_id)
+    genus_ids = genus_ids_for_family(family_id)
 
     from [s, gt] in query,
       join: st in "species_taxonomy",
       on: st.species_id == s.id,
       where: st.taxonomy_id in ^genus_ids
+  end
+
+  # The genera under a family in the old `taxonomy` table, through any
+  # intermediate ranks.
+  defp genus_ids_for_family(family_id) do
+    query = """
+    WITH RECURSIVE descendants AS (
+      SELECT id, type FROM taxonomy WHERE parent_id = $1::bigint
+      UNION ALL
+      SELECT t.id, t.type
+      FROM taxonomy t
+      JOIN descendants d ON t.parent_id = d.id
+      WHERE d.type != 'genus'
+    )
+    SELECT id FROM descendants WHERE type = 'genus'
+    """
+
+    case Repo.query(query, [family_id]) do
+      {:ok, %{rows: rows}} -> Enum.map(rows, fn [id] -> id end)
+      {:error, _} -> []
+    end
   end
 
   defp apply_plant_part_filter(query, nil, _logic), do: query
@@ -284,7 +302,7 @@ defmodule Gallformers.Galls.Identification do
     # See matter 53cb.
     galls_with_placeholder_in_genus =
       from(gh in "gallhost",
-        join: hs in SpeciesSchema,
+        join: hs in "species",
         on: hs.id == gh.host_species_id,
         join: st in "species_taxonomy",
         on: st.species_id == hs.id,
@@ -303,9 +321,7 @@ defmodule Gallformers.Galls.Identification do
 
   defp place_filter_subqueries(place_codes) do
     # Resolve place codes to IDs, then expand hierarchy in both directions
-    place_ids =
-      Enum.map(place_codes, &Ranges.get_place_id_by_code/1)
-      |> Enum.reject(&is_nil/1)
+    place_ids = place_ids(place_codes)
 
     # Descendant IDs: when user selects "US", include all US states
     descendant_ids = Enum.flat_map(place_ids, &Places.descendant_ids/1) |> Enum.uniq()
@@ -342,6 +358,9 @@ defmodule Gallformers.Galls.Identification do
     {galls_with_range_match, galls_with_host_fallback}
   end
 
+  defp place_ids(place_codes),
+    do: Repo.all(from(p in "place", where: p.code in ^place_codes, select: type(p.id, :integer)))
+
   defp apply_undescribed_filter(query, nil), do: query
   defp apply_undescribed_filter(query, false), do: query
 
@@ -356,7 +375,7 @@ defmodule Gallformers.Galls.Identification do
   defp apply_exclude_non_gall_filter(query, true) do
     non_gall_species_ids =
       from(gf in "gall_form",
-        join: f in Form,
+        join: f in "form",
         on: f.id == gf.form_id,
         where: f.form == "non-gall",
         select: gf.species_id
@@ -371,10 +390,10 @@ defmodule Gallformers.Galls.Identification do
 
     non_gall_species_ids =
       from(gf in "gall_form",
-        join: f in Form,
+        join: f in "form",
         on: f.id == gf.form_id,
         where: gf.species_id in ^gall_ids and f.form == "non-gall",
-        select: gf.species_id
+        select: type(gf.species_id, :integer)
       )
       |> Repo.all()
       |> MapSet.new()
@@ -386,7 +405,7 @@ defmodule Gallformers.Galls.Identification do
 
   defp attach_images(galls) do
     image_map =
-      Galls.get_default_gall_images()
+      default_gall_images()
       |> Enum.into(%{}, fn %{species_id: id, path: path} -> {id, path} end)
 
     base_url = Image.base_url()
@@ -403,14 +422,29 @@ defmodule Gallformers.Galls.Identification do
     end)
   end
 
+  # The first image (by sort_order) of each gall species.
+  defp default_gall_images do
+    from(i in "image",
+      join: s in "species",
+      on: i.species_id == s.id,
+      where: s.taxoncode == "gall",
+      where:
+        fragment(
+          "? = (SELECT MIN(i2.sort_order) FROM image i2 WHERE i2.species_id = ?)",
+          i.sort_order,
+          i.species_id
+        ),
+      select: %{species_id: type(i.species_id, :integer), path: type(i.path, :string)}
+    )
+    |> Repo.all()
+  end
+
   defp attach_place_match(galls, nil), do: galls
   defp attach_place_match(galls, []), do: galls
 
   defp attach_place_match(galls, place_codes) do
     # Resolve place codes to IDs for hierarchy expansion
-    place_ids =
-      Enum.map(place_codes, &Ranges.get_place_id_by_code/1)
-      |> Enum.reject(&is_nil/1)
+    place_ids = place_ids(place_codes)
 
     # Descendant IDs: exact matches for the selected place and its subdivisions
     descendant_ids = Enum.flat_map(place_ids, &Places.descendant_ids/1) |> Enum.uniq()

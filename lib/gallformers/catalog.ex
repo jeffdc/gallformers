@@ -4,10 +4,10 @@ defmodule Gallformers.Catalog do
   them, the Trait vocabularies, generation groups and the Relationship-type
   list.
 
-  This is the new gall system. It lives beside today's `Gallformers.Galls`
-  (old `species`, `gall_traits`, `gallhost`, … tables) until the public
-  pages are re-pointed; nothing here reads or writes the old gall tables.
-  It reads `host_range` (by its `taxon_id`, filled by the data migration)
+  This is the new gall system; nothing here reads or writes the old gall
+  tables (`species`, `gall_traits`, `gallhost`, …), which only the data
+  migration and the old ID filter (`Gallformers.Galls.Identification`, kept
+  for `mix gallformers.catalog.id_parity` until the cutover) read. It reads `host_range` (by its `taxon_id`, filled by the data migration)
   and `place` for potential ranges. Today's record-level citations,
   carried over by the data migration until the backscan replaces them,
   are `Gallformers.Catalog.LegacyCitation`s (not Facts).
@@ -102,9 +102,13 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Catalog.Vocab.Loader
   alias Gallformers.Catalog.Vocab.TraitValue
+  alias Gallformers.Facts
+  alias Gallformers.Facts.Attribution
+  alias Gallformers.Places.Place
   alias Gallformers.Ranges.DisplayRange
   alias Gallformers.Repo
   alias Gallformers.Sources
+  alias Gallformers.Sources.Source
 
   # -- vocabularies ------------------------------------------------------------
 
@@ -181,6 +185,13 @@ defmodule Gallformers.Catalog do
   @spec get_gall!(integer()) :: Gall.t()
   def get_gall!(id), do: Repo.get!(Gall, id)
 
+  @doc "The Galls with the given IDs, by name (IDs with no Gall are left out)."
+  @spec list_galls_by_id([integer()]) :: [Gall.t()]
+  def list_galls_by_id([]), do: []
+
+  def list_galls_by_id(ids) when is_list(ids),
+    do: Repo.all(from(g in Gall, where: g.id in ^Enum.uniq(ids), order_by: [g.name, g.id]))
+
   # -- Gall names (`Gallformers.Catalog.GallName`) -----------------------------
 
   @doc """
@@ -244,6 +255,190 @@ defmodule Gallformers.Catalog do
               reason: reason
             )
     end
+  end
+
+  # -- Gall images ---------------------------------------------------------------
+
+  @doc """
+  Gall `gall_id`'s images changed (`Gallformers.Images`: added, reordered or
+  deleted): the ID tool's lookup table row, which stores the Gall's default
+  image, is refreshed. The Images context cannot call the Catalog, so the
+  screen that changed them calls this.
+  """
+  @spec gall_images_changed(integer()) :: :ok
+  def gall_images_changed(gall_id) when is_integer(gall_id),
+    do: GallIndex.enqueue_refresh([gall_id])
+
+  # -- Gall editorial fields ---------------------------------------------------
+
+  @typedoc """
+  Why a Gall's `datacomplete` is locked false: it has no Sources
+  (`gall_sources/1`), or it is undescribed (no current Inducer at species
+  rank or below).
+  """
+  @type datacomplete_lock_reason :: :no_sources | :undescribed
+
+  @datacomplete_locked %{
+    no_sources: "cannot be true: the Gall has no Sources (citations, notes or current Facts)",
+    undescribed: "cannot be true: the Gall is undescribed (no current species-rank Inducer)"
+  }
+
+  @doc """
+  A curator's edit of Gall `gall`'s editorial fields (the Gall page).
+  `attrs` (atom or string keys, as a form sends them) may set:
+
+    * `gallformers_code` — unique among Galls (the
+      `galls_gallformers_code_index`; `gallformers_code_taken?/2` checks it
+      live); surrounding blanks are trimmed and a blank code clears it;
+    * `abundance_id`;
+    * `datacomplete` — refused true while it is locked
+      (`datacomplete_lock/1`). The value saved is checked, so a locked Gall
+      stored as complete saves only with it cleared;
+    * `default_source_id` — the Source the Gall page leads with, one of the
+      Gall's Sources (`gall_sources/1`); blank clears it.
+
+  Nothing else (names have `update_name_parts/3`). One audited transaction;
+  `{:error, changeset}` changes nothing. The ID tool's lookup table
+  (`gall_index`) stores none of these fields, so it is not refreshed.
+  """
+  @spec update_gall_editorial(Actor.t(), Gall.t(), map()) ::
+          {:ok, Gall.t()} | {:error, Changeset.t()}
+  def update_gall_editorial(%Actor{} = actor, %Gall{id: id}, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "catalog.update_gall_editorial", fn ->
+      gall = Repo.one!(from(g in Gall, where: g.id == ^id, lock: "FOR UPDATE"))
+
+      changeset =
+        gall
+        |> Gall.editorial_changeset(attrs)
+        |> validate_datacomplete_lock()
+        |> validate_lead_source()
+
+      case Repo.update(changeset) do
+        {:ok, updated} -> updated
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc "A changeset of Gall `gall`'s editorial fields, for a form (`update_gall_editorial/3`)."
+  @spec change_gall_editorial(Gall.t(), map()) :: Changeset.t()
+  def change_gall_editorial(%Gall{} = gall, attrs \\ %{}),
+    do: Gall.editorial_changeset(gall, attrs)
+
+  @doc "A changeset of Gall `gall`'s name parts, for a form (`update_name_parts/3`)."
+  @spec change_name_parts(Gall.t(), map()) :: Changeset.t()
+  def change_name_parts(%Gall{} = gall, attrs \\ %{}), do: Gall.name_parts_changeset(gall, attrs)
+
+  @doc "The abundance choices (`abundance_id`), by ID, as `%{id, abundance}`."
+  @spec list_abundances() :: [%{id: integer(), abundance: String.t()}]
+  def list_abundances,
+    do:
+      Repo.all(
+        from(a in "abundance", order_by: a.id, select: %{id: a.id, abundance: a.abundance})
+      )
+
+  defp validate_datacomplete_lock(changeset) do
+    with true <- Changeset.get_field(changeset, :datacomplete),
+         {:locked, reason} <- datacomplete_lock(changeset.data) do
+      Changeset.add_error(changeset, :datacomplete, @datacomplete_locked[reason], lock: reason)
+    else
+      _ -> changeset
+    end
+  end
+
+  defp validate_lead_source(changeset) do
+    case Changeset.get_change(changeset, :default_source_id) do
+      nil ->
+        changeset
+
+      source_id ->
+        if source_id in gall_source_ids(changeset.data.id),
+          do: changeset,
+          else:
+            Changeset.add_error(
+              changeset,
+              :default_source_id,
+              "must be one of the Gall's Sources"
+            )
+    end
+  end
+
+  @doc """
+  Whether Gall `gall`'s `datacomplete` is locked false, and why
+  (`t:datacomplete_lock_reason/0`): `:no_sources` is checked first.
+  `update_gall_editorial/3` enforces it; a form shows it.
+  """
+  @spec datacomplete_lock(Gall.t()) :: :unlocked | {:locked, datacomplete_lock_reason()}
+  def datacomplete_lock(%Gall{id: id}) do
+    cond do
+      gall_source_ids(id) == [] -> {:locked, :no_sources}
+      match?([%{undescribed: true}], add_undescribed([%{id: id}])) -> {:locked, :undescribed}
+      true -> :unlocked
+    end
+  end
+
+  @doc """
+  Gall `gall_id`'s Sources, by title: those citing it (legacy citations),
+  the Source of its Gallformers notes, and those attributing current Facts
+  about it (`Gallformers.Catalog.ReadModels.Current.source_ids_attributing/1`),
+  each once. Its lead Source (`default_source_id`) is one of them; the Gall
+  page lists the citations, the note and the lead Source (`gall_page/1`).
+  """
+  @spec gall_sources(integer()) :: [Source.t()]
+  def gall_sources(gall_id) when is_integer(gall_id) do
+    gall_id
+    |> gall_source_ids()
+    |> Sources.list_sources_by_id()
+    |> Enum.sort_by(&{&1.title, &1.id})
+  end
+
+  defp gall_source_ids(gall_id) do
+    cited = Repo.all(from(c in LegacyCitation, where: c.gall_id == ^gall_id, select: c.source_id))
+    noted = gall_id |> Sources.list_gall_notes() |> Enum.map(& &1.source_id)
+    attributing = gall_id |> Current.source_ids_attributing() |> Repo.all()
+
+    Enum.uniq(cited ++ noted ++ attributing)
+  end
+
+  @typedoc """
+  A current range adjustment of a Gall (`list_range_adjustments/1`), with
+  its place and the attributions of its Fact.
+  """
+  @type range_adjustment :: %{
+          fact_id: integer(),
+          adjustment: :exclude | :only,
+          place_id: integer(),
+          place_code: String.t(),
+          place_name: String.t(),
+          attributions: [Attribution.t()]
+        }
+
+  @doc """
+  Gall `gall_id`'s current range adjustments (`exclude` / `only` range
+  Facts, `assert_range/3`), by place code, each with its place and its
+  Fact's attributions.
+  """
+  @spec list_range_adjustments(integer()) :: [range_adjustment()]
+  def list_range_adjustments(gall_id) when is_integer(gall_id) do
+    adjustments =
+      from(r in Current.range_adjustments(gall_id),
+        join: p in Place,
+        on: p.id == r.place_id,
+        order_by: [p.code, r.fact_id],
+        select: %{
+          fact_id: r.fact_id,
+          adjustment: r.adjustment,
+          place_id: p.id,
+          place_code: p.code,
+          place_name: p.name
+        }
+      )
+      |> Repo.all()
+
+    attributions =
+      adjustments |> Enum.map(& &1.fact_id) |> Facts.list_attributions_for_facts()
+
+    Enum.map(adjustments, &Map.put(&1, :attributions, Map.get(attributions, &1.fact_id, [])))
   end
 
   @doc """
@@ -446,10 +641,19 @@ defmodule Gallformers.Catalog do
     )
   end
 
-  @doc "Whether a Gall already has Gallformers code `code` (codes are unique)."
-  @spec gallformers_code_taken?(String.t()) :: boolean()
-  def gallformers_code_taken?(code) when is_binary(code),
-    do: Repo.exists?(from(g in Gall, where: g.gallformers_code == ^code))
+  @doc """
+  Whether a Gall other than `except_gall_id` (nil for none) already has
+  Gallformers code `code`, surrounding blanks ignored (codes are unique).
+  """
+  @spec gallformers_code_taken?(String.t(), integer() | nil) :: boolean()
+  def gallformers_code_taken?(code, except_gall_id \\ nil) when is_binary(code) do
+    query = from(g in Gall, where: g.gallformers_code == ^String.trim(code))
+
+    query =
+      if except_gall_id, do: where(query, [g], g.id != ^except_gall_id), else: query
+
+    Repo.exists?(query)
+  end
 
   # -- read models -------------------------------------------------------------
 

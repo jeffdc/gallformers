@@ -20,7 +20,7 @@ defmodule Gallformers.Sources.MatchSourceTest do
       })
 
     if doi do
-      {:ok, source} = Sources.update_source_details(source, %{doi: doi})
+      {:ok, source} = Sources.update_source_details(test_actor(), source, %{doi: doi})
       source
     else
       source

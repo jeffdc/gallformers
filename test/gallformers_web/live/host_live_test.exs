@@ -100,6 +100,27 @@ defmodule GallformersWeb.HostLiveTest do
     end
   end
 
+  describe "admin links" do
+    test "an admin's Gall and image links go to the new admin screens", %{conn: conn} do
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/host/10")
+
+      for id <- 300..304 do
+        assert has_element?(view, "a[href='/admin/galls/#{id}'][title='Edit in admin']")
+      end
+
+      assert has_element?(view, "#host-images a[href='/admin/taxonomy/10#images']")
+      refute has_element?(view, "a[href^='/admin/gallhost']")
+      refute has_element?(view, "a[href^='/admin/images']")
+    end
+
+    test "a visitor gets none", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/host/10")
+
+      refute has_element?(view, "a[href^='/admin']")
+    end
+  end
+
   describe "Not found" do
     test "shows error for invalid ID format", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/host/invalid")

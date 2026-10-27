@@ -221,7 +221,8 @@ defmodule Gallformers.Import.SourceStep do
       if source.retracted_by_id == notice.id do
         :ok
       else
-        with {:ok, _source} <- Sources.retract_source(source, notice, notice.authored_date),
+        with {:ok, _source} <-
+               Sources.retract_source(actor, source, notice, notice.authored_date),
              {:ok, _conflicts} <- Facts.recompute_for_source(actor, source.id) do
           :ok
         end

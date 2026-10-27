@@ -10,7 +10,6 @@ defmodule Gallformers.Sources do
       Gallformers.Repo,
       Gallformers.ChangesetHelpers,
       Gallformers.SchemaFields,
-      Gallformers.Species,
       Gallformers.Licenses,
       Gallformers.Storage
     ],
@@ -25,8 +24,6 @@ defmodule Gallformers.Sources do
   alias Gallformers.Sources.QuoteLocator
   alias Gallformers.Sources.Source
   alias Gallformers.Sources.SourceDocument
-  alias Gallformers.Species.Species
-  alias Gallformers.Species.SpeciesSource
   alias Gallformers.Storage.Private
 
   @doc """
@@ -115,77 +112,44 @@ defmodule Gallformers.Sources do
     |> Repo.all()
   end
 
-  # Gallformers Notes source ID - should appear second after default
-  @gallformers_notes_source_id 58
-
   @doc """
-  Gets all sources for a species.
-
-  Sources are sorted with:
-  1. Default source first (if any)
-  2. Gallformers Notes second (unless it's the default)
-  3. Remaining sources alphabetically by title
+  A page of the Sources, by title, for the Source editor's list: those whose
+  title or author contains `:query` (ignoring case; all when blank). Options:
+  `:query`, `:page` (from 1, default 1), `:page_size` (default 25). Returns
+  the page's Sources and how many match.
   """
-  @spec get_sources_for_species(integer()) :: [map()]
-  def get_sources_for_species(species_id) do
-    from(ss in SpeciesSource,
-      join: s in Source,
-      on: ss.source_id == s.id,
-      where: ss.species_id == ^species_id,
-      select: %{
-        id: s.id,
-        title: s.title,
-        author: s.author,
-        pubyear: s.pubyear,
-        link: s.link,
-        citation: s.citation,
-        license: s.license,
-        licenselink: s.licenselink,
-        description: ss.description,
-        useasdefault: ss.useasdefault,
-        externallink: ss.externallink
-      }
-    )
-    |> Repo.all()
-    |> sort_sources_with_priority()
-  end
+  @spec list_sources_page(keyword()) :: %{entries: [Source.t()], total: non_neg_integer()}
+  def list_sources_page(opts \\ []) do
+    page = max(Keyword.get(opts, :page, 1), 1)
+    page_size = Keyword.get(opts, :page_size, 25)
 
-  # Sort sources: default first, Gallformers Notes second, then alphabetically
-  defp sort_sources_with_priority(sources) do
-    Enum.sort_by(sources, fn source ->
-      cond do
-        source.useasdefault -> {0, source.title}
-        source.id == @gallformers_notes_source_id -> {1, source.title}
-        true -> {2, source.title}
+    query =
+      case String.trim(Keyword.get(opts, :query) || "") do
+        "" ->
+          Source
+
+        text ->
+          term = "%#{text}%"
+          from(s in Source, where: ilike(s.title, ^term) or ilike(s.author, ^term))
       end
-    end)
-  end
 
-  @doc """
-  Gets all species associated with a source.
-  """
-  @spec get_species_for_source(integer()) :: [map()]
-  def get_species_for_source(source_id) do
-    from(ss in SpeciesSource,
-      join: sp in Species,
-      on: ss.species_id == sp.id,
-      where: ss.source_id == ^source_id,
-      order_by: sp.name,
-      select: %{
-        id: sp.id,
-        name: sp.name,
-        taxoncode: sp.taxoncode,
-        description: ss.description,
-        externallink: ss.externallink
-      }
-    )
-    |> Repo.all()
+    %{
+      entries:
+        Repo.all(
+          from(s in query,
+            order_by: [s.title, s.id],
+            limit: ^page_size,
+            offset: ^((page - 1) * page_size)
+          )
+        ),
+      total: Repo.aggregate(query, :count)
+    }
   end
 
   # Admin functions
 
   @doc """
-  Returns a changeset for tracking source changes.
+  The Source editor's changeset for `source` (`Gallformers.Sources.Source.changeset/2`).
   """
   @spec change_source(Source.t(), map()) :: Ecto.Changeset.t()
   def change_source(%Source{} = source, attrs \\ %{}) do
@@ -200,48 +164,66 @@ defmodule Gallformers.Sources do
     %Source{}
     |> Source.changeset(attrs)
     |> Repo.insert()
-    |> broadcast(:source_created)
   end
 
   @doc """
-  Updates a source.
-  """
-  @spec update_source(Source.t(), map()) :: {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
-  def update_source(%Source{} = source, attrs) do
-    source
-    |> Source.changeset(attrs)
-    |> Repo.update()
-    |> broadcast(:source_updated)
-  end
+  Edits a Source's details as the Source editor does
+  (`Gallformers.Sources.Source.changeset/2`): today's columns (`title`,
+  `author`, `pubyear`, `link`, `citation`, `datacomplete`, `license`,
+  `licenselink`) and the descriptive fields (`kind`, `authors`, `authored` —
+  a partial date, `"1897"`, `"1897-05"` or `"1897-05-14"` —
+  `authored_as_written`, `doi`, `url`, `isbn`, `license_as_written`), in a
+  transaction audited as `actor`.
 
-  @doc """
-  Sets a Source's descriptive fields: `kind`, `authors`, `authored` (a partial
-  date, `"1897"`, `"1897-05"` or `"1897-05-14"`), `authored_as_written`,
-  `doi`, `url`, `isbn`, `license_value` and `license_as_written`.
-
-  Today's columns (`author`, `pubyear`, ...) are left as they are.
+  The standings of the Source's Facts and the replay log are
+  `Gallformers.Import.record_source_edit/2`'s, which calls this.
   """
-  @spec update_source_details(Source.t(), map()) ::
+  @spec update_source_details(Actor.t(), Source.t(), map()) ::
           {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
-  def update_source_details(%Source{} = source, attrs) do
-    source
-    |> Source.details_changeset(attrs)
-    |> Repo.update()
-    |> broadcast(:source_updated)
+  def update_source_details(%Actor{} = actor, %Source{} = source, attrs) when is_map(attrs) do
+    audited_update(actor, "sources.update_source_details", Source.changeset(source, attrs))
   end
 
   @doc """
   Marks `source` as retracted by the retraction notice `notice` (another
-  Source) on `retracted_on`. A retraction cancels all of the Source's stances;
-  the Source stays, marked.
+  Source) on `retracted_on`, in a transaction audited as `actor`. A
+  retraction cancels all of the Source's stances; the Source stays, marked.
+  Recompute its Facts' standings afterwards
+  (`Gallformers.Facts.recompute_for_source/2`).
   """
-  @spec retract_source(Source.t(), Source.t(), Date.t()) ::
+  @spec retract_source(Actor.t(), Source.t(), Source.t(), Date.t()) ::
           {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
-  def retract_source(%Source{} = source, %Source{} = notice, %Date{} = retracted_on) do
-    source
-    |> Source.retract_changeset(notice, retracted_on)
-    |> Repo.update()
-    |> broadcast(:source_updated)
+  def retract_source(
+        %Actor{} = actor,
+        %Source{} = source,
+        %Source{} = notice,
+        %Date{} = retracted_on
+      ) do
+    audited_update(
+      actor,
+      "sources.retract_source",
+      Source.retract_changeset(source, notice, retracted_on)
+    )
+  end
+
+  @doc """
+  Undoes `source`'s retraction (a retraction entered by mistake), in a
+  transaction audited as `actor`; a Source that is not retracted is an
+  error. Recompute its Facts' standings afterwards.
+  """
+  @spec unretract_source(Actor.t(), Source.t()) ::
+          {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
+  def unretract_source(%Actor{} = actor, %Source{} = source) do
+    audited_update(actor, "sources.unretract_source", Source.unretract_changeset(source))
+  end
+
+  defp audited_update(actor, operation, changeset) do
+    Audit.transaction(actor, operation, fn ->
+      case Repo.update(changeset) do
+        {:ok, source} -> source
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
   end
 
   @doc "The IDs of the retracted Sources among `source_ids`, in ID order."
@@ -358,15 +340,13 @@ defmodule Gallformers.Sources do
     %Source{}
     |> Source.import_changeset(attrs)
     |> Repo.insert()
-    |> broadcast(:source_created)
   end
 
   @doc """
   The Source titled `attrs.title`, created from `attrs` if there is none
   (`Gallformers.Sources.Source.record_changeset/2`: today's columns, which
   may be empty, and the descriptive fields; no authored date needed). An
-  existing Source is returned as it is. Nothing is broadcast: the data
-  migration calls this without the application running.
+  existing Source is returned as it is.
   """
   @spec ensure_source(map()) :: {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
   def ensure_source(%{title: title} = attrs) when is_binary(title) do
@@ -380,282 +360,6 @@ defmodule Gallformers.Sources do
   @spec title_taken?(String.t()) :: boolean()
   def title_taken?(title) when is_binary(title),
     do: Repo.exists?(from(s in Source, where: s.title == ^String.trim(title)))
-
-  @doc """
-  Deletes a source.
-  """
-  @spec delete_source(Source.t()) :: {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
-  def delete_source(%Source{} = source) do
-    Repo.delete(source)
-    |> broadcast(:source_deleted)
-  end
-
-  @doc """
-  Subscribes to source changes.
-  """
-  @spec subscribe() :: :ok | {:error, term()}
-  def subscribe do
-    Phoenix.PubSub.subscribe(Gallformers.PubSub, "sources")
-  end
-
-  defp broadcast({:ok, source}, event) do
-    Phoenix.PubSub.broadcast(Gallformers.PubSub, "sources", {event, source})
-    {:ok, source}
-  end
-
-  defp broadcast({:error, changeset}, _event) do
-    {:error, changeset}
-  end
-
-  # ============================================
-  # SpeciesSource (mapping) functions
-  # ============================================
-
-  @doc """
-  Returns a changeset for tracking species-source mapping changes.
-  """
-  @spec change_species_source(SpeciesSource.t(), map()) :: Ecto.Changeset.t()
-  def change_species_source(%SpeciesSource{} = species_source, attrs \\ %{}) do
-    SpeciesSource.changeset(species_source, attrs)
-  end
-
-  @doc """
-  Gets a species-source mapping by ID, raising if not found.
-  """
-  @spec get_species_source!(integer()) :: SpeciesSource.t()
-  def get_species_source!(id) do
-    Repo.get!(SpeciesSource, id)
-  end
-
-  @doc """
-  Gets a species-source mapping by species_id and source_id.
-  """
-  @spec get_species_source_by_ids(integer(), integer()) :: SpeciesSource.t() | nil
-  def get_species_source_by_ids(species_id, source_id) do
-    from(ss in SpeciesSource,
-      where: ss.species_id == ^species_id and ss.source_id == ^source_id
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Creates a species-source mapping.
-
-  If useasdefault is set to 1, clears all other defaults for that species first.
-  """
-  @spec create_species_source(map()) :: {:ok, SpeciesSource.t()} | {:error, Ecto.Changeset.t()}
-  def create_species_source(attrs \\ %{}) do
-    changeset = SpeciesSource.changeset(%SpeciesSource{}, attrs)
-
-    result =
-      if setting_as_default?(attrs) do
-        species_id = get_species_id_from_attrs(attrs)
-        insert_with_default_transaction(changeset, species_id)
-      else
-        Repo.insert(changeset)
-      end
-
-    result |> broadcast(:species_source_created)
-  end
-
-  @doc """
-  Updates a species-source mapping.
-
-  If useasdefault is set to 1, clears all other defaults for that species first.
-  """
-  @spec update_species_source(SpeciesSource.t(), map()) ::
-          {:ok, SpeciesSource.t()} | {:error, Ecto.Changeset.t()}
-  def update_species_source(%SpeciesSource{} = species_source, attrs) do
-    changeset = SpeciesSource.changeset(species_source, attrs)
-
-    result =
-      if setting_as_default?(attrs) do
-        update_with_default_transaction(changeset, species_source.species_id, species_source.id)
-      else
-        Repo.update(changeset)
-      end
-
-    result |> broadcast(:species_source_updated)
-  end
-
-  # Inserts a species-source mapping with transaction to clear other defaults
-  defp insert_with_default_transaction(changeset, species_id) do
-    Repo.transaction(fn ->
-      clear_other_defaults(species_id, nil)
-      insert_or_rollback(changeset)
-    end)
-  end
-
-  # Updates a species-source mapping with transaction to clear other defaults
-  defp update_with_default_transaction(changeset, species_id, exclude_id) do
-    Repo.transaction(fn ->
-      clear_other_defaults(species_id, exclude_id)
-      update_or_rollback(changeset)
-    end)
-  end
-
-  defp insert_or_rollback(changeset) do
-    case Repo.insert(changeset) do
-      {:ok, record} -> record
-      {:error, changeset} -> Repo.rollback(changeset)
-    end
-  end
-
-  defp update_or_rollback(changeset) do
-    case Repo.update(changeset) do
-      {:ok, record} -> record
-      {:error, changeset} -> Repo.rollback(changeset)
-    end
-  end
-
-  defp setting_as_default?(attrs) do
-    useasdefault = attrs["useasdefault"] || attrs[:useasdefault]
-    useasdefault in [true, "true"]
-  end
-
-  # Gets species_id from attrs (handles both string and atom keys)
-  defp get_species_id_from_attrs(attrs) do
-    species_id = attrs["species_id"] || attrs[:species_id]
-
-    case species_id do
-      id when is_integer(id) -> id
-      id when is_binary(id) -> String.to_integer(id)
-      _ -> nil
-    end
-  end
-
-  # Clears useasdefault flag on all other mappings for a species
-  defp clear_other_defaults(species_id, exclude_id) when not is_nil(species_id) do
-    query =
-      from(ss in SpeciesSource,
-        where: ss.species_id == ^species_id and ss.useasdefault == true
-      )
-
-    query =
-      if exclude_id do
-        from(ss in query, where: ss.id != ^exclude_id)
-      else
-        query
-      end
-
-    Repo.update_all(query, set: [useasdefault: false])
-  end
-
-  defp clear_other_defaults(_, _), do: :ok
-
-  @doc """
-  Deletes a species-source mapping.
-  """
-  @spec delete_species_source(SpeciesSource.t()) ::
-          {:ok, SpeciesSource.t()} | {:error, Ecto.Changeset.t()}
-  def delete_species_source(%SpeciesSource{} = species_source) do
-    Repo.delete(species_source)
-    |> broadcast(:species_source_deleted)
-  end
-
-  @doc """
-  Returns whether a species has any sources linked to it.
-  """
-  @spec has_sources?(integer()) :: boolean()
-  def has_sources?(species_id) do
-    from(ss in SpeciesSource, where: ss.species_id == ^species_id)
-    |> Repo.exists?()
-  end
-
-  @doc """
-  Searches species-source mappings by species name, source title, or description.
-  Returns mappings with full species and source info for display.
-  """
-  @spec search_species_source_mappings(String.t(), integer()) :: [map()]
-  def search_species_source_mappings(query, limit \\ 50) do
-    search_term = "%#{String.downcase(query)}%"
-
-    from(ss in SpeciesSource,
-      join: sp in Species,
-      on: ss.species_id == sp.id,
-      join: src in Source,
-      on: ss.source_id == src.id,
-      where:
-        ilike(sp.name, ^search_term) or
-          ilike(src.title, ^search_term) or
-          ilike(src.author, ^search_term) or
-          ilike(ss.description, ^search_term),
-      order_by: [asc: sp.name, asc: src.title],
-      limit: ^limit,
-      select: %{
-        id: ss.id,
-        species_id: sp.id,
-        species_name: sp.name,
-        species_taxoncode: sp.taxoncode,
-        source_id: src.id,
-        source_title: src.title,
-        source_author: src.author,
-        source_pubyear: src.pubyear,
-        description: ss.description,
-        externallink: ss.externallink,
-        useasdefault: ss.useasdefault
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets all species-source mappings for a specific species.
-  Returns mappings in the same format as search_species_source_mappings for display.
-  """
-  @spec get_species_source_mappings_for_species(integer()) :: [map()]
-  def get_species_source_mappings_for_species(species_id) do
-    from(ss in SpeciesSource,
-      join: sp in Species,
-      on: ss.species_id == sp.id,
-      join: src in Source,
-      on: ss.source_id == src.id,
-      where: ss.species_id == ^species_id,
-      order_by: [asc: src.title],
-      select: %{
-        id: ss.id,
-        species_id: sp.id,
-        species_name: sp.name,
-        species_taxoncode: sp.taxoncode,
-        source_id: src.id,
-        source_title: src.title,
-        source_author: src.author,
-        source_pubyear: src.pubyear,
-        description: ss.description,
-        externallink: ss.externallink,
-        useasdefault: ss.useasdefault
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets a species-source mapping with full details for editing.
-  """
-  @spec get_species_source_for_edit(integer()) :: map() | nil
-  def get_species_source_for_edit(id) do
-    from(ss in SpeciesSource,
-      join: sp in Species,
-      on: ss.species_id == sp.id,
-      join: src in Source,
-      on: ss.source_id == src.id,
-      where: ss.id == ^id,
-      select: %{
-        id: ss.id,
-        species_id: sp.id,
-        species_name: sp.name,
-        species_taxoncode: sp.taxoncode,
-        source_id: src.id,
-        source_title: src.title,
-        source_author: src.author,
-        source_pubyear: src.pubyear,
-        description: ss.description,
-        externallink: ss.externallink,
-        useasdefault: ss.useasdefault
-      }
-    )
-    |> Repo.one()
-  end
 
   # ============================================
   # Stored documents

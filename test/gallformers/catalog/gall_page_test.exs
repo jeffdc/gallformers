@@ -217,6 +217,39 @@ defmodule Gallformers.Catalog.GallPageTest do
            ]
   end
 
+  test "a lead Source that only attributes Facts leads, with no description" do
+    gallformers = gallformers_source()
+    facts_only = source_fixture("Facts only", "1990")
+    cited = source_fixture("Cited", "1990")
+    inducer = Gallformers.TaxaFixtures.taxon_fixture(name: "Andricus factsonlyi")
+    gall = gall_fixture(default_source_id: facts_only.id)
+
+    {:ok, _} =
+      Catalog.assert_relationship(
+        test_actor(),
+        %{type: "inducer_of", subject_taxon_id: inducer.id, object_gall_id: gall.id},
+        confirm(facts_only)
+      )
+
+    {:ok, _} = Sources.store_note(test_actor(), gallformers, gall.id, "Note.", ~D[2024-01-01])
+
+    {:ok, 1} =
+      Catalog.insert_legacy_citations(test_actor(), [
+        %{gall_id: gall.id, source_id: cited.id, description: "C.", useasdefault: false}
+      ])
+
+    assert [lead | rest] = page!(gall.id).sources
+
+    assert %{id: id, useasdefault: true, note?: false, description: "", externallink: ""} = lead
+    assert id == facts_only.id
+    assert lead.title == facts_only.title
+
+    assert Enum.map(rest, &{&1.id, &1.useasdefault}) == [
+             {gallformers.id, false},
+             {cited.id, false}
+           ]
+  end
+
   test "former labels and codes are not common names" do
     page = page!(304)
 

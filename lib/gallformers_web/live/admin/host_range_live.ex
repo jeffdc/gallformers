@@ -1,24 +1,29 @@
 defmodule GallformersWeb.Admin.HostRangeLive do
   @moduledoc """
-  Admin triage page for host range confirmation and WCVP sync.
+  Admin triage page for host range confirmation and WCVP sync (matter
+  a856, decision 4: carried over from the old Host admin onto plant taxa).
 
-  Shows hosts that need range review and allows bulk confirmation
-  plus bulk WCVP match/sync operations.
+  Shows plants (`Gallformers.Ranges.Wcvp.list_for_range_review/1`) that
+  need range review and allows bulk confirmation plus bulk WCVP
+  match/sync/ignore, each through `Gallformers.Import.record_wcvp_edit/2`
+  as the signed-in admin, so it is audited and in the replay log. Matching
+  all filtered plants is for superadmins only, as before.
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.Accounts
-  alias Gallformers.Plants
-  alias Gallformers.Wcvp
+  alias Gallformers.Import
+  alias Gallformers.Ranges.Wcvp
 
   @page_size 50
 
+  defp wcvp_lookup, do: Application.get_env(:gallformers, :wcvp_lookup, Gallformers.Wcvp.Lookup)
+
   @impl true
-  def mount(_params, session, socket) do
+  def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(:current_user, session["current_user"])
-      |> assign(:superadmin?, Accounts.superadmin?(session["current_user"]))
+      |> assign(:superadmin?, Accounts.superadmin?(socket.assigns.current_user))
       |> assign(:page_title, "Host Range Review")
       |> assign(:selected_ids, MapSet.new())
       |> assign(:processing, nil)
@@ -28,7 +33,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
       |> assign(:page_size, @page_size)
       |> assign(:total_count, 0)
       |> assign(:hosts, [])
-      |> assign(:wcvp_built_at, Wcvp.Lookup.built_at())
+      |> assign(:wcvp_built_at, wcvp_lookup().built_at())
 
     {:ok, socket}
   end
@@ -168,16 +173,17 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   def handle_event("do_confirm_selected", _params, socket) do
     ids = MapSet.to_list(socket.assigns.selected_ids)
 
-    {count, _} = Plants.bulk_confirm_host_ranges(ids)
-
     socket =
-      socket
-      |> assign(:confirm_action, nil)
-      |> assign(:selected_ids, MapSet.new())
-      |> load_hosts()
-      |> put_flash(:info, "Confirmed range for #{count} host(s)")
+      case Import.record_wcvp_edit(socket.assigns.actor, {:confirm_ranges, ids}) do
+        {:ok, count} -> put_flash(socket, :info, "Confirmed range for #{count} host(s)")
+        {:error, _reason} -> put_flash(socket, :error, "Could not confirm the ranges")
+      end
 
-    {:noreply, socket}
+    {:noreply,
+     socket
+     |> assign(:confirm_action, nil)
+     |> assign(:selected_ids, MapSet.new())
+     |> load_hosts()}
   end
 
   @impl true
@@ -190,7 +196,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
         MapSet.member?(selected_ids, host.id)
       end)
 
-    ref_data = Plants.load_sync_ref_data()
+    ref_data = Wcvp.load_sync_ref_data()
 
     summary = %{synced: 0, no_match: [], failed: []}
     send(self(), {:sync_next, hosts_to_sync, summary, ref_data})
@@ -218,25 +224,15 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   @impl true
   def handle_event("ignore_selected", _params, socket) do
     ids = MapSet.to_list(socket.assigns.selected_ids)
-    {count, _} = Plants.bulk_ignore_hosts_for_wcvp(ids)
-
-    {:noreply,
-     socket
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()
-     |> put_flash(:info, "Ignored #{count} host(s) for default WCVP flows")}
+    {:noreply, bulk(socket, {:ignore, ids}, "Ignored %{count} host(s) for default WCVP flows")}
   end
 
   @impl true
   def handle_event("unignore_selected", _params, socket) do
     ids = MapSet.to_list(socket.assigns.selected_ids)
-    {count, _} = Plants.bulk_clear_wcvp_match_status(ids)
 
     {:noreply,
-     socket
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()
-     |> put_flash(:info, "Cleared WCVP match status for #{count} host(s)")}
+     bulk(socket, {:clear_match_status, ids}, "Cleared WCVP match status for %{count} host(s)")}
   end
 
   # Dismiss sync results modal
@@ -275,7 +271,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   @impl true
   def handle_info({:sync_next, [host | rest], summary, ref_data}, socket) do
     updated_summary =
-      case Plants.sync_host_from_wcvp(host.id, ref_data) do
+      case Import.record_wcvp_edit(socket.assigns.actor, {:sync, host.id, ref_data}) do
         {:ok, _} ->
           %{summary | synced: summary.synced + 1}
 
@@ -317,7 +313,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   @impl true
   def handle_info({:match_next, [host | rest], summary}, socket) do
     updated_summary =
-      case Plants.match_host_to_wcvp(host.id) do
+      case Import.record_wcvp_edit(socket.assigns.actor, {:match, host.id}) do
         {:ok, :linked} ->
           %{summary | linked: summary.linked + 1}
 
@@ -356,8 +352,8 @@ defmodule GallformersWeb.Admin.HostRangeLive do
           offset: (page - 1) * page_size
         ]
 
-    hosts = Plants.list_hosts_for_range_review(opts)
-    total_count = Plants.count_hosts_for_range_review(filter_opts)
+    hosts = Wcvp.list_for_range_review(opts)
+    total_count = Wcvp.count_for_range_review(filter_opts)
 
     socket
     |> assign(:hosts, hosts)
@@ -383,7 +379,20 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   defp filtered_hosts(socket) do
     socket
     |> range_review_filter_opts()
-    |> Plants.list_host_refs_for_range_review()
+    |> Wcvp.list_refs_for_range_review()
+  end
+
+  # A bulk WCVP action on the selected plants; `message` takes the count.
+  defp bulk(socket, edit, message) do
+    socket =
+      case Import.record_wcvp_edit(socket.assigns.actor, edit) do
+        {:ok, count} -> put_flash(socket, :info, String.replace(message, "%{count}", "#{count}"))
+        {:error, _reason} -> put_flash(socket, :error, "The WCVP action failed")
+      end
+
+    socket
+    |> assign(:selected_ids, MapSet.new())
+    |> load_hosts()
   end
 
   defp begin_match(socket, hosts) do
@@ -481,7 +490,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
         <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded flex items-center gap-4">
           <span class="text-sm font-medium text-gray-700">Quick Links:</span>
           <.link navigate={~p"/admin"} class="text-sm hover:underline">← Back to Admin</.link>
-          <.link navigate={~p"/admin/images"} class="text-sm hover:underline">Manage Images</.link>
+          <.link navigate={~p"/admin/taxonomy"} class="text-sm hover:underline">Taxonomy</.link>
         </div>
 
         <div class="bg-white border border-gray-200 rounded shadow-sm">
@@ -699,7 +708,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
                       />
                     </td>
                     <td class="py-2 pr-4">
-                      <.link navigate={~p"/admin/hosts/#{host.id}"} class="hover:underline">
+                      <.link navigate={~p"/admin/taxonomy/#{host.id}"} class="hover:underline">
                         <.taxon_name name={host.name} />
                       </.link>
                     </td>

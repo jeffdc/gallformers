@@ -31,9 +31,9 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
   rebuilds everything at its end) nothing is refreshed or enqueued.
 
   A Gall's name, edited deliberately (`Gallformers.Catalog.update_name_parts/3`),
-  enqueues its refresh the same way. Not refreshed by anything yet: a Gall's
-  images, which have no write path in the new back-end (the data migration
-  sets them and rebuilds the table).
+  enqueues its refresh the same way, and so does a change to its images
+  (`Gallformers.Catalog.gall_images_changed/1`, called by the admin image
+  component).
   """
   use Ecto.Schema
 

@@ -209,13 +209,13 @@ endif
 	@echo "Production data loaded into gallformers_test"
 
 # Run context-level tests against converted production data (no browser)
-# Checks the new back-end's invariants and exercises the old admin's write
-# paths against real data. All writes use Ecto sandbox (rolled back automatically)
+# Checks the new back-end's invariants against real data. All writes use Ecto
+# sandbox (rolled back automatically)
 # Needs AWS credentials for the backup, unless PROD_DATA_DB names a converted
 # copy to clone: make test-prod-data PROD_DATA_DB=gallformers_taxogall
 test-prod-data: load-prod-data-test
 	@echo "Running prod data context tests..."
-	@mix test test/prod_data/invariants_test.exs test/prod_data/write_operations_test.exs --include prod_data; \
+	@mix test test/prod_data/invariants_test.exs --include prod_data; \
 		status=$$?; \
 		echo "Restoring test database..."; \
 		$(MAKE) test-db; \
@@ -225,7 +225,7 @@ test-prod-data: load-prod-data-test
 # E2E tests are now consolidated in test/e2e/ — use `make e2e` to run them separately
 test-prod-data-all: load-prod-data-test
 	@echo "Running prod data context tests..."
-	@mix test test/prod_data/invariants_test.exs test/prod_data/write_operations_test.exs --include prod_data
+	@mix test test/prod_data/invariants_test.exs --include prod_data
 	@echo "Running E2E browser tests..."
 	@GALLFORMERS_E2E=1 mix test test/e2e --include e2e; \
 		status=$$?; \
@@ -256,20 +256,10 @@ e2e-setup:
 	@echo ""
 	@echo "Done. Run 'make e2e' to run E2E tests."
 
-# Run all E2E tests (loads prod data, runs in two passes, restores test DB)
-# Pass 1: main suite
-# Pass 2: host admin reclassify in its own ExUnit invocation (heavy page
-#          with range map — LiveView mount needs a clean process environment)
-E2E_MAIN := test/e2e/public test/e2e/search test/e2e/browse test/e2e/auth \
-	test/e2e/admin/admin_test.exs test/e2e/admin/reclassify_test.exs \
-	test/e2e/admin/taxonomy_admin_test.exs
-E2E_HOST := test/e2e/admin/reclassify_host_test.exs
-
+# Run all E2E tests (loads prod data, restores the test DB afterwards)
 e2e: load-prod-data-test
-	@echo "Running E2E tests (pass 1: main suite)..."
-	@GALLFORMERS_E2E=1 mix test $(E2E_MAIN) --include e2e
-	@echo "Running E2E tests (pass 2: host admin)..."
-	@GALLFORMERS_E2E=1 mix test $(E2E_HOST) --include e2e; \
+	@echo "Running E2E tests..."
+	@GALLFORMERS_E2E=1 mix test test/e2e --include e2e; \
 		status=$$?; \
 		echo "Restoring test database..."; \
 		$(MAKE) test-db; \

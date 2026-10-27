@@ -9,10 +9,9 @@ defmodule GallformersWeb.HostLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Catalog, Images, Places, Ranges, Taxa}
+  alias Gallformers.{Accounts, Catalog, Images, Places, Ranges, Taxa}
   alias Gallformers.Images.Image
   alias Gallformers.Taxa.ReadModels.HostPage
-  alias GallformersWeb.LegacyAdmin
   alias GallformersWeb.LineageBreadcrumb
   alias GallformersWeb.SEO
 
@@ -21,10 +20,6 @@ defmodule GallformersWeb.HostLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Admin edit links go to the old-domain screens: shown only while those
-    # are enabled (matter a856).
-    socket = assign(socket, :legacy_admin?, LegacyAdmin.enabled?())
-
     case Integer.parse(id) do
       {host_id, ""} -> load_host(socket, host_id)
       _ -> {:ok, not_found(socket, "Invalid host ID")}
@@ -245,8 +240,8 @@ defmodule GallformersWeb.HostLive do
                     </.link>
                   </h2>
                   <.link
-                    :if={@current_user && @legacy_admin?}
-                    href={~p"/admin/hosts/#{@host.id}"}
+                    :if={Accounts.admin?(@current_user)}
+                    href={~p"/admin/taxonomy/#{@host.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
                   >
@@ -310,7 +305,7 @@ defmodule GallformersWeb.HostLive do
                               />
                             </div>
                           </th>
-                          <th :if={@current_user && @legacy_admin?} class="w-10"></th>
+                          <th :if={Accounts.admin?(@current_user)} class="w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -341,11 +336,11 @@ defmodule GallformersWeb.HostLive do
                               </span>
                             <% end %>
                           </td>
-                          <td :if={@current_user && @legacy_admin?} class="text-center">
+                          <td :if={Accounts.admin?(@current_user)} class="text-center">
                             <.link
-                              href={~p"/admin/gallhost?id=#{gall.id}"}
+                              href={~p"/admin/galls/#{gall.id}"}
                               class="text-gray-400 hover:text-gf-maroon"
-                              title="Edit gall-host mappings"
+                              title="Edit in admin"
                             >
                               <.icon name="ph-pencil-simple" class="h-4 w-4" />
                             </.link>
@@ -452,7 +447,7 @@ defmodule GallformersWeb.HostLive do
               <.image_gallery
                 images={@images}
                 id="host-images"
-                species_id={@host.id}
+                edit_href={~p"/admin/taxonomy/#{@host.id}" <> "#images"}
                 current_user={@current_user}
                 no_image_src="/images/noimagehost.jpg"
               />

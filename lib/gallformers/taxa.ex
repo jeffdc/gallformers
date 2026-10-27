@@ -4,9 +4,8 @@ defmodule Gallformers.Taxa do
   editorial tree, the ancestry read model, and name resolution for import
   (`9449` §3; rules in `8567`).
 
-  This is the new taxonomy storage. It lives beside today's
-  `Gallformers.Taxonomy` (old `taxonomy` tables) until the public pages are
-  re-pointed; nothing here reads the old tables.
+  This is the taxonomy storage; nothing here reads the old `taxonomy`
+  tables, which only the data migration and the old ID filter read.
 
   ## The editorial tree (phase 1)
 
@@ -73,6 +72,7 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.Events
   alias Gallformers.Taxa.LegacyId
   alias Gallformers.Taxa.NameNormalizer
+  alias Gallformers.Taxa.Rank
   alias Gallformers.Taxa.ReadModels.Browse
   alias Gallformers.Taxa.ReadModels.HostPage
   alias Gallformers.Taxa.ReadModels.Search
@@ -297,6 +297,146 @@ defmodule Gallformers.Taxa do
     Repo.all(from(c in CommonName, where: c.taxon_id == ^taxon_id(taxon), order_by: c.id))
   end
 
+  @doc """
+  Removes a synonym (a `Gallformers.Taxa.TaxonName` or its ID): the name no
+  longer resolves to the taxon. `{:error, :accepted_name}` for the accepted
+  name (rename the taxon instead), `{:error, :not_found}` when there is no
+  such name.
+  """
+  @spec remove_synonym(Actor.t(), TaxonName.t() | integer()) ::
+          {:ok, TaxonName.t()} | {:error, :accepted_name | :not_found | Changeset.t()}
+  def remove_synonym(%Actor{} = actor, name) do
+    Audit.transaction(actor, "taxa.remove_synonym", fn ->
+      case Repo.get(TaxonName, row_id(name)) do
+        %TaxonName{status: :synonym} = synonym -> synonym |> Repo.delete() |> unwrap_or_rollback()
+        %TaxonName{status: :accepted} -> Repo.rollback(:accepted_name)
+        nil -> Repo.rollback(:not_found)
+      end
+    end)
+  end
+
+  @doc """
+  Removes a common name (a `Gallformers.Taxa.CommonName` or its ID).
+  `{:error, :not_found}` when there is no such name.
+  """
+  @spec remove_common_name(Actor.t(), CommonName.t() | integer()) ::
+          {:ok, CommonName.t()} | {:error, :not_found | Changeset.t()}
+  def remove_common_name(%Actor{} = actor, common_name) do
+    Audit.transaction(actor, "taxa.remove_common_name", fn ->
+      case Repo.get(CommonName, row_id(common_name)) do
+        %CommonName{} = found -> found |> Repo.delete() |> unwrap_or_rollback()
+        nil -> Repo.rollback(:not_found)
+      end
+    end)
+  end
+
+  # -- editorial flags ---------------------------------------------------------
+
+  @doc """
+  Sets a plant's editorial flags (`803b` decision 6): `:datacomplete`
+  (every gall known on the plant is in the database) and `:abundance_id`
+  (how common it is; nil for unknown). Other keys in `attrs` are ignored.
+  """
+  @spec update_editorial(Actor.t(), taxon_ref(), map()) ::
+          {:ok, Taxon.t()} | {:error, Changeset.t()}
+  def update_editorial(%Actor{} = actor, taxon, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "taxa.update_editorial", fn ->
+      Taxon
+      |> Repo.get!(taxon_id(taxon))
+      |> Taxon.editorial_changeset(attrs)
+      |> Repo.update()
+      |> unwrap_or_rollback()
+    end)
+  end
+
+  @doc "The abundances a plant can be given, as `{name, id}`, by ID."
+  @spec abundance_options() :: [{String.t(), integer()}]
+  def abundance_options,
+    do: Repo.all(from(a in "abundance", order_by: a.id, select: {a.abundance, a.id}))
+
+  # -- deleting ----------------------------------------------------------------
+
+  @typedoc """
+  Rows that refer to a taxon: `count` rows of `table` name it in `column`.
+  """
+  @type taxon_reference :: %{table: String.t(), column: String.t(), count: pos_integer()}
+
+  @doc """
+  The columns that refer to a taxon and keep it from being deleted, as
+  `{table, column}`: every foreign key to `taxa` that does not delete its
+  rows with the taxon — its children (`taxa.parent_id`), Facts and their
+  attributions, Galls, Host ranges and images (whose keys would only be
+  cleared), generation groups, import statements. Read from the database's
+  foreign keys, so a new one is checked without naming it here. Rows whose
+  key deletes with the taxon (its names, common names, crosswalk entries,
+  ancestry, WCVP link) are the taxon's own.
+  """
+  @spec reference_columns() :: [{String.t(), String.t()}]
+  def reference_columns do
+    """
+    SELECT c.conrelid::regclass::text, a.attname::text
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+    WHERE c.contype = 'f' AND c.confrelid = 'taxa'::regclass AND c.confdeltype <> 'c'
+    ORDER BY 1, 2
+    """
+    |> Repo.query!()
+    |> Map.fetch!(:rows)
+    |> Enum.map(fn [table, column] -> {table, column} end)
+  end
+
+  @doc """
+  What refers to `taxon` (`reference_columns/0`), by table and column; empty
+  when nothing does and the taxon can be deleted (`delete_taxon/2`).
+  """
+  @spec references(taxon_ref()) :: [taxon_reference()]
+  def references(taxon) do
+    sql =
+      Enum.map_join(reference_columns(), " UNION ALL ", fn {table, column} ->
+        ~s|SELECT '#{table}', '#{column}', count(*) FROM "#{table}" WHERE "#{column}" = $1|
+      end)
+
+    sql
+    |> Repo.query!([taxon_id(taxon)])
+    |> Map.fetch!(:rows)
+    |> Enum.filter(fn [_table, _column, count] -> count > 0 end)
+    |> Enum.map(fn [table, column, count] -> %{table: table, column: column, count: count} end)
+  end
+
+  @doc "Whether anything refers to `taxon` (`references/1`)."
+  @spec referenced?(taxon_ref()) :: boolean()
+  def referenced?(taxon), do: references(taxon) != []
+
+  @doc """
+  Deletes a taxon nothing refers to (`a856` decision 8), with its own rows:
+  its names, common names and crosswalk entries (and its ancestry rows and
+  WCVP link, whose keys delete with it). `{:error, {:referenced,
+  references}}` when anything refers to it (`references/1`); nothing is
+  deleted then.
+  """
+  @spec delete_taxon(Actor.t(), taxon_ref()) ::
+          {:ok, Taxon.t()} | {:error, {:referenced, [taxon_reference()]} | Changeset.t()}
+  def delete_taxon(%Actor{} = actor, taxon) do
+    Audit.transaction(actor, "taxa.delete_taxon", fn ->
+      Tree.lock()
+      id = taxon_id(taxon)
+
+      # Locked, so no row can come to refer to it before the delete commits.
+      found = Repo.one!(from(t in Taxon, where: t.id == ^id, lock: "FOR UPDATE"))
+
+      case references(id) do
+        [] ->
+          Repo.delete_all(from(n in TaxonName, where: n.taxon_id == ^id))
+          Repo.delete_all(from(c in CommonName, where: c.taxon_id == ^id))
+          Repo.delete_all(from(l in LegacyId, where: l.taxon_id == ^id))
+          found |> Repo.delete() |> unwrap_or_rollback()
+
+        references ->
+          Repo.rollback({:referenced, references})
+      end
+    end)
+  end
+
   # -- legacy crosswalk --------------------------------------------------------
 
   @doc """
@@ -354,7 +494,11 @@ defmodule Gallformers.Taxa do
       current = Repo.get!(Taxon, taxon_id(taxon))
       parent_id = parent && taxon_id(parent)
 
-      changeset = current |> Taxon.parent_changeset(parent_id) |> Tree.validate_parent()
+      changeset =
+        current
+        |> Taxon.parent_changeset(parent_id)
+        |> Tree.validate_parent()
+        |> validate_section_genus(current)
 
       cond do
         not changeset.valid? ->
@@ -379,6 +523,32 @@ defmodule Gallformers.Taxa do
       end
     end)
   end
+
+  # A section's members share one genus: a plant at species rank or below
+  # placed in a section must be named in the section's genus (the genus
+  # above it), compared as names are normalized.
+  defp validate_section_genus(%Changeset{valid?: false} = changeset, _current), do: changeset
+
+  defp validate_section_genus(changeset, %Taxon{kingdom: "Plantae"} = current) do
+    parent_id = Changeset.get_field(changeset, :parent_id)
+
+    with true <- current.rank in Rank.species_and_below(),
+         %Taxon{rank: :section} <- parent_id && Repo.get(Taxon, parent_id),
+         %Taxon{} = genus <- Enum.find(ancestors(parent_id), &(&1.rank == :genus)),
+         genus_name = accepted_name(genus),
+         false <- genus_word(accepted_name(current)) == NameNormalizer.normalize(genus_name) do
+      Changeset.add_error(changeset, :parent_id, "must be in the section's genus, %{genus}",
+        validation: :section_genus,
+        genus: genus_name
+      )
+    else
+      _ -> changeset
+    end
+  end
+
+  defp validate_section_genus(changeset, _current), do: changeset
+
+  defp genus_word(name), do: name |> NameNormalizer.normalize() |> String.split() |> List.first()
 
   @doc "The taxa above `taxon`, nearest first."
   @spec ancestors(taxon_ref()) :: [Taxon.t()]
@@ -454,6 +624,10 @@ defmodule Gallformers.Taxa do
   """
   @spec get_by_name(String.t(), Gallformers.Taxa.Rank.t()) :: [Taxon.t()]
   defdelegate get_by_name(name, rank), to: Browse
+
+  @doc "The taxa with no parent (the tree's roots), by name, as `children_with_ranks/1` gives taxa."
+  @spec root_taxa() :: [Browse.child()]
+  defdelegate root_taxa(), to: Browse, as: :roots
 
   @doc "The taxa directly under a taxon, by name, with their ranks and common names."
   @spec children_with_ranks(integer()) :: [Browse.child()]
@@ -792,6 +966,9 @@ defmodule Gallformers.Taxa do
 
   defp taxon_id(%Taxon{id: id}), do: id
   defp taxon_id(id) when is_integer(id), do: id
+
+  defp row_id(%{id: id}), do: id
+  defp row_id(id) when is_integer(id), do: id
 
   defp unwrap_or_rollback({:ok, value}), do: value
   defp unwrap_or_rollback({:error, changeset}), do: Repo.rollback(changeset)

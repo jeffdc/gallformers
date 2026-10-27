@@ -286,6 +286,10 @@ defmodule GallformersWeb.GenusLive do
                       rank="genus"
                     />
                   </h1>
+                  <RankPageComponents.admin_edit_link
+                    current_user={@current_user}
+                    taxon_id={@genus.id}
+                  />
                 </div>
               </div>
 

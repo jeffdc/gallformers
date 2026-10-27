@@ -68,9 +68,7 @@ defmodule Mix.Tasks.Audit.SchemaFields do
     candidates = [
       arg,
       "Gallformers.#{arg}",
-      "Gallformers.Sources.#{arg}",
-      "Gallformers.Species.#{arg}",
-      "Gallformers.Taxonomy.#{arg}"
+      "Gallformers.Sources.#{arg}"
     ]
 
     case Enum.find_value(candidates, &valid_schema_module/1) do

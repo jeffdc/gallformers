@@ -47,17 +47,17 @@ defmodule GallformersWeb.Admin.FormHelpers do
 
       use GallformersWeb.Admin.FormHelpers, crud_helpers: true
 
-      alias Gallformers.Sources
-      alias Gallformers.Sources.Source
+      alias Gallformers.Glossaries
+      alias Gallformers.Glossaries.Glossary
 
       # Required callbacks - all explicit, no magic
-      def entity_key, do: :source
-      def entity_struct, do: Source
-      def list_path, do: ~p"/admin/sources"
-      def load_entity(id), do: Sources.get_source!(id)
-      def change_entity(entity, params \\\\ %{}), do: Sources.change_source(entity, params)
-      def create_entity(params), do: Sources.create_source(params)
-      def update_entity(entity, params), do: Sources.update_source(entity, params)
+      def entity_key, do: :entry
+      def entity_struct, do: Glossary
+      def list_path, do: ~p"/admin/glossary"
+      def load_entity(id), do: Glossaries.get_glossary!(id)
+      def change_entity(entity, params \\\\ %{}), do: Glossaries.change_glossary(entity, params)
+      def create_entity(params), do: Glossaries.create_glossary(params)
+      def update_entity(entity, params), do: Glossaries.update_glossary(entity, params)
 
       # Use consolidated helpers
       def mount(_params, session, socket) do
@@ -73,13 +73,13 @@ defmodule GallformersWeb.Admin.FormHelpers do
   ## Callbacks
 
   ### Required (when using crud_helpers: true)
-  - `entity_key/0` - Returns the assign key atom (e.g., `:source`)
-  - `entity_struct/0` - Returns the struct module (e.g., `Source`)
+  - `entity_key/0` - Returns the assign key atom (e.g., `:entry`)
+  - `entity_struct/0` - Returns the struct module (e.g., `Glossary`)
   - `list_path/0` - Returns the path to navigate to after save/cancel
-  - `load_entity/1` - Loads entity by id (e.g., `Sources.get_source!(id)`)
-  - `change_entity/2` - Returns changeset (e.g., `Sources.change_source(entity, params)`)
-  - `create_entity/1` - Creates entity (e.g., `Sources.create_source(params)`)
-  - `update_entity/2` - Updates entity (e.g., `Sources.update_source(entity, params)`)
+  - `load_entity/1` - Loads entity by id (e.g., `Glossaries.get_glossary!(id)`)
+  - `change_entity/2` - Returns changeset (e.g., `Glossaries.change_glossary(entity, params)`)
+  - `create_entity/1` - Creates entity (e.g., `Glossaries.create_glossary(params)`)
+  - `update_entity/2` - Updates entity (e.g., `Glossaries.update_glossary(entity, params)`)
 
   ### Optional (have defaults)
   - `form_key/0` - Form params key, defaults to `to_string(entity_key())`
@@ -205,17 +205,6 @@ defmodule GallformersWeb.Admin.FormHelpers do
       end
 
       defoverridable close_form: 1
-
-      # =================================================================
-      # Utility functions (always available)
-      # =================================================================
-
-      @doc """
-      Validates that a name follows binomial nomenclature (Genus species or Genus x species).
-      """
-      def valid_species_name?(name) do
-        Regex.match?(~r/^[A-Z][a-z-]+ (x )?[a-z-]+/, name)
-      end
 
       # Conditionally include CRUD helpers if crud_helpers: true is passed
       if unquote(crud_helpers) do

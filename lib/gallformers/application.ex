@@ -24,8 +24,6 @@ defmodule Gallformers.Application do
       {Phoenix.PubSub, name: Gallformers.PubSub},
       # Stop VM if app becomes unresponsive so Fly restarts it
       Gallformers.HealthWatchdog,
-      # Image audit cache for orphan detection
-      Gallformers.Images.AuditCache,
       # Site-wide settings with persistent_term cache
       Gallformers.SiteSettings,
       # Start to serve requests, typically the last entry

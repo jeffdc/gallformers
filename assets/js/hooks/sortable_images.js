@@ -3,6 +3,9 @@
  *
  * Enables drag-and-drop reordering of images in a grid.
  * The first image in the order becomes the default image.
+ *
+ * The new order goes to the hook element's LiveComponent
+ * (`pushEventTo(this.el)`), or to the LiveView when the element is in none.
  */
 
 const SortableImages = {
@@ -90,7 +93,7 @@ const SortableImages = {
       const newOrder = Array.from(this.container.querySelectorAll("[data-image-id]"))
         .map(el => parseInt(el.dataset.imageId, 10))
 
-      this.pushEvent("reorder_images", { order: newOrder })
+      this.pushEventTo(this.el, "reorder_images", { order: newOrder })
     }
 
     this.draggingEl = null

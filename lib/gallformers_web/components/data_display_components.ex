@@ -10,6 +10,7 @@ defmodule GallformersWeb.DataDisplayComponents do
 
   import GallformersWeb.CoreComponents, only: [icon: 1]
 
+  alias Gallformers.Accounts
   alias Gallformers.TaxonName
 
   @doc """
@@ -71,15 +72,22 @@ defmodule GallformersWeb.DataDisplayComponents do
 
       <.image_gallery images={@images} />
 
-      <.image_gallery images={@images} species_id={123} current_user={@current_user} />
+      <.image_gallery
+        images={@images}
+        edit_href="/admin/galls/123#images"
+        current_user={@current_user}
+      />
   """
   attr :images, :list,
     required: true,
     doc:
       "list of image maps with :src, :alt, :creator, :license, :licenselink, :sourcelink, :caption keys"
 
-  attr :species_id, :integer, default: nil, doc: "species ID for admin edit link"
-  attr :current_user, :any, default: nil, doc: "current user for showing admin controls"
+  attr :edit_href, :string,
+    default: nil,
+    doc: "where an admin edits these images (the owner's admin page); nil for no link"
+
+  attr :current_user, :any, default: nil, doc: "current user, an admin sees the edit links"
   attr :class, :any, default: nil, doc: "additional CSS classes"
   attr :id, :string, default: "image-gallery", doc: "unique id for the gallery"
   attr :no_image_src, :string, default: nil, doc: "optional placeholder image when no images"
@@ -90,12 +98,9 @@ defmodule GallformersWeb.DataDisplayComponents do
       |> assign(:images_json, prepare_images_json(assigns.images))
       |> assign(:first_image, List.first(assigns.images) || %{})
       |> assign(:image_count, length(assigns.images))
-      # The image admin is an old-domain screen: linked only while those are
-      # enabled (matter a856).
       |> assign(
         :admin_links?,
-        assigns.current_user != nil and assigns.species_id != nil and
-          GallformersWeb.LegacyAdmin.enabled?()
+        assigns.edit_href != nil and Accounts.admin?(assigns.current_user)
       )
 
     ~H"""
@@ -206,7 +211,7 @@ defmodule GallformersWeb.DataDisplayComponents do
         </button>
         <.link
           :if={@admin_links?}
-          href={"/admin/images?species_id=#{@species_id}"}
+          href={@edit_href}
           class="px-2 py-1 text-sm border border-gray-300 rounded bg-white hover:bg-gray-50"
           aria-label={gettext("Edit images")}
         >
@@ -397,7 +402,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       </div>
       <div :if={@admin_links?} class="mt-2 flex justify-center">
         <.link
-          href={"/admin/images?species_id=#{@species_id}"}
+          href={@edit_href}
           class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon"
         >
           <.icon name="ph-upload-simple" class="size-4" />
@@ -415,7 +420,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       </div>
       <div :if={@admin_links?} class="mt-2 flex justify-center">
         <.link
-          href={"/admin/images?species_id=#{@species_id}"}
+          href={@edit_href}
           class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon"
         >
           <.icon name="ph-upload-simple" class="size-4" />

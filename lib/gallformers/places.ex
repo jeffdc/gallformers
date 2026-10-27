@@ -5,13 +5,12 @@ defmodule Gallformers.Places do
   Provides functions for working with geographic places (states, provinces, regions).
   """
   use Boundary,
-    deps: [Gallformers.Repo, Gallformers.SchemaFields, Gallformers.TextMatch, Gallformers.Species],
+    deps: [Gallformers.Repo, Gallformers.SchemaFields, Gallformers.TextMatch],
     exports: :all
 
   import Ecto.Query
   alias Gallformers.Places.Place
   alias Gallformers.Repo
-  alias Gallformers.Species.Species
   alias Gallformers.TextMatch
 
   # Bounding boxes per place code, extracted from PMTiles by extract_bounds.py.
@@ -536,50 +535,4 @@ defmodule Gallformers.Places do
       Map.put(base, :nodes, children)
     end
   end
-
-  # Range management - semantic wrappers for V2 schema
-
-  @doc """
-  Gets host ranges for a species (places where the host plant exists).
-  """
-  @spec get_host_ranges(integer()) :: [Place.t()]
-  def get_host_ranges(species_id) do
-    from(p in Place,
-      join: hr in "host_range",
-      on: hr.place_id == p.id,
-      where: hr.species_id == ^species_id,
-      order_by: p.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets the curated gall range for a species (places where the gall occurs).
-  """
-  @spec get_gall_ranges(integer()) :: [Place.t()]
-  def get_gall_ranges(species_id) do
-    from(p in Place,
-      join: gr in "gall_range",
-      on: gr.place_id == p.id,
-      where: gr.species_id == ^species_id,
-      order_by: p.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets the range for a species based on its taxoncode.
-  For plants: returns places where the host exists
-  For galls: returns places in the gall's curated range
-  """
-  @spec get_species_range(Species.t()) :: [Place.t()]
-  def get_species_range(%Species{taxoncode: "plant", id: id}) do
-    get_host_ranges(id)
-  end
-
-  def get_species_range(%Species{taxoncode: "gall", id: id}) do
-    get_gall_ranges(id)
-  end
-
-  def get_species_range(_), do: []
 end

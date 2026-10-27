@@ -39,7 +39,7 @@ See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for details as needed.
 
 - **[docs/domain/domain-model.md](docs/domain/domain-model.md)** records the **domain language** being discovered for the redesign (galls, organisms, Sources, Observations). It is about the domain, not software, and is **not yet implemented**. The software design draft lives in matter `8567`.
 - **The current code and database** follow [docs/domain/general.md](docs/domain/general.md) and [docs/domain/admin-domain-reference.md](docs/domain/admin-domain-reference.md) ("everything is a species") until the taxonomy migration (matter `8567`).
-- **On the `taxogall` branch** the new back-end lives beside the old one: `Catalog`, `Taxa`, `Facts`, `Import`, `Audit` and the extended `Sources` (schema in matter `9449`, program punchlist in `50ff`). Public pages are being re-pointed onto it one at a time (matter `803b`); the old admin still writes the old tables until it is replaced.
+- **On the `taxogall` branch** the new back-end lives beside the old one: `Catalog`, `Taxa`, `Facts`, `Import`, `Audit` and the extended `Sources` (schema in matter `9449`, program punchlist in `50ff`). The public pages (matter `803b`) and the admin (matter `a856`: review queue, Gall page, taxonomy admin, Source editor) run on it; the old domain modules (`Galls`, `Plants`, `Species`, `Taxonomy`) are gone. The old tables stay until cutover — the catalog migration reads them by raw SQL, and `Galls.Identification` is kept only for `mix gallformers.catalog.id_parity`.
 - Don't use the target model to explain current code, or the current docs to design new work.
 
 ## Work Tracking & Planning

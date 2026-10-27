@@ -48,7 +48,9 @@ defmodule Gallformers.Import.ReplayTest do
     legacy =
       Sources.get_source_by_title("Gallformers legacy data") ||
         then(source_fixture("Legacy", "1990"), fn s ->
-          {:ok, s} = Sources.update_source(s, %{title: "Gallformers legacy data"})
+          {:ok, s} =
+            Sources.update_source_details(test_actor(), s, %{title: "Gallformers legacy data"})
+
           s
         end)
 

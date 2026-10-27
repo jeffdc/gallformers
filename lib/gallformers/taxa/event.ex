@@ -10,10 +10,13 @@ defmodule Gallformers.Taxa.Event do
       was the accepted name before.
     * `:merge` — `taxon_id` was merged into `into_taxon_id`.
     * `:split` — `taxon_id` was divided into `into_taxon_ids`.
+    * `:host_range` — plant `taxon_id`'s Host range rows changed.
 
   Taxa emits `:move` (`Gallformers.Taxa.place/3`) and `:rename`
   (`Gallformers.Taxa.rename/3`) in phase 1; merges and splits come with the
-  operations that make them.
+  operations that make them. `Gallformers.Ranges` emits `:host_range`
+  (`Gallformers.Ranges.update_taxon_places/3`): the range is the taxon's,
+  kept outside Taxa.
   """
 
   @enforce_keys [:type, :taxon_id]
@@ -28,7 +31,7 @@ defmodule Gallformers.Taxa.Event do
     into_taxon_ids: []
   ]
 
-  @type type :: :move | :rename | :merge | :split
+  @type type :: :move | :rename | :merge | :split | :host_range
 
   @type t :: %__MODULE__{
           type: type(),

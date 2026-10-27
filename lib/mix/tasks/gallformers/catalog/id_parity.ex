@@ -60,7 +60,7 @@ defmodule Mix.Tasks.Gallformers.Catalog.IdParity do
 
   alias Gallformers.Catalog
   alias Gallformers.CatalogMigration.TraitIdExport
-  alias Gallformers.Galls
+  alias Gallformers.Galls.Identification
   alias Gallformers.Places
   alias Gallformers.Repo
   alias Gallformers.Taxa
@@ -299,13 +299,13 @@ defmodule Mix.Tasks.Gallformers.Catalog.IdParity do
   end
 
   defp differences(set, old, new) do
-    old_ids = ids(Galls.filter_galls(old))
+    old_ids = ids(Identification.filter_galls(old))
     new_ids = ids(Catalog.identify(new))
 
     {old_all, new_all} =
       if set[:place],
         do:
-          {ids(Galls.filter_galls(%{old | place_codes: nil})),
+          {ids(Identification.filter_galls(%{old | place_codes: nil})),
            ids(Catalog.identify(%{new | place_codes: nil}))},
         else: {old_ids, new_ids}
 

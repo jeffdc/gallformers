@@ -52,16 +52,20 @@ defmodule Gallformers.Storage.Images do
   end
 
   @doc """
-  Generates the S3 path for a species image.
+  Generates the S3 path for an image of a Gall or a taxon, by its ID.
 
-  Format: gall/{species_id}/{species_id}_{timestamp}_{unique}_original.{ext}
+  Format: gall/{id}/{id}_{timestamp}_{unique}_original.{ext}
+
+  Galls and taxa share one layout: their IDs come from one sequence, and
+  it is the layout of today's images (whose species IDs the Galls and
+  taxa keep).
   """
-  @spec generate_path(integer(), String.t()) :: String.t()
-  def generate_path(species_id, extension) do
+  @spec generate_path({:gall | :taxon, integer()}, String.t()) :: String.t()
+  def generate_path({kind, id}, extension) when kind in [:gall, :taxon] and is_integer(id) do
     timestamp = System.system_time(:millisecond)
     unique = System.unique_integer([:positive])
     ext = String.trim_leading(extension, ".")
-    prefix_path("gall/#{species_id}/#{species_id}_#{timestamp}_#{unique}_original.#{ext}")
+    prefix_path("gall/#{id}/#{id}_#{timestamp}_#{unique}_original.#{ext}")
   end
 
   @doc """
@@ -206,18 +210,6 @@ defmodule Gallformers.Storage.Images do
     list_article_images_with_prefix(prefix_path("articles/#{article_id}/"))
   end
 
-  @doc """
-  Lists all image paths from S3 under the gall/ prefix.
-  """
-  @spec list_all_gall_paths() :: {:ok, [map()]} | {:error, term()}
-  def list_all_gall_paths do
-    if Application.get_env(:gallformers, :s3_enabled, true) do
-      list_gall_paths_recursive(prefix_path("gall/"), nil, [])
-    else
-      {:ok, []}
-    end
-  end
-
   defp prefix_path(path) do
     case image_prefix() do
       nil -> path
@@ -327,61 +319,11 @@ defmodule Gallformers.Storage.Images do
     end
   end
 
-  defp list_gall_paths_recursive(prefix, continuation_token, acc) do
-    opts =
-      [prefix: prefix]
-      |> maybe_add_continuation_token(continuation_token)
-
-    case ExAws.S3.list_objects_v2(bucket(), opts) |> S3.request() do
-      {:ok, %{body: body}} ->
-        contents = body[:contents] || []
-
-        new_paths =
-          contents
-          |> Enum.filter(&original_gall_image?/1)
-          |> Enum.map(&extract_s3_object_info/1)
-
-        all_paths = new_paths ++ acc
-
-        if body[:is_truncated] == "true" && body[:next_continuation_token] do
-          list_gall_paths_recursive(prefix, body[:next_continuation_token], all_paths)
-        else
-          {:ok, all_paths}
-        end
-
-      {:error, reason} ->
-        Logger.error("Failed to list S3 gall paths: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  defp maybe_add_continuation_token(opts, nil), do: opts
-
-  defp maybe_add_continuation_token(opts, token) do
-    Keyword.put(opts, :continuation_token, token)
-  end
-
   defp bucket do
     Application.get_env(:gallformers, :images)[:bucket]
   end
 
   defp image_prefix do
     Application.get_env(:gallformers, :s3_image_prefix)
-  end
-
-  defp original_gall_image?(obj) do
-    String.contains?(obj[:key], "_original.") && image_extension?(obj[:key])
-  end
-
-  defp image_extension?(path) do
-    String.ends_with?(path, [".jpg", ".jpeg", ".png", ".gif", ".webp"])
-  end
-
-  defp extract_s3_object_info(obj) do
-    %{
-      key: obj[:key],
-      last_modified: obj[:last_modified],
-      size: obj[:size]
-    }
   end
 end

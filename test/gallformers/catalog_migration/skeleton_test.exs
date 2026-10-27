@@ -16,6 +16,9 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
   alias Gallformers.CatalogMigration
   alias Gallformers.CatalogMigration.NameSuffixes
   alias Gallformers.CatalogMigration.Report
+  alias Gallformers.Ranges
+  alias Gallformers.Ranges.TaxonWcvp
+  alias Gallformers.Ranges.Wcvp
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Taxon
 
@@ -353,6 +356,90 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
                {ctx.old.spp, genus.id},
                {ctx.old.spp, genus.id}
              ])
+  end
+
+  test "two placeholders' rows for one place give their genus one row", ctx do
+    other = plant!(880_104, "Fixturquercus sp", ctx.old.quercus, placeholder: true)
+    host_range!(other, "MX-JAL", distribution_type: "introduced")
+
+    report = run!()
+
+    genus = taxon_named("Fixturquercus", :genus)
+
+    assert Repo.all(
+             from(hr in "host_range",
+               where: hr.taxon_id == ^genus.id,
+               order_by: hr.place_id,
+               select: {hr.species_id, hr.place_id, hr.distribution_type}
+             )
+           ) ==
+             Enum.sort_by(
+               [
+                 {ctx.old.spp, place_id("MX-JAL"), "native"},
+                 {ctx.old.spp, place_id("CA-AB"), "native"}
+               ],
+               &elem(&1, 1)
+             )
+
+    entry = Enum.find(report.reconciliation, &(&1.label == "Host range rows (re-keyed by taxon)"))
+    assert Report.balanced?(entry) == true
+  end
+
+  test "a Host range written by taxon alone is cleared, and the run repeats", ctx do
+    run!()
+    genus = taxon_named("Fixturquercus", :genus)
+
+    {:ok, plant} =
+      Taxa.create_taxon(test_actor(), %{
+        name: "Fixturquercus nova",
+        rank: :species,
+        origin: :powo,
+        kingdom: "Plantae",
+        parent_id: genus.id
+      })
+
+    {:ok, 1} = Ranges.update_taxon_places(test_actor(), plant, [place_id("US-CA")])
+
+    {:ok, 1} =
+      Ranges.update_taxon_places(test_actor(), ctx.old.alba, [place_id("RO-B")])
+
+    run!()
+
+    assert Repo.aggregate(from(hr in "host_range", where: is_nil(hr.species_id)), :count) == 0
+
+    # A migrated plant's range written by taxon keeps its species key.
+    assert Repo.all(
+             from(hr in "host_range", where: hr.species_id == ^ctx.old.alba, select: hr.place_id)
+           ) == [place_id("RO-B")]
+  end
+
+  test "a plant's WCVP link and range review move to its taxon", ctx do
+    host_traits!(ctx.old.alba,
+      wcvp_id: "123",
+      powo_id: "urn:test:123",
+      range_confirmed: true,
+      wcvp_synced_at: ~U[2026-05-01 00:00:00Z]
+    )
+
+    host_traits!(ctx.old.spp, wcvp_match_status: "ignored")
+
+    report = run!()
+
+    assert %TaxonWcvp{
+             wcvp_id: "123",
+             powo_id: "urn:test:123",
+             wcvp_match_status: nil,
+             range_confirmed: true,
+             wcvp_synced_at: ~U[2026-05-01 00:00:00Z]
+           } = Wcvp.get_link(ctx.old.alba)
+
+    # A placeholder is no plant taxon: its row is not carried.
+    genus = taxon_named("Fixturquercus", :genus)
+    assert Wcvp.get_link(genus.id) == nil
+
+    entry = Enum.find(report.reconciliation, &(&1.label == "WCVP links (host_traits by taxon)"))
+    assert Report.balanced?(entry) == true
+    assert entry.new >= 1
   end
 
   test "a genus placeholder's species ID maps to its genus, for its old /host/:id URL", ctx do

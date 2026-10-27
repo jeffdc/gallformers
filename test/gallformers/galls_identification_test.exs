@@ -1,7 +1,7 @@
 defmodule Gallformers.GallsIdentificationTest do
   use Gallformers.DataCase, async: true
 
-  alias Gallformers.Galls
+  alias Gallformers.Galls.Identification
 
   # Seed data IDs (from test_seeds.sql):
   #   Hosts: T. alpinus=6, T. serpyllum=7, M. arvensis=8
@@ -10,20 +10,34 @@ defmodule Gallformers.GallsIdentificationTest do
   #   Places: Alberta(CA-AB)=1, California(US-CA)=2, US=902, Canada=903
   #   host_range: T. alpinus→US-CA, M. arvensis→CA-AB+US-CA+US(country), T. serpyllum→US-CA
 
-  # Shared test helpers
-  defp create_species(name, taxoncode) do
-    Repo.insert!(%Gallformers.Species.Species{name: name, taxoncode: taxoncode})
+  # Shared test helpers: rows of the old tables, which the filter reads by name.
+  @now ~U[2026-01-01 00:00:00Z]
+
+  defp insert_returning_id!(table, row) do
+    {1, [%{id: id}]} = Repo.insert_all(table, [row], returning: [:id])
+    %{id: id}
   end
 
+  defp create_species(name, taxoncode, extra \\ %{}) do
+    insert_returning_id!(
+      "species",
+      Map.merge(%{name: name, taxoncode: taxoncode, inserted_at: @now, updated_at: @now}, extra)
+    )
+  end
+
+  defp create_placeholder(name), do: create_species(name, "plant", %{genus_placeholder: true})
+
   defp create_gall_traits(species_id) do
-    Repo.insert!(%Gallformers.Galls.GallTraits{species_id: species_id})
+    Repo.insert_all("gall_traits", [%{species_id: species_id, undescribed: false}])
   end
 
   defp create_taxonomy(name, type, opts \\ []) do
-    Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
+    insert_returning_id!("taxonomy", %{
       name: name,
       type: type,
-      parent_id: Keyword.get(opts, :parent_id)
+      parent_id: Keyword.get(opts, :parent_id),
+      inserted_at: @now,
+      updated_at: @now
     })
   end
 
@@ -34,19 +48,26 @@ defmodule Gallformers.GallsIdentificationTest do
   end
 
   defp create_gall_host(gall_id, host_id) do
-    Repo.insert!(%Gallformers.Galls.GallHost{
-      gall_species_id: gall_id,
-      host_species_id: host_id
-    })
+    Repo.insert_all("gallhost", [
+      %{gall_species_id: gall_id, host_species_id: host_id, inserted_at: @now, updated_at: @now}
+    ])
   end
 
   defp create_host_range(host_id, place_id, opts \\ []) do
-    Repo.insert!(%Gallformers.Ranges.HostRange{
-      species_id: host_id,
-      place_id: place_id,
-      precision: Keyword.get(opts, :precision, "exact"),
-      distribution_type: Keyword.get(opts, :distribution_type, "native")
-    })
+    Repo.insert_all("host_range", [
+      %{
+        species_id: host_id,
+        place_id: place_id,
+        precision: Keyword.get(opts, :precision, "exact"),
+        distribution_type: Keyword.get(opts, :distribution_type, "native")
+      }
+    ])
+  end
+
+  defp create_gall_range(gall_id, place_id, precision) do
+    Repo.insert_all("gall_range", [
+      %{species_id: gall_id, place_id: place_id, precision: precision}
+    ])
   end
 
   describe "filter_galls genus+place interaction" do
@@ -57,7 +78,7 @@ defmodule Gallformers.GallsIdentificationTest do
       #   - genus filter: gall 100 has a host in GenusAlpha (T. alpinus) -> passes
       #   - place filter: gall 100 has CA-AB in gall_range -> passes
       # These are independent filters now that gall_range stores the curated range.
-      results = Galls.filter_galls(%{genus_id: 10, place_codes: ["CA-AB"]})
+      results = Identification.filter_galls(%{genus_id: 10, place_codes: ["CA-AB"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -65,7 +86,7 @@ defmodule Gallformers.GallsIdentificationTest do
     test "genus + place includes galls whose genus hosts are in the place" do
       # Gall 100 is on T. alpinus (GenusAlpha). T. alpinus IS in California.
       # genus=GenusAlpha + place=California SHOULD return gall 100.
-      results = Galls.filter_galls(%{genus_id: 10, place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{genus_id: 10, place_codes: ["US-CA"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -76,7 +97,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # host=T. alpinus + place=Alberta returns gall 100 because:
       #   - host filter: gall 100 has T. alpinus as host -> passes
       #   - place filter: gall 100 has CA-AB in gall_range -> passes
-      results = Galls.filter_galls(%{host_ids: [6], place_codes: ["CA-AB"]})
+      results = Identification.filter_galls(%{host_ids: [6], place_codes: ["CA-AB"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -84,7 +105,7 @@ defmodule Gallformers.GallsIdentificationTest do
     test "place filter without host/genus is unconstrained" do
       # Place=Alberta with no host/genus filter should still return gall 100,
       # because CA-AB is in gall 100's curated range.
-      results = Galls.filter_galls(%{place_codes: ["CA-AB"]})
+      results = Identification.filter_galls(%{place_codes: ["CA-AB"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -95,7 +116,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # M. arvensis (host 8) has country-level range for US (id=902)
       # Gall 100 has host 8
       # Filtering by California (US-CA) should include gall 100 via ancestor match
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -104,7 +125,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # T. alpinus (host 6) has exact range in California (US-CA)
       # Gall 100 has host 6
       # Filtering by United States (US) should include gall 100 via descendant match
-      results = Galls.filter_galls(%{place_codes: ["US"]})
+      results = Identification.filter_galls(%{place_codes: ["US"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -113,7 +134,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # genus=GenusAlpha(10) includes T. alpinus(6) and T. serpyllum(7)
       # T. alpinus is in US-CA, T. serpyllum is in US-CA
       # Filtering by US with genus=GenusAlpha should return galls 100 and 101
-      results = Galls.filter_galls(%{genus_id: 10, place_codes: ["US"]})
+      results = Identification.filter_galls(%{genus_id: 10, place_codes: ["US"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
       assert 101 in gall_ids
@@ -121,7 +142,7 @@ defmodule Gallformers.GallsIdentificationTest do
 
     test "filtering by unrelated country returns no galls" do
       # No hosts have ranges in Mexico (only Jalisco subdivision, but no host_range rows)
-      results = Galls.filter_galls(%{place_codes: ["MX"]})
+      results = Identification.filter_galls(%{place_codes: ["MX"]})
       gall_ids = Enum.map(results, & &1.id)
       refute 100 in gall_ids
       refute 101 in gall_ids
@@ -131,7 +152,7 @@ defmodule Gallformers.GallsIdentificationTest do
   describe "place_match precision tagging" do
     test "no place filter results in no place_match tag" do
       # Without place filter, place_match should not be set
-      results = Galls.filter_galls(%{})
+      results = Identification.filter_galls(%{})
       gall = Enum.find(results, &(&1.id == 100))
 
       if gall do
@@ -143,7 +164,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # T. alpinus (host 6) has exact range in California (US-CA)
       # Gall 100 has host 6
       # Filtering by California should tag gall 100 as :documented
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall = Enum.find(results, &(&1.id == 100))
 
       assert gall != nil
@@ -170,7 +191,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # the tag should be :country_level. But our seed data doesn't have this case.
 
       # Let's verify the tag exists when place filter is active
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall = Enum.find(results, &(&1.id == 100))
 
       assert gall != nil
@@ -182,7 +203,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # T. alpinus (host 6) has exact range US-CA
       # When we filter by US (country), the match is via descendant expansion,
       # not a direct country-level range record, so it should be :documented
-      results = Galls.filter_galls(%{place_codes: ["US"]})
+      results = Identification.filter_galls(%{place_codes: ["US"]})
       gall = Enum.find(results, &(&1.id == 100))
 
       assert gall != nil
@@ -212,13 +233,9 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_traits(gall.id)
       create_gall_host(gall.id, host.id)
       # explicit gall_range for US-CA (place_id 2)
-      Repo.insert!(%Gallformers.Ranges.GallRange{
-        species_id: gall.id,
-        place_id: 2,
-        precision: "exact"
-      })
+      create_gall_range(gall.id, 2, "exact")
 
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       found = Enum.find(results, &(&1.id == gall.id))
 
       assert found != nil
@@ -238,13 +255,9 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_traits(gall.id)
       create_gall_host(gall.id, host.id)
       # explicit gall_range for US-CA (place_id 2) with non-exact precision
-      Repo.insert!(%Gallformers.Ranges.GallRange{
-        species_id: gall.id,
-        place_id: 2,
-        precision: "country"
-      })
+      create_gall_range(gall.id, 2, "country")
 
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       found = Enum.find(results, &(&1.id == gall.id))
 
       assert found != nil
@@ -264,15 +277,11 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_traits(gall.id)
       create_gall_host(gall.id, host.id)
       # explicit gall_range at the COUNTRY level (US = 902)
-      Repo.insert!(%Gallformers.Ranges.GallRange{
-        species_id: gall.id,
-        place_id: 902,
-        precision: "country"
-      })
+      create_gall_range(gall.id, 902, "country")
 
       # User filters by subdivision US-CA — gall is admitted via ancestor
       # expansion (US is an ancestor of US-CA).
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       found = Enum.find(results, &(&1.id == gall.id))
 
       assert found != nil
@@ -290,7 +299,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # host_range for US-CA — no gall_range
       create_host_range(host.id, 2)
 
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       found = Enum.find(results, &(&1.id == gall.id))
 
       assert found != nil
@@ -301,11 +310,7 @@ defmodule Gallformers.GallsIdentificationTest do
       genus = create_taxonomy("PlaceholderTagGenus", "genus")
 
       placeholder =
-        Repo.insert!(%Gallformers.Species.Species{
-          name: "PlaceholderTagGenus spp",
-          taxoncode: "plant",
-          genus_placeholder: true
-        })
+        create_placeholder("PlaceholderTagGenus spp")
 
       link_species_taxonomy(placeholder.id, genus.id)
 
@@ -315,7 +320,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # No host_range, no gall_range — surfaces only via genus_placeholder admit path
 
       results =
-        Galls.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
+        Identification.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
 
       found = Enum.find(results, &(&1.id == gall.id))
 
@@ -334,7 +339,7 @@ defmodule Gallformers.GallsIdentificationTest do
     #   201 (C. quercus) → genus Cynips(34)
 
     test "family filter finds galls whose genera are nested under intermediate ranks" do
-      results = Galls.filter_galls(%{family_id: 30})
+      results = Identification.filter_galls(%{family_id: 30})
       gall_ids = Enum.map(results, & &1.id)
 
       assert 200 in gall_ids,
@@ -346,7 +351,7 @@ defmodule Gallformers.GallsIdentificationTest do
 
     test "family filter does not return galls from unrelated families" do
       # FamilyAlpha is id=20, galls 200/201 are under Cynipidae(30)
-      results = Galls.filter_galls(%{family_id: 20})
+      results = Identification.filter_galls(%{family_id: 20})
       gall_ids = Enum.map(results, & &1.id)
 
       refute 200 in gall_ids
@@ -375,7 +380,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_host(gall_b.id, host_b.id)
 
       # filter_galls with genus_a should only find gall_a
-      ids = Enum.map(Galls.filter_galls(%{genus_id: genus_a.id}), & &1.id)
+      ids = Enum.map(Identification.filter_galls(%{genus_id: genus_a.id}), & &1.id)
       assert ids == [gall_a.id], "expected only gall_a for genus_a, got #{inspect(ids)}"
     end
 
@@ -392,7 +397,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_traits(other_gall.id)
       # No taxonomy link for other_gall
 
-      ids = Enum.map(Galls.filter_galls(%{family_id: family.id}), & &1.id)
+      ids = Enum.map(Identification.filter_galls(%{family_id: family.id}), & &1.id)
       assert ids == [gall.id], "expected only the gall in the family, got #{inspect(ids)}"
     end
   end
@@ -408,11 +413,7 @@ defmodule Gallformers.GallsIdentificationTest do
       genus = create_taxonomy("PlaceholderGenus", "genus")
 
       placeholder =
-        Repo.insert!(%Gallformers.Species.Species{
-          name: "PlaceholderGenus spp",
-          taxoncode: "plant",
-          genus_placeholder: true
-        })
+        create_placeholder("PlaceholderGenus spp")
 
       link_species_taxonomy(placeholder.id, genus.id)
 
@@ -422,7 +423,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # IMPORTANT: no host_range on the placeholder, no gall_range on the gall
 
       results =
-        Galls.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
+        Identification.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
 
       gall_ids = Enum.map(results, & &1.id)
 
@@ -437,11 +438,7 @@ defmodule Gallformers.GallsIdentificationTest do
       genus_b = create_taxonomy("BetaGenus", "genus")
 
       placeholder_b =
-        Repo.insert!(%Gallformers.Species.Species{
-          name: "BetaGenus spp",
-          taxoncode: "plant",
-          genus_placeholder: true
-        })
+        create_placeholder("BetaGenus spp")
 
       link_species_taxonomy(placeholder_b.id, genus_b.id)
 
@@ -449,11 +446,7 @@ defmodule Gallformers.GallsIdentificationTest do
       # to match — otherwise the test would pass for the wrong reason (genus
       # filter rejecting the gall before the place filter runs).
       placeholder_a =
-        Repo.insert!(%Gallformers.Species.Species{
-          name: "AlphaGenus spp",
-          taxoncode: "plant",
-          genus_placeholder: true
-        })
+        create_placeholder("AlphaGenus spp")
 
       link_species_taxonomy(placeholder_a.id, genus_a.id)
 
@@ -462,7 +455,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_host(gall.id, placeholder_b.id)
 
       results =
-        Galls.filter_galls(%{genus_id: genus_a.id, place_codes: ["US-CA"]})
+        Identification.filter_galls(%{genus_id: genus_a.id, place_codes: ["US-CA"]})
 
       gall_ids = Enum.map(results, & &1.id)
 
@@ -483,7 +476,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_host_range(host.id, 2)
 
       results =
-        Galls.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
+        Identification.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
 
       gall_ids = Enum.map(results, & &1.id)
 
@@ -505,7 +498,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_host_range(host.id, 2)
 
       # No gall_range entries for this gall — should fall back to host range
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall_ids = Enum.map(results, & &1.id)
       assert gall.id in gall_ids
     end
@@ -519,7 +512,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_host_range(host.id, 2, distribution_type: "introduced")
 
       # Only introduced range — should NOT match for fallback
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall_ids = Enum.map(results, & &1.id)
       refute gall.id in gall_ids
     end
@@ -527,7 +520,7 @@ defmodule Gallformers.GallsIdentificationTest do
     test "gall WITH gall_range still uses gall_range not host fallback" do
       # Gall 100 has explicit gall_range for US-CA and CA-AB
       # Should still work via gall_range, not fallback
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids
     end
@@ -541,7 +534,7 @@ defmodule Gallformers.GallsIdentificationTest do
       create_host_range(host.id, 902, precision: "country")
 
       # Filter by California — should match via ancestor expansion
-      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      results = Identification.filter_galls(%{place_codes: ["US-CA"]})
       gall_ids = Enum.map(results, & &1.id)
       assert gall.id in gall_ids
     end

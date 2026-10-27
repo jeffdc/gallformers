@@ -125,6 +125,10 @@ defmodule GallformersWeb.IntermediateLive do
                   <span class="text-lg font-normal text-gray-600">{@taxonomy.rank}:</span>
                   {@taxonomy.name}
                 </h1>
+                <RankPageComponents.admin_edit_link
+                  current_user={@current_user}
+                  taxon_id={@taxonomy.id}
+                />
               </div>
               <p
                 :if={@taxonomy.description not in [nil, ""]}

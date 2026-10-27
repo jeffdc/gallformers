@@ -2,13 +2,36 @@ defmodule GallformersWeb.RankPageComponents do
   @moduledoc """
   The species table the rank pages share (genus, section, and the Galls
   placed at a family or intermediate rank): name, common name and a count,
-  sortable by each. Rows are `GallformersWeb.RankPage.row/0`s.
+  sortable by each. Rows are `GallformersWeb.RankPage.row/0`s. And the
+  rank pages' admin edit link.
   """
   use Phoenix.Component
 
+  import GallformersWeb.CoreComponents, only: [icon: 1]
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
 
+  alias Gallformers.Accounts
   alias GallformersWeb.RankPage
+
+  @doc """
+  The rank page's "Edit in admin" link to the taxon's page in the taxonomy
+  admin, shown to admins only.
+  """
+  attr :current_user, :any, required: true
+  attr :taxon_id, :integer, required: true
+
+  def admin_edit_link(assigns) do
+    ~H"""
+    <.link
+      :if={Accounts.admin?(@current_user)}
+      href={"/admin/taxonomy/#{@taxon_id}"}
+      class="text-gray-400 hover:text-gf-maroon"
+      title="Edit in admin"
+    >
+      <.icon name="ph-pencil-simple" class="h-5 w-5" />
+    </.link>
+    """
+  end
 
   attr :id, :string, required: true
   attr :rows, :list, required: true, doc: "the rows shown (already filtered)"

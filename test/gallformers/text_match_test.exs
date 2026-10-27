@@ -1,8 +1,20 @@
 defmodule Gallformers.TextMatchTest do
   use Gallformers.DataCase, async: true
 
-  alias Gallformers.Species.Species
   alias Gallformers.TextMatch
+
+  # Rows of a table with two text columns to filter on: the old model's
+  # `species` table (not audited), mapped here for the test only.
+  defmodule Species do
+    use Ecto.Schema
+
+    schema "species" do
+      field :name, :string
+      field :taxoncode, :string
+      field :datacomplete, :boolean
+      timestamps(type: :utc_datetime)
+    end
+  end
 
   defp create_species(name, taxoncode) do
     Repo.insert!(%Species{name: name, taxoncode: taxoncode, datacomplete: false})

@@ -8,9 +8,8 @@ defmodule Gallformers.Taxa.ReadModels.Search do
       IDs only.
     * `plants/2` — plants (Plantae at species rank or below) by accepted
       name, synonym or common name. Every word of the query must appear in
-      one name of the plant or in its accepted name (as today's
-      `Gallformers.Plants.search_hosts/3` matches a host's name and its
-      aliases); ranked an exact name first, then a name starting with the
+      one name of the plant or in its accepted name (as the old model's
+      host search matched a host's name and its aliases); ranked an exact name first, then a name starting with the
       query, then the rest, each by accepted name.
     * `genera_and_sections/3` — genera, subgenera and sections whose name
       (accepted or synonym) starts with the query or whose common name

@@ -17,7 +17,7 @@ defmodule GallformersWeb.Admin.RoleLiveSessionTest do
 
   alias Gallformers.Accounts.Auth0User
 
-  @superadmin_paths ["/admin/users", "/admin/filter-terms", "/admin/filter-terms/new"]
+  @superadmin_paths ["/admin/users"]
   @operator_paths ["/admin/ops"]
 
   defp conn_for(conn, roles) do
@@ -85,12 +85,6 @@ defmodule GallformersWeb.Admin.RoleLiveSessionTest do
 
         assert {:ok, _view, _html} = live(conn)
       end
-    end
-
-    test "live-navigates between the filter-term screens", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/filter-terms")
-
-      assert {:ok, _view, _html} = live_redirect(view, to: "/admin/filter-terms/new")
     end
   end
 

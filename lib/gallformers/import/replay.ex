@@ -25,7 +25,16 @@ defmodule Gallformers.Import.Replay do
       change before it made the proposal again.
     * `:synonym_added`, `:plant_added`, `:taxonomy_edit` — the Host-name
       step's and the taxonomy admin's edits, made again on the taxa found
-      by name.
+      by name (the newer ops, and WCVP actions logged as the state they
+      left: `Gallformers.Import.TaxonomyEdits`).
+    * `:package_denied` (`%{"package"}`) — the package, registered from its
+      files if it is not yet, is denied with the logged reason.
+    * `:batch_denied` (`%{"package", "batch_id"}`) — the package is made
+      ready as for `:batch_applied`, and the batch denied with the logged
+      reason.
+    * `:source_edit` (`%{"op", "source"}`) — the Source editor's edit, made
+      again on the Sources found by title
+      (`Gallformers.Import.SourceEdits.from_entry/2`).
 
   Each step goes through the same functions as on preview, so the log is
   written again as it is replayed. The first entry that cannot be replayed
@@ -40,7 +49,9 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.ReplayEntry
+  alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.StableRef
+  alias Gallformers.Import.TaxonomyEdits
 
   @typedoc "A log entry: a `ReplayEntry` or a map with its `kind`, `key` and `payload`."
   @type entry :: ReplayEntry.t() | map()
@@ -151,6 +162,42 @@ defmodule Gallformers.Import.Replay do
     end
   end
 
+  defp replay(actor, %{kind: :package_denied, key: %{"package" => key}, payload: payload}) do
+    package =
+      case Import.get_package_by_key(key) do
+        nil -> Import.register_package(actor, key)
+        package -> {:ok, package}
+      end
+
+    case package do
+      {:ok, %Package{status: :denied}} -> :ok
+      {:ok, package} -> ok(Import.deny_package(actor, package, payload["reason"]))
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp replay(actor, %{
+         kind: :batch_denied,
+         key: %{"package" => key, "batch_id" => batch_id},
+         payload: payload
+       }) do
+    with {:ok, package} <- ensure_package(actor, key) do
+      case Enum.find(Import.list_batches(package), &(&1.producer_batch_id == batch_id)) do
+        %Batch{status: :denied} -> :ok
+        %Batch{} = batch -> ok(Import.deny_batch(actor, batch, payload["reason"]))
+        nil -> {:error, {:no_batch, batch_id}}
+      end
+    end
+  end
+
+  defp replay(actor, %{kind: :source_edit, key: key, payload: payload}) do
+    case SourceEdits.from_entry(key, payload) do
+      {:ok, edit} -> ok(Import.record_source_edit(actor, edit))
+      :done -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
 
   defp edit(%{"op" => "place", "taxon" => taxon}, payload) do
@@ -183,7 +230,12 @@ defmodule Gallformers.Import.Replay do
     end
   end
 
-  defp edit(key, _payload), do: {:error, {:unknown_edit, key}}
+  defp edit(key, payload) do
+    case TaxonomyEdits.decode(key, payload) do
+      :unknown -> {:error, {:unknown_edit, key}}
+      decoded -> decoded
+    end
+  end
 
   defp optional_taxon(nil), do: {:ok, nil}
   defp optional_taxon(ref), do: StableRef.resolve_taxon(ref)

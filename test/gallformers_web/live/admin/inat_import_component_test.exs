@@ -1,67 +1,98 @@
 defmodule GallformersWeb.Admin.InatImportComponentTest do
   @moduledoc """
-  Tests for the iNaturalist import component on the Images admin page.
+  Tests for the iNaturalist import component of the image component
+  (`GallformersWeb.Admin.ImagesComponent`), hosted by a minimal LiveView.
   """
   use GallformersWeb.ConnCase, async: true
 
-  import Ecto.Query
   import Phoenix.LiveViewTest
 
-  alias Gallformers.Accounts.Auth0User
+  alias Gallformers.CatalogFixtures
+  alias Gallformers.INaturalist.{Observation, Photo}
+  alias GallformersWeb.Admin.InatImportComponent
 
-  setup %{conn: conn} do
-    user = %Auth0User{
-      id: "test-user-id",
-      email: "admin@test.com",
-      name: "Test Admin",
-      nickname: nil,
-      picture: nil,
-      roles: ["admin"]
-    }
+  defmodule HostLive do
+    use Phoenix.LiveView
 
-    conn =
-      conn
-      |> init_test_session(%{})
-      |> put_session(:current_user, user)
-      |> put_session(:db_display_name, "Test Admin")
+    def mount(_params, %{"owner" => owner}, socket),
+      do: {:ok, Phoenix.Component.assign(socket, :owner, owner)}
 
-    species =
-      Gallformers.Repo.one!(from(s in Gallformers.Species.Species, limit: 1))
-
-    {:ok, conn: conn, species: species}
+    def render(assigns) do
+      ~H"""
+      <.live_component module={InatImportComponent} id="inat" owner={@owner} uploader="Admin" />
+      """
+    end
   end
 
   describe "inat import component" do
-    test "renders in upload section when species is selected", %{conn: conn, species: species} do
-      {:ok, view, _html} = live(conn, ~p"/admin/images?species_id=#{species.id}")
+    setup %{conn: conn} do
+      gall = CatalogFixtures.gall_fixture()
+      {:ok, view, _html} = live_isolated(conn, HostLive, session: %{"owner" => {:gall, gall.id}})
+      %{view: view}
+    end
 
-      html = render(view)
-      assert html =~ "Import from iNaturalist"
+    test "renders the observation URL input and fetch button", %{view: view} do
+      assert render(view) =~ "Import from iNaturalist"
       assert has_element?(view, "[data-role=inat-url-input]")
       assert has_element?(view, "[data-role=inat-fetch-button]")
     end
 
-    test "fetch button is disabled when input is empty", %{conn: conn, species: species} do
-      {:ok, view, _html} = live(conn, ~p"/admin/images?species_id=#{species.id}")
-
+    test "fetch button is disabled when input is empty", %{view: view} do
       assert has_element?(view, "[data-role=inat-fetch-button][disabled]")
     end
 
-    test "shows error for invalid input", %{conn: conn, species: species} do
-      {:ok, view, _html} = live(conn, ~p"/admin/images?species_id=#{species.id}")
-
+    test "shows error for invalid input", %{view: view} do
       view
       |> element("form[phx-submit=inat_fetch]")
       |> render_submit(%{url: "not-a-valid-url"})
 
-      html = render(view)
-      assert html =~ "valid iNaturalist observation URL"
+      assert render(view) =~ "valid iNaturalist observation URL"
+    end
+  end
+
+  describe "store_photo/5" do
+    setup do
+      observation = %Observation{
+        id: 12_345,
+        observer_login: "janedoe",
+        observer_name: "Jane Doe",
+        url: "https://www.inaturalist.org/observations/12345",
+        photos: []
+      }
+
+      photo = %Photo{
+        id: 1,
+        thumbnail_url: "https://static.inaturalist.org/photos/1/medium.png",
+        original_url: "https://static.inaturalist.org/photos/1/original.png",
+        mapped_license: "CC-BY-NC"
+      }
+
+      %{observation: observation, photo: photo}
     end
 
-    test "does not render when no species is selected", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/images")
+    test "stores a downloaded photo as the owner's image", %{observation: obs, photo: photo} do
+      gall = CatalogFixtures.gall_fixture()
 
-      refute html =~ "Import from iNaturalist"
+      assert {:ok, image} =
+               InatImportComponent.store_photo("png bytes", photo, obs, {:gall, gall.id}, "Admin")
+
+      assert image.gall_id == gall.id
+      assert image.path =~ ~r{^gall/#{gall.id}/#{gall.id}_\d+_\d+_original\.png$}
+      assert image.creator == "janedoe - Jane Doe"
+      assert image.license == "CC-BY-NC"
+      assert image.licenselink == Gallformers.Licenses.url("CC-BY-NC")
+      assert image.sourcelink == "https://www.inaturalist.org/observations/12345"
+      assert image.uploader == "Admin"
+    end
+
+    test "stores a taxon's photo", %{observation: obs, photo: photo} do
+      plant = CatalogFixtures.plant_fixture()
+
+      assert {:ok, image} =
+               InatImportComponent.store_photo("bytes", photo, obs, {:taxon, plant.id}, "Admin")
+
+      assert image.taxon_id == plant.id
+      assert [_] = Gallformers.Images.list_images_for_taxon(plant.id)
     end
   end
 end

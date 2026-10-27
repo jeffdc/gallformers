@@ -71,7 +71,20 @@ defmodule Gallformers.DataCase do
   in one sandbox transaction, so a test uses this actor for every audited
   call (fixtures included). See `Gallformers.Audit`.
   """
-  def test_actor, do: Gallformers.Audit.Actor.system("test")
+  def test_actor,
+    do: Process.get(:gallformers_test_actor) || Gallformers.Audit.Actor.system("test")
+
+  @doc """
+  Makes `actor` the test process's `test_actor/0`, before any audited write.
+
+  A LiveView test that writes through an admin screen writes as the signed-in
+  admin (`GallformersWeb.AdminLiveHelpers.log_in_admin/2` calls this), and the
+  test's fixtures must then write as the same actor.
+  """
+  def put_test_actor(%Gallformers.Audit.Actor{} = actor) do
+    Process.put(:gallformers_test_actor, actor)
+    :ok
+  end
 
   @doc """
   Records explicit audit metadata (`test_actor/0`, operation `"test.setup"`)

@@ -2,9 +2,10 @@ defmodule Gallformers.Images do
   @moduledoc """
   The Images context.
 
-  Provides functions for managing species images including CRUD operations,
-  audit functions, and attribution checking. Image-object storage operations
-  are in `Gallformers.Storage.Images`.
+  Provides functions for managing the images of Galls and taxa (an image's
+  owner, `t:Gallformers.Images.Image.owner/0`): CRUD, ordering and copying
+  metadata. Attribution rules are in `Gallformers.Images.Attribution`;
+  image-object storage operations are in `Gallformers.Storage.Images`.
   """
   use Boundary,
     deps: [
@@ -13,8 +14,6 @@ defmodule Gallformers.Images do
       Gallformers.SchemaFields,
       Gallformers.Async,
       Gallformers.Licenses,
-      Gallformers.TextMatch,
-      Gallformers.Species,
       Gallformers.Storage
     ],
     exports: :all
@@ -23,11 +22,8 @@ defmodule Gallformers.Images do
 
   import Ecto.Query
   alias Gallformers.Images.Image, as: ImageSchema
-  alias Gallformers.Licenses
   alias Gallformers.Repo
-  alias Gallformers.Species.Species
   alias Gallformers.Storage.Images, as: ImageStorage
-  alias Gallformers.TextMatch
 
   @species_variant_sizes [small: 300, medium: 800, large: 1200, xlarge: 2000]
   @species_variant_names [:original | Keyword.keys(@species_variant_sizes)]
@@ -49,18 +45,11 @@ defmodule Gallformers.Images do
   # =============================================================================
 
   @doc """
-  Gets all images for a species, ordered by sort_order.
+  Gets an owner's images (a Gall's or a taxon's), ordered by sort_order.
   """
-  @spec list_images_for_species(integer()) :: [ImageSchema.t()]
-  def list_images_for_species(species_id) do
-    from(i in ImageSchema,
-      left_join: src in assoc(i, :source),
-      where: i.species_id == ^species_id,
-      order_by: [asc: i.sort_order, asc: i.id],
-      preload: [source: src]
-    )
-    |> Repo.all()
-  end
+  @spec list_images(ImageSchema.owner()) :: [ImageSchema.t()]
+  def list_images({:gall, id}), do: list_images_for_gall(id)
+  def list_images({:taxon, id}), do: list_images_for_taxon(id)
 
   @doc """
   Gets a Gall's images (by `image.gall_id`, the typed reference the catalog
@@ -125,21 +114,19 @@ defmodule Gallformers.Images do
   end
 
   @doc """
-  Creates an image record and schedules background size variant generation.
+  Creates `owner`'s image record for an uploaded `path` and schedules
+  background size variant generation.
 
   Used by both the presigned-URL upload flow and the iNat import flow.
   `extra_attrs` can include `:creator`, `:license`, `:licenselink`, `:sourcelink`, etc.
   """
-  @spec finalize_upload(String.t(), integer(), String.t(), map()) ::
+  @spec finalize_upload(String.t(), ImageSchema.owner(), String.t(), map()) ::
           {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
-  def finalize_upload(path, species_id, uploader, extra_attrs \\ %{}) do
+  def finalize_upload(path, owner, uploader, extra_attrs \\ %{}) do
     attrs =
-      Map.merge(extra_attrs, %{
-        species_id: species_id,
-        path: path,
-        uploader: uploader,
-        lastchangedby: uploader
-      })
+      extra_attrs
+      |> Map.merge(ImageSchema.owner_attrs(owner))
+      |> Map.merge(%{path: path, uploader: uploader, lastchangedby: uploader})
 
     case create_image(attrs) do
       {:ok, image} ->
@@ -181,35 +168,43 @@ defmodule Gallformers.Images do
   end
 
   @doc """
-  Creates a new image record.
+  Creates a new image record for the owner its attrs name (`gall_id` or
+  `taxon_id`, exactly one).
 
-  Automatically assigns the next sort_order for the species (appends to end).
+  Automatically assigns the next sort_order among the owner's images
+  (appends to end).
   """
   @spec create_image(map()) :: {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
   def create_image(attrs) do
-    attrs = assign_next_sort_order(attrs)
+    changeset = ImageSchema.changeset(%ImageSchema{}, attrs)
 
-    %ImageSchema{}
-    |> image_changeset(attrs)
+    changeset
+    |> Ecto.Changeset.put_change(:sort_order, next_sort_order(changeset))
     |> Repo.insert()
   end
 
-  defp assign_next_sort_order(attrs) do
-    species_id = attrs[:species_id] || attrs["species_id"]
+  defp next_sort_order(changeset) do
+    case owner_filter(changeset) do
+      nil ->
+        0
 
-    if species_id do
-      max_order =
-        from(i in ImageSchema,
-          where: i.species_id == ^species_id,
-          select: max(i.sort_order)
-        )
-        |> Repo.one() || -1
-
-      Map.put(attrs, :sort_order, max_order + 1)
-    else
-      attrs
+      filter ->
+        last = from(i in ImageSchema, where: ^filter, select: max(i.sort_order)) |> Repo.one()
+        (last || -1) + 1
     end
   end
+
+  defp owner_filter(changeset) do
+    case {Ecto.Changeset.get_field(changeset, :gall_id),
+          Ecto.Changeset.get_field(changeset, :taxon_id)} do
+      {gall_id, nil} when is_integer(gall_id) -> owner_where({:gall, gall_id})
+      {nil, taxon_id} when is_integer(taxon_id) -> owner_where({:taxon, taxon_id})
+      _ -> nil
+    end
+  end
+
+  defp owner_where({:gall, id}), do: dynamic([i], i.gall_id == ^id)
+  defp owner_where({:taxon, id}), do: dynamic([i], i.taxon_id == ^id)
 
   @doc """
   Updates an image record.
@@ -218,7 +213,7 @@ defmodule Gallformers.Images do
           {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
   def update_image(%ImageSchema{} = image, attrs) do
     image
-    |> image_changeset(attrs)
+    |> ImageSchema.changeset(attrs)
     |> Repo.update()
   end
 
@@ -277,47 +272,22 @@ defmodule Gallformers.Images do
   end
 
   @doc """
-  Deletes all images from S3 for a species without touching the database.
-
-  Used when cascade deleting a species where the image DB rows will be
-  automatically removed by the foreign key constraint. Logs warnings for
-  any S3 deletion failures but continues processing all images.
-
-  Returns :ok regardless of individual S3 errors to allow the delete to proceed.
-  """
-  @spec delete_images_from_s3_for_species(integer()) :: :ok
-  def delete_images_from_s3_for_species(species_id) do
-    images =
-      from(i in ImageSchema, where: i.species_id == ^species_id, select: i.path)
-      |> Repo.all()
-
-    Enum.each(images, fn path ->
-      case ImageStorage.delete_content_image(path, species_variant_names()) do
-        :ok ->
-          :ok
-
-        {:error, reason} ->
-          Logger.warning("Failed to delete S3 image #{path}: #{inspect(reason)}")
-      end
-    end)
-
-    :ok
-  end
-
-  @doc """
-  Reorders images for a species.
+  Reorders an owner's images.
 
   Takes a list of image IDs in the desired order. Persists the sort_order
-  for each image based on its position in the list.
+  for each image based on its position in the list; IDs of other owners'
+  images are skipped.
   """
-  @spec reorder_images(integer(), [integer()]) :: :ok | {:error, term()}
-  def reorder_images(_species_id, ordered_ids) when is_list(ordered_ids) do
+  @spec reorder_images(ImageSchema.owner(), [integer()]) :: :ok | {:error, term()}
+  def reorder_images(owner, ordered_ids) when is_list(ordered_ids) do
+    owned = owner_where(owner)
+
     Repo.transaction(fn ->
       # Update sort_order for each image based on position in list
       ordered_ids
       |> Enum.with_index()
       |> Enum.each(fn {image_id, index} ->
-        from(i in ImageSchema, where: i.id == ^image_id)
+        from(i in ImageSchema, where: i.id == ^image_id, where: ^owned)
         |> Repo.update_all(set: [sort_order: index])
       end)
     end)
@@ -325,27 +295,6 @@ defmodule Gallformers.Images do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
     end
-  end
-
-  defp image_changeset(image, attrs) do
-    import Ecto.Changeset
-
-    image
-    |> cast(attrs, [
-      :species_id,
-      :source_id,
-      :path,
-      :sort_order,
-      :creator,
-      :attribution,
-      :license,
-      :licenselink,
-      :sourcelink,
-      :uploader,
-      :lastchangedby,
-      :caption
-    ])
-    |> validate_required([:species_id, :path])
   end
 
   # =============================================================================
@@ -386,108 +335,6 @@ defmodule Gallformers.Images do
     from(i in ImageSchema,
       where: not is_nil(i.gall_id) or not is_nil(i.taxon_id),
       select: count(i.id)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Searches for species by name for image management.
-  """
-  @spec search_species(String.t()) :: [map()]
-  def search_species(query) when is_binary(query) do
-    filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      left_join: i in ImageSchema,
-      on: i.species_id == s.id,
-      where: ^filter,
-      group_by: [s.id, s.name, s.taxoncode],
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        image_count: count(i.id)
-      },
-      order_by: s.name,
-      limit: 20
-    )
-    |> Repo.all()
-  end
-
-  # =============================================================================
-  # Attribution Functions (delegates to Images.Attribution)
-  # =============================================================================
-
-  defdelegate requires_attribution?(license), to: Gallformers.Images.Attribution
-  defdelegate image_attributed?(image), to: Gallformers.Images.Attribution
-
-  @doc """
-  Lists images that are not properly attributed.
-
-  Options:
-  - :page - page number (default 1)
-  - :per_page - items per page (default 50)
-
-  Returns {images, total_count}.
-  """
-  @spec list_unattributed_images(keyword()) :: {[ImageSchema.t()], integer()}
-  def list_unattributed_images(opts \\ []) do
-    page = Keyword.get(opts, :page, 1)
-    per_page = Keyword.get(opts, :per_page, 50)
-    offset = (page - 1) * per_page
-
-    base_query = unattributed_images_query()
-
-    images =
-      base_query
-      |> order_by([i, _src, s], asc: s.name, asc: i.id)
-      |> limit(^per_page)
-      |> offset(^offset)
-      |> preload([:source, :species])
-      |> Repo.all()
-
-    total = Repo.aggregate(base_query, :count)
-
-    {images, total}
-  end
-
-  @doc """
-  Returns the count of unattributed images.
-  """
-  @spec count_unattributed_images() :: integer()
-  def count_unattributed_images do
-    unattributed_images_query()
-    |> Repo.aggregate(:count)
-  end
-
-  # Query for images that are not properly attributed.
-  # An image is unattributed if:
-  # - No source_id AND (no license OR (license requires attribution AND no creator))
-  defp unattributed_images_query do
-    # Licenses that require attribution (all except CC0)
-    attribution_licenses = Licenses.all() -- ["Public Domain / CC0"]
-
-    from(i in ImageSchema,
-      left_join: src in assoc(i, :source),
-      left_join: s in Species,
-      on: i.species_id == s.id,
-      # No source with license
-      # AND either no license, or license requires attribution but no creator
-      where:
-        (is_nil(i.source_id) or is_nil(src.license)) and
-          (is_nil(i.license) or i.license == "" or
-             (i.license in ^attribution_licenses and (is_nil(i.creator) or i.creator == "")))
-    )
-  end
-
-  @doc """
-  Gets an image by ID with species preloaded (for audit display).
-  """
-  @spec get_image_with_species(integer()) :: ImageSchema.t() | nil
-  def get_image_with_species(id) do
-    from(i in ImageSchema,
-      where: i.id == ^id,
-      preload: [:source, :species]
     )
     |> Repo.one()
   end

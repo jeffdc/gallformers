@@ -21,7 +21,9 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
     * `related_galls` — other Galls with the same current species-rank
       Inducer (alternate generations and forms), by name;
     * `sources` — the legacy citations and the newest Gallformers note: the
-      Gall's default Source (`default_source_id`, a citation or the note)
+      Gall's default Source (`default_source_id`, a citation, the note, or
+      any other of its Sources, `Gallformers.Catalog.gall_sources/1`, such as
+      one that only attributes Facts — listed then without a description)
       first, the note next, then by title. Each is the Source's fields with
       the citation's `description` (the note's text), `useasdefault` (it is
       the Gall's default Source), `externallink` and `note?`;
@@ -230,7 +232,8 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
 
   @doc """
   A Gall's Sources as its page lists them (`sources` above): the legacy
-  citations and the newest Gallformers note, the default Source first.
+  citations and the newest Gallformers note, the default Source first (also
+  when it is neither).
   """
   @spec sources(Gall.t()) :: [source()]
   def sources(%Gall{id: gall_id, default_source_id: default_id}) do
@@ -252,6 +255,8 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
         source -> [entry(source, note.text, source.id == default_id, "", true) | entries]
       end
 
+    entries = entries ++ lead_only(default_id, Map.keys(by_id))
+
     Enum.sort_by(entries, fn entry ->
       cond do
         entry.useasdefault -> {0, entry.title}
@@ -259,6 +264,19 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
         true -> {2, entry.title}
       end
     end)
+  end
+
+  # The lead Source when neither a citation nor the note gives it (a Source
+  # that only attributes Facts about the Gall), without a description.
+  defp lead_only(nil, _listed_ids), do: []
+
+  defp lead_only(default_id, listed_ids) do
+    if default_id in listed_ids do
+      []
+    else
+      for source <- Sources.list_sources_by_id([default_id]),
+          do: entry(source, "", true, "", false)
+    end
   end
 
   defp newest_note(gall_id) do

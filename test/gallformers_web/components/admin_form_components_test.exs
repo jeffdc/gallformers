@@ -31,7 +31,7 @@ defmodule GallformersWeb.AdminFormComponentsTest do
       {:ok,
        assign(socket,
          warnings: [
-           %{reason: :name_match, species_id: 42, species_name: "Quercus alba"}
+           %{reason: :name_match, taxon_id: 42, name: "Quercus alba"}
          ]
        )}
     end
@@ -53,8 +53,8 @@ defmodule GallformersWeb.AdminFormComponentsTest do
            %{
              reason: :alias_match,
              alias_type: "common",
-             species_id: 99,
-             species_name: "Quercus rubra"
+             taxon_id: 99,
+             name: "Quercus rubra"
            }
          ]
        )}
@@ -77,8 +77,8 @@ defmodule GallformersWeb.AdminFormComponentsTest do
            %{
              reason: :alias_match,
              alias_type: "scientific",
-             species_id: 55,
-             species_name: "Quercus velutina"
+             taxon_id: 55,
+             name: "Quercus velutina"
            }
          ]
        )}
@@ -98,7 +98,7 @@ defmodule GallformersWeb.AdminFormComponentsTest do
       {:ok,
        assign(socket,
          warnings: [
-           %{reason: :wcvp_id_match, species_id: 77, species_name: "Acer saccharum"}
+           %{reason: :wcvp_id_match, taxon_id: 77, name: "Acer saccharum"}
          ]
        )}
     end
@@ -117,14 +117,14 @@ defmodule GallformersWeb.AdminFormComponentsTest do
       {:ok,
        assign(socket,
          warnings: [
-           %{reason: :name_match, species_id: 42, species_name: "Quercus alba"},
+           %{reason: :name_match, taxon_id: 42, name: "Quercus alba"},
            %{
              reason: :alias_match,
              alias_type: "common",
-             species_id: 99,
-             species_name: "Quercus rubra"
+             taxon_id: 99,
+             name: "Quercus rubra"
            },
-           %{reason: :wcvp_id_match, species_id: 77, species_name: "Acer saccharum"}
+           %{reason: :wcvp_id_match, taxon_id: 77, name: "Acer saccharum"}
          ]
        )}
     end
@@ -144,7 +144,7 @@ defmodule GallformersWeb.AdminFormComponentsTest do
       assert html =~ "Possible duplicate"
       assert html =~ "exact name already exists"
       assert html =~ "Quercus alba"
-      assert html =~ ~s(href="/admin/hosts/42")
+      assert html =~ ~s(href="/admin/taxonomy/42")
     end
 
     test "renders warning for alias_match with common type", %{conn: conn} do

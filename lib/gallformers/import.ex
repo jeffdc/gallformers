@@ -39,13 +39,22 @@ defmodule Gallformers.Import do
        (new open items) sends the package back to `:awaiting_review`.
 
   Until a package is approved nothing here changes Facts, taxa or Galls.
+  Instead of approving, an admin can deny a package or one of its batches
+  (`deny_package/3`, `deny_batch/3`) until it is applied.
+
+  The review screens list packages and the open queue items of every
+  package (`list_packages/1`, `list_open_queue_items/1`). Gallformers' own
+  statements written in a form — a curator's range exclusion, say — arrive
+  as a package of their own (`submit_gallformers_fragment/2`) and go
+  through the same steps, approved at once when nothing needs a decision.
 
   ## The replay log
 
   Every data-changing step appends to `replay_log` by stable keys
-  (`Gallformers.Import.StableRef`): batches applied, queue decisions, and
-  the Host-name step's and taxonomy admin's edits (`record_synonym_added/4`,
-  `record_plant_added/2`, `record_taxonomy_edit/2`).
+  (`Gallformers.Import.StableRef`): batches applied, queue decisions,
+  denials, and the Host-name step's and taxonomy admin's edits
+  (`record_synonym_added/4`, `record_plant_added/2`,
+  `record_taxonomy_edit/2`, `record_wcvp_edit/2`).
   `Gallformers.Import.Replay` replays it after the cutover data migration:
   `export_replay_log/0` writes preview's log to the private bucket and
   `replay_exported/2` replays that file on production
@@ -64,6 +73,7 @@ defmodule Gallformers.Import do
       Gallformers.Facts,
       Gallformers.Licenses,
       Gallformers.Places,
+      Gallformers.Ranges,
       Gallformers.Repo,
       Gallformers.Sources,
       Gallformers.Storage,
@@ -102,8 +112,11 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.ReplayExport
   alias Gallformers.Import.ReplayLog
   alias Gallformers.Import.Resolver
+  alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.SourceStep
   alias Gallformers.Import.StableRef
+  alias Gallformers.Import.TaxonomyAdmin
+  alias Gallformers.Import.TaxonomyEdits
   alias Gallformers.Import.Validator
   alias Gallformers.Import.Validator.Problem
   alias Gallformers.Import.Worker
@@ -115,6 +128,7 @@ defmodule Gallformers.Import do
   @package_files ["document.json", "taxonomy.json", "gall.json", "review.json"]
   @validatable [:received, :invalid, :validated]
   @resolvable [:validated, :resolving, :awaiting_review]
+  @deniable [:received, :invalid, :validated, :resolving, :awaiting_review]
   @statement_fields [
     :kind,
     :ref,
@@ -156,6 +170,38 @@ defmodule Gallformers.Import do
   @doc "Gets a package by key, or nil."
   @spec get_package_by_key(String.t()) :: Package.t() | nil
   def get_package_by_key(key), do: Repo.get_by(Package, key: key)
+
+  @typedoc "A page of results: the entries asked for and how many there are in all."
+  @type page(entry) :: %{entries: [entry], total: non_neg_integer()}
+
+  @doc """
+  Packages, newest first, as a page. Options: `:status` (a status or a
+  list of them; every package when absent), `:limit` (nil for all),
+  `:offset`.
+  """
+  @spec list_packages(keyword()) :: page(Package.t())
+  def list_packages(opts \\ []) do
+    query =
+      case opts[:status] do
+        nil -> Package
+        statuses when is_list(statuses) -> from(p in Package, where: p.status in ^statuses)
+        status -> from(p in Package, where: p.status == ^status)
+      end
+
+    page(query, [desc: :id], [], opts)
+  end
+
+  defp page(query, order, preloads, opts) do
+    entries =
+      query
+      |> order_by(^order)
+      |> offset(^(opts[:offset] || 0))
+      |> then(&if(opts[:limit], do: limit(&1, ^opts[:limit]), else: &1))
+      |> preload(^preloads)
+      |> Repo.all()
+
+    %{entries: entries, total: Repo.aggregate(query, :count)}
+  end
 
   @doc """
   The package's files from the private bucket, as a map of file name to
@@ -342,7 +388,10 @@ defmodule Gallformers.Import do
   defp resolve(package, files) do
     all = list_batches(package)
     batches = Enum.reject(all, &(&1.status in [:applied, :denied]))
-    taxonomy = Enum.find_value(all, &(&1.batch_type == :taxonomy && &1.content))
+    # A denied taxonomy batch names no taxa for the gall batch.
+    taxonomy =
+      Enum.find_value(all, &(&1.batch_type == :taxonomy && &1.status != :denied && &1.content))
+
     texts = document_texts(files["document.json"])
     review = decode(files["review.json"])
 
@@ -532,6 +581,33 @@ defmodule Gallformers.Import do
   end
 
   @doc """
+  The open queue items of every package, and the rename proposals (which
+  come from no package), oldest first, as a page; each with its `package`
+  and `batch` (nil for a rename proposal and for an item about the
+  package's Source). Options: `:kind`, `:limit` (nil for all), `:offset`.
+  """
+  @spec list_open_queue_items(keyword()) :: page(QueueItem.t())
+  def list_open_queue_items(opts \\ []) do
+    query = from(q in QueueItem, where: q.status == :open)
+
+    query =
+      case opts[:kind] do
+        nil -> query
+        kind -> where(query, [q], q.kind == ^kind)
+      end
+
+    page(query, [asc: :id], [:package, :batch], opts)
+  end
+
+  @doc "How many queue items are open, by kind (kinds with none are absent)."
+  @spec count_open_queue_items() :: %{QueueItem.kind() => pos_integer()}
+  def count_open_queue_items do
+    from(q in QueueItem, where: q.status == :open, group_by: q.kind, select: {q.kind, count()})
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  @doc """
   Whether a batch can be applied now: resolved with nothing holding it (a
   gall batch waits for its Host names, `d585`). Applying also waits for the
   package's taxonomy batch (Task 13).
@@ -716,6 +792,98 @@ defmodule Gallformers.Import do
   defp pending_batches(package),
     do: package |> list_batches() |> Enum.reject(&(&1.status in [:applied, :denied]))
 
+  # -- denial ------------------------------------------------------------------
+
+  @doc """
+  Denies a package: it and its batches become `:denied` with `reason` (the
+  same for each), and its open queue items are dropped (decided ones are
+  kept), so nothing of it is applied. The replay log records it by the
+  package's key.
+
+  Refused (`{:error, :not_deniable}`) for a package approved or denied
+  already, or with a batch applied (deny its other batches one by one,
+  `deny_batch/3`). `{:error, changeset}` (errors on `:denied_reason`) when
+  `reason` is blank.
+  """
+  @spec deny_package(Actor.t(), Package.t(), String.t() | nil) ::
+          {:ok, Package.t()} | {:error, :not_deniable | Changeset.t()}
+  def deny_package(%Actor{} = actor, %Package{} = package, reason) do
+    Audit.transaction(actor, "import.deny_package", fn ->
+      package = lock_package(package.id)
+      batches = list_batches(package)
+
+      if package.status not in @deniable or Enum.any?(batches, &(&1.status == :applied)),
+        do: Repo.rollback(:not_deniable)
+
+      package = deny_whole_package(package, batches, reason)
+
+      ReplayLog.append!(:package_denied, %{"package" => package.key}, %{
+        "reason" => package.denied_reason
+      })
+
+      package
+    end)
+  end
+
+  @doc """
+  Denies one batch of a package: it becomes `:denied` with `reason` and its
+  open queue items are dropped (decided ones are kept). Resolving and
+  applying the package leave it out; the package waits on for its other
+  batches, and is denied too when none is left that is not denied. The
+  replay log records it by the package's key and the producer's
+  `batch_id`.
+
+  Refused (`{:error, :not_deniable}`) for a batch applied or denied already,
+  or of a package approved or denied. `{:error, changeset}` (errors on
+  `:denied_reason`) when `reason` is blank.
+  """
+  @spec deny_batch(Actor.t(), Batch.t(), String.t() | nil) ::
+          {:ok, Batch.t()} | {:error, :not_deniable | Changeset.t()}
+  def deny_batch(%Actor{} = actor, %Batch{} = batch, reason) do
+    Audit.transaction(actor, "import.deny_batch", fn ->
+      package = lock_package(batch.package_id)
+      batch = Repo.one!(from(b in Batch, where: b.id == ^batch.id, lock: "FOR UPDATE"))
+
+      if package.status not in @deniable or batch.status in [:applied, :denied],
+        do: Repo.rollback(:not_deniable)
+
+      batch = batch |> Batch.deny_changeset(reason) |> Repo.update() |> unwrap_or_rollback()
+      Repo.delete_all(from(q in QueueItem, where: q.batch_id == ^batch.id and q.status == :open))
+
+      ReplayLog.append!(
+        :batch_denied,
+        %{"package" => package.key, "batch_id" => batch.producer_batch_id},
+        %{"reason" => batch.denied_reason}
+      )
+
+      batches = list_batches(package)
+
+      if Enum.all?(batches, &(&1.status == :denied)),
+        do: deny_whole_package(package, batches, batch.denied_reason)
+
+      batch
+    end)
+  end
+
+  # Inside the caller's transaction, the package row locked: the package
+  # and its batches not yet denied become denied, and its open items go.
+  defp deny_whole_package(package, batches, reason) do
+    package = package |> Package.deny_changeset(reason) |> Repo.update() |> unwrap_or_rollback()
+
+    for batch <- batches, batch.status != :denied do
+      batch
+      |> Batch.deny_changeset(package.denied_reason)
+      |> Repo.update()
+      |> unwrap_or_rollback()
+    end
+
+    Repo.delete_all(
+      from(q in QueueItem, where: q.package_id == ^package.id and q.status == :open)
+    )
+
+    package
+  end
+
   @doc """
   Enqueues the import worker for `package`, acting as `actor`: one waiting
   job per package (a newer enqueue replaces the waiting job's actor).
@@ -772,6 +940,71 @@ defmodule Gallformers.Import do
 
     sources == [] or not Enum.all?(sources, &match?(%{"gallformers" => true}, &1))
   end
+
+  # -- Gallformers' own statements ---------------------------------------------
+
+  @doc """
+  Takes in Gallformers' own statements written in a form (a curator's range
+  exclusion, say; `priv/import/GALLFORMERS_STATEMENTS.md`) as a package of
+  their own: `batches` maps a batch file name (`"gall.json"`,
+  `"taxonomy.json"`) to the decoded batch, its source `{"gallformers":
+  true}`. Each batch is given a fresh producer `batch_id` (any it has is
+  replaced) and written to the private bucket under a fresh key; the
+  package is registered as `actor` (the submitter), validated (no review,
+  `review_required?/1`) and resolved, then approved when nothing needs a
+  decision, and the import worker applies it.
+
+  Returns the package: `:approved` (applied by the worker; inline in
+  tests), `:awaiting_review` when a queue item or an unresolved Host name
+  needs an admin first, or `:invalid` with its problems.
+  `{:error, :not_gallformers}` when `batches` is empty, names another file
+  or has a batch that is not Gallformers' own.
+  """
+  @spec submit_gallformers_fragment(Actor.t(), %{String.t() => map()}) ::
+          {:ok, Package.t()} | {:error, :not_gallformers | term()}
+  def submit_gallformers_fragment(%Actor{} = actor, batches) when is_map(batches) do
+    key = "gallformers-" <> Ecto.UUID.generate()
+    attrs = if actor.type == :user, do: %{submitter_user_id: actor.id}, else: %{}
+
+    with :ok <- gallformers_batches(batches),
+         :ok <- put_fragment(key, batches),
+         {:ok, package} <- register_package(actor, key, attrs),
+         {:ok, package} <- advance_package(actor, package.id) do
+      approve_if_clear(actor, package)
+    end
+  end
+
+  defp gallformers_batches(batches) do
+    gallformers? = fn {name, batch} ->
+      name in Validator.batch_files() and is_map(batch) and
+        match?(%{"gallformers" => true}, batch["source"])
+    end
+
+    if map_size(batches) > 0 and Enum.all?(batches, gallformers?),
+      do: :ok,
+      else: {:error, :not_gallformers}
+  end
+
+  defp put_fragment(key, batches) do
+    Enum.reduce_while(batches, :ok, fn {name, batch}, :ok ->
+      bytes = batch |> Map.put("batch_id", Ecto.UUID.generate()) |> Jason.encode!()
+
+      case Private.put(Package.prefix(key) <> name, bytes) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, {name, reason}}}
+      end
+    end)
+  end
+
+  defp approve_if_clear(actor, %Package{status: :awaiting_review} = package) do
+    case approve_package(actor, package) do
+      {:ok, package} -> {:ok, package}
+      {:error, {held, _found}} when held in [:open_items, :blocked] -> {:ok, package}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp approve_if_clear(_actor, package), do: {:ok, package}
 
   # -- applying ----------------------------------------------------------------
 
@@ -1053,6 +1286,7 @@ defmodule Gallformers.Import do
           | {:rename, Taxa.taxon_ref(), String.t()}
           | {:add_common_name, Taxa.taxon_ref(), String.t()}
           | {:create_taxon, map()}
+          | TaxonomyEdits.edit()
 
   @doc """
   A taxonomy admin's editorial edit (phase 1: curator edits, no Facts) —
@@ -1064,6 +1298,15 @@ defmodule Gallformers.Import do
     * `{:add_common_name, taxon, name}` — `Gallformers.Taxa.add_common_name/3`
     * `{:create_taxon, attrs}` — `Gallformers.Taxa.create_taxon/2`
       (`:name`, `:rank`, `:parent_id`, `:kingdom`, `:origin`)
+    * `{:update_editorial, taxon, attrs}` — `Gallformers.Taxa.update_editorial/3`
+    * `{:remove_synonym, name}` — `Gallformers.Taxa.remove_synonym/2`
+    * `{:remove_common_name, name}` — `Gallformers.Taxa.remove_common_name/2`
+    * `{:delete_taxon, taxon}` — `Gallformers.Taxa.delete_taxon/2`
+    * `{:set_host_range, taxon, entries}` — `Gallformers.Ranges.update_taxon_places/3`
+    * `{:set_wcvp, taxon, attrs}` — `Gallformers.Ranges.Wcvp.put_link/3`
+
+  The last six are `Gallformers.Import.TaxonomyEdits`'s, which says how
+  each is logged.
   """
   @spec record_taxonomy_edit(Actor.t(), taxonomy_edit()) :: {:ok, term()} | {:error, term()}
   def record_taxonomy_edit(%Actor{} = actor, edit) do
@@ -1097,6 +1340,8 @@ defmodule Gallformers.Import do
      }}
   end
 
+  defp edit_entry(edit), do: TaxonomyEdits.entry(edit)
+
   defp run_edit(actor, {:place, taxon, parent}), do: Taxa.place(actor, taxon, parent)
   defp run_edit(actor, {:rename, taxon, name}), do: Taxa.rename(actor, taxon, name)
 
@@ -1106,8 +1351,81 @@ defmodule Gallformers.Import do
   defp run_edit(actor, {:create_taxon, attrs}),
     do: Taxa.create_taxon(actor, Map.put_new(attrs, :origin, :curated))
 
+  defp run_edit(actor, edit), do: TaxonomyEdits.run(actor, edit)
+
+  @doc """
+  A WCVP action of the taxonomy admin or the bulk range review, made
+  through `Gallformers.Ranges.Wcvp` and recorded in the replay log as the
+  state it left, in one transaction (`Gallformers.Import.TaxonomyEdits`):
+  `{:match, taxon}`, `{:sync, taxon}` (or `{:sync, taxon, ref_data}`),
+  `{:ignore, taxon_ids}`, `{:clear_match_status, taxon_ids}`,
+  `{:confirm_ranges, taxon_ids}`. A match or sync that finds nothing keeps
+  the `no_match` status it set and returns `{:error, message}`.
+  """
+  @spec record_wcvp_edit(Actor.t(), TaxonomyEdits.wcvp_edit()) ::
+          {:ok, term()} | {:error, term()}
+  defdelegate record_wcvp_edit(actor, edit), to: TaxonomyEdits, as: :record_wcvp
+
+  # The taxonomy admin's writes of several edits as one
+  # (`Gallformers.Import.TaxonomyAdmin`): all of their edits or none, each
+  # in the replay log.
+
+  @doc """
+  Saves a plant's Host range and, when `link_attrs` is not empty, its WCVP
+  link's fields (`Gallformers.Import.TaxonomyAdmin.save_host_range/4`).
+  """
+  @spec record_host_range_saved(Actor.t(), integer(), [TaxonomyAdmin.range_entry()], map()) ::
+          {:ok, :ok} | {:error, term()}
+  defdelegate record_host_range_saved(actor, taxon_id, entries, link_attrs),
+    to: TaxonomyAdmin,
+    as: :save_host_range
+
+  @doc """
+  Creates a taxon, moves `child_ids` under it and gives a plant its Host
+  range (`Gallformers.Import.TaxonomyAdmin.create_taxon/4`).
+  """
+  @spec record_taxon_created(Actor.t(), map(), [integer()], [TaxonomyAdmin.range_entry()]) ::
+          {:ok, Taxa.Taxon.t()} | {:error, term()}
+  defdelegate record_taxon_created(actor, attrs, child_ids, entries),
+    to: TaxonomyAdmin,
+    as: :create_taxon
+
+  @doc """
+  Adds a plant from its WCVP record under its WCVP genus and family, with
+  its range and WCVP link (`Gallformers.Import.TaxonomyAdmin.add_plant_from_wcvp/4`).
+  """
+  @spec record_plant_added_from_wcvp(
+          Actor.t(),
+          map(),
+          Taxa.Rank.t(),
+          [TaxonomyAdmin.range_entry()]
+        ) :: {:ok, Taxa.Taxon.t()} | {:error, term()}
+  defdelegate record_plant_added_from_wcvp(actor, wcvp, rank, entries),
+    to: TaxonomyAdmin,
+    as: :add_plant_from_wcvp
+
+  @doc "Moves each of `taxon_ids` under `parent_id` (`Gallformers.Import.TaxonomyAdmin.move_all/3`)."
+  @spec record_taxa_moved(Actor.t(), [integer()], integer()) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  defdelegate record_taxa_moved(actor, taxon_ids, parent_id), to: TaxonomyAdmin, as: :move_all
+
   defp taxon_id(%Taxa.Taxon{id: id}), do: id
   defp taxon_id(id) when is_integer(id), do: id
+
+  # -- the Source editor -------------------------------------------------------
+
+  @doc """
+  A Source editor's edit (matter a856, Task 10), made through
+  `Gallformers.Sources` with its Facts' standings recomputed and recorded in
+  the replay log, in one transaction (`Gallformers.Import.SourceEdits`):
+
+    * `{:update_details, source, attrs}` — `Gallformers.Sources.update_source_details/3`
+    * `{:retract, source, notice, date}` — `Gallformers.Sources.retract_source/4`
+    * `{:unretract, source}` — `Gallformers.Sources.unretract_source/2`
+  """
+  @spec record_source_edit(Actor.t(), SourceEdits.edit()) ::
+          {:ok, Gallformers.Sources.Source.t()} | {:error, Changeset.t() | term()}
+  defdelegate record_source_edit(actor, edit), to: SourceEdits, as: :record
 
   # -- helpers -----------------------------------------------------------------
 

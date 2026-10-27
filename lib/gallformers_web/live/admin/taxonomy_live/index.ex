@@ -1,701 +1,386 @@
 defmodule GallformersWeb.Admin.TaxonomyLive.Index do
   @moduledoc """
-  Admin page for listing and managing taxonomic classifications.
+  The taxonomy admin's list (matter a856, Task 9), at `/admin/taxonomy`:
+  search taxa of every rank by accepted name, synonym or common name
+  (`?q=`), or browse the tree from its roots down (`?parent=ID`). Each taxon
+  links to its page (`GallformersWeb.Admin.TaxonomyLive.Edit`).
 
-  Displays families, genera, and sections with their hierarchical relationships.
-  Supports moving genera between families via selection and modal.
+  Browsing a taxon's children, several can be selected and moved under
+  another parent at once (the old "move genera"), each move through
+  `Gallformers.Import.record_taxonomy_edit/2` as the signed-in admin.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Taxonomy
-  alias GallformersWeb.TaxonomyURL
+  alias Gallformers.Import
+  alias Gallformers.Taxa
+  alias Gallformers.Taxa.Rank
+  alias Gallformers.Taxa.Taxon
+  alias GallformersWeb.Admin.TaxonomyLive.Errors
 
-  @page_size 50
-  @valid_sort_columns ~w(name type description parent_name)
+  @search_limit 200
+  @parent_results 20
 
   @impl true
-  def mount(_params, session, socket) do
-    current_user = session["current_user"]
+  def mount(_params, _session, socket) do
+    {:ok,
+     assign(socket,
+       page_title: "Taxonomy",
+       selected: MapSet.new(),
+       show_move_modal: false,
+       move_query: "",
+       move_results: [],
+       move_target: nil
+     )}
+  end
 
-    if connected?(socket), do: Taxonomy.subscribe()
+  @impl true
+  def handle_params(params, _uri, socket) do
+    query = params |> Map.get("q", "") |> String.trim()
 
     socket =
       socket
-      |> assign(:current_user, current_user)
-      |> assign(:page_title, "Taxonomy")
-      |> assign(:search_query, "")
-      |> assign(:filter_type, nil)
-      |> assign(:current_page, 1)
-      |> assign(:page_size, @page_size)
-      |> assign(:sort_by, :name)
-      |> assign(:sort_dir, :asc)
-      |> assign(:selected_genera, MapSet.new())
-      |> assign(:show_move_modal, false)
-      |> assign(:families, [])
-      |> assign(:move_target_family_id, nil)
-      |> assign(:hide_empty_unknown, true)
-      |> assign(:show_delete_modal, false)
-      |> assign(:deletion_impact, nil)
-      |> assign(:delete_confirmation, "")
-      |> assign(:delete_taxonomy, nil)
-      |> assign(:total_count, 0)
-      |> load_taxonomies()
+      |> assign(:query, query)
+      |> assign(:selected, MapSet.new())
+      |> assign(:parent, parent(params["parent"]))
+      |> load()
 
-    {:ok, socket}
+    {:noreply, socket}
   end
 
-  @impl true
-  def handle_params(params, _url, socket) do
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+  defp parent(nil), do: nil
+
+  defp parent(id) do
+    with {id, ""} <- Integer.parse(id),
+         %Taxon{} = taxon <- Taxa.get_taxon(id),
+         do: taxon,
+         else: (_ -> nil)
   end
 
-  defp apply_action(socket, :index, _params) do
+  defp load(%{assigns: %{query: query}} = socket) when query != "" do
+    hits = Taxa.search(query)
+
     socket
-    |> assign(:page_title, "Taxonomy")
+    |> assign(:mode, :search)
+    |> assign(:total, length(hits))
+    |> assign(:rows, hits |> Enum.take(@search_limit) |> Enum.map(&search_row/1))
+    |> assign(:lineage, [])
   end
 
-  @impl true
-  def handle_event("search", %{"query" => query}, socket) do
-    socket =
-      socket
-      |> assign(:search_query, query)
-      |> assign(:current_page, 1)
-      |> load_taxonomies()
-
-    {:noreply, socket}
+  defp load(%{assigns: %{parent: nil}} = socket) do
+    socket
+    |> assign(:mode, :browse)
+    |> assign(:lineage, [])
+    |> assign_children(Taxa.root_taxa())
   end
 
-  @impl true
-  def handle_event("filter_type", %{"type" => type}, socket) do
-    filter_type = if type == "", do: nil, else: type
-
-    socket =
-      socket
-      |> assign(:filter_type, filter_type)
-      |> assign(:current_page, 1)
-      |> load_taxonomies()
-
-    {:noreply, socket}
+  defp load(%{assigns: %{parent: parent}} = socket) do
+    socket
+    |> assign(:mode, :browse)
+    |> assign(:lineage, Taxa.lineage(parent))
+    |> assign_children(Taxa.children_with_ranks(parent.id))
   end
 
-  @impl true
-  def handle_event("toggle_empty_unknown", _params, socket) do
-    socket =
-      socket
-      |> assign(:hide_empty_unknown, !socket.assigns.hide_empty_unknown)
-      |> assign(:current_page, 1)
-      |> load_taxonomies()
-
-    {:noreply, socket}
+  defp search_row(hit) do
+    %{
+      id: hit.id,
+      name: hit.name,
+      rank: hit.rank,
+      kingdom: hit.kingdom,
+      aliases: hit.aliases,
+      child_count: nil
+    }
   end
 
-  @impl true
-  def handle_event("page", %{"page" => page}, socket) do
-    total = max(1, ceil(socket.assigns.total_count / socket.assigns.page_size))
-    page = max(1, min(page, total))
-    {:noreply, socket |> assign(:current_page, page) |> load_taxonomies()}
-  end
+  defp assign_children(socket, children) do
+    counts =
+      children
+      |> Enum.map(& &1.taxon_id)
+      |> Taxa.children_by_parent()
+      |> Map.new(fn {id, kids} -> {id, length(kids)} end)
 
-  @impl true
-  def handle_event("sort", %{"column" => column}, socket) when column in @valid_sort_columns do
-    column_atom = String.to_atom(column)
-
-    {new_sort_by, new_sort_dir} =
-      if socket.assigns.sort_by == column_atom do
-        new_dir = if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
-        {column_atom, new_dir}
-      else
-        {column_atom, :asc}
+    rows =
+      for child <- children do
+        %{
+          id: child.taxon_id,
+          name: child.name,
+          rank: child.rank,
+          kingdom: nil,
+          aliases: child.common_names,
+          child_count: Map.get(counts, child.taxon_id, 0)
+        }
       end
 
+    socket
+    |> assign(:rows, rows)
+    |> assign(:total, length(rows))
+  end
+
+  # -- search ------------------------------------------------------------------
+
+  @impl true
+  def handle_event("search", %{"q" => query}, socket) do
+    {:noreply, push_patch(socket, to: index_path(%{"q" => String.trim(query)}))}
+  end
+
+  # -- moving the selected children --------------------------------------------
+
+  def handle_event("toggle_select", %{"id" => id}, socket) do
+    id = String.to_integer(id)
+    selected = socket.assigns.selected
+
+    selected =
+      if MapSet.member?(selected, id),
+        do: MapSet.delete(selected, id),
+        else: MapSet.put(selected, id)
+
+    {:noreply, assign(socket, :selected, selected)}
+  end
+
+  def handle_event("clear_selection", _params, socket),
+    do: {:noreply, assign(socket, :selected, MapSet.new())}
+
+  def handle_event("open_move_modal", _params, socket) do
     {:noreply,
-     socket
-     |> assign(:sort_by, new_sort_by)
-     |> assign(:sort_dir, new_sort_dir)
-     |> assign(:current_page, 1)}
+     assign(socket, show_move_modal: true, move_query: "", move_results: [], move_target: nil)}
   end
 
-  @impl true
-  def handle_event("delete", %{"id" => id}, socket) do
-    taxonomy = Taxonomy.get_taxonomy!(id)
-    impact = Taxonomy.get_deletion_impact(taxonomy)
+  def handle_event("close_move_modal", _params, socket),
+    do: {:noreply, assign(socket, :show_move_modal, false)}
 
-    {:noreply,
-     socket
-     |> assign(:delete_taxonomy, taxonomy)
-     |> assign(:deletion_impact, impact)
-     |> assign(:show_delete_modal, true)
-     |> assign(:delete_confirmation, "")}
+  def handle_event("search_move_target", %{"value" => query}, socket) do
+    results =
+      if String.length(String.trim(query)) >= 2 do
+        ranks = target_ranks(socket)
+
+        query
+        |> Taxa.search(ranks: ranks)
+        |> Enum.reject(&MapSet.member?(socket.assigns.selected, &1.id))
+        |> Enum.take(@parent_results)
+      else
+        []
+      end
+
+    {:noreply, assign(socket, move_query: query, move_results: results)}
   end
 
-  @impl true
-  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :delete_confirmation, value)}
+  def handle_event("select_move_target", %{"id" => id}, socket) do
+    target = Enum.find(socket.assigns.move_results, &(&1.id == String.to_integer(id)))
+    {:noreply, assign(socket, move_target: target, move_query: "", move_results: [])}
   end
 
-  @impl true
-  def handle_event("confirm_cascade_delete", %{"confirmation" => confirmation}, socket) do
-    taxonomy = socket.assigns.delete_taxonomy
-    expected_name = taxonomy.name
-    impact = Taxonomy.get_deletion_impact(taxonomy)
+  def handle_event("clear_move_target", _params, socket),
+    do: {:noreply, assign(socket, move_target: nil, move_query: "", move_results: [])}
+
+  def handle_event("move_selected", _params, socket) do
+    %{selected: selected, move_target: target, actor: actor} = socket.assigns
 
     cond do
-      taxonomy.type == "section" and impact.species_count > 0 ->
-        {:noreply,
-         socket
-         |> assign(:deletion_impact, impact)
-         |> put_flash(
-           :error,
-           "This section cannot be deleted until its linked species are reclassified."
-         )}
+      is_nil(target) ->
+        {:noreply, put_flash(socket, :error, "Pick where to move them")}
 
-      confirmation != expected_name ->
-        {:noreply, put_flash(socket, :error, "Name does not match. Please type the exact name.")}
+      MapSet.size(selected) == 0 ->
+        {:noreply, put_flash(socket, :error, "Select the taxa to move")}
 
       true ->
-        case Taxonomy.delete_taxonomy_cascade(taxonomy) do
-          {:ok, deleted_impact} ->
-            message = build_delete_success_message(taxonomy, deleted_impact)
-
+        case Import.record_taxa_moved(actor, MapSet.to_list(selected), target.id) do
+          {:ok, count} ->
             {:noreply,
              socket
-             |> assign(:show_delete_modal, false)
-             |> assign(:delete_taxonomy, nil)
-             |> put_flash(:info, message)
-             |> load_taxonomies()}
+             |> assign(show_move_modal: false, selected: MapSet.new())
+             |> load()
+             |> put_flash(:info, "Moved #{count} #{taxa_word(count)} under #{target.name}")}
 
           {:error, reason} ->
-            {:noreply,
-             socket
-             |> assign(:show_delete_modal, false)
-             |> assign(:delete_taxonomy, nil)
-             |> put_flash(:error, "Delete failed: #{inspect(reason)}")}
+            {:noreply, put_flash(socket, :error, "Not moved: #{Errors.text(reason)}")}
         end
     end
   end
 
-  @impl true
-  def handle_event("cancel_cascade_delete", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_delete_modal, false)
-     |> assign(:deletion_impact, nil)
-     |> assign(:delete_confirmation, "")
-     |> assign(:delete_taxonomy, nil)}
+  # A new parent must rank above every selected taxon.
+  defp target_ranks(socket) do
+    ranks =
+      for row <- socket.assigns.rows,
+          MapSet.member?(socket.assigns.selected, row.id),
+          do: row.rank
+
+    Enum.filter(Rank.all(), fn rank -> Enum.all?(ranks, &Rank.below?(&1, rank)) end)
   end
 
-  @impl true
-  def handle_event("toggle_select", %{"id" => id_str}, socket) do
-    id = String.to_integer(id_str)
-    selected = socket.assigns.selected_genera
+  defp taxa_word(1), do: "taxon"
+  defp taxa_word(_count), do: "taxa"
 
-    new_selected =
-      if MapSet.member?(selected, id) do
-        MapSet.delete(selected, id)
-      else
-        MapSet.put(selected, id)
-      end
-
-    {:noreply, assign(socket, :selected_genera, new_selected)}
+  defp index_path(params) do
+    params = Map.reject(params, fn {_key, value} -> value in [nil, ""] end)
+    if params == %{}, do: ~p"/admin/taxonomy", else: ~p"/admin/taxonomy?#{params}"
   end
 
-  @impl true
-  def handle_event("clear_selection", _params, socket) do
-    {:noreply, assign(socket, :selected_genera, MapSet.new())}
+  defp rank_label(rank), do: rank |> Atom.to_string() |> String.capitalize()
+
+  defp name_rank(rank) do
+    if rank in Rank.species_and_below(), do: "species", else: Atom.to_string(rank)
   end
 
-  @impl true
-  def handle_event("open_move_modal", _params, socket) do
-    families = Taxonomy.list_families_for_select()
-
-    {:noreply,
-     socket
-     |> assign(:show_move_modal, true)
-     |> assign(:families, families)
-     |> assign(:move_target_family_id, nil)}
-  end
-
-  @impl true
-  def handle_event("close_move_modal", _params, socket) do
-    {:noreply, assign(socket, :show_move_modal, false)}
-  end
-
-  @impl true
-  def handle_event("select_target_family", %{"family_id" => family_id}, socket) do
-    family_id = if family_id == "", do: nil, else: String.to_integer(family_id)
-    {:noreply, assign(socket, :move_target_family_id, family_id)}
-  end
-
-  @impl true
-  def handle_event("move_genera", _params, socket) do
-    selected_ids = MapSet.to_list(socket.assigns.selected_genera)
-    target_family_id = socket.assigns.move_target_family_id
-
-    if target_family_id == nil do
-      {:noreply, put_flash(socket, :error, "Please select a destination family.")}
-    else
-      # Get the current family of the first selected genus to use as old_family_id
-      first_genus = Taxonomy.get_taxonomy!(hd(selected_ids))
-      old_family_id = first_genus.parent_id
-
-      case Taxonomy.move_genera(selected_ids, old_family_id, target_family_id) do
-        {:ok, count} ->
-          {:noreply,
-           socket
-           |> put_flash(
-             :info,
-             "Successfully moved #{count} #{if count == 1, do: "genus", else: "genera"}."
-           )
-           |> assign(:show_move_modal, false)
-           |> assign(:selected_genera, MapSet.new())
-           |> load_taxonomies()}
-
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to move genera: #{inspect(reason)}")}
-      end
-    end
-  end
-
-  @impl true
-  def handle_info({event, _taxonomy}, socket)
-      when event in [:taxonomy_created, :taxonomy_updated, :taxonomy_deleted] do
-    {:noreply, load_taxonomies(socket)}
-  end
-
-  @impl true
-  def handle_info(:genera_moved, socket) do
-    {:noreply, load_taxonomies(socket)}
-  end
-
-  defp load_taxonomies(socket) do
-    %{
-      hide_empty_unknown: hide_empty_unknown,
-      search_query: query,
-      filter_type: filter_type,
-      current_page: page,
-      page_size: page_size
-    } = socket.assigns
-
-    opts = [hide_empty_unknown: hide_empty_unknown]
-    offset = (page - 1) * page_size
-
-    case query do
-      "" ->
-        total = Taxonomy.count_taxonomies(filter_type, opts)
-
-        taxonomies =
-          Taxonomy.list_taxonomies_with_parent_paginated(filter_type, page_size, offset, opts)
-
-        socket
-        |> assign(:total_count, total)
-        |> assign(:taxonomies, taxonomies)
-        |> assign(:searching, false)
-
-      query ->
-        results = search_and_filter(query, filter_type, hide_empty_unknown)
-
-        socket
-        |> assign(:total_count, length(results))
-        |> assign(:taxonomies, results)
-        |> assign(:searching, true)
-    end
-  end
-
-  defp search_and_filter(query, type, hide_empty_unknown) do
-    taxonomies = Taxonomy.search_taxonomies(query, type, 500)
-
-    # Batch fetch all parent records (1 query instead of up to 500)
-    parent_ids =
-      taxonomies
-      |> Enum.map(& &1.parent_id)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
-
-    parents_map = Taxonomy.get_taxonomies_batch(parent_ids)
-
-    results =
-      Enum.map(taxonomies, fn t ->
-        parent = Map.get(parents_map, t.parent_id)
-
-        %{
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          type: t.type,
-          rank: t.rank,
-          parent_id: t.parent_id,
-          parent_name: parent && parent.name,
-          parent_type: parent && parent.type
-        }
-      end)
-
-    if hide_empty_unknown do
-      empty_ids = Taxonomy.empty_unknown_genus_ids()
-      Enum.reject(results, fn t -> t.id in empty_ids end)
-    else
-      results
-    end
-  end
-
-  defp sorted_taxonomies(taxonomies, sort_by, sort_dir) do
-    sorted =
-      Enum.sort_by(taxonomies, fn t ->
-        value =
-          case sort_by do
-            :name -> t.name
-            :type -> t.type
-            :description -> t.description
-            :parent_name -> t.parent_name
-            _ -> t.name
-          end
-
-        if is_binary(value), do: String.downcase(value), else: value || ""
-      end)
-
-    if sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
-  end
-
-  # Browse mode: already paginated by DB, just sort in-memory (DB sorts by type, name)
-  # Search mode: sort and paginate the full result set in memory
-  defp display_taxonomies(taxonomies, searching, current_page, page_size, sort_by, sort_dir) do
-    sorted = sorted_taxonomies(taxonomies, sort_by, sort_dir)
-
-    if searching do
-      sorted
-      |> Enum.drop((current_page - 1) * page_size)
-      |> Enum.take(page_size)
-    else
-      sorted
-    end
-  end
-
-  defp taxonomy_public_url(taxonomy), do: TaxonomyURL.public_path(taxonomy)
+  # -- rendering ---------------------------------------------------------------
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} page_title="Taxonomy">
       <div class="space-y-6">
-        <%!-- Header with search, filter, and buttons --%>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex items-center gap-4 flex-1 max-w-2xl">
-            <form phx-change="search" phx-submit="search" id="taxonomy-search-form" class="flex-1">
-              <.search_input
-                id="taxonomy-search"
-                name="query"
-                value={@search_query}
-                placeholder="Search taxonomy..."
-                phx-debounce="300"
-              />
-            </form>
-            <form phx-change="filter_type">
-              <.input
-                type="select"
-                name="type"
-                prompt="All Types"
-                options={[
-                  {"Families", "family"},
-                  {"Genera", "genus"},
-                  {"Intermediates", "intermediate"},
-                  {"Sections", "section"}
-                ]}
-                value={@filter_type}
-              />
-            </form>
-            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer whitespace-nowrap">
-              <input
-                type="checkbox"
-                checked={@hide_empty_unknown}
-                phx-click="toggle_empty_unknown"
-                class="h-4 w-4 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-              /> Hide empty Unknown
-            </label>
-          </div>
+          <form
+            id="taxonomy-search-form"
+            phx-change="search"
+            phx-submit="search"
+            class="flex-1 max-w-2xl"
+          >
+            <.search_input
+              id="taxonomy-search"
+              name="q"
+              value={@query}
+              placeholder="Search taxa by name, synonym or common name..."
+              phx-debounce="300"
+            />
+          </form>
           <div class="flex items-center gap-2">
-            <button
-              :if={MapSet.size(@selected_genera) > 0}
-              type="button"
-              phx-click="open_move_modal"
-              class="gf-btn gf-btn-secondary"
-            >
-              <.icon name="ph-arrow-right" class="h-4 w-4 mr-1" />
-              Move {MapSet.size(@selected_genera)} Selected
-            </button>
-            <button
-              :if={MapSet.size(@selected_genera) > 0}
-              type="button"
-              phx-click="clear_selection"
-              class="gf-btn gf-btn-ghost text-sm"
-            >
-              Clear
-            </button>
+            <.link navigate={~p"/admin/host-range"} class="gf-btn gf-btn-secondary">
+              Host Range Review
+            </.link>
             <.link navigate={~p"/admin/taxonomy/new"} class="gf-btn gf-btn-primary">
-              New Entry
+              New Taxon
             </.link>
           </div>
         </div>
 
-        <%!-- Taxonomy list table --%>
+        <nav :if={@mode == :browse} id="browse-trail" class="text-sm text-gray-600">
+          <.link patch={~p"/admin/taxonomy"} class="hover:underline">All roots</.link>
+          <span :for={entry <- @lineage}>
+            <span class="mx-1 text-gray-400">›</span>
+            <.link patch={~p"/admin/taxonomy?#{%{parent: entry.taxon_id}}"} class="hover:underline">
+              <.taxon_name name={entry.name} rank={name_rank(entry.rank)} />
+            </.link>
+          </span>
+        </nav>
+
+        <div
+          :if={@mode == :browse and MapSet.size(@selected) > 0}
+          class="flex items-center gap-2"
+        >
+          <button type="button" phx-click="open_move_modal" class="gf-btn gf-btn-secondary">
+            <.icon name="ph-arrow-right" class="h-4 w-4 mr-1" />
+            Move {MapSet.size(@selected)} Selected
+          </button>
+          <button type="button" phx-click="clear_selection" class="gf-btn gf-btn-ghost text-sm">
+            Clear
+          </button>
+        </div>
+
         <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table class="gf-table gf-table-dark">
+          <table id="taxa-table" class="gf-table gf-table-dark">
             <thead>
               <tr>
-                <th class="w-10"></th>
-                <th class="sortable" phx-click="sort" phx-value-column="name">
-                  Name
-                  <span :if={@sort_by == :name} class="ml-1">
-                    {if @sort_dir == :asc, do: "↑", else: "↓"}
-                  </span>
-                </th>
-                <th class="sortable" phx-click="sort" phx-value-column="type">
-                  Type
-                  <span :if={@sort_by == :type} class="ml-1">
-                    {if @sort_dir == :asc, do: "↑", else: "↓"}
-                  </span>
-                </th>
-                <th class="sortable" phx-click="sort" phx-value-column="description">
-                  Description
-                  <span :if={@sort_by == :description} class="ml-1">
-                    {if @sort_dir == :asc, do: "↑", else: "↓"}
-                  </span>
-                </th>
-                <th class="sortable" phx-click="sort" phx-value-column="parent_name">
-                  Parent
-                  <span :if={@sort_by == :parent_name} class="ml-1">
-                    {if @sort_dir == :asc, do: "↑", else: "↓"}
-                  </span>
-                </th>
-                <th class="text-right">Actions</th>
+                <th :if={@mode == :browse} class="w-10"></th>
+                <th>Name</th>
+                <th>Rank</th>
+                <th :if={@mode == :search}>Kingdom</th>
+                <th>{if @mode == :search, do: "Also known as", else: "Common names"}</th>
+                <th :if={@mode == :browse} class="text-right">Children</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                :for={
-                  taxonomy <-
-                    display_taxonomies(
-                      @taxonomies,
-                      @searching,
-                      @current_page,
-                      @page_size,
-                      @sort_by,
-                      @sort_dir
-                    )
-                }
-                class={if MapSet.member?(@selected_genera, taxonomy.id), do: "bg-canary", else: ""}
-              >
-                <td class="text-center">
-                  <%= if taxonomy.type == "genus" do %>
-                    <input
-                      type="checkbox"
-                      checked={MapSet.member?(@selected_genera, taxonomy.id)}
-                      phx-click="toggle_select"
-                      phx-value-id={taxonomy.id}
-                      class="h-4 w-4 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-                    />
-                  <% end %>
+              <tr :for={row <- @rows} id={"taxon-#{row.id}"}>
+                <td :if={@mode == :browse} class="text-center">
+                  <input
+                    type="checkbox"
+                    checked={MapSet.member?(@selected, row.id)}
+                    phx-click="toggle_select"
+                    phx-value-id={row.id}
+                    class="h-4 w-4 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
+                  />
                 </td>
                 <td>
-                  <.link
-                    navigate={~p"/admin/taxonomy/#{taxonomy.id}"}
-                    class="hover:underline font-medium"
-                  >
-                    <.taxon_name name={taxonomy.name} rank={taxonomy.type} />
+                  <.link navigate={~p"/admin/taxonomy/#{row.id}"} class="hover:underline font-medium">
+                    <.taxon_name name={row.name} rank={name_rank(row.rank)} />
                   </.link>
                 </td>
-                <td>
-                  <.type_badge type={taxonomy.type} />
-                  <span
-                    :if={taxonomy.type == "intermediate" && taxonomy[:rank]}
-                    class="text-xs text-amber-600 ml-1"
+                <td>{rank_label(row.rank)}</td>
+                <td :if={@mode == :search}>{row.kingdom || "—"}</td>
+                <td class="text-gray-500">{Enum.join(row.aliases, ", ")}</td>
+                <td :if={@mode == :browse} class="text-right">
+                  <.link
+                    :if={row.child_count > 0}
+                    patch={~p"/admin/taxonomy?#{%{parent: row.id}}"}
+                    class="hover:underline"
                   >
-                    ({taxonomy.rank})
-                  </span>
-                </td>
-                <td class="text-gray-500">
-                  {taxonomy.description || "—"}
-                </td>
-                <td>
-                  <%= if taxonomy.parent_name do %>
-                    <.taxon_name
-                      name={taxonomy.parent_name}
-                      rank={taxonomy.parent_type}
-                      class="text-gray-900"
-                    />
-                    <span class="text-gray-500 text-xs ml-1">({taxonomy.parent_type})</span>
-                  <% else %>
-                    <span class="text-gray-400">—</span>
-                  <% end %>
-                </td>
-                <td class="text-right">
-                  <.table_actions>
-                    <.action_button
-                      icon="ph-pencil-simple"
-                      label="Edit"
-                      navigate={~p"/admin/taxonomy/#{taxonomy.id}"}
-                      variant="primary"
-                    />
-                    <.action_button
-                      icon="ph-arrow-square-out"
-                      label="View"
-                      navigate={taxonomy_public_url(taxonomy)}
-                    />
-                    <.action_button
-                      icon="ph-trash"
-                      label="Delete"
-                      variant="danger"
-                      phx-click="delete"
-                      phx-value-id={taxonomy.id}
-                    />
-                  </.table_actions>
+                    {row.child_count} ›
+                  </.link>
+                  <span :if={row.child_count == 0} class="text-gray-400">—</span>
                 </td>
               </tr>
-              <tr :if={@taxonomies == []}>
-                <td colspan="6" class="text-center text-gray-500">
-                  No taxonomy entries found.
-                </td>
+              <tr :if={@rows == []}>
+                <td colspan="6" class="text-center text-gray-500">No taxa found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <%= if ceil(@total_count / @page_size) > 1 do %>
-          <.pagination
-            page={@current_page}
-            total_pages={ceil(@total_count / @page_size)}
-            total_items={@total_count}
-            page_size={@page_size}
-            on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
-          />
-        <% else %>
-          <p class="text-sm text-gray-500">
-            Showing {@total_count} entries
-          </p>
-        <% end %>
+        <p class="text-sm text-gray-500">
+          <%= if @mode == :search and @total > length(@rows) do %>
+            Showing the first {length(@rows)} of {@total} taxa. Narrow the search to see the rest.
+          <% else %>
+            Showing {@total} {taxa_word(@total)}
+          <% end %>
+        </p>
       </div>
 
-      <%!-- Move Genera Modal --%>
-      <.modal
-        :if={@show_move_modal}
-        id="move-genera-modal"
-        show
-        on_cancel={JS.push("close_move_modal")}
-      >
-        <:header>
-          <h3 class="text-lg font-semibold text-gray-900">
-            Move {MapSet.size(@selected_genera)} {if MapSet.size(@selected_genera) == 1,
-              do: "Genus",
-              else: "Genera"}
-          </h3>
-        </:header>
-
+      <.modal :if={@show_move_modal} id="move-taxa-modal" show on_cancel={JS.push("close_move_modal")}>
+        <:header>Move {MapSet.size(@selected)} {taxa_word(MapSet.size(@selected))}</:header>
         <:body>
           <div class="space-y-4">
-            <div>
-              <p class="text-sm text-gray-600 mb-2">Selected genera:</p>
-              <div class="flex flex-wrap gap-2">
-                <%= for taxonomy <- Enum.filter(@taxonomies, fn t -> MapSet.member?(@selected_genera, t.id) end) do %>
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                    <.taxon_name name={taxonomy.name} rank={taxonomy.type} />
-                  </span>
-                <% end %>
-              </div>
+            <div class="flex flex-wrap gap-2">
+              <span
+                :for={row <- Enum.filter(@rows, &MapSet.member?(@selected, &1.id))}
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800"
+              >
+                <.taxon_name name={row.name} rank={name_rank(row.rank)} />
+              </span>
             </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Destination Family
-              </label>
-              <select phx-change="select_target_family" name="family_id" class="gf-select w-full">
-                <option value="">Select a family...</option>
-                <%= for {name, id} <- @families do %>
-                  <option value={id} selected={@move_target_family_id == id}>{name}</option>
-                <% end %>
-              </select>
-            </div>
-
+            <.typeahead
+              id="move-target-picker"
+              label="Move under"
+              placeholder="Search for the new parent..."
+              search_event="search_move_target"
+              select_event="select_move_target"
+              clear_event="clear_move_target"
+              query={@move_query}
+              results={@move_results}
+              selected={@move_target}
+              display_fn={fn t -> "#{t.name} (#{t.rank})" end}
+            />
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p class="text-sm text-amber-800">
                 <.icon name="ph-warning" class="h-4 w-4 inline mr-1" />
-                This will move the selected genera and all their species to the new family.
-                This change takes effect immediately.
+                Each selected taxon moves with everything below it. This takes effect immediately.
               </p>
             </div>
           </div>
         </:body>
-
         <:footer>
           <button type="button" phx-click="close_move_modal" class="gf-btn gf-btn-secondary">
             Cancel
           </button>
           <button
+            id="move-selected"
             type="button"
-            phx-click="move_genera"
-            disabled={@move_target_family_id == nil}
+            phx-click="move_selected"
+            disabled={is_nil(@move_target)}
             class="gf-btn gf-btn-primary"
           >
-            Move to Selected Family
+            Move
           </button>
         </:footer>
       </.modal>
-      <%!-- Cascade Delete Modal --%>
-      <.cascade_delete_modal
-        :if={@show_delete_modal}
-        show={@show_delete_modal}
-        impact={@deletion_impact}
-        confirmation_value={@delete_confirmation}
-      />
     </Layouts.admin>
-    """
-  end
-
-  # Handle impact map (for family/genus cascade delete)
-  defp build_delete_success_message(
-         taxonomy,
-         %{genera_count: _, sections_count: _, species_count: _} = impact
-       ) do
-    base = "Deleted #{taxonomy.type} \"#{taxonomy.name}\""
-
-    details =
-      [
-        if(impact.genera_count > 0, do: "#{impact.genera_count} genera"),
-        if(impact.sections_count > 0, do: "#{impact.sections_count} sections"),
-        if(impact.species_count > 0, do: "#{impact.species_count} species")
-      ]
-      |> Enum.filter(& &1)
-
-    if details == [] do
-      base
-    else
-      base <> " and #{Enum.join(details, ", ")}"
-    end
-  end
-
-  # Handle intermediate delete (collapse upward - returns the deleted struct)
-  defp build_delete_success_message(%{type: "intermediate"} = taxonomy, %Taxonomy.Taxonomy{}) do
-    "Deleted intermediate \"#{taxonomy.name}\" — children re-parented to parent"
-  end
-
-  # Handle simple taxonomy struct (for section delete - no cascade)
-  defp build_delete_success_message(_taxonomy, %Taxonomy.Taxonomy{} = deleted) do
-    "Deleted #{deleted.type} \"#{deleted.name}\""
-  end
-
-  defp type_badge(assigns) do
-    color_class =
-      case assigns.type do
-        "family" -> "bg-blue-100 text-blue-800"
-        "genus" -> "bg-green-100 text-green-800"
-        "intermediate" -> "bg-amber-100 text-amber-800"
-        "section" -> "bg-purple-100 text-purple-800"
-        _ -> "bg-gray-100 text-gray-800"
-      end
-
-    assigns = assign(assigns, :color_class, color_class)
-
-    ~H"""
-    <span class={"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{@color_class}"}>
-      {@type}
-    </span>
     """
   end
 end

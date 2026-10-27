@@ -4,13 +4,15 @@ defmodule Gallformers.ChangesetHelpersTest do
   import Gallformers.ChangesetHelpers
 
   alias Ecto.Changeset
-  alias Gallformers.Species.Species
+  alias Gallformers.Glossaries.Glossary
 
   defmodule TestSchema do
     use Ecto.Schema
 
     schema "test" do
       field :url, :string
+      field :name, :string
+      field :taxoncode, :string
     end
   end
 
@@ -21,7 +23,7 @@ defmodule Gallformers.ChangesetHelpersTest do
   describe "trim_strings/1" do
     test "trims leading whitespace from string fields" do
       cs =
-        %Species{}
+        %TestSchema{}
         |> Changeset.cast(%{name: " Synchytrium tillaeae", taxoncode: "gall"}, [:name, :taxoncode])
         |> trim_strings()
 
@@ -30,7 +32,7 @@ defmodule Gallformers.ChangesetHelpersTest do
 
     test "trims trailing whitespace from string fields" do
       cs =
-        %Species{}
+        %TestSchema{}
         |> Changeset.cast(%{name: "Andricus quercuslanigera  "}, [:name])
         |> trim_strings()
 
@@ -39,7 +41,7 @@ defmodule Gallformers.ChangesetHelpersTest do
 
     test "preserves inner whitespace" do
       cs =
-        %Species{}
+        %TestSchema{}
         |> Changeset.cast(%{name: "Andricus  quercuslanigera"}, [:name])
         |> trim_strings()
 
@@ -48,7 +50,7 @@ defmodule Gallformers.ChangesetHelpersTest do
 
     test "does not modify already-clean strings" do
       cs =
-        %Species{}
+        %TestSchema{}
         |> Changeset.cast(%{name: "Andricus quercuslanigera"}, [:name])
         |> trim_strings()
 
@@ -57,16 +59,16 @@ defmodule Gallformers.ChangesetHelpersTest do
 
     test "handles nil values without error" do
       cs =
-        %Species{}
+        %TestSchema{}
         |> Changeset.cast(%{name: nil}, [:name])
         |> trim_strings()
 
       assert Changeset.get_change(cs, :name) == nil
     end
 
-    test "Species.changeset trims names automatically" do
-      cs = Species.changeset(%Species{}, %{name: " Synchytrium tillaeae ", taxoncode: "gall"})
-      assert Changeset.get_change(cs, :name) == "Synchytrium tillaeae"
+    test "a schema's changeset trims its strings (Glossary)" do
+      cs = Glossary.changeset(%Glossary{}, %{word: " agamic ", definition: "x"})
+      assert Changeset.get_change(cs, :word) == "agamic"
     end
   end
 

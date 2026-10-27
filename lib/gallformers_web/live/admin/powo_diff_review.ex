@@ -7,7 +7,7 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
 
   ## Props
 
-  - `diff` — from `Plants.compute_powo_diff/3`
+  - `diff` — from `Gallformers.Ranges.Wcvp.compute_powo_diff/3`
   - `place_by_code` — `%{code => %{name: _, ...}}`
 
   ## Messages sent to parent

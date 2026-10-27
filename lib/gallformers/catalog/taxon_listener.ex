@@ -26,6 +26,10 @@ defmodule Gallformers.Catalog.TaxonListener do
   (`Gallformers.Catalog.GallRenames`); the proposals are admin queue items,
   made by `Gallformers.Import.GallRenames`, registered after this listener.
   A name collision is flagged on the proposal and never rejects the change.
+    * `:host_range` — a plant's Host range changed
+      (`Gallformers.Ranges.update_taxon_places/3`): the Galls whose current
+      Host is the plant, or a genus or section above it (whose range is its
+      subtree's), get a refresh enqueued.
     * `:merge`, `:split` — not emitted in phase 1; re-pointing Relationship
       endpoints and curator tasks come with the operations that emit them.
   """
@@ -54,6 +58,20 @@ defmodule Gallformers.Catalog.TaxonListener do
         where: r.subject_taxon_id in ^hosts,
         select: r.object_gall_id
       )
+    )
+    |> Repo.all()
+    |> GallIndex.enqueue_refresh()
+  end
+
+  # A Host range change reaches the Galls whose potential range reads the
+  # taxon's rows: those with it, or a taxon above it, as a Host.
+  def taxon_changed(%Event{type: :host_range, taxon_id: taxon_id}) do
+    hosts = [taxon_id | Enum.map(Taxa.ancestors(taxon_id), & &1.id)]
+
+    from(r in Current.relationships("host_of"),
+      where: r.subject_taxon_id in ^hosts,
+      distinct: true,
+      select: r.object_gall_id
     )
     |> Repo.all()
     |> GallIndex.enqueue_refresh()

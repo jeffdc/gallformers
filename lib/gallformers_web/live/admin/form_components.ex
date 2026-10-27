@@ -5,8 +5,6 @@ defmodule GallformersWeb.Admin.FormComponents do
 
   use Phoenix.Component
 
-  import GallformersWeb.CoreComponents, only: [icon: 1]
-  import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
   import GallformersWeb.UIComponents, only: [alert: 1]
 
   @doc """
@@ -52,51 +50,17 @@ defmodule GallformersWeb.Admin.FormComponents do
   end
 
   @doc """
-  Renders a warning when a species name matches an existing alias.
-
-  Hidden when `collisions` is empty. Each collision is shown on its own line
-  with a link to the species that owns the alias.
-
-  ## Attributes
-
-  * `:collisions` - Required. List of maps with `:species_id`, `:species_name`,
-    `:taxoncode`, and `:alias_type` keys (from `Species.find_species_with_alias/1`).
-
-  ## Examples
-
-      <.alias_collision_warning collisions={@alias_collisions} />
-  """
-  attr :collisions, :list, required: true
-
-  def alias_collision_warning(assigns) do
-    ~H"""
-    <.alert :if={@collisions != []} variant="warning">
-      <:title>Alias collision</:title>
-      <div :for={c <- @collisions}>
-        This name is a {alias_type_label(c.alias_type)} of
-        <.link
-          navigate={species_path(c.taxoncode, c.species_id)}
-          class="underline font-medium"
-        >
-          {c.species_name}
-        </.link>
-      </div>
-    </.alert>
-    """
-  end
-
-  @doc """
-  Displays warnings for potential duplicate hosts found during creation.
-
-  Handles three types of matches from `Plants.find_duplicate_host_candidates/2`:
-  - `:name_match` — exact species name already exists
-  - `:alias_match` — name matches an existing alias
-  - `:wcvp_id_match` — same WCVP record already linked to another host
+  Displays warnings for potential duplicate taxa found while adding one in
+  the taxonomy admin, each linking to the taxon's admin page:
+  - `:name_match` — a taxon with this exact name already exists
+  - `:alias_match` — the name is a synonym (`alias_type` `"scientific"`) or
+    a common name (`"common"`) of a taxon
+  - `:wcvp_id_match` — the same WCVP record is already linked to a plant
 
   ## Attributes
 
-  * `:warnings` - Required. List of maps with `:species_id`, `:species_name`,
-    and `:reason` keys (plus `:alias_type` for alias matches).
+  * `:warnings` - Required. List of maps with `:taxon_id`, `:name`, and
+    `:reason` keys (plus `:alias_type` for alias matches).
   """
   attr :warnings, :list, required: true
 
@@ -106,8 +70,8 @@ defmodule GallformersWeb.Admin.FormComponents do
       <:title>Possible duplicate</:title>
       <div :for={w <- @warnings}>
         {duplicate_reason_text(w)}
-        <.link navigate={"/admin/hosts/#{w.species_id}"} class="underline font-medium">
-          {w.species_name}
+        <.link navigate={"/admin/taxonomy/#{w.taxon_id}"} class="underline font-medium">
+          {w.name}
         </.link>
       </div>
     </.alert>
@@ -115,7 +79,7 @@ defmodule GallformersWeb.Admin.FormComponents do
   end
 
   defp duplicate_reason_text(%{reason: :name_match}),
-    do: "A host with this exact name already exists: "
+    do: "A taxon with this exact name already exists: "
 
   defp duplicate_reason_text(%{reason: :alias_match, alias_type: type}),
     do: "This name is a #{alias_type_label(type)} of "
@@ -126,122 +90,4 @@ defmodule GallformersWeb.Admin.FormComponents do
   defp alias_type_label("common"), do: "common name"
   defp alias_type_label("scientific"), do: "scientific synonym"
   defp alias_type_label(other), do: other
-
-  defp species_path("gall", id), do: "/gall/#{id}"
-  defp species_path(_taxoncode, id), do: "/host/#{id}"
-
-  @doc """
-  Renders an alias editor table for editing species/host aliases.
-
-  ## Attributes
-
-  * `:aliases` - Required. List of alias maps with :id, :name, :type keys.
-  * `:new_alias_name` - Required. Current value of the new alias name input.
-  * `:new_alias_type` - Required. Currently selected alias type.
-
-  ## Events
-
-  The parent LiveView must handle these events:
-  * `"update_new_alias_name"` - When the name input changes (via InputEvent hook)
-  * `"update_new_alias_type"` - When the type select changes
-  * `"add_alias"` - When plus button clicked
-  * `"remove_alias"` - When X button clicked (with `alias-id` value)
-
-  ## Examples
-
-      <.alias_editor
-        aliases={@aliases}
-        new_alias_name={@new_alias_name}
-        new_alias_type={@new_alias_type}
-      />
-  """
-  attr :aliases, :list, required: true
-  attr :new_alias_name, :string, required: true
-  attr :new_alias_type, :string, required: true
-
-  def alias_editor(assigns) do
-    ~H"""
-    <div class="mb-3">
-      <label class="gf-label">Aliases:</label>
-      <div class="border border-gray-300 rounded">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-3 py-1.5 text-left font-medium text-gray-700">Name</th>
-              <th class="px-3 py-1.5 text-left font-medium text-gray-700">Type</th>
-              <th class="px-3 py-1.5 w-10"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <tr :for={a <- @aliases} class="hover:bg-gray-50">
-              <td class="px-3 py-1.5"><.taxon_name name={a.name} /></td>
-              <td class="px-3 py-1.5">{a.type}</td>
-              <td class="px-3 py-1.5">
-                <button
-                  type="button"
-                  phx-click="remove_alias"
-                  phx-value-alias-id={a.id}
-                  class="text-red-600 hover:text-red-800"
-                >
-                  <.icon name="ph-x" class="h-4 w-4" />
-                </button>
-              </td>
-            </tr>
-            <tr class="bg-yellow-50">
-              <td class="px-3 py-1.5">
-                <input
-                  id="new-alias-input"
-                  type="text"
-                  value={@new_alias_name}
-                  placeholder="New alias name (press Enter or click Add)"
-                  phx-hook="InputEvent"
-                  data-event="update_new_alias_name"
-                  data-enter-event="add_alias"
-                  class="gf-input text-sm"
-                />
-              </td>
-              <td class="px-3 py-1.5">
-                <select
-                  name="alias_type"
-                  phx-change="update_new_alias_type"
-                  class="gf-select text-sm"
-                >
-                  <option
-                    :for={{label, value} <- alias_type_options()}
-                    value={value}
-                    selected={@new_alias_type == value}
-                  >
-                    {label}
-                  </option>
-                </select>
-              </td>
-              <td class="px-3 py-1.5">
-                <button
-                  type="button"
-                  phx-click="add_alias"
-                  class="inline-flex items-center gap-1 rounded border border-green-600 px-2 py-1 text-sm font-medium text-green-700 hover:bg-green-50"
-                >
-                  <.icon name="ph-plus" class="h-4 w-4" /> Add
-                </button>
-              </td>
-            </tr>
-            <tr :if={String.trim(@new_alias_name) != ""} class="bg-yellow-50">
-              <td colspan="3" class="px-3 py-1 text-xs italic text-yellow-800">
-                Unsaved draft — click <strong>Add</strong>
-                (or press <strong>Enter</strong>) to add this alias before saving the form.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    """
-  end
-
-  defp alias_type_options do
-    [
-      {"Common Name", "common"},
-      {"Scientific Synonym", "scientific"}
-    ]
-  end
 end

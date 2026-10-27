@@ -9,6 +9,7 @@ defmodule GallformersWeb.GallLive do
   use GallformersWeb, :live_view
 
   alias Gallformers.{
+    Accounts,
     Catalog,
     Galls,
     Glossaries,
@@ -18,7 +19,6 @@ defmodule GallformersWeb.GallLive do
 
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
-  alias GallformersWeb.LegacyAdmin
   alias GallformersWeb.LineageBreadcrumb
   alias GallformersWeb.SEO
 
@@ -34,10 +34,6 @@ defmodule GallformersWeb.GallLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    # Admin edit links go to the old-domain screens: shown only while those
-    # are enabled (matter a856).
-    socket = assign(socket, :legacy_admin?, LegacyAdmin.enabled?())
-
     case Integer.parse(id) do
       {gall_id, ""} ->
         load_gall(socket, gall_id)
@@ -377,7 +373,7 @@ defmodule GallformersWeb.GallLive do
                     </em>
                   </h2>
                   <.link
-                    :if={@current_user && @legacy_admin?}
+                    :if={Accounts.admin?(@current_user)}
                     href={~p"/admin/galls/#{@gall.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
@@ -466,14 +462,6 @@ defmodule GallformersWeb.GallLive do
                         /></.link>
                     </span>
                   </div>
-                  <.link
-                    :if={@current_user && @legacy_admin?}
-                    href={~p"/admin/gallhost?id=#{@gall.id}"}
-                    class="text-gray-400 hover:text-gf-maroon"
-                    title="Edit gall-host mappings"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-4 w-4" />
-                  </.link>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4">
@@ -597,7 +585,7 @@ defmodule GallformersWeb.GallLive do
               <.image_gallery
                 images={@images}
                 id="gall-images"
-                species_id={@gall.id}
+                edit_href={~p"/admin/galls/#{@gall.id}" <> "#images"}
                 current_user={@current_user}
               />
             </div>
@@ -640,14 +628,6 @@ defmodule GallformersWeb.GallLive do
           <%= if length(@sources) > 0 do %>
             <div class="flex items-center gap-2 mb-2">
               <h3 class="font-semibold">Further Information ({length(@sources)})</h3>
-              <.link
-                :if={@current_user && @legacy_admin?}
-                href={~p"/admin/species-sources/add?species_id=#{@gall.id}"}
-                class="text-gray-400 hover:text-gf-maroon"
-                title="Add source mapping"
-              >
-                <.icon name="ph-plus-circle" class="h-5 w-5" />
-              </.link>
             </div>
             <div class="space-y-2">
               <div
@@ -688,16 +668,6 @@ defmodule GallformersWeb.GallLive do
                   >
                     <.icon name="ph-link" class="h-4 w-4 inline-block align-text-bottom" />
                   </button>
-                  <.link
-                    :if={@current_user && @legacy_admin?}
-                    href={
-                      ~p"/admin/species-sources/find?species_id=#{@gall.id}&source_id=#{source.id}"
-                    }
-                    class="ml-2 text-gray-400 hover:text-gf-maroon"
-                    title="Edit species-source mapping"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-4 w-4 inline-block align-text-bottom" />
-                  </.link>
                 </div>
                 <button
                   :if={source.description not in [nil, ""]}

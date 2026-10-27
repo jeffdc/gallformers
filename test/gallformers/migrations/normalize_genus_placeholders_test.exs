@@ -26,26 +26,33 @@ defmodule Gallformers.Migrations.NormalizeGenusPlaceholdersTest do
     :ok
   end
 
-  defp insert_genus(name) do
-    {:ok, tax} =
-      Repo.insert(%Gallformers.Taxonomy.Taxonomy{
-        name: name,
-        type: "genus",
-        description: "Plant"
-      })
+  # The old tables, which the migration works on, by name (their schemas are
+  # gone with the old domain code).
+  @now ~U[2026-01-01 00:00:00Z]
 
-    tax
+  defp insert_returning!(table, row) do
+    {1, [inserted]} = Repo.insert_all(table, [row], returning: [:id])
+    inserted
+  end
+
+  defp insert_genus(name) do
+    insert_returning!("taxonomy", %{
+      name: name,
+      type: "genus",
+      description: "Plant",
+      inserted_at: @now,
+      updated_at: @now
+    })
   end
 
   defp insert_species(name, taxoncode \\ "plant") do
-    {:ok, sp} =
-      Repo.insert(%Gallformers.Species.Species{
-        name: name,
-        taxoncode: taxoncode,
-        datacomplete: false
-      })
-
-    sp
+    insert_returning!("species", %{
+      name: name,
+      taxoncode: taxoncode,
+      datacomplete: false,
+      inserted_at: @now,
+      updated_at: @now
+    })
   end
 
   defp link_to_genus(species, genus) do
@@ -88,12 +95,7 @@ defmodule Gallformers.Migrations.NormalizeGenusPlaceholdersTest do
   end
 
   defp insert_gall_species(name) do
-    {:ok, sp} =
-      Repo.insert(%Gallformers.Species.Species{
-        name: name,
-        taxoncode: "gall",
-        datacomplete: false
-      })
+    sp = insert_species(name, "gall")
 
     Repo.insert_all("gall_traits", [
       %{
@@ -107,7 +109,12 @@ defmodule Gallformers.Migrations.NormalizeGenusPlaceholdersTest do
   end
 
   defp species_by_name(name) do
-    Repo.get_by(Gallformers.Species.Species, name: name)
+    Repo.one(
+      from(s in "species",
+        where: s.name == ^name,
+        select: %{id: s.id, name: s.name, genus_placeholder: s.genus_placeholder}
+      )
+    )
   end
 
   describe "run!/0" do
@@ -126,7 +133,7 @@ defmodule Gallformers.Migrations.NormalizeGenusPlaceholdersTest do
 
       # Old name preserved as scientific synonym
       aliases =
-        from(a in Gallformers.Species.Alias,
+        from(a in "alias",
           join: link in "alias_species",
           on: link.alias_id == a.id,
           where: link.species_id == ^renamed.id,
@@ -198,7 +205,7 @@ defmodule Gallformers.Migrations.NormalizeGenusPlaceholdersTest do
 
       # Verify no duplicate alias was created on the second pass
       alias_count =
-        from(a in Gallformers.Species.Alias,
+        from(a in "alias",
           join: link in "alias_species",
           on: link.alias_id == a.id,
           where: link.species_id == ^renamed.id and a.name == "Testgenusthree sp",
@@ -245,8 +252,8 @@ defmodule Gallformers.Migrations.NormalizeGenusPlaceholdersTest do
 
       assert :ok = apply(@migration_module, :run!, [])
 
-      reloaded = Repo.get!(Gallformers.Species.Species, existing.id)
-      assert reloaded.name == "Testgenusfive spp"
+      reloaded = species_by_name("Testgenusfive spp")
+      assert reloaded.id == existing.id
       assert reloaded.genus_placeholder == true
     end
 

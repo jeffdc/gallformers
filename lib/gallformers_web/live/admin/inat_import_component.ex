@@ -2,8 +2,15 @@ defmodule GallformersWeb.Admin.InatImportComponent do
   @moduledoc """
   LiveComponent for importing images from iNaturalist observations.
 
-  Mounted in the Images Admin upload section. Owns its own lifecycle:
+  Mounted beside an image upload section with the `owner` the photos are
+  imported for (`t:Gallformers.Images.Image.owner/0`, a Gall or a taxon)
+  and the `uploader` name. Owns its own lifecycle:
   :idle → :fetching → :picking → :importing → :done
+
+  When done it sends `{:inat_import_complete, owner}` to the parent
+  LiveView, or, given `notify` (`{module, id}` of a LiveComponent, such as
+  `GallformersWeb.Admin.ImagesComponent`), updates that component with
+  `inat_import_complete: owner`.
   """
 
   use GallformersWeb, :live_component
@@ -52,8 +59,7 @@ defmodule GallformersWeb.Admin.InatImportComponent do
         {n, e} -> "Imported #{n} image(s). #{e} failed."
       end
 
-    # Notify parent to refresh images
-    send(self(), {:inat_import_complete, socket.assigns.species_id})
+    notify_complete(socket.assigns)
 
     {:ok,
      socket
@@ -69,10 +75,17 @@ defmodule GallformersWeb.Admin.InatImportComponent do
   def update(assigns, socket) do
     {:ok,
      socket
-     |> assign(:species_id, assigns.species_id)
+     |> assign(:owner, assigns.owner)
      |> assign(:uploader, assigns.uploader)
+     |> assign(:notify, Map.get(assigns, :notify))
      |> assign(:id, assigns.id)}
   end
+
+  # Has the images refreshed: the `notify` component's, else the parent's.
+  defp notify_complete(%{notify: {module, id}, owner: owner}),
+    do: send_update(module, id: id, inat_import_complete: owner)
+
+  defp notify_complete(%{owner: owner}), do: send(self(), {:inat_import_complete, owner})
 
   # -------------------------------------------------------------------
   # Render
@@ -291,14 +304,14 @@ defmodule GallformersWeb.Admin.InatImportComponent do
 
     # Run the import in a background task
     component_id = socket.assigns.id
-    species_id = socket.assigns.species_id
+    owner = socket.assigns.owner
     uploader = socket.assigns.uploader
     observation = socket.assigns.observation
     lv = self()
 
     Gallformers.Async.run(fn ->
       {imported, errors} =
-        do_import_photos(photos, species_id, uploader, observation, component_id, lv)
+        do_import_photos(photos, owner, uploader, observation, component_id, lv)
 
       send_update(lv, __MODULE__, id: component_id, import_result: {:done, imported, errors})
     end)
@@ -334,7 +347,7 @@ defmodule GallformersWeb.Admin.InatImportComponent do
     end
   end
 
-  defp do_import_photos(photos, species_id, uploader, observation, component_id, lv) do
+  defp do_import_photos(photos, owner, uploader, observation, component_id, lv) do
     total = length(photos)
 
     photos
@@ -345,7 +358,7 @@ defmodule GallformersWeb.Admin.InatImportComponent do
         import_progress: %{current: index, total: total}
       )
 
-      result = import_single_photo(photo, species_id, uploader, observation)
+      result = import_single_photo(photo, owner, uploader, observation)
       # Respect iNat rate limits (~1s between requests)
       if index < total, do: Process.sleep(1_000)
       accumulate_result(acc, result, photo.id)
@@ -357,22 +370,37 @@ defmodule GallformersWeb.Admin.InatImportComponent do
   defp accumulate_result({imported, errors}, {:error, reason}, photo_id),
     do: {imported, errors ++ ["Photo #{photo_id}: #{inspect(reason)}"]}
 
-  defp import_single_photo(photo, species_id, uploader, observation) do
+  defp import_single_photo(photo, owner, uploader, observation) do
     with {:ok, binary} <- INaturalist.download_photo(photo.original_url),
-         path = ImageStorage.generate_path(species_id, extension_from_url(photo.original_url)),
-         {:ok, _} <- ImageStorage.upload(path, binary, content_type_from_url(photo.original_url)),
-         creator =
-           INaturalist.format_creator(observation.observer_login, observation.observer_name),
-         {:ok, _image} <-
-           Images.finalize_upload(path, species_id, uploader, %{
-             creator: creator,
-             license: photo.mapped_license,
-             licenselink: Licenses.url(photo.mapped_license),
-             sourcelink: observation.url
-           }) do
+         {:ok, _image} <- store_photo(binary, photo, observation, owner, uploader) do
       :ok
-    else
-      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Stores a downloaded iNat `photo` (its bytes, `binary`) as `owner`'s image:
+  uploads it under the owner's path and creates the image with the
+  observation's creator ("login - name"), the mapped license and its link,
+  and the observation link as the source link.
+  """
+  @spec store_photo(
+          binary(),
+          Gallformers.INaturalist.Photo.t(),
+          Gallformers.INaturalist.Observation.t(),
+          Gallformers.Images.Image.owner(),
+          String.t()
+        ) :: {:ok, Gallformers.Images.Image.t()} | {:error, term()}
+  def store_photo(binary, photo, observation, owner, uploader) do
+    path = ImageStorage.generate_path(owner, extension_from_url(photo.original_url))
+
+    with {:ok, _} <- ImageStorage.upload(path, binary, content_type_from_url(photo.original_url)) do
+      Images.finalize_upload(path, owner, uploader, %{
+        creator:
+          INaturalist.format_creator(observation.observer_login, observation.observer_name),
+        license: photo.mapped_license,
+        licenselink: Licenses.url(photo.mapped_license),
+        sourcelink: observation.url
+      })
     end
   end
 

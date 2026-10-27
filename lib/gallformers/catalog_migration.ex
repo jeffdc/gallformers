@@ -37,7 +37,8 @@ defmodule Gallformers.CatalogMigration do
     2. `Gallformers.CatalogMigration.Taxa` — higher taxa (rows kept twice
        merged, `taxon_merges.csv`; family kingdoms a curator set,
        `kingdoms.csv`), plants, genus placeholders (crosswalked to their
-       genus for their old URLs), `host_range` re-keyed by taxon.
+       genus for their old URLs), `host_range` re-keyed by taxon, plants'
+       WCVP links (`host_traits`) carried to `taxon_wcvp`.
     3. `Gallformers.CatalogMigration.Galls` — Inducer taxa from gall names
        (`priv/catalog_migration/name_suffixes.csv`), Galls, their name parts
        and derived names (`Gallformers.CatalogMigration.GallNames`; today's
@@ -117,8 +118,13 @@ defmodule Gallformers.CatalogMigration do
   # Emptied before each run, children first. Never `replay_log`, Sources,
   # their stored documents or the vocabularies; of `source_documents`, only
   # the Gallformers notes (rebuilt from `species_source`).
+  # Host range rows with no species key were written by taxon for plants
+  # created since (the replay log writes them again); the rest lose their
+  # taxon key and are re-keyed.
   @clear [
+    "DELETE FROM host_range WHERE species_id IS NULL",
     "UPDATE host_range SET taxon_id = NULL WHERE taxon_id IS NOT NULL",
+    "DELETE FROM taxon_wcvp",
     "UPDATE image SET gall_id = NULL, taxon_id = NULL " <>
       "WHERE gall_id IS NOT NULL OR taxon_id IS NOT NULL",
     "DELETE FROM queue_items",

@@ -6,6 +6,9 @@
  * - Client-side preview before upload
  * - Progress indicator during upload
  * - Direct upload to S3 using presigned URLs
+ *
+ * Events go to the hook element's LiveComponent (`pushEventTo(this.el)`), or
+ * to the LiveView when the element is in none.
  */
 
 const ImageUpload = {
@@ -180,7 +183,7 @@ const ImageUpload = {
       extension: file.name.split(".").pop()
     }))
 
-    this.pushEvent("request_presigned_urls", { files: fileInfo })
+    this.pushEventTo(this.el, "request_presigned_urls", { files: fileInfo })
   },
 
   async executeUploads(urls) {
@@ -197,7 +200,7 @@ const ImageUpload = {
 
       if (successPaths.length > 0) {
         // Tell the server which uploads succeeded
-        this.pushEvent("uploads_completed", {
+        this.pushEventTo(this.el, "uploads_completed", {
           paths: successPaths,
           species_id: this.speciesId
         })
@@ -309,7 +312,7 @@ const ImageUpload = {
     }
 
     // Notify the LiveView to refresh the image list
-    this.pushEvent("refresh_images", {})
+    this.pushEventTo(this.el, "refresh_images", {})
   }
 }
 

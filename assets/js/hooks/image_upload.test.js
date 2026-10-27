@@ -215,6 +215,17 @@ describe('ImageUpload upload request', () => {
     })
   })
 
+  test('pushes to its own element (its LiveComponent, else the LiveView)', () => {
+    const hook = mountHook(ImageUpload, uploadHTML())
+    hook.mounted()
+
+    hook.addFiles([fakeFile('photo.jpg')])
+    hook.uploadFiles()
+
+    const req = getPushedEvents(hook).find(e => e.event === 'request_presigned_urls')
+    expect(req.selector).toBe(hook.el)
+  })
+
   test('uploadFiles disables button and shows preparing text', () => {
     const hook = mountHook(ImageUpload, uploadHTML())
     hook.mounted()
@@ -259,6 +270,22 @@ describe('ImageUpload progress', () => {
 // Server event handlers
 // ============================================
 
+describe('ImageUpload completion', () => {
+  test('pushes the uploaded paths to its own element', async () => {
+    const hook = mountHook(ImageUpload, uploadHTML({ speciesId: '42' }))
+    hook.mounted()
+    hook.addFiles([fakeFile('a.jpg'), fakeFile('b.jpg')])
+    hook.uploadToS3 = async (_file, { path }) => ({ success: path !== 'p2', path })
+
+    await hook.executeUploads([{ path: 'p1' }, { path: 'p2' }])
+
+    const done = getPushedEvents(hook).find(e => e.event === 'uploads_completed')
+    expect(done.selector).toBe(hook.el)
+    expect(done.payload).toEqual({ paths: ['p1'], species_id: '42' })
+    expect(hook.el.textContent).toContain('1 upload(s) failed')
+  })
+})
+
 describe('ImageUpload server events', () => {
   test('upload_complete resets form and pushes refresh_images', () => {
     const hook = mountHook(ImageUpload, uploadHTML())
@@ -271,7 +298,8 @@ describe('ImageUpload server events', () => {
 
     expect(hook.files).toHaveLength(0)
     expect(hook.uploadButton.disabled).toBe(true)
-    expect(getPushedEvents(hook).some(e => e.event === 'refresh_images')).toBe(true)
+    const refresh = getPushedEvents(hook).find(e => e.event === 'refresh_images')
+    expect(refresh.selector).toBe(hook.el)
   })
 
   test('upload_error shows error message', () => {

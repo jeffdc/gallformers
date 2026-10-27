@@ -102,6 +102,7 @@ public            taxon_names
 public            taxon_common_names
 public            legacy_taxon_ids
 public            taxon_ancestry
+public            taxon_wcvp
 public            placement_facts
 public            name_facts
 public            synonymy_facts

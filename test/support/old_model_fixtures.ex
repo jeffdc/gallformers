@@ -123,10 +123,20 @@ defmodule Gallformers.OldModelFixtures do
     ])
   end
 
-  @doc "A `host_traits` row. `opts`: `:wcvp_synced_at`."
+  @doc """
+  A `host_traits` row. `opts`: `:wcvp_synced_at`, `:wcvp_id`, `:powo_id`,
+  `:wcvp_match_status`, `:range_confirmed`.
+  """
   def host_traits!(species_id, opts \\ []) do
     Repo.insert_all("host_traits", [
-      %{species_id: species_id, wcvp_synced_at: opts[:wcvp_synced_at]}
+      %{
+        species_id: species_id,
+        wcvp_synced_at: opts[:wcvp_synced_at],
+        wcvp_id: opts[:wcvp_id],
+        powo_id: opts[:powo_id],
+        wcvp_match_status: opts[:wcvp_match_status],
+        range_confirmed: Keyword.get(opts, :range_confirmed, false)
+      }
     ])
   end
 

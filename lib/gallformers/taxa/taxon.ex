@@ -73,6 +73,15 @@ defmodule Gallformers.Taxa.Taxon do
     |> foreign_key_constraint(:abundance_id)
   end
 
+  @doc "Creates a changeset for a plant's editorial flags: `:datacomplete`, `:abundance_id`."
+  @spec editorial_changeset(t(), map()) :: Ecto.Changeset.t()
+  def editorial_changeset(taxon, attrs) do
+    taxon
+    |> cast(attrs, [:datacomplete, :abundance_id])
+    |> validate_required([:datacomplete])
+    |> foreign_key_constraint(:abundance_id)
+  end
+
   @doc "Creates a changeset moving the taxon under `parent_id` (nil for a root)."
   @spec parent_changeset(t(), integer() | nil) :: Ecto.Changeset.t()
   def parent_changeset(taxon, parent_id) do

@@ -8,6 +8,18 @@ defmodule Gallformers.Storage.ImagesTest do
 
   alias Gallformers.Storage.Images
 
+  describe "generate_path/2" do
+    test "lays a Gall's image out under its ID" do
+      path = Images.generate_path({:gall, 42}, "jpg")
+      assert path =~ ~r{^gall/42/42_\d+_\d+_original\.jpg$}
+    end
+
+    test "lays a taxon's image out the same way" do
+      path = Images.generate_path({:taxon, 7}, ".png")
+      assert path =~ ~r{^gall/7/7_\d+_\d+_original\.png$}
+    end
+  end
+
   describe "generate_content_image_path/4" do
     test "generates article path without _original suffix" do
       path = Images.generate_content_image_path("articles", 42, "jpg", has_variants: false)

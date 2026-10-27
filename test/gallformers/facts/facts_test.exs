@@ -33,7 +33,10 @@ defmodule Gallformers.FactsTest do
       })
 
     {:ok, source} =
-      Sources.update_source_details(source, %{kind: "publication", authored: authored})
+      Sources.update_source_details(test_actor(), source, %{
+        kind: "publication",
+        authored: authored
+      })
 
     source
   end
@@ -50,7 +53,7 @@ defmodule Gallformers.FactsTest do
       })
 
     Repo.query!("UPDATE source SET kind = NULL WHERE kind = 'gallformers'")
-    {:ok, source} = Sources.update_source_details(source, %{kind: "gallformers"})
+    {:ok, source} = Sources.update_source_details(test_actor(), source, %{kind: "gallformers"})
     source
   end
 
@@ -451,7 +454,7 @@ defmodule Gallformers.FactsTest do
       attribute!(untouched, other, %{stance: :confirm})
       assert standing(also_confirmed) == :withdrawn
 
-      {:ok, _} = Sources.retract_source(retracted, notice, ~D[2021-06-01])
+      {:ok, _} = Sources.retract_source(test_actor(), retracted, notice, ~D[2021-06-01])
       assert {:ok, []} = Facts.recompute_for_source(test_actor(), retracted.id)
 
       assert standing(only_retracted) == :retracted
