@@ -3,7 +3,7 @@ status: raw
 created: 2026-10-24
 updated: 2026-10-26
 epic: taxonomy
-relates: [8567, 9449, 3272]
+relates: [8567, 9449, 3272, 803b]
 ---
 
 # Taxogall: program overview and punchlist
@@ -35,6 +35,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 | `e381` | Gallformers-side importer, admin queue, intake |
 | `d585` | Host names resolved before the gall batch |
 | `20e5` | Gallformers ID Notes: Facts vs commentary; conversion |
+| `803b` | Step 9: public pages and API on the new back-end (design, inventory) |
 | `86e7` | Gall name builder (derived names with generation / Host / form qualifiers) |
 | `ede2` | Audit trail (shared building block; to rewrite for the new tables) |
 | `f465` | Preview environment with production-like data (backscan staging, rehearsal timing) |
@@ -63,7 +64,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 
 **Front-end:**
 
-9. **Public pages re-pointed in place (`b5bd` M3):** Gall, Host, taxon ranks, Source, place, browse; ID tool parity (season filter wording to "forms and grows"); search; name builder (`86e7`); minimal API; redirects and the gall-lookalikes Article; sitemap.
+9. **Public pages re-pointed in place (`b5bd` M3; design in `803b`):** Gall, Host, taxon ranks, Source, place, browse; ID tool parity (season filter wording to "forms and grows"); search; name builder (`86e7`); minimal API; redirects and the gall-lookalikes Article; sitemap. **Built 2026-10-27 (uncommitted), except the name builder (`86e7`, not in `803b`'s plan — Galls keep today's names as `name_override`); see `803b` Status.** The e2e browser suite's Playwright breakage (pre-existing since #593) is fixed on `taxogall`: Elixir test libraries and npm Playwright upgraded together.
 10. **New minimal admin (`b5bd` M3, `8567` rule 12):** taxonomy admin, images, a note editor for each Gall's Gallformers note (`20e5`), and only what else proves unavoidable; retire the old Gall/Host/gall–host/range/Source forms.
 
 **Release:**
@@ -82,4 +83,3 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 - Generation groups: taxa mappings, multivoltine value names, taxon moves out of a group's subtree (`8567`). Details can wait until more of the system is built.
 - Rename handling A vs B; scope of the curated taxonomy; Traits that vary by Host (`8567`).
 - Coordinates on recorded occurrences (`294c`, with Adam).
-

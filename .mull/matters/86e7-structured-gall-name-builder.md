@@ -1,8 +1,9 @@
 ---
 status: raw
 created: 2026-09-14
-updated: 2026-10-24
+updated: 2026-10-26
 epic: taxonomy
+relates: [803b]
 ---
 
 # Structured gall name builder
@@ -24,4 +25,3 @@ Give every Gall a unique, human-readable name derived from its data (`8567` rule
 - A Gall's name carries no authorship and no taxonomic synonyms; a Gall's common names are `alias` Facts.
 
 History: extracted from the dropped `2cb2` draft (a label-builder UI with recipes, primary inducers and confidence), which `8567` superseded.
-

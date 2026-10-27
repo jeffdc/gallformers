@@ -3,7 +3,7 @@ status: planned
 created: 2026-10-24
 updated: 2026-10-26
 epic: taxonomy
-relates: [50ff, 8567]
+relates: [50ff, 8567, 803b]
 ---
 
 # Taxogall back-end schema
@@ -67,7 +67,7 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 
 ## 4. Gall system (`Catalog`)
 
-- `galls`: `id` (keeps species ID), `gallformers_code`, `generation_value_id` (identifies the Gall; not a Fact), derived `name` plus `name_override`, editorial carry-over (abundance, `datacomplete`, and whatever is decided for default Source and range-confirmed).
+- `galls`: `id` (keeps species ID), `gallformers_code`, `generation_value_id` (identifies the Gall; not a Fact), derived `name` plus `name_override`, editorial carry-over (abundance, `datacomplete`, `default_source_id` — the Source the Gall page leads with, from today's `useasdefault`, note or citation (decided 2026-10-26, `803b`) — and whatever is decided for range-confirmed).
 
 | Fact table | Columns | Natural key |
 |---|---|---|
@@ -76,7 +76,7 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 | `trait_facts` | `gall_id`, `trait_value_id` | Gall + value; `detachable` in a slot |
 | `range_facts` | `gall_id`, `adjustment` (`exclude | only`; `include` removed 2026-10-26), `place_id` | Gall + adjustment + place; slot per Gall + place (newest statement wins) |
 | `occurrence_facts` | `gall_id`, `place_id` | Gall + place (when / stage on the attribution) |
-| `alias_facts` | `gall_id`, `name` | Gall + name |
+| `alias_facts` | `gall_id`, `name`, `kind` (`common_name` \| `former_label` \| `code`; added 2026-10-26, `803b`) | Gall + name |
 | `description_facts` | `gall_id` | one per Gall; each Source's attribution carries its quotes |
 
 - Vocabularies: `trait_values` (trait, value, definition), `trait_term_mappings`, `generation_groups`, `generation_values` (value, definition, name-qualifier text), `generation_group_taxa`. Relationship types: a code-level list (direction, inverse label, endpoint kinds) with a check constraint, changed only by migration.
@@ -365,4 +365,3 @@ Run on `gallformers_taxogall`, a clone of `gallformers_dev` (data to 2026-10-23)
 - **Name suffixes** (`name_suffixes.csv`): parenthetical names such as *Neuroterus saltatorius* (australis / texanus / decrescens / saltatorius) (agamic) are gall forms of one species — one Inducer, a separate Gall per form, the form kept in the Gall's displayed name (also *N. quercicola* (pacificus), *N. vesicula* (cerinus), *Phylloxera caryaesepta* (perforans), *Cynips mellea* (rydbergiana)). "Summer and autumn generation(s)" is one multivoltine Gall with the generation `summer`. *Prociphilus caryae* on *Amelanchier* is fundatrix. *Pseudomonas savastanoi* pv nerii is the species for now. *Periclistus pirata*'s modified-form link to its *Diplolepis* gall comes later from source import. 6026 and 7161 name *Puccinia recondita* and *Aceria hibisci*.
 
 **Result:** 3,976 Galls (128 non-galls excluded); 2,407 synonyms, 79 former labels, 361 gall alias Facts; 324 range Facts; 43,876 legacy Facts. The derived names of a species' several gall forms coincide ("*N. saltatorius* (agamic)"); each Gall keeps today's name as its displayed name, so the form needs a home before names are rebuilt (`86e7`).
-

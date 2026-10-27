@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-02
-updated: 2026-10-24
+updated: 2026-10-26
 epic: taxonomy
-relates: [8567]
+relates: [8567, 803b]
 ---
 
 # Taxonomy migration
