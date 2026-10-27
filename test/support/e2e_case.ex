@@ -58,7 +58,8 @@ defmodule GallformersWeb.E2ECase do
 
   using do
     quote do
-      import PhoenixTest
+      import PhoenixTest, except: [visit: 2]
+      import GallformersWeb.E2ECase, only: [visit: 2]
 
       import PhoenixTest.Playwright,
         only: [
@@ -101,6 +102,33 @@ defmodule GallformersWeb.E2ECase do
 
     # Launch browser via Playwright
     PhoenixTest.Playwright.Case.do_setup_all(context)
+  end
+
+  # Resolves once the page's LiveView has joined (its root gets
+  # `phx-connected`), or at once on a page without a LiveView.
+  @await_liveview """
+  new Promise(resolve => {
+    const main = document.querySelector('[data-phx-main]');
+    const joined = () => !main || main.classList.contains('phx-connected');
+    if (joined()) return resolve(true);
+    const observer = new MutationObserver(() => {
+      if (joined()) { observer.disconnect(); resolve(true); }
+    });
+    observer.observe(main, {attributes: true, attributeFilter: ['class']});
+  })
+  """
+
+  @doc """
+  `PhoenixTest.visit/2`, then waits for the page's LiveView to connect.
+
+  Playwright's `visit` returns at the page's `load` event, before the
+  LiveView has joined; a `phx-click` sent in that gap is silently dropped
+  (seen as a click that opens nothing).
+  """
+  def visit(session, path) do
+    session
+    |> PhoenixTest.visit(path)
+    |> PhoenixTest.Playwright.evaluate(@await_liveview)
   end
 
   setup context do

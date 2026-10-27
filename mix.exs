@@ -98,7 +98,7 @@ defmodule Gallformers.MixProject do
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # E2E browser testing (Playwright, separate from regular test suite)
       {:phoenix_test, "~> 0.4", only: :test, runtime: false},
-      {:phoenix_test_playwright, "~> 0.12", only: :test, runtime: false}
+      {:phoenix_test_playwright, "~> 0.19", only: :test, runtime: false}
     ]
   end
 

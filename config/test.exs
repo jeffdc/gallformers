@@ -67,9 +67,13 @@ config :gallformers, GallformersWeb.Endpoint,
 #    and browser setting.
 config :phoenix_test, otp_app: :gallformers
 
+# 4. timeout: the library default is 2s per action, and `visit` waits for the
+#    page's `load` event. On production-sized data a Gall page loads many
+#    remote images and map tiles, which can take longer than that.
 config :phoenix_test, :playwright,
   browser: :firefox,
   browser_pools: [[id: :default_pool, browser: :firefox]],
+  timeout: 10_000,
   screenshot: true,
   screenshot_dir: "test/screenshots"
 
