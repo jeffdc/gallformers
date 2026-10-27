@@ -83,7 +83,7 @@ gall,575,12024,Andricus lustrans,scientific,drop,"",rule 2: identical to the gal
 gall,575,12025,Andricus impositus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,575,12026,Andricus dimorphus variety verifactor,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,575,12027,Acraspis vaccinii,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,577,7601,Unknown q-rubra-woody-midrib-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,577,7601,Unknown q-rubra-woody-midrib-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,577,7602,Cynips quercus decidua,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,577,7603,Dryocosmus deciduus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,577,7605,Andricus decidua,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -758,8 +758,8 @@ gall,1053,12107,Itonida foliora,scientific,synonym,"",rule 1: synonym of the spe
 gall,1063,11968,Disholcaspis q-margarettae-bullet-gall (agamic),scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,1063,11969,Cynips rugosa,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,1063,11970,Holcaspis rugosa,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
-gall,1073,9215,Andricus q-laceyi-midrib-cluster,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1076,10662,Unknown q-stellata-white-bead-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1073,9215,Andricus q-laceyi-midrib-cluster,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,1076,10662,Unknown q-stellata-white-bead-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1079,7465,Cynips gemmula var gemmula form prinoides,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1079,7466,Philonix prinoides,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1079,7467,Cynips prinoides,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -788,16 +788,16 @@ gall,1099,9756,Andricus excavatus,scientific,synonym,"",rule 1: synonym of the s
 gall,1100,7679,Cynips ilicifoliae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1100,7680,Cynips quercus ilicifoliae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1103,736,Colomerus buceras,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1107,11393,Unknown q-virginiana-twig-swelling-cells,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1107,11393,Unknown q-virginiana-twig-swelling-cells,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1107,11394,Loxaulus virginianae,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,1109,7022,Neuroterus saltatorius (texanus),scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,1111,6793,Neuroterus niger (alimas),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1112,6722,Unknown q-virginiana-like-A-utriculus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1112,6722,Unknown q-virginiana-like-A-utriculus,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1114,3278,Aceria quercerinus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1115,977,Eriophyes dentatae,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,1115,12269,Unknown (Cynipidae) c-dentata-woody-radiating-fibers,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
-gall,1117,5988,refdfd,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1119,6720,Unknown q-myrtifolia-globular-flower-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1117,5988,refdfd,scientific,drop,"",rule 2: not a name (stray text); Jeff 2026-10-26
+gall,1119,6720,Unknown q-myrtifolia-globular-flower-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1129,5363,Callirhytis futilis (sexgen),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1129,5364,Cynips quercus futilis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1129,5365,Cynips quercus papillata,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -820,9 +820,9 @@ gall,1148,8335,Andricus davisi,scientific,synonym,"",rule 1: synonym of the spec
 gall,1148,8336,Synergus davisi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1148,8337,Cynips lignicola,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1148,8338,Synerges lignicola,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1148,8339,Synergus deforming-quercusgemmaria,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1148,8339,Synergus deforming-quercusgemmaria,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1164,6352,Unknown q-marilandica-globular-vein-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
-gall,1169,6776,Dryocosmus q-myrtifolia-conical-leaf-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1169,6776,Dryocosmus q-myrtifolia-conical-leaf-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1169,6777,Dryocosmus archboldi,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,1170,10579,Unknown q-phellos-midrib-swelling,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,1173,5926,Andricus fulvicollis form bicolens,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1179,13 +1179,13 @@ gall,1589,12240,Neolasioptera sambuci,scientific,synonym,"",rule 1: synonym of t
 gall,1589,12241,Cecidomyia sambuci,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1589,12242,Lasioptera sambuci,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1590,2226,Lasioptera nodulosa,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1592,12011,Unknown a-vulgaris-stem-swelling,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1592,12011,Unknown a-vulgaris-stem-swelling,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1593,9514,Diplosis farinosa,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1593,9515,Lasioptera farinosa,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1593,9516,Cecidomyia farinosa,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1594,11348,Lasioptera viburnicola,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1595,4168,Lasioptera linderae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1596,10696,Unknown white-oak-fuzzy-tan-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1596,10696,Unknown white-oak-fuzzy-tan-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1598,6001,Cecidomyia parthenocissi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1598,6002,Dasyneura parthenocissi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1601,9471,Sphaeroteras trimaculosum (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1311,7 +1311,7 @@ gall,1858,9672,Asteromyia nigrina,scientific,synonym,"",rule 1: synonym of the s
 gall,1858,9673,Asteromyia sylvestris,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1858,9674,Asteromyia fuscoanulata,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1865,12116,Giardomyia rhododendri,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1871,10983,Cynips q-durata-pink-bow-tie-gall-wasp (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1871,10983,Cynips q-durata-pink-bow-tie-gall-wasp (agamic),scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1879,4149,Cecidomyia inaequalis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1879,4150,Asphondylia diervillae,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,1898,4085,Psylla ilecis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1333,8 +1333,8 @@ gall,1978,6503,Cecidomyia lysimachiae,scientific,synonym,"",rule 1: synonym of t
 gall,1979,10765,Rhopalomyia sabinae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1983,11022,Dasineura flavicornis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,1985,12050,Dryocosmus brown-eye-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
-gall,1987,11156,Unknown q-garryana-disc-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,1996,5309,Unknown q-lobata-catkin-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,1987,11156,Unknown q-garryana-disc-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,1996,5309,Unknown q-lobata-catkin-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,1996,12262,Neuroterus quercicola (pacificus) (sexgen) (q-lobata),scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,1999,2714,Lasioptera tripsaci,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2004,11640,Endocronartium harknessii,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1397,7 +1397,7 @@ gall,2128,5618,Neuroterus cupulae,scientific,synonym,"",rule 1: synonym of the s
 gall,2128,5619,Neuroterus quercicola pacificus (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2128,5620,Neuroterus pacificus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2129,10928,Plagiotrochus suberi (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2130,11676,Unknown q-dumosa-mottled-flower-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2130,11676,Unknown q-dumosa-mottled-flower-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2134,11462,Neuroterus quercicola var. pacificus (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2137,9489,Trigonaspis pulchella,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2137,9490,Trigonaspis obconica,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1411,14 +1411,14 @@ gall,2170,11389,Itonida citrulli,scientific,synonym,"",rule 1: synonym of the sp
 gall,2180,3103,Janetiella coloradensis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2185,11512,Asteromyia c-filaginifolia-cotton-bud-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,2209,12042,Unknown f-splendens-aborted-bud-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
-gall,2219,6732,Unknown q-turbinella-pink-thorn-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2219,6732,Unknown q-turbinella-pink-thorn-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2231,4096,Phytophaga thujae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2249,10351,Diplolepis sessilis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2249,10352,Dros sessile,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,2249,10353,Andricus sessilus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2249,10354,Andricus sessilum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2253,12734,Unknown (Pucciniaceae) hypericum-ring-rust,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2253,12736,Unknown (Pucciniaceae) h-fraseri-leaf-rust,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2253,12734,Unknown (Pucciniaceae) hypericum-ring-rust,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,2253,12736,Unknown (Pucciniaceae) h-fraseri-leaf-rust,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2255,12255,Hamamelistes spinosus (on-betula),scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,2266,7365,Hormomyia verruca,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2266,7366,Cecidomyia salicisverruca,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1430,7 +1430,7 @@ gall,2274,11057,Choristoneura helianthi,scientific,synonym,"",rule 1: synonym of
 gall,2280,3000,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,2282,3007,Andricus clavigerus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2284,3009,Plagiotrochus punctatus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2289,11587,Aciurina e-nauseosa-fuzzy-teardrop-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2289,11587,Aciurina e-nauseosa-fuzzy-teardrop-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2296,3034,Janetiella siskiyou,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2300,10601,Callirhytis balanella,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2352,11731,Cynips capronae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1446,14 +1446,14 @@ gall,2398,11065,Cecidomyia helianthibulla,scientific,synonym,"",rule 1: synonym 
 gall,2398,11066,Hormomyia bulla,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2408,10647,Heteroecus q-chrysolepis-hair-stalk-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,2418,8890,Andricus vernus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2422,6730,Unknown q-arizonica-inside-acorn,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2424,11392,Unknown q-arizonica-conical-yellow-bud-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2427,6800,Unknown q-arizonica-striped-bud-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2422,6730,Unknown q-arizonica-inside-acorn,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,2424,11392,Unknown q-arizonica-conical-yellow-bud-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,2427,6800,Unknown q-arizonica-striped-bud-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2428,7385,Neuroterus alexandrae,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
-gall,2428,7386,Unknown q-arizonica-bluish-bud-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2428,7386,Unknown q-arizonica-bluish-bud-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2433,10663,Neuroterus rileyi var. virgens,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2435,11531,Andricus furnessulus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2435,11532,Andricus q-arizonica-woolly-stem-gall (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2435,11532,Andricus q-arizonica-woolly-stem-gall (agamic),scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2437,11837,Cynips dugesi var simulatrix,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2438,8062,Cynips plumbeum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2438,8063,Cynips plumbea,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1473,8 +1473,8 @@ gall,2445,10979,Andricus tecturnarum (agamic),scientific,synonym,"",rule 1: syno
 gall,2447,10854,Unknown q-arizonica-pointed-leaf-edge-cell,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,2456,11668,Unknown q-arizonica-prolonged-vein,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,2456,11669,Feron q-arizonica-prolonged-vein,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
-gall,2460,6788,Unknown q-oblongifolia-small-cells-stamens,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2465,8723,Unknown q-oblongifolia-fall-pubescent-bud-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2460,6788,Unknown q-oblongifolia-small-cells-stamens,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,2465,8723,Unknown q-oblongifolia-fall-pubescent-bud-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2474,10348,Andricus viscidus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2474,10349,Dros viscidum,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,2474,10350,Liodora viscida,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1489,7 +1489,7 @@ gall,2494,11670,Trioza eugeniae,scientific,synonym,"",rule 1: synonym of the spe
 gall,2499,8985,Xanthoteras mediocre,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2500,10203,Striatoandrius barriosi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2500,10204,Andricus barriosi (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2507,10606,Unknown q-rugosa-honeydew-bud-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2507,10606,Unknown q-rugosa-honeydew-bud-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2510,10660,Neuroterus quercicola var. congregatus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2517,10841,Callirhytis rhizoxenus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2517,10842,Callirhytis rhizoxena,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1512,8 +1512,8 @@ gall,2582,10336,Heteroecus dasydactyli var. pygmaeus,scientific,synonym,"",rule 
 gall,2589,11093,Neolasioptera fulva,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2589,11094,Cecidomyia fulva,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2589,11095,Lasioptera impatientifolia,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2600,11007,Andricus q-turbinella-woolly-leaf-gall (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2601,9224,Andricus q-oblongifolia-masked-woolly-tube-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2600,11007,Andricus q-turbinella-woolly-leaf-gall (agamic),scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,2601,9224,Andricus q-oblongifolia-masked-woolly-tube-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2605,9131,Cynips madera,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2613,9269,Masonaphis r-parviflorus-pouch-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,2627,3853,Dasyneura cercocarpi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1526,7 +1526,7 @@ gall,2653,10671,Cynips championii,scientific,synonym,"",rule 1: synonym of the s
 gall,2653,10672,Cynips ashmeadi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2653,10673,Cynips championi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2665,3900,Aculus euphorbicolus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2670,10659,Unknown q-chrysolepis-abrupt-blister,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2670,10659,Unknown q-chrysolepis-abrupt-blister,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2674,10180,Andricus mexicanus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2674,10181,Andricus nievesaldreyi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2675,12124,Cecidomyia meibomiae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1534,7 +1534,7 @@ gall,2675,12125,Dasyneura meibomiae,scientific,synonym,"",rule 1: synonym of the
 gall,2679,12803,Unknown (Unknown) a-fasciculatum-bud-rosette,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,2688,12260,Eriosoma lanigerum (on-malus),scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,2692,12287,Caloptilia murtfeldtella,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2697,9604,Unknown chrysolepis-spherical-leaf-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2697,9604,Unknown chrysolepis-spherical-leaf-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2697,12481,Dryocosmus juliae (sexgen),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2700,11888,Cecidomyia lappa,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,2700,11889,Parallelodiplosis clarkei,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1585,7 +1585,7 @@ gall,2884,4615,Phylloxera caryae-globosum,scientific,synonym,"",rule 1: synonym 
 gall,2884,4616,Dactylosphaera coniferum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2884,4617,Dactylosphaera globosum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2884,4618,Phylloxera globosum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,2895,7960,Asphondylia s-patula-bud-rosette,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,2895,7960,Asphondylia s-patula-bud-rosette,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,2902,4359,Contarinia tudensis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2902,4360,Contarinia pontevedrensis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,2902,4361,Contarinia isatidis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1644,7 +1644,7 @@ gall,3118,4901,Cephaloneon bifrons,scientific,synonym,"",rule 1: synonym of the 
 gall,3119,9977,Eriophyes coryli,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,3130,5160,Eriophyes holodisci,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3136,6768,Antron tomkursari,scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
-gall,3136,6769,Unknown q-arizonica-green-midrib-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,3136,6769,Unknown q-arizonica-green-midrib-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,3138,8312,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,3140,12228,Coleosporium asterum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3148,11078,Cecidomyia solidaginis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1674,7 +1674,7 @@ gall,3247,12559,unknown e-texanum-red-leaf-gall,scientific,former_label,"","rule
 gall,3248,12268,Eriophyes cerasicrumena (on-p-americana),scientific,drop,"",rule 2: identical to the gall name; Jeff 2026-10-26
 gall,3254,10332,Callirhytis bakeri,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3340,10294,Neoschema powelli,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,3352,6061,Unknown a-ludoviciana-root-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,3352,6061,Unknown a-ludoviciana-root-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,3356,11428,Ophiodothella angustissima,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3359,11672,Unknown u-sessilifolia-leaf-spot,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,3364,10988,Lasioptera podagrae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -1715,8 +1715,8 @@ gall,3465,12040,Asynapta antennariae,scientific,synonym,"",rule 1: synonym of th
 gall,3473,10891,Agromyza schineri,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3473,10892,Hexomyza schineri,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3477,11627,Gymnosporangium libocedri,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,3500,8139,Andricus sp. E,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,3500,8140,Andricus q-oblongifolia-russet-midrib-wasp,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,3500,8139,Andricus sp. E,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,3500,8140,Andricus q-oblongifolia-russet-midrib-wasp,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,3520,6909,Rhabdophaga coloradensis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3521,6843,Rhabdophaga latebrosa,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,3524,7371,Rhabdophaga gnaphaloides,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -2013,7 +2013,7 @@ gall,4557,10605,Callirhytis crassicornis,scientific,synonym,"",rule 1: synonym o
 gall,4568,10944,Asphondylia patens,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4591,10885,Rhizobium radiobacter,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4591,10887,Agrobacterium tumefaciens,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,4614,12258,Emaravirus rose-rosette-disease,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,4614,12258,Emaravirus rose-rosette-disease,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,4641,10666,Taphrina potentillae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4650,9589,Diplosis punicei,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4655,10953,Diarthronomyia chrysanthemi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -2031,8 +2031,8 @@ gall,4770,10064,Ampeloglypter ater,scientific,synonym,"",rule 1: synonym of the 
 gall,4771,10102,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,4787,10811,Exobasidium myrtilli,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4806,11881,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
-gall,4807,10844,Holocynips q-macrocarpa-root-crown-cluster (agamic),scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,4807,10845,Unknown q-bicolor-root-crown-cluster,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,4807,10844,Holocynips q-macrocarpa-root-crown-cluster (agamic),scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,4807,10845,Unknown q-bicolor-root-crown-cluster,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,4817,10849,Andricus fusciformis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4834,11632,Eriosporangium punctato-striatum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,4834,11633,Caeoma punctato-striatum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -2045,10 +2045,10 @@ gall,4849,10371,Stagmatophora enchrysa,scientific,synonym,"",rule 1: synonym of 
 gall,4861,12270,Antistrophus s-integrifolium-flower-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,4897,12206,Unknown p-edulis-enlarged-needle-sheath,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,4897,12207,Janetiella sp. near coloradensis,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
-gall,4918,11006,Feron q-rugosa-like-vitreus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,4919,11176,Feron quercus-pot-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,4920,11167,Feron q-potosina-leaf-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,4931,11475,Unknown n-densiflorus-midrib-cell,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,4918,11006,Feron q-rugosa-like-vitreus,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,4919,11176,Feron quercus-pot-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,4920,11167,Feron q-potosina-leaf-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
+gall,4931,11475,Unknown n-densiflorus-midrib-cell,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,4951,12032,Asphondylia s-odora-bud-rosette-gall,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,4960,10759,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,4971,10768,Urophlyctis pluriannulatus,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -2060,10 +2060,10 @@ gall,5024,10810,Cristulariella moricola,scientific,synonym,"",rule 1: synonym of
 gall,5057,10831,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,5065,11424,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,5066,12191,Cecidomyia epilobii,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,5066,12192,Dasineura c-angustifolium-flower-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,5066,12192,Dasineura c-angustifolium-flower-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,5068,10837,Exobasidium r-menziesii-from-taxon-split,scientific,former_label,"","rule 3: undescribed gall, former label; Jeff 2026-10-26"
 gall,5068,10838,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
-gall,5077,11466,Unknown q-fusiformis-bud-gall,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,5077,11466,Unknown q-fusiformis-bud-gall,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,5079,10862,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,5085,11673,Paranguina picridis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,5085,11674,Anguina picridis,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -2073,7 +2073,7 @@ gall,5137,11916,Cecidomyia antennariae,scientific,synonym,"",rule 1: synonym of 
 gall,5139,10900,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,5172,10933,Dasineura rhois,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,5172,10934,Cecidomyia rhois,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,5174,11541,Neolasioptera a-venenosa-tapered-stem-swelling,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,5174,11541,Neolasioptera a-venenosa-tapered-stem-swelling,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,5178,10936,Lasioptera apocyni,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,5199,10950,Rhopalomyia lateriflorae,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,5199,10951,Rhopalomyia thomi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
@@ -2108,9 +2108,9 @@ gall,5462,11958,Heterotrioza chenopodii,scientific,drop,"",rule 2: identical to 
 gall,5462,11959,Trioza chenopodii,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,5539,11521,Eriophyes dracunculi,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
 gall,5542,11523,Phytoptus prunandersoni,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,5578,12267,Gymnosporangium nidus-avis on Juniper,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,5578,12267,Gymnosporangium nidus-avis on Juniper,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,5622,11637,Sphaerotheca phytophila,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
-gall,5634,12527,Josephiella f-microcarpa-stem-cluster,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
+gall,5634,12527,Josephiella f-microcarpa-stem-cluster,scientific,former_label,"","rule 3: a former Gallformers label (not a binomial), kept as a gall alias, never a taxon synonym; Jeff 2026-10-26"
 gall,5673,11683,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,5673,11684,"",scientific,drop,"",rule 2: blank alias; Jeff 2026-10-26
 gall,5675,11735,Atrusca centricola var. clivorum,scientific,synonym,"",rule 1: synonym of the species-level Inducer; Jeff 2026-10-26
