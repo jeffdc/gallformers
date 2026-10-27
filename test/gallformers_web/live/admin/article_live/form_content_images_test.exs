@@ -7,6 +7,7 @@ defmodule GallformersWeb.Admin.ArticleLive.FormContentImagesTest do
 
   alias Gallformers.Accounts.Auth0User
   alias Gallformers.Articles
+  alias Gallformers.ContentImages
 
   defp setup_admin_session(conn) do
     user = %Auth0User{
@@ -40,6 +41,21 @@ defmodule GallformersWeb.Admin.ArticleLive.FormContentImagesTest do
       {:ok, view, _html} = live(conn, ~p"/admin/articles/#{article.id}")
 
       assert has_element?(view, "[data-content-image-manager]")
+    end
+
+    test "an upload sent to the uploader reaches the component", %{
+      conn: conn,
+      article: article
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/articles/#{article.id}")
+      path = "articles/#{article.id}/form-upload.jpg"
+
+      view
+      |> element("#article-content-images-uploader")
+      |> render_hook("uploads_completed", %{"paths" => [path]})
+
+      assert [%{id: id}] = ContentImages.list_images_for_article(article.id)
+      assert has_element?(view, "#article-content-images [data-image-id='#{id}']")
     end
 
     test "does not show content image manager on new article", %{conn: conn} do
