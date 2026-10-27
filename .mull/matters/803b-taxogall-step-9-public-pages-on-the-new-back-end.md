@@ -1,9 +1,9 @@
 ---
 status: planned
 created: 2026-10-26
-updated: 2026-10-26
+updated: 2026-10-27
 epic: taxonomy
-relates: [50ff, b5bd, 9449, 86e7]
+relates: [50ff, b5bd, 9449, 86e7, a856]
 ---
 
 # Taxogall step 9: public pages on the new back-end
@@ -282,7 +282,7 @@ Each Fact's attributions are loaded and carried in the struct but not rendered.
 
 ## Status
 
-**All 14 tasks built (2026-10-27), uncommitted on `taxogall`.** `mix precommit` green (2,699 tests), `MIX_ENV=dev mix dialyzer` 0 errors. Rehearsal on `gallformers_taxogall` strict and clean (incl. 128 non-gall redirects, 159 genus-placeholder redirects, the gall-lookalikes Article, `gall_index` 3,976). `:prod_data` suite 28/28 on a copy of the converted database (`make test-prod-data PROD_DATA_DB=gallformers_taxogall`; e2e: `make e2e PROD_DATA_DB=gallformers_taxogall`).
+**All 14 tasks built and committed (2026-10-27) on `taxogall`:** aa996069 (alias curation), 67378c93 (step 9), 2b3dd12d (e2e Playwright fix), e276bb58 (matters). `mix precommit` green (2,699 tests), `MIX_ENV=dev mix dialyzer` 0 errors. Rehearsal on `gallformers_taxogall` strict and clean (incl. 128 non-gall redirects, 159 genus-placeholder redirects, the gall-lookalikes Article, `gall_index` 3,976). `:prod_data` suite 28/28 on a copy of the converted database (`make test-prod-data PROD_DATA_DB=gallformers_taxogall`; e2e: `make e2e PROD_DATA_DB=gallformers_taxogall`).
 - Tasks 11–13 (2026-10-27): global search (`Catalog.search_galls/2`, `Taxa.search/2`; Inducer names find Galls only at species rank and below), home/about/sitemap/redirects (`Plugs.LegacyEntityRedirect` for 301s; `non_gall_redirects` table; `legacy_taxon_ids` kind `:genus_placeholder`; the gall-lookalikes Article created by the data migration only if missing), API v2 (shapes kept; empty gall `places` = everywhere; higher-taxon IDs are new IDs; `gall_id` now emitted, `pubyear` a string).
 - Task 14: e2e browse / integration tests on `Catalog`/`Taxa`; new-schema `:prod_data` invariants; `write_operations_test` kept (old-admin writes still live); `Makefile` `PROD_DATA_DB=` copies a converted database into `gallformers_test`; old read functions with no callers deleted. No old-domain callers remain outside the old admin; `Galls.Identification.filter_galls` stays for `id_parity` until cutover.
 - **e2e browser suite fixed (2026-10-27):** it had broken since #593's lock refresh let npm `playwright` float to 1.62.0, which `playwright_ex` 0.5 / `phoenix_test_playwright` 0.13 couldn't parse. Upgraded `phoenix_test_playwright` 0.13 → 0.19, `playwright_ex` 0.5 → 0.15, `phoenix_test` 0.10 → 0.13.1 (lock change limited to these three) and npm `playwright` to `^1.64.1` (0.19's minimum). Two test fixes: the e2e Playwright timeout is 10 s (a Gall page on production data loads many remote images and map tiles past the 2 s default); `E2ECase.visit/2` now waits for the LiveView to connect, since a `phx-click` sent before the join is dropped (the section-delete test clicked too early). `make e2e PROD_DATA_DB=gallformers_taxogall`: 41 + 1 tests, 0 failures.
@@ -302,4 +302,3 @@ Rehearsal 2026-10-27: strict run clean, every line balances. Parity: 347 filter 
 Doubtful carried-over common names, for Jeff (not blocking): "Creeper" (Parthenocissus), "Plane" (Platanus), combined names ("Plums, Cherries, and Allies", "Rowans and Mountain Ash", "Aspens and White Poplars", "necklace or bigleaf poplars"), and "Bramble, cinquefoil, and rose inquiline gall wasps" (tribe Diastrophini).
 
 **Remaining then:** Tasks 11–14 — done 2026-10-27 (see Status above).
-

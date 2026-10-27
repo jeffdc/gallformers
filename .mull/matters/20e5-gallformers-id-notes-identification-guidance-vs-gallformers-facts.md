@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-11
-updated: 2026-10-24
+updated: 2026-10-27
 epic: taxonomy
-relates: [294c]
+relates: [294c, a856]
 ---
 
 # Gallformers ID Notes: identification guidance vs Gallformers Facts

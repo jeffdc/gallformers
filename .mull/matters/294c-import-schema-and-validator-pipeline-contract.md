@@ -29,7 +29,7 @@ Applied to the contract and recorded in the decisions doc: season (when the Gall
 ## Remaining work
 
 - **Generation groups** (`8567`, *Generation groups*): generation values come in groups mapped to taxa. When the groups are settled, `traits.json` lists each group's values, definitions and taxa, and the guide tells producers to choose from the group for the Inducer's taxon and to give a generation only when the Source shows a clearly different Gall (repeated broods that induce the same Gall are multivoltine). Aphid values chosen in `8567`; the provisional `generation` enum in `vocab/traits.schema.json` grows to match.
-- **Open with Adam:** whether recorded occurrences keep coordinates as written (left out for now).
+- **Deferred (Jeff, 2026-10-27):** whether recorded occurrences keep coordinates as written when a Source prints them. Left out of the schema; revisit after release.
 - **Vocabulary generator:** a mix task that writes the vocab files from the database, replacing the hand extraction.
 - **Schema descriptions:** a pass to remove negative phrasing and consumer-side notes (producers read them too).
 - **Golden regression set:** the five human-checked trial packages, re-run and diffed whenever the model or guide changes.

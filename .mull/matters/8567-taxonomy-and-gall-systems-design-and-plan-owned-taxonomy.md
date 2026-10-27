@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-03
-updated: 2026-10-24
+updated: 2026-10-27
 epic: taxonomy
-relates: [b5bd, e381, 294c, 50ff, 9449]
+relates: [b5bd, e381, 294c, 50ff, 9449, a856]
 ---
 
 # Taxonomy and gall systems — design and plan (owned taxonomy)
@@ -62,7 +62,7 @@ Both systems are black boxes behind internal APIs (Phoenix contexts; `boundary` 
 4. **Standings:** *Current* (shown) · *Withdrawn* — newest stance denies (shown, marked) · *Superseded* — a newer value replaced it (shown as history) · *Retracted* — its support was retracted (shown, marked) · *Unsupported* — re-import dropped it (hidden; audit keeps it).
 5. **Storage:** a central `facts` table (ID, kind, precomputed standing); each system owns typed detail tables keyed by Fact ID; attributions reference the Fact ID with a real foreign key. Hot reads use the stored standing.
 6. **Identity:** each kind has a natural key (Host = Gall + host taxon; Trait = Gall + Trait + value; Range adjustment = Gall + place + exclude/only; Placement = taxon + parent). **Relationship qualifiers are separate Facts** about the Relationship, independently sourced.
-7. **An attribution carries:** stance; **quote** plus page hint (required for imported literature; replaces offset locators, 2026-10-06 — quotes are checkable against the stored plain text); **`name_as_written`** for each taxon the Source names (2026-10-06 — after a taxonomic split, Facts can only be re-resolved if we know the name the Source used); **structured cited Observations** (provider + ID); **statement text** (required for Gallformers). The authorship date comes from the Source (Sources need one — today only `pubyear` exists; each Gallformers statement is its own dated entry). Who made the entry is audit. **Open (2026-10-24):** the date of Gallformers statements whose text has none — the legacy ID Notes (`20e5`), legacy range exclusions, and legacy Facts if they are attributed to Gallformers (`b5bd` M0). Dated at migration, they would outrank all the literature under rule 2.
+7. **An attribution carries:** stance; **quote** plus page hint (required for imported literature; replaces offset locators, 2026-10-06 — quotes are checkable against the stored plain text); **`name_as_written`** for each taxon the Source names (2026-10-06 — after a taxonomic split, Facts can only be re-resolved if we know the name the Source used); **structured cited Observations** (provider + ID); **statement text** (required for Gallformers). The authorship date comes from the Source (Sources need one — today only `pubyear` exists; each Gallformers statement is its own dated entry). Who made the entry is audit. **Decided (Jeff, 2026-10-27):** Gallformers statements whose text has no date — the legacy range exclusions and the legacy ID Notes (`20e5`) once processed — carry the **cutover date** (for testing before then: the date of the run). As the newest statements they outrank the older literature, as Gallformers positions should. The **"Gallformers legacy data" Source stays undated**, so any real Source outranks a legacy Fact and the backscan can correct one; a Fact whose only support is legacy data is shown as unconfirmed (`b5bd` M0).
 8. **Gallformers notes** (Jeff, 2026-10-24; `20e5`): each Gall's note is Gallformers' document for that Gall — shown whole as "Notes on ID and Taxonomy", never cut down to commentary. Gallformers statements are extracted from it with quotes, like any Source, through the normal pipeline (rule 12); a curator edits the note and the edit is re-extracted, each version dated by its edit. Legacy notes migrate verbatim and are processed after release.
 
 **Scale (Fermi, checked against the production copy):** ~4×10³ Galls × ~90 Facts each ≈ 3.6×10⁵ Facts; × ~1.5–2 Sources per Fact ≈ 6–7×10⁵ attributions; taxonomic Facts add ~2–3×10⁴. Realistic ~10⁶ rows, generous ceiling ~10⁷. Production already holds 1.08 million `host_range` rows. **Scale is not a risk; the spike was dropped.** The rule cases become acceptance tests, written first, in step 4.
@@ -99,7 +99,7 @@ Jeff (2026-10-23): generation gets the full treatment ("in for a penny, in for a
   | gallicolae | | Phylloxerid generations that induce leaf galls. | grape phylloxera (*Daktulosphaira vitifoliae*) |
   | radicicolae | | Phylloxerid generations that induce root galls. | grape phylloxera |
 
-- **Open:** the value name for multivoltine seasonal entries such as "summer and autumn generations"; when a taxon move carries an Inducer out of its group's subtree, whether the taxonomy change fails (rule 6) or raises a curator task.
+- **Settled (2026-10-27):** a multivoltine seasonal Gall ("summer and autumn generations") takes one value, `summer` (Jeff, 2026-10-26). A taxon move that carries an Inducer out of its group's subtree does not fail; it is flagged for a curator (`Catalog.ReadModels.Flags`, as built).
 
 ## Phases
 
@@ -164,7 +164,7 @@ Script: `docs/plans/coupling_inventory.py` (local). **The taxonomy facade is sma
 ## Open questions
 
 - **Taxonomy API: learn from prior art before finalizing.** iNaturalist in particular has solved taxonomy curation (swaps, splits, merges) and taxonomy queries at scale. The current API sketch (lookup and name resolution, facts about a taxon, tree operations, published read models, change events, phase-2 writes) is a placeholder until then. Not urgent.
-- **Rename handling:** (A) derived names update automatically, curator only for overrides/collisions; or (B) every rename reviewed first. Leaning A.
+- **Rename handling — decided B (Jeff, 2026-10-27):** a Gall rename that follows from a taxon rename is reviewed by a curator before it takes effect. Reason: the Gallformers code is derived from the name and is how existing iNat observations are tied to Galls; a rename must never silently change a code or break that link. The code stays as it is unless the curator changes it (`86e7`).
 - **Scope of the curated taxonomy:** all Gall Community members (Inducers, Inquilines, Parasitoids, …) or a narrower set?
 - **Traits that vary by Host:** open in the domain doc (leaning no); needs a definitive answer.
 
