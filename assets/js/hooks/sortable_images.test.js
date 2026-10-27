@@ -96,6 +96,21 @@ describe('SortableImages drag end', () => {
     expect(reorder.payload.order).toEqual([20, 30, 10])
   })
 
+  test('pushes reorder_images to its own element (its LiveComponent, else the LiveView)', () => {
+    const hook = mountHook(SortableImages, sortableHTML([10, 20, 30]))
+    hook.mounted()
+
+    const items = getItems(hook)
+    hook.draggingEl = items[0]
+    hook.originalIndex = 0
+    hook.el.appendChild(items[0])
+
+    hook.handleDragEnd(new Event('dragend', { bubbles: true }))
+
+    const reorder = getPushedEvents(hook).find(e => e.event === 'reorder_images')
+    expect(reorder.selector).toBe(hook.el)
+  })
+
   test('does not push when position unchanged', () => {
     const hook = mountHook(SortableImages, sortableHTML([10, 20, 30]))
     hook.mounted()

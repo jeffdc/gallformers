@@ -208,6 +208,51 @@ defmodule GallformersWeb.Admin.ContentImageManagerTest do
     end
   end
 
+  # The ContentImageUpload and SortableImages hooks push these events to their
+  # own elements, so they reach this component rather than the parent LiveView.
+  describe "hook events sent to the component" do
+    test "uploads_completed from the uploader saves the images and notifies parent", %{
+      conn: conn,
+      article: article
+    } do
+      {:ok, view, _html} =
+        live_isolated(conn, TestLive,
+          session: %{"owner_type" => :article, "owner_id" => article.id}
+        )
+
+      path = "articles/#{article.id}/hook-upload.jpg"
+
+      view
+      |> element("#test-content-images-uploader")
+      |> render_hook("uploads_completed", %{"paths" => [path]})
+
+      assert [%{id: id, path: ^path}] = ContentImages.list_images_for_article(article.id)
+      assert_push_event(view, "upload_complete", %{message: "1 image(s) uploaded successfully"})
+      assert has_element?(view, "[data-image-id='#{id}']")
+      assert render(view) =~ "uploaded"
+    end
+
+    test "reorder_images from the grid saves the new order", %{conn: conn, article: article} do
+      {:ok, first} =
+        ContentImages.finalize_upload("articles/#{article.id}/1.jpg", :article, article.id, "t")
+
+      {:ok, second} =
+        ContentImages.finalize_upload("articles/#{article.id}/2.jpg", :article, article.id, "t")
+
+      {:ok, view, _html} =
+        live_isolated(conn, TestLive,
+          session: %{"owner_type" => :article, "owner_id" => article.id}
+        )
+
+      view
+      |> element("#test-content-images-grid")
+      |> render_hook("reorder_images", %{"order" => [second.id, first.id]})
+
+      assert Enum.map(ContentImages.list_images_for_article(article.id), & &1.id) ==
+               [second.id, first.id]
+    end
+  end
+
   describe "delete" do
     test "deletes image and notifies parent", %{conn: conn, article: article} do
       {:ok, img} =

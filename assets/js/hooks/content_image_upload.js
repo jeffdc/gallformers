@@ -4,6 +4,9 @@
  * Handles drag-drop image upload for content images (articles and keys).
  * Nearly identical to ImageUpload but uses owner_type/owner_id instead of species_id.
  * Uploads directly to S3 via presigned URLs.
+ *
+ * Events go to the hook element's LiveComponent (`pushEventTo(this.el)`) —
+ * ContentImageManager handles them, not the article/key LiveView.
  */
 
 const ContentImageUpload = {
@@ -160,7 +163,7 @@ const ContentImageUpload = {
       extension: file.name.split(".").pop()
     }))
 
-    this.pushEvent("request_presigned_urls", { files: fileInfo })
+    this.pushEventTo(this.el, "request_presigned_urls", { files: fileInfo })
   },
 
   async executeUploads(urls) {
@@ -175,7 +178,7 @@ const ContentImageUpload = {
       const successPaths = results.filter(r => r.success).map(r => r.path)
 
       if (successPaths.length > 0) {
-        this.pushEvent("uploads_completed", { paths: successPaths })
+        this.pushEventTo(this.el, "uploads_completed", { paths: successPaths })
       }
 
       const failed = results.filter(r => !r.success)
@@ -281,7 +284,7 @@ const ContentImageUpload = {
       this.progressContainer.innerHTML = ""
     }
 
-    this.pushEvent("refresh_images", {})
+    this.pushEventTo(this.el, "refresh_images", {})
   }
 }
 
