@@ -19,7 +19,10 @@ defmodule Gallformers.Import.Replay do
       found by its batch, kind and statement ref (resolving the package
       again if a later resolution made it), and decided with the logged
       decision, its taxa, Galls and Sources found by their stable
-      references.
+      references. A rename proposal's decision (`"kind" => "gall_rename"`,
+      no package) is found by its Gall and the name it was decided for
+      (`Gallformers.Import.GallRenames.find/2`): replaying the taxonomy
+      change before it made the proposal again.
     * `:synonym_added`, `:plant_added`, `:taxonomy_edit` — the Host-name
       step's and the taxonomy admin's edits, made again on the taxa found
       by name.
@@ -33,6 +36,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Audit.Actor
   alias Gallformers.Import
   alias Gallformers.Import.Batch
+  alias Gallformers.Import.GallRenames
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.ReplayEntry
@@ -83,6 +87,27 @@ defmodule Gallformers.Import.Replay do
         %Batch{status: :applied} -> :ok
         %Batch{} -> ok(Import.apply_batch_for_replay(actor, package, batch_id))
         nil -> {:error, {:no_batch, batch_id}}
+      end
+    end
+  end
+
+  defp replay(actor, %{
+         kind: :queue_decision,
+         key: %{"kind" => "gall_rename"} = key,
+         payload: %{"decision" => decision}
+       }) do
+    with {:ok, gall_id} <- StableRef.resolve_gall(key["gall"]) do
+      case GallRenames.find(gall_id, key["to"]) do
+        nil ->
+          {:error, {:no_queue_item, key}}
+
+        %QueueItem{status: :decided} ->
+          :ok
+
+        item ->
+          with {:ok, decision} <- StableRef.decode_decision(decision) do
+            ok(Import.decide_queue_item(actor, item, decision))
+          end
       end
     end
   end

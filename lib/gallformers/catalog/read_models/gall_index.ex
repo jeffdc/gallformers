@@ -30,9 +30,10 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
   at once instead. Inside `without_refresh/1` (the data migration, which
   rebuilds everything at its end) nothing is refreshed or enqueued.
 
-  Not refreshed by anything yet: a Gall's own name and its images, which
-  have no write path in the new back-end (the data migration sets them and
-  rebuilds the table).
+  A Gall's name, edited deliberately (`Gallformers.Catalog.update_name_parts/3`),
+  enqueues its refresh the same way. Not refreshed by anything yet: a Gall's
+  images, which have no write path in the new back-end (the data migration
+  sets them and rebuilds the table).
   """
   use Ecto.Schema
 

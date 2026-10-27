@@ -54,7 +54,7 @@ defmodule Gallformers.SpeciesTest do
   describe "list_galls_paginated/2" do
     test "returns only gall species, ordered by name" do
       galls = Galls.list_galls_paginated(20, 0)
-      assert length(galls) == 11
+      assert length(galls) == 12
       assert Enum.all?(galls, &(&1.taxoncode == "gall")) == true
 
       names = Enum.map(galls, & &1.name)
@@ -67,7 +67,7 @@ defmodule Gallformers.SpeciesTest do
     end
 
     test "respects offset parameter" do
-      # 11 galls total, page size 3
+      # 12 galls total, page size 3
       first_page = Galls.list_galls_paginated(3, 0)
       second_page = Galls.list_galls_paginated(3, 3)
 
@@ -82,7 +82,7 @@ defmodule Gallformers.SpeciesTest do
 
   describe "count_galls/0" do
     test "returns count matching seeded galls" do
-      assert Galls.count_galls() == 11
+      assert Galls.count_galls() == 12
     end
   end
 

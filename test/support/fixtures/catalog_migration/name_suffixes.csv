@@ -10,3 +10,4 @@ token,summer and autumn generation,,,summer,false,Seasonal generation,"multivolt
 token,aecial,,,aecial,false,Rust spore stage,generation (mechanical)
 token,telial,,,telial,false,Rust spore stage,generation (mechanical)
 gall,302,Neuroterus seedatorius (australis) (agamic),Neuroterus seedatorius,agamic,false,Gall form,one species with several gall forms → separate Gall per form; form qualifier in name
+gall,305,Cynips seedhostus (on Notholithocarpus densiflorus),Cynips seedhostus,,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name

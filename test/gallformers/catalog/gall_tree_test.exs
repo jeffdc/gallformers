@@ -8,9 +8,10 @@ defmodule Gallformers.Catalog.GallTreeTest do
   Mostly the converted seeds (`priv/repo/test_seeds.sql`): in Cynipidae >
   Cynipinae > Cynipini, Andricus holds Andricus crystallinus (Gall 200),
   Andricus seedii (the generation pair 300/301) and the undescribed Gall
-  304 linked at the genus; Cynips quercus (201); Neuroterus seedatorius
-  (302/303). Plant 10 hosts 300–304; 304 is also on the genus
-  Notholithocarpus. Galls 100–103 have no Inducer.
+  304 linked at the genus; Cynips quercus (201) and Cynips seedhostus
+  (305, no Host); Neuroterus seedatorius (302/303). Plant 10 hosts
+  300–304; 304 is also on the genus Notholithocarpus. Galls 100–103 have
+  no Inducer.
   """
   use Gallformers.DataCase, async: true
 
@@ -116,7 +117,7 @@ defmodule Gallformers.Catalog.GallTreeTest do
     [cynipidae, andricus, neuroterus, fagaceae] = ids
 
     assert Catalog.count_galls_under(ids) ==
-             %{cynipidae => 7, andricus => 4, neuroterus => 2, fagaceae => 0}
+             %{cynipidae => 8, andricus => 4, neuroterus => 2, fagaceae => 0}
 
     assert Catalog.count_galls_under([]) == %{}
   end

@@ -26,10 +26,10 @@ defmodule Gallformers.CatalogMigration.Galls do
 
   Each gall row becomes a Gall keeping its species ID, Gallformers Code,
   abundance and `datacomplete`, with the generation the mapping gives. Its
-  `name` is derived for now — the Inducer link's accepted name plus the
-  generation's qualifier ("Andricus foo (agamic)") — and today's name is kept
-  as `name_override` wherever it differs, so every name shown stays as it is.
-  A gall with no Inducer keeps today's name as its derived name.
+  name parts are read from its name and its `name` derived from them, with
+  today's name kept as `name_override` only where the derived name differs
+  (`Gallformers.CatalogMigration.GallNames`), so every name shown stays as
+  it is.
 
   Each Gall's `default_source_id` — the Source its page leads with (`803b`
   decision 3) — is the Source of its `species_source` row marked
@@ -38,6 +38,7 @@ defmodule Gallformers.CatalogMigration.Galls do
   """
 
   alias Gallformers.Catalog
+  alias Gallformers.CatalogMigration.GallNames
   alias Gallformers.CatalogMigration.NameSuffixes
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Report
@@ -84,28 +85,33 @@ defmodule Gallformers.CatalogMigration.Galls do
     read = Enum.map(rows, &read_gall(&1, suffixes, Map.get(links, &1.id), taxa))
     inducers = create_inducers(actor, read, taxa)
 
-    galls =
-      for gall <- read do
-        {inducer_id, level, inducer_name} = inducer(gall.target, inducers, taxa)
+    {galls, names} =
+      read
+      |> Enum.map(fn gall ->
+        {inducer_id, level} = inducer(gall.target, inducers)
 
         if inducer_id,
           do:
             MigrationTaxa.legacy_id!(actor, inducer_id, :gall_inducer, gall.row.id, gall.row.name)
 
-        create_gall!(actor, gall, inducer_name, generations, default_of[gall.row.id])
+        generation = gall.generation && Map.fetch!(generations, gall.generation)
+        name = GallNames.read(suffixes, gall.row, inducer_id, level, generation)
+        create_gall!(actor, gall, name, generation, default_of[gall.row.id])
 
-        %{
-          id: gall.row.id,
-          name: gall.row.name,
-          generation: gall.generation,
-          inducer_id: inducer_id,
-          level: level
-        }
-      end
+        {%{
+           id: gall.row.id,
+           name: gall.row.name,
+           generation: gall.generation,
+           inducer_id: inducer_id,
+           level: level
+         }, name}
+      end)
+      |> Enum.unzip()
 
     report =
       report
       |> report(read, galls, inducers, length(skipped))
+      |> GallNames.report(names)
       |> report_defaults(defaults, read)
 
     {galls, report}
@@ -212,28 +218,27 @@ defmodule Gallformers.CatalogMigration.Galls do
     end)
   end
 
-  defp inducer({:species, name, parent}, inducers, _taxa),
-    do: {Map.fetch!(inducers, {name, parent}), :species, name}
+  defp inducer({:species, name, parent}, inducers),
+    do: {Map.fetch!(inducers, {name, parent}), :species}
 
-  defp inducer({:taxon, nil, _level}, _inducers, _taxa), do: {nil, nil, nil}
-
-  defp inducer({:taxon, id, level}, _inducers, taxa), do: {id, level, taxa.taxa[id].name}
-
-  defp inducer({:none, _why}, _inducers, _taxa), do: {nil, nil, nil}
+  defp inducer({:taxon, nil, _level}, _inducers), do: {nil, nil}
+  defp inducer({:taxon, id, level}, _inducers), do: {id, level}
+  defp inducer({:none, _why}, _inducers), do: {nil, nil}
 
   # -- Galls -----------------------------------------------------------------------
 
-  defp create_gall!(actor, gall, inducer_name, generations, default_source_id) do
+  defp create_gall!(actor, gall, name, generation, default_source_id) do
     row = gall.row
-    name = String.trim(row.name)
-    derived = derived_name(inducer_name, gall.generation, generations) || name
 
     attrs = %{
       id: row.id,
-      name: derived,
-      name_override: if(derived != name, do: name),
+      name: name.stored_name,
+      name_override: name.name_override,
+      form_label: name.form_label,
+      host_qualifier_taxon_id: name.host_qualifier_taxon_id,
+      descriptor: name.descriptor,
       gallformers_code: blank_nil(row.gallformers_code),
-      generation_value_id: gall.generation && Map.fetch!(generations, gall.generation).id,
+      generation_value_id: generation && generation.id,
       abundance_id: row.abundance_id,
       datacomplete: row.datacomplete,
       default_source_id: default_source_id
@@ -247,12 +252,6 @@ defmodule Gallformers.CatalogMigration.Galls do
         raise "could not create Gall #{row.id} #{row.name}: #{inspect(changeset.errors)}"
     end
   end
-
-  defp derived_name(nil, _generation, _generations), do: nil
-  defp derived_name(name, nil, _generations), do: name
-
-  defp derived_name(name, generation, generations),
-    do: "#{name} (#{Map.fetch!(generations, generation).qualifier})"
 
   defp blank_nil(nil), do: nil
 

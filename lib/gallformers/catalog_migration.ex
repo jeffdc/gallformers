@@ -39,7 +39,9 @@ defmodule Gallformers.CatalogMigration do
        `kingdoms.csv`), plants, genus placeholders (crosswalked to their
        genus for their old URLs), `host_range` re-keyed by taxon.
     3. `Gallformers.CatalogMigration.Galls` — Inducer taxa from gall names
-       (`priv/catalog_migration/name_suffixes.csv`), Galls.
+       (`priv/catalog_migration/name_suffixes.csv`), Galls, their name parts
+       and derived names (`Gallformers.CatalogMigration.GallNames`; today's
+       name kept as the override only where the derived one differs).
     4. `Gallformers.CatalogMigration.Citations` — other Sources' record-level
        citations as legacy citations (not Facts).
     5. `Gallformers.CatalogMigration.Notes` — Gallformers ID Notes, verbatim,

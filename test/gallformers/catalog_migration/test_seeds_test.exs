@@ -31,7 +31,8 @@ defmodule Gallformers.CatalogMigration.TestSeedsTest do
     301 => {"Andricus seedii", :species},
     302 => {"Neuroterus seedatorius", :species},
     303 => {"Neuroterus seedatorius", :species},
-    304 => {"Andricus", :genus}
+    304 => {"Andricus", :genus},
+    305 => {"Cynips seedhostus", :species}
   }
 
   @gallformers_source 58
@@ -77,6 +78,38 @@ defmodule Gallformers.CatalogMigration.TestSeedsTest do
 
     assert Gall.display_name(Catalog.get_gall!(302)) ==
              "Neuroterus seedatorius (australis) (agamic)"
+  end
+
+  describe "Gall names (86e7)" do
+    test "each Gall with an Inducer has today's name as its derived name, with no override" do
+      for id <- [200, 201, 300, 301, 302, 303, 304, 305] do
+        gall = Catalog.get_gall!(id)
+        old = Repo.one!(from(s in "species", where: s.id == ^id, select: s.name))
+
+        assert {gall.name, gall.name_override} == {old, nil}, "seed gall #{id}"
+        assert Catalog.derived_name(id) == {:ok, old}, "seed gall #{id}"
+      end
+    end
+
+    test "the parts are read from the names" do
+      assert Catalog.get_gall!(302).form_label == "australis"
+      assert Catalog.get_gall!(304).descriptor == "n-densiflorus-seed-gall"
+      assert Catalog.get_gall!(305).host_qualifier_taxon_id == 10
+
+      for id <- [300, 301, 303, 305] do
+        assert %Gall{form_label: nil, descriptor: nil} = Catalog.get_gall!(id)
+      end
+    end
+
+    test "a Gall with no Inducer keeps today's name as its stored name" do
+      for id <- [100, 101, 102, 103] do
+        gall = Catalog.get_gall!(id)
+        old = Repo.one!(from(s in "species", where: s.id == ^id, select: s.name))
+
+        assert {gall.name, gall.name_override} == {old, nil}
+        assert Catalog.derived_name(id) == {:error, :no_base}
+      end
+    end
   end
 
   test "the undescribed gall's Inducer is its genus, the species' genus" do

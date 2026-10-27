@@ -5,8 +5,8 @@ defmodule Gallformers.Taxa.Events do
 
   Taxa calls every registered listener inside the transaction that changes
   a taxon, after the change is written, in registration order. A listener
-  returns `:ok`, or `{:error, reason}` when its side can't accept the change
-  (e.g. a derived Gall name would collide): the taxonomy change then fails
+  returns `:ok`, or `{:error, reason}` when its side can't accept the change:
+  the taxonomy change then fails
   and rolls back, returning `{:error, {:rejected, listener, reason}}`, and
   later listeners are not called. A listener that raises, or returns
   anything else, also rolls the change back.

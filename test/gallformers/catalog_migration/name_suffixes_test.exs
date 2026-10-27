@@ -126,6 +126,54 @@ defmodule Gallformers.CatalogMigration.NameSuffixesTest do
     end
   end
 
+  describe "qualifiers/3: the trailing parentheticals as name parts" do
+    test "a mechanical name: its stem and generation, as written", %{mapping: m} do
+      assert NameSuffixes.qualifiers(m, 1, "Andricus  foo (spring generation)") ==
+               {"Andricus foo", [{:generation, "spring generation"}]}
+
+      assert NameSuffixes.qualifiers(m, 1, "Andricus foo") == {"Andricus foo", []}
+    end
+
+    test "a placeholder prefix stays in the stem", %{mapping: m} do
+      assert NameSuffixes.qualifiers(m, 1, "Unknown (Cynipidae) q-alba-red-bead (agamic)") ==
+               {"Unknown (Cynipidae) q-alba-red-bead", [{:generation, "agamic"}]}
+    end
+
+    test "a parenthesis inside a word is no qualifier", %{mapping: m} do
+      assert NameSuffixes.qualifiers(m, 1519, "Unknown (Cynipidae) q-alba-(deforming-pisiformis)") ==
+               {"Unknown (Cynipidae) q-alba-(deforming-pisiformis)", []}
+    end
+
+    test "a gall-form row's other parentheticals are form labels", %{mapping: m} do
+      assert NameSuffixes.qualifiers(m, 1076, "Neuroterus saltatorius (australis) (agamic)") ==
+               {"Neuroterus saltatorius", [{:form, "australis"}, {:generation, "agamic"}]}
+
+      assert NameSuffixes.qualifiers(m, 2886, "Asphondylia pseudorosa (leaf snap)") ==
+               {"Asphondylia pseudorosa", [{:form, "leaf snap"}]}
+    end
+
+    test "a host-scoped row's (on X) is a Host qualifier", %{mapping: m} do
+      assert NameSuffixes.qualifiers(
+               m,
+               3167,
+               "Neuroterus quercicola (pacificus) (sexgen) (on Quercus douglasii)"
+             ) ==
+               {"Neuroterus quercicola",
+                [{:form, "pacificus"}, {:generation, "sexgen"}, {:host, "Quercus douglasii"}]}
+    end
+
+    test "other parentheticals are unread", %{mapping: m} do
+      assert NameSuffixes.qualifiers(m, 7161, "Aceria hibisci (Nalepa, 1906)") ==
+               {"Aceria hibisci", [{:unread, "Nalepa, 1906"}]}
+
+      assert NameSuffixes.qualifiers(m, 1340, "Neuroterus quercusbatatus (agamic) (q-bicolor)") ==
+               {"Neuroterus quercusbatatus", [{:generation, "agamic"}, {:unread, "q-bicolor"}]}
+
+      assert NameSuffixes.qualifiers(m, 1, "Andricus foo (pacificus)") ==
+               {"Andricus foo", [{:unread, "pacificus"}]}
+    end
+  end
+
   describe "load/1" do
     test "rejects an unknown kind", context do
       path = write_csv!(context, "suffix,agamic,,,agamic,false,x,y\n")

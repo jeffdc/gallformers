@@ -6,12 +6,21 @@ defmodule Gallformers.Import.ApplyGall do
     1. Taxa and Galls come from the batch's resolved statements, decisions
        already honoured (`Gallformers.Import.Queue`). A taxon the Source
        presents as new that no taxonomy batch created is created, unplaced.
-       A Gall resolved `:new` (or decided new) is created: its name is its
-       species-level Inducer's accepted name with the generation's name
-       qualifier ("Andricus novus (agamic)"), or the Source's
-       `name_as_written` for an undescribed Gall, made unique with " (2)",
-       " (3)", ... — a provisional derived name until name derivation
-       (`8567` rule 9) is built.
+       A Gall resolved `:new` (or decided new) is created with its name
+       parts and the name they derive (`Gallformers.Catalog.GallName`,
+       `86e7` §5): its generation, and
+         * a described Gall (Inducer at species rank or below): a Host
+           qualifier when the batch identifies it by its Host (a plant) —
+           "Andricus novus (sexgen) (on Quercus lobata)". A name already
+           shown, ignoring case, gets an override numbered " (2)", " (3)", ….
+         * an undescribed Gall: a descriptor in today's convention, its
+           Host's genus initial and epithet then the Source's wording,
+           slugged (lowercase ASCII, hyphenated, at most 60 characters) —
+           "Andricus q-lobata-a-small-spindle-shaped-gall-on-the-leaf-midrib"
+           (just the wording without a Host). The descriptor seeds the
+           Gallformers code; a name or code already taken numbers it "-2",
+           "-3", …. Parts that derive no name (an Inducer outside a family)
+           leave the Source's wording as the name and its override.
     2. Each Fact is written through `Gallformers.Import.Diff` with
        `Gallformers.Catalog`: Relationships and the other kinds first, then
        qualifiers (they point at a Relationship Fact of the batch). A Fact
@@ -26,6 +35,7 @@ defmodule Gallformers.Import.ApplyGall do
   """
 
   alias Gallformers.Catalog
+  alias Gallformers.Catalog.GallName
   alias Gallformers.Catalog.RelationshipTypes
   alias Gallformers.Facts
   alias Gallformers.Import.ApplyTaxonomy
@@ -133,33 +143,127 @@ defmodule Gallformers.Import.ApplyGall do
     end)
   end
 
+  # A new Gall: its name parts from the batch and the name they derive.
   defp create_gall(ctx, g, taxa) do
     ident = g["identified_by"] || %{}
     generation = get_in(ident, ["generation", "value"])
     generation_value = generation && Catalog.get_generation_value(generation)
+    inducer = get_taxon(taxa, ident["inducer"])
+    host = get_taxon(taxa, ident["host"])
 
-    base =
-      case taxa[ident["inducer"]] && Taxa.get_taxon!(taxa[ident["inducer"]]) do
-        %{rank: rank} = taxon when rank in @species_level -> Taxa.accepted_name(taxon)
-        _ -> String.trim(g["name_as_written"])
+    parts = %{
+      inducer_taxon_id: inducer && inducer.id,
+      generation_value_id: generation_value && generation_value.id
+    }
+
+    attrs =
+      case inducer do
+        %{rank: rank} when rank in @species_level ->
+          described(Map.put(parts, :host_qualifier_taxon_id, plant_id(host)))
+
+        _ ->
+          undescribed(parts, descriptor(host, g["name_as_written"]), g["name_as_written"])
       end
 
-    name =
-      if generation_value && generation_value.name_qualifier,
-        do: "#{base} (#{generation_value.name_qualifier})",
-        else: base
-
-    Catalog.create_gall(ctx.actor, %{
-      name: unique_name(name),
-      generation_value_id: generation_value && generation_value.id
-    })
+    Catalog.create_gall(ctx.actor, Map.delete(attrs, :inducer_taxon_id))
   end
 
-  defp unique_name(name), do: unique_name(name, 1)
+  defp get_taxon(taxa, ref), do: taxa[ref] && Taxa.get_taxon!(taxa[ref])
 
-  defp unique_name(name, n) do
-    candidate = if n == 1, do: name, else: "#{name} (#{n})"
-    if Catalog.gall_name_taken?(candidate), do: unique_name(name, n + 1), else: candidate
+  defp plant_id(%{kingdom: "Plantae", id: id}), do: id
+  defp plant_id(_host), do: nil
+
+  # A species-rank Inducer always gives a name; one already shown gets a
+  # numbered override.
+  defp described(parts) do
+    {:ok, name} = GallName.derive(parts)
+    shown = first_free(&numbered(name, &1, " (#{&1})"), &(not Catalog.gall_name_taken?(&1)))
+    Map.merge(parts, %{name: name, name_override: if(shown != name, do: shown)})
+  end
+
+  # The first numbering of `descriptor` whose name and code are both free;
+  # without a derivable name, the Source's wording is the name and override.
+  defp undescribed(parts, descriptor, as_written) do
+    case GallName.derive(Map.put(parts, :descriptor, descriptor)) do
+      {:ok, _name} ->
+        {descriptor, name} =
+          first_free(
+            fn n ->
+              d = numbered(descriptor, n, "-#{n}")
+              {:ok, name} = GallName.derive(Map.put(parts, :descriptor, d))
+              {d, name}
+            end,
+            fn {d, name} -> code_free?(d) and not Catalog.gall_name_taken?(name) end
+          )
+
+        Map.merge(parts, %{name: name, descriptor: descriptor, gallformers_code: descriptor})
+
+      {:error, _reason} ->
+        descriptor = first_free(&numbered(descriptor, &1, "-#{&1}"), &code_free?/1)
+        wording = String.trim(as_written)
+        name = first_free(&numbered(wording, &1, " (#{&1})"), &(not Catalog.gall_name_taken?(&1)))
+
+        Map.merge(parts, %{
+          name: name,
+          name_override: name,
+          descriptor: descriptor,
+          gallformers_code: descriptor
+        })
+    end
+  end
+
+  defp code_free?(code), do: not Catalog.gallformers_code_taken?(code)
+
+  defp numbered(text, 1, _suffix), do: text
+  defp numbered(text, _n, suffix), do: text <> suffix
+
+  # The first of `candidate.(1)`, `candidate.(2)`, … that `free?` accepts.
+  defp first_free(candidate, free?) do
+    1 |> Stream.iterate(&(&1 + 1)) |> Stream.map(candidate) |> Enum.find(free?)
+  end
+
+  @descriptor_length 60
+
+  # Today's undescribed convention: "<host genus initial>-<host epithet>-
+  # <the Source's wording>", slugged and trimmed to whole words.
+  defp descriptor(host, as_written) do
+    [host && host_part(host), slug(as_written)]
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join("-")
+    |> trim_words(@descriptor_length)
+    |> case do
+      "" -> "gall"
+      descriptor -> descriptor
+    end
+  end
+
+  # "Quercus lobata" → "q-lobata"; a genus, "Quercus" → "quercus".
+  defp host_part(host) do
+    case host |> Taxa.accepted_name() |> String.split() |> Enum.reject(&(&1 == "×")) do
+      [genus, epithet | _] -> slug(String.first(genus) <> " " <> epithet)
+      words -> slug(Enum.join(words, " "))
+    end
+  end
+
+  # Lowercase ASCII words joined by single hyphens.
+  defp slug(text) do
+    text
+    |> :unicode.characters_to_nfd_binary()
+    |> String.replace(~r/[^\x00-\x7F]/u, "")
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/, "-")
+    |> String.trim("-")
+  end
+
+  defp trim_words(slug, max) when byte_size(slug) <= max, do: slug
+
+  defp trim_words(slug, max) do
+    [first | rest] = String.split(slug, "-")
+
+    Enum.reduce_while(rest, binary_part(first, 0, min(byte_size(first), max)), fn word, acc ->
+      next = acc <> "-" <> word
+      if byte_size(next) <= max, do: {:cont, next}, else: {:halt, acc}
+    end)
   end
 
   # -- Facts -------------------------------------------------------------------

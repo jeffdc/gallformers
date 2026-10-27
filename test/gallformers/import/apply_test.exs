@@ -376,6 +376,125 @@ defmodule Gallformers.Import.ApplyTest do
     end
   end
 
+  describe "new Galls' names (86e7 Task 5)" do
+    # The fixture gall batch with g1 a new Gall written `as_written` and
+    # identified by `ident`, stated only by its Inducer Fact (f1). t4 is the
+    # genus Andricus, an undescribed Gall's Inducer.
+    defp new_gall_batch(as_written, ident) do
+      gall_batch()
+      |> drop_facts(["f2", "f3", "f4"])
+      |> Map.update!(
+        "taxa",
+        &(&1 ++ [%{"ref" => "t4", "name_as_written" => "Andricus", "rank" => "genus"}])
+      )
+      |> put_in(["galls", Access.at(0)], %{
+        "ref" => "g1",
+        "new" => true,
+        "name_as_written" => as_written,
+        "identified_by" => ident
+      })
+      |> put_in(["facts", Access.at(0), "subject"], ident["inducer"])
+    end
+
+    defp new_gall!(batch) do
+      package = package(gall: batch) |> with_review() |> deliver!() |> approve!()
+      [gall_row] = Import.list_batches(package)
+      assert gall_row.status == :applied
+      assert %BatchStatement{resolution: :new, gall_id: id} = statements(gall_row)[{:gall, "g1"}]
+      Catalog.get_gall!(id)
+    end
+
+    @sexual %{"value" => "sexual", "as_written" => "sexual generation"}
+
+    test "a described Gall is named from its Inducer, generation and distinguishing Host", ctx do
+      gall =
+        new_gall!(
+          new_gall_batch("the sexual gall on valley oak", %{
+            "inducer" => "t1",
+            "generation" => @sexual,
+            "host" => "t2"
+          })
+        )
+
+      assert gall.name == "Andricus quercuscalifornicus (sexgen) (on Quercus lobata)"
+      assert gall.host_qualifier_taxon_id == ctx.lobata.id
+      assert {gall.name_override, gall.descriptor, gall.gallformers_code} == {nil, nil, nil}
+    end
+
+    test "a described Gall whose name is taken gets an override" do
+      gall_fixture(name: "andricus quercuscalifornicus (sexgen)")
+
+      gall =
+        new_gall!(
+          new_gall_batch("the sexual gall", %{"inducer" => "t1", "generation" => @sexual})
+        )
+
+      assert gall.name == "Andricus quercuscalifornicus (sexgen)"
+      assert gall.name_override == "Andricus quercuscalifornicus (sexgen) (2)"
+    end
+
+    test "an undescribed Gall gets a descriptor from its Host and wording, and the same code" do
+      gall =
+        new_gall!(
+          new_gall_batch("a small spindle gall (fusiforme, ‘très’ petit)", %{
+            "inducer" => "t4",
+            "host" => "t2"
+          })
+        )
+
+      assert gall.descriptor == "q-lobata-a-small-spindle-gall-fusiforme-tres-petit"
+      assert gall.name == "Andricus q-lobata-a-small-spindle-gall-fusiforme-tres-petit"
+      assert gall.gallformers_code == gall.descriptor
+      assert {gall.name_override, gall.host_qualifier_taxon_id} == {nil, nil}
+    end
+
+    test "an undescribed Gall without a Host is described by its wording, trimmed" do
+      gall =
+        new_gall!(
+          new_gall_batch(
+            "A very long description of a gall found on the underside of leaves near the veins",
+            %{"inducer" => "t4"}
+          )
+        )
+
+      assert gall.descriptor == "a-very-long-description-of-a-gall-found-on-the-underside-of"
+      assert gall.name == "Andricus " <> gall.descriptor
+      assert gall.gallformers_code == gall.descriptor
+    end
+
+    test "a taken undescribed name or code numbers the descriptor" do
+      gall_fixture(name: "Andricus Q-lobata-midrib-gall")
+      gall_fixture(gallformers_code: "q-lobata-midrib-gall-2")
+
+      gall =
+        new_gall!(new_gall_batch("midrib gall", %{"inducer" => "t4", "host" => "t2"}))
+
+      assert gall.descriptor == "q-lobata-midrib-gall-3"
+      assert gall.name == "Andricus q-lobata-midrib-gall-3"
+      assert gall.gallformers_code == "q-lobata-midrib-gall-3"
+      assert gall.name_override == nil
+    end
+
+    test "an Inducer outside any family leaves the wording as the name and override" do
+      taxon_fixture(name: "Testoptera", rank: :order, kingdom: "Animalia")
+
+      batch =
+        new_gall_batch("a woolly gall", %{"inducer" => "t4", "host" => "t2"})
+        |> put_in(["taxa", Access.at(3)], %{
+          "ref" => "t4",
+          "name_as_written" => "Testoptera",
+          "rank" => "order"
+        })
+
+      gall = new_gall!(batch)
+
+      assert {gall.name, gall.name_override} == {"a woolly gall", "a woolly gall"}
+
+      assert {gall.descriptor, gall.gallformers_code} ==
+               {"q-lobata-a-woolly-gall", "q-lobata-a-woolly-gall"}
+    end
+  end
+
   describe "taxonomy batches" do
     test "a taxonomy batch adding a new species makes its gall batch resolve", ctx do
       taxonomy =
@@ -550,6 +669,12 @@ defmodule Gallformers.Import.ApplyTest do
       assert new_gall != ctx.gall.id
       assert [%{taxon_id: andricus}] = Catalog.gall_summary(new_gall).inducers
       assert andricus == ctx.andricus.id
+
+      # Its descriptor: the Host and the Source's wording, trimmed.
+      assert %{
+               name: "Andricus q-lobata-a-small-spindle-shaped-gall-on-the-leaf-midrib",
+               gallformers_code: "q-lobata-a-small-spindle-shaped-gall-on-the-leaf-midrib"
+             } = Catalog.get_gall!(new_gall)
 
       summary = Catalog.gall_summary(ctx.gall.id)
       assert Enum.map(summary.hosts, & &1.taxon_id) == [ctx.lobata.id]

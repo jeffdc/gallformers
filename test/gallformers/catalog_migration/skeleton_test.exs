@@ -98,10 +98,8 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
     assert inducer(ctx.old.in_family) == {"Cynipidae", :family}
     assert inducer(ctx.old.no_inducer) == nil
 
-    # The derived name is the link's name; today's name stays as the override.
-    in_family = Catalog.get_gall!(ctx.old.in_family)
-    assert in_family.name == "Cynipidae"
-    assert Gall.display_name(in_family) == "Unknown (Cynipidae) q-alba-fixture-bead"
+    assert Gall.display_name(Catalog.get_gall!(ctx.old.in_family)) ==
+             "Unknown (Cynipidae) q-alba-fixture-bead"
 
     assert Gall.display_name(Catalog.get_gall!(ctx.old.no_inducer)) ==
              "Unknown (Unknown) fixture-mystery"
@@ -147,6 +145,156 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
 
     assert Catalog.get_gall!(ctx.old.unknown_suffix).name_override ==
              "Andricus fixturaria (pacificus)"
+  end
+
+  defp names(gall_id) do
+    g = Catalog.get_gall!(gall_id)
+    {g.name, g.name_override}
+  end
+
+  defp name_parts(gall_id) do
+    g = Catalog.get_gall!(gall_id)
+    {g.form_label, g.host_qualifier_taxon_id, g.descriptor}
+  end
+
+  defp worksheet_row(report, gall_id),
+    do: Enum.find(report.curation["gall_names"].rows, &(&1["gall_id"] == gall_id))
+
+  # The shipped mapping plus curated `rows` ({id, name, inducer, generation, category}).
+  defp with_curated_rows(rows) do
+    {:ok, shipped} = File.read(NameSuffixes.default_path())
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "name_suffixes_names_#{System.unique_integer([:positive])}.csv"
+      )
+
+    extra =
+      for {id, name, inducer, generation, category} <- rows,
+          do: "gall,#{id},\"#{name}\",#{inducer},#{generation},false,#{category},test row\n"
+
+    File.write!(path, [shipped | extra])
+    on_exit(fn -> File.rm(path) end)
+    path
+  end
+
+  describe "Gall names (86e7 §4)" do
+    test "names are derived from their parts; today's names need no override", ctx do
+      run!()
+
+      assert names(ctx.old.agamic) == {"Andricus fixtura (agamic)", nil}
+      assert names(ctx.old.undescribed) == {"Andricus q-alba-fixture-gall", nil}
+      assert name_parts(ctx.old.undescribed) == {nil, nil, "q-alba-fixture-gall"}
+      assert names(ctx.old.in_family) == {"Unknown (Cynipidae) q-alba-fixture-bead", nil}
+      assert name_parts(ctx.old.in_family) == {nil, nil, "q-alba-fixture-bead"}
+      assert names(ctx.old.no_inducer) == {"Unknown (Unknown) fixture-mystery", nil}
+      assert name_parts(ctx.old.no_inducer) == {nil, nil, "fixture-mystery"}
+    end
+
+    test "a name with no derivation is stored as it is and listed", ctx do
+      report = run!()
+
+      assert names(ctx.old.unknown_suffix) == {"Andricus fixturaria (pacificus)", nil}
+
+      assert %{"category" => "not derivable", "derived" => nil} =
+               worksheet_row(report, ctx.old.unknown_suffix)
+    end
+
+    test "a seasonal generation reads \"(spring generation)\", as today's names do" do
+      gall!(880_299, "Andricus fixturspring (spring generation)", 33)
+
+      run!()
+
+      assert names(880_299) == {"Andricus fixturspring (spring generation)", nil}
+    end
+
+    test "a name its parts do not reproduce keeps today's name as its override" do
+      gall!(880_207, "Andricus fixturvern (summer and autumn generations)", 33)
+
+      report = run!()
+
+      assert names(880_207) ==
+               {"Andricus fixturvern (summer generation)",
+                "Andricus fixturvern (summer and autumn generations)"}
+
+      assert %{
+               "category" => "generation written otherwise",
+               "derived" => "Andricus fixturvern (summer generation)",
+               "name" => "Andricus fixturvern (summer and autumn generations)"
+             } = worksheet_row(report, 880_207)
+    end
+
+    test "curated form labels and Host qualifiers become name parts", ctx do
+      gall!(880_208, "Andricus fixturform (australis) (agamic)", 33)
+      gall!(880_209, "Andricus fixturhost (on Fixturquercus alba)", 33)
+      gall!(880_210, "Andricus fixturlost (on Fixturquercus nowhere)", 33)
+      gall!(880_211, "Andricus fixturtwo (one) (two)", 33)
+      gall!(880_212, "Andricus fixturauthor (Fixture, 1906)", 33)
+
+      path =
+        with_curated_rows([
+          {880_208, "Andricus fixturform (australis) (agamic)", "Andricus fixturform", "agamic",
+           "Gall form"},
+          {880_209, "Andricus fixturhost (on Fixturquercus alba)", "Andricus fixturhost", "",
+           "Host-scoped"},
+          {880_210, "Andricus fixturlost (on Fixturquercus nowhere)", "Andricus fixturlost", "",
+           "Host-scoped"},
+          {880_211, "Andricus fixturtwo (one) (two)", "Andricus fixturtwo", "", "Gall form"},
+          {880_212, "Andricus fixturauthor (Fixture, 1906)", "Andricus fixturauthor", "",
+           "Name text"}
+        ])
+
+      report = run!(name_suffixes: path)
+
+      assert names(880_208) == {"Andricus fixturform (australis) (agamic)", nil}
+      assert name_parts(880_208) == {"australis", nil, nil}
+
+      assert names(880_209) == {"Andricus fixturhost (on Fixturquercus alba)", nil}
+      assert name_parts(880_209) == {nil, ctx.old.alba, nil}
+
+      assert names(880_210) ==
+               {"Andricus fixturlost", "Andricus fixturlost (on Fixturquercus nowhere)"}
+
+      assert %{"category" => "Host qualifier not resolved"} = worksheet_row(report, 880_210)
+
+      assert names(880_211) == {"Andricus fixturtwo (one)", "Andricus fixturtwo (one) (two)"}
+      assert name_parts(880_211) == {"one", nil, nil}
+
+      assert %{"category" => "several form labels or Host qualifiers"} =
+               worksheet_row(report, 880_211)
+
+      assert names(880_212) == {"Andricus fixturauthor", "Andricus fixturauthor (Fixture, 1906)"}
+
+      assert %{"category" => "parenthetical not read as a name part", "reason" => reason} =
+               worksheet_row(report, 880_212)
+
+      assert reason =~ "(Fixture, 1906)"
+    end
+
+    test "the report reconciles the names and lists every override", ctx do
+      gall!(880_207, "Andricus fixturvern (summer and autumn generations)", 33)
+
+      report = run!()
+
+      entry = Enum.find(report.reconciliation, &(&1.label == "Gall names (today's names shown)"))
+      assert Report.balanced?(entry) == true
+      assert entry.old == Repo.aggregate(Gall, :count)
+
+      overridden = Repo.all(from(g in Gall, where: not is_nil(g.name_override), select: g.id))
+      listed = Enum.map(report.curation["gall_names"].rows, & &1["gall_id"])
+
+      assert Enum.sort(overridden) -- listed == []
+      assert ctx.old.unknown_suffix in listed
+      refute ctx.old.agamic in listed
+
+      assert {"kept as an override (the derived name differs)", length(overridden)} in entry.accounted
+
+      for gall <- Repo.all(Gall) do
+        old = Repo.one!(from(s in "species", where: s.id == ^gall.id, select: s.name))
+        assert Gall.display_name(gall) == String.trim(old)
+      end
+    end
   end
 
   test "plants keep their IDs as POWO taxa in Plantae, under their genus or section", ctx do

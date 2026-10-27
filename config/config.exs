@@ -115,8 +115,10 @@ config :gallformers, :private_storage, bucket: "gallformers-private"
 
 # "Taxon changed" listeners (`8567` rule 6), called inside each taxonomy
 # change's transaction. Registered here so Taxa never references its
-# listeners.
-config :gallformers, Gallformers.Taxa.Events, listeners: [Gallformers.Catalog.TaxonListener]
+# listeners. Rename proposals for the Galls whose derived names change
+# (`86e7` §3) are admin queue items, so Import listens too, after the Catalog.
+config :gallformers, Gallformers.Taxa.Events,
+  listeners: [Gallformers.Catalog.TaxonListener, Gallformers.Import.GallRenames]
 
 # "Facts changed" listeners, called inside each attribution write's
 # transaction with the Facts whose standing changed. Registered here so

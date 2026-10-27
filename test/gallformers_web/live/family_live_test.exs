@@ -5,7 +5,7 @@ defmodule GallformersWeb.FamilyLiveTest do
   `Gallformers.Catalog.count_galls_under/1`.
 
   Uses the converted seeds (`priv/repo/test_seeds.sql`): Cynipidae >
-  Cynipinae (7 Galls under it); Fagaceae > Notholithocarpus (1 plant).
+  Cynipinae (8 Galls under it); Fagaceae > Notholithocarpus (1 plant).
   """
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
@@ -44,7 +44,7 @@ defmodule GallformersWeb.FamilyLiveTest do
       assert html =~ "Children (1)"
       assert html =~ "Galls"
       assert html =~ "Hosts"
-      assert row_words(view, "Cynipinae") == ["Cynipinae", "subfamily", "7", "0"]
+      assert row_words(view, "Cynipinae") == ["Cynipinae", "subfamily", "8", "0"]
 
       # A child shows its common name (the migrated taxonomy description).
       {:ok, view, _html} = live(conn, "/family/Fagaceae")

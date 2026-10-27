@@ -41,7 +41,7 @@ defmodule GallformersWeb.IntermediateLiveTest do
       {:ok, view, html} = live(conn, "/subfamily/Cynipinae")
 
       assert html =~ "Cynipini"
-      assert has_element?(view, "tbody tr", ~r/Cynipini\s+tribe\s+7\s+0/)
+      assert has_element?(view, "tbody tr", ~r/Cynipini\s+tribe\s+8\s+0/)
     end
 
     test "shows genera as children of tribe", %{conn: conn} do

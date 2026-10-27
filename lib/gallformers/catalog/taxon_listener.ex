@@ -18,10 +18,14 @@ defmodule Gallformers.Catalog.TaxonListener do
       their group's subtree are reported by
       `Gallformers.Catalog.ReadModels.Flags`; whether such a move should
       fail instead is open (`8567` *Generation groups*).
-    * `:rename` — the same refresh, for the taxon's subtree. Derived Gall
-      names (Inducer name plus qualifiers, `8567` rule 9) and keeping the
-      old name as a Gall alias are later work, with name derivation; this
-      is where a derived-name collision will reject the rename.
+    * `:rename` — the same refresh, for the taxon's subtree.
+
+  A rename or move never renames a Gall: Galls whose derived names
+  (`8567` rule 9, `Gallformers.Catalog.GallName`) it changes get rename
+  proposals for a curator (`86e7` §3). The Catalog says which
+  (`Gallformers.Catalog.GallRenames`); the proposals are admin queue items,
+  made by `Gallformers.Import.GallRenames`, registered after this listener.
+  A name collision is flagged on the proposal and never rejects the change.
     * `:merge`, `:split` — not emitted in phase 1; re-pointing Relationship
       endpoints and curator tasks come with the operations that emit them.
   """

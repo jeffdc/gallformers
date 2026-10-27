@@ -273,6 +273,11 @@ defmodule Gallformers.Import.ReplayTest do
      Enum.sort(for o <- a.observations, do: {o.provider, o.external_id, o.url})}
   end
 
+  # A rename proposal comes from no package.
+  defp queue_entry(%QueueItem{kind: :gall_rename} = item) do
+    {nil, nil, item.kind, item.proposal["from"], item.proposal["to"], item.status, item.decision}
+  end
+
   defp queue_entry(item) do
     package = Import.get_package!(item.package_id)
     batch = item.batch_id && Import.get_batch!(item.batch_id)
@@ -384,6 +389,55 @@ defmodule Gallformers.Import.ReplayTest do
 
     assert {:ok, renamed} = Taxa.resolve_name("Andricus exemplarius", rank: :species)
     assert Taxa.accepted_name(renamed.parent_id) == "Andricus"
+  end
+
+  test "a rename proposal's decision replays after the taxonomy edit that made it" do
+    load_vocab!()
+    # Sources outlive the wipe, so the seed's own is made once.
+    legacy = source_fixture("Legacy", "1990")
+    source_ids = Repo.all(from s in "source", select: s.id)
+    wipe!(source_ids)
+
+    seed_gall = fn ->
+      andricus = taxon_fixture(name: "Andricus", rank: :genus, kingdom: "Animalia")
+      wasp = taxon_fixture(name: "Andricus exemplaris", parent: andricus, kingdom: "Animalia")
+
+      {:ok, gall} =
+        Catalog.create_gall(test_actor(), %{
+          id: @stem_gall_id,
+          name: "Andricus exemplaris (agamic)",
+          generation_value_id: Catalog.get_generation_value("agamic").id
+        })
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          test_actor(),
+          %{type: "inducer_of", subject_taxon_id: wasp.id, object_gall_id: gall.id},
+          confirm(legacy)
+        )
+
+      wasp
+    end
+
+    wasp = seed_gall.()
+    {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:rename, wasp, "Andricus exemplarius"})
+    [proposal] = Import.list_gall_renames()
+    {:ok, _} = Import.decide_queue_item(test_actor(), proposal, %{"accept" => true})
+
+    before = snapshot()
+    entries = Import.list_replay_entries()
+    assert Enum.map(entries, & &1.kind) == [:taxonomy_edit, :queue_decision]
+    assert {"Andricus exemplarius (agamic)", "agamic"} in before.galls
+
+    wipe!(source_ids)
+    seed_gall.()
+
+    assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+    assert snapshot() == before
+
+    # A decision replayed again is skipped: its proposal is decided.
+    assert {:ok, 1} = Replay.run([List.last(entries)], actor: test_actor())
+    assert snapshot().galls == before.galls
   end
 
   test "a log entry that cannot be replayed stops the replay and says which" do

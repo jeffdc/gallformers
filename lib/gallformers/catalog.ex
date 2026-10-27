@@ -57,6 +57,7 @@ defmodule Gallformers.Catalog do
       Facts.TraitFact,
       FactListener,
       Gall,
+      GallName,
       LegacyCitation,
       LegacyTraitIds,
       ReadModels.GallPage,
@@ -84,6 +85,8 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.Facts.RelationshipFact
   alias Gallformers.Catalog.Facts.TraitFact
   alias Gallformers.Catalog.Gall
+  alias Gallformers.Catalog.GallName
+  alias Gallformers.Catalog.GallRenames
   alias Gallformers.Catalog.Identify
   alias Gallformers.Catalog.LegacyCitation
   alias Gallformers.Catalog.LegacyTraitIds
@@ -153,11 +156,12 @@ defmodule Gallformers.Catalog do
 
   @doc """
   Creates a Gall (`Gallformers.Catalog.Gall`). `attrs` (atom keys): `:name`
-  (required), `:name_override`, `:gallformers_code`,
-  `:generation_value_id`, `:abundance_id`, `:datacomplete`,
-  `:default_source_id` (the Source the Gall page leads with), and `:id` for a
-  migrated Gall keeping its species ID (otherwise the shared sequence gives
-  one).
+  (required), `:name_override`, the name parts `:form_label`,
+  `:descriptor` and `:host_qualifier_taxon_id` (a plant),
+  `:gallformers_code`, `:generation_value_id`, `:abundance_id`,
+  `:datacomplete`, `:default_source_id` (the Source the Gall page leads
+  with), and `:id` for a migrated Gall keeping its species ID (otherwise the
+  shared sequence gives one). The name shown must be unique, ignoring case.
   """
   @spec create_gall(Actor.t(), map()) :: {:ok, Gall.t()} | {:error, Changeset.t()}
   def create_gall(%Actor{} = actor, attrs) when is_map(attrs) do
@@ -176,6 +180,92 @@ defmodule Gallformers.Catalog do
   @doc "Gets a Gall by ID, raising if there is none."
   @spec get_gall!(integer()) :: Gall.t()
   def get_gall!(id), do: Repo.get!(Gall, id)
+
+  # -- Gall names (`Gallformers.Catalog.GallName`) -----------------------------
+
+  @doc """
+  The name Gall `gall_id`'s stored name parts and its current Inducer give
+  (`Gallformers.Catalog.GallName.derive/1`), or why they give none
+  (`{:error, :several_inducers}` when current Sources disagree on its
+  Inducer). Raises if there is no such Gall.
+  """
+  @spec derived_name(integer()) ::
+          {:ok, String.t()} | {:error, GallName.error() | :several_inducers}
+  def derived_name(gall_id) when is_integer(gall_id),
+    do: gall_id |> get_gall!() |> GallName.for_gall()
+
+  @doc """
+  A deliberate edit of Gall `gall`'s name (`86e7` §3, §5): a curator's or a
+  Gallformers batch's, applied directly — it is the review. `attrs` (atom
+  keys) may set `:form_label`, `:descriptor`, `:host_qualifier_taxon_id`
+  (a plant) and `:name_override` (nil clears it); nothing else, never the
+  Gallformers code.
+
+  The derived `name` is recomputed from the parts and the Gall's current
+  Inducer (`derived_name/1`), in one audited transaction. Parts that give no
+  name are refused unless the Gall has an override (its stored name then
+  stays). A name shown by another Gall, ignoring case, is refused
+  (`{:error, changeset}`, error on `:name`); nothing changes. The ID tool's
+  lookup table row is refreshed (it stores the name).
+  """
+  @spec update_name_parts(Actor.t(), Gall.t(), map()) ::
+          {:ok, Gall.t()} | {:error, Changeset.t()}
+  def update_name_parts(%Actor{} = actor, %Gall{id: id}, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "catalog.update_name_parts", fn ->
+      gall = Repo.one!(from(g in Gall, where: g.id == ^id, lock: "FOR UPDATE"))
+      changeset = gall |> Gall.name_parts_changeset(attrs) |> put_derived_name()
+
+      case Repo.update(changeset) do
+        {:ok, updated} ->
+          :ok = GallIndex.enqueue_refresh([updated.id])
+          updated
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp put_derived_name(%Changeset{valid?: false} = changeset), do: changeset
+
+  defp put_derived_name(changeset) do
+    case changeset |> Changeset.apply_changes() |> GallName.for_gall() do
+      {:ok, name} ->
+        Changeset.put_change(changeset, :name, name)
+
+      {:error, reason} ->
+        if Changeset.get_field(changeset, :name_override),
+          do: changeset,
+          else:
+            Changeset.add_error(
+              changeset,
+              :name,
+              "cannot be derived from the name parts (#{reason}); give a name override",
+              reason: reason
+            )
+    end
+  end
+
+  @doc """
+  The Galls without a name override whose derived name a taxonomy change
+  (a `Gallformers.Taxa.Event`) may change, each as `%{gall_id, from, to,
+  collision}`: its stored name, the name its parts give now (changed or
+  not), and whether that is another Gall's name shown, ignoring case
+  (`Gallformers.Catalog.GallRenames`). For rename proposals (`86e7` §3).
+  """
+  @spec gall_name_changes(Gallformers.Taxa.Event.t()) :: [GallRenames.change()]
+  defdelegate gall_name_changes(event), to: GallRenames, as: :name_changes
+
+  @doc """
+  Applies an accepted rename proposal to Gall `gall_id`
+  (`Gallformers.Catalog.GallRenames.accept/2`): the name its parts give now,
+  with the name shown before kept as a `former_label` alias of the
+  Gallformers Source. Never touches the Gallformers code.
+  """
+  @spec accept_gall_rename(Actor.t(), integer()) ::
+          {:ok, %{gall: Gall.t(), from: String.t(), to: String.t()}}
+          | {:error, GallRenames.accept_error()}
+  defdelegate accept_gall_rename(actor, gall_id), to: GallRenames, as: :accept
 
   # -- legacy citations --------------------------------------------------------
 
@@ -344,13 +434,22 @@ defmodule Gallformers.Catalog do
     end
   end
 
-  @doc "Whether a Gall already shows `name` (names shown are unique)."
+  @doc "Whether a Gall already shows `name`, ignoring case (names shown are unique)."
   @spec gall_name_taken?(String.t()) :: boolean()
   def gall_name_taken?(name) when is_binary(name) do
     Repo.exists?(
-      from(g in Gall, where: fragment("COALESCE(?, ?)", g.name_override, g.name) == ^name)
+      from(g in Gall,
+        where:
+          fragment("lower(COALESCE(?, ?))", g.name_override, g.name) ==
+            fragment("lower(?)", ^String.trim(name))
+      )
     )
   end
+
+  @doc "Whether a Gall already has Gallformers code `code` (codes are unique)."
+  @spec gallformers_code_taken?(String.t()) :: boolean()
+  def gallformers_code_taken?(code) when is_binary(code),
+    do: Repo.exists?(from(g in Gall, where: g.gallformers_code == ^code))
 
   # -- read models -------------------------------------------------------------
 

@@ -21,8 +21,10 @@ defmodule Gallformers.CatalogMigration.Report do
       these and on `duplicates` (`blocking?/1`); a lenient run skips them.
     * `curation` — the worksheets for the curated inputs, by name
       (`"non_galls"`, `"ranges"`, `"aliases"`, `"keys"`): every row the
-      input covers with its decision so far, written as CSV by
-      `write_curation/2`.
+      input covers with its decision so far; and `"gall_names"`, the Galls
+      whose name kept today's as an override or could not be derived
+      (`Gallformers.CatalogMigration.GallNames`), for review. Written as
+      CSV by `write_curation/2`.
   """
 
   alias Gallformers.CatalogMigration.Curated

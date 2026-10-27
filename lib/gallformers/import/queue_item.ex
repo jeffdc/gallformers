@@ -17,6 +17,11 @@ defmodule Gallformers.Import.QueueItem do
     * `:taxonomy_disagreement` — a taxonomic act, or a name held valid, that
       disagrees with the tree
     * `:generation_outside_group` — a generation outside its Inducer's groups
+    * `:gall_rename` — a taxonomy change would change a Gall's derived name
+      (`Gallformers.Import.GallRenames`): `subject` is `%{"gall_id"}`,
+      `proposal` `%{"gall_id", "from", "to", "collision"}`. It comes from no
+      package (`package_id` is nil for this kind only), and a Gall has at
+      most one open.
 
   `statement_ref` is the batch statement it is about (`t1`, `g1`, `f3`);
   `subject` what it is about, `proposal` the proposed answer and
@@ -37,7 +42,8 @@ defmodule Gallformers.Import.QueueItem do
     :dispute,
     :same_date_conflict,
     :taxonomy_disagreement,
-    :generation_outside_group
+    :generation_outside_group,
+    :gall_rename
   ]
 
   @type kind ::
@@ -49,6 +55,7 @@ defmodule Gallformers.Import.QueueItem do
           | :same_date_conflict
           | :taxonomy_disagreement
           | :generation_outside_group
+          | :gall_rename
 
   @type t :: %__MODULE__{
           id: integer() | nil,
@@ -64,7 +71,7 @@ defmodule Gallformers.Import.QueueItem do
           decided_by_user_id: integer() | nil,
           decided_by_name: String.t() | nil,
           decided_at: DateTime.t() | nil,
-          package: Package.t() | Ecto.Association.NotLoaded.t(),
+          package: Package.t() | Ecto.Association.NotLoaded.t() | nil,
           batch: Batch.t() | Ecto.Association.NotLoaded.t() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
@@ -109,14 +116,26 @@ defmodule Gallformers.Import.QueueItem do
     |> check_constraint(:decision, name: :queue_items_decided_check)
   end
 
-  @doc "A changeset for a new (open) queue item."
+  @doc """
+  A changeset for a new (open) queue item. Every kind but `:gall_rename`
+  needs its package.
+  """
   @spec create_changeset(t(), map()) :: Ecto.Changeset.t()
   def create_changeset(item, attrs) do
     item
     |> cast(attrs, [:package_id, :batch_id, :kind, :statement_ref, :subject, :proposal, :reason])
-    |> validate_required([:package_id, :kind])
+    |> validate_required([:kind])
+    |> validate_package()
     |> unique_constraint([:batch_id, :kind, :statement_ref], name: :queue_items_statement_unique)
+    |> unique_constraint(:subject, name: :queue_items_open_gall_rename_index)
+    |> check_constraint(:package_id, name: :queue_items_package_check)
     |> foreign_key_constraint(:package_id)
     |> foreign_key_constraint(:batch_id)
+  end
+
+  defp validate_package(changeset) do
+    if get_field(changeset, :kind) == :gall_rename,
+      do: validate_change(changeset, :package_id, fn _, _ -> [package_id: "must be empty"] end),
+      else: validate_required(changeset, [:package_id])
   end
 end

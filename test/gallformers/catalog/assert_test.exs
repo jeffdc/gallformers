@@ -70,7 +70,7 @@ defmodule Gallformers.Catalog.AssertTest do
                  name_override: "Andricus foo (agamic)"
                })
 
-      assert %{name: ["has already been taken"]} = errors_on(changeset)
+      assert %{name: ["is already the name of another Gall" <> _]} = errors_on(changeset)
     end
 
     test "its Code is unique when given" do

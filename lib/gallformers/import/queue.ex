@@ -16,6 +16,7 @@ defmodule Gallformers.Import.Queue do
   | the Source a notice retracts (`"retracts"`) | `%{"source_id" => id}` or `%{"skip" => true}` |
   | a phase 6 dispute (`f3`, `a2`, ...) | `%{"keep" => true}` (the statement stands) or `%{"skip" => true}` (it is dropped) |
   | a same-date conflict, a generation outside its group, a disagreeing act | `%{"note" => text}` or `%{}` (acknowledged) |
+  | a rename proposal (`Gallformers.Import.GallRenames`) | `%{"accept" => true}` or `%{"reject" => true}` |
 
   Any decision may add a `"note"`. A decided item stays decided: resolving
   the package again keeps it and honours it (`overlay/2`), and the replay
@@ -86,6 +87,9 @@ defmodule Gallformers.Import.Queue do
 
   defp choices(%QueueItem{kind: :dispute}),
     do: [{"keep", &(&1 == true)}, {"skip", &(&1 == true)}]
+
+  defp choices(%QueueItem{kind: :gall_rename}),
+    do: [{"accept", &(&1 == true)}, {"reject", &(&1 == true)}]
 
   defp choices(%QueueItem{kind: kind})
        when kind in [:same_date_conflict, :generation_outside_group],

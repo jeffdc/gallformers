@@ -276,6 +276,19 @@ INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated
   (9, 10, 304, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
   (10, 11, 304, '2026-01-01T00:00:00', '2026-01-01T00:00:00');  -- the genus placeholder
 
+-- 305: a host-scoped gall (`86e7`): its curated name_suffixes.csv row reads
+--      "(on Notholithocarpus densiflorus)" as its Host qualifier, so its name
+--      is derived with no override. No gallhost row, so the host's pages and
+--      the ID tool's host filters list the same Galls as before.
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (305, 'Cynips seedhostus (on Notholithocarpus densiflorus)', 'gall', false, 3, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO gall_traits (species_id, detachable, undescribed, gallformers_code) VALUES
+  (305, 'unknown', false, NULL);
+
+INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
+  (305, 34);                        -- → Cynips
+
 -- Gall 300's aliases: a common name (a gall alias Fact) and a scientific
 -- name (a synonym of its Inducer, as the test aliases.csv decides)
 INSERT INTO alias (id, name, type, description, inserted_at, updated_at) VALUES

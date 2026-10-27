@@ -204,6 +204,71 @@ defmodule Gallformers.CatalogMigration.NameSuffixes do
     end
   end
 
+  @typedoc """
+  A trailing parenthetical of a gall name as a name part (`86e7` §4), its
+  text as written: a generation token, a Host qualifier ("on X", the X), a
+  form label, or one the mapping does not read as a name part.
+  """
+  @type qualifier ::
+          {:generation, String.t()}
+          | {:host, String.t()}
+          | {:form, String.t()}
+          | {:unread, String.t()}
+
+  @trailing_group ~r/^(.*\S)\s+\(([^()]*)\)$/u
+
+  @doc """
+  Gall `id`'s name `name` (spacing squished) split into its stem and its
+  trailing parentheticals, in written order, each read as a name part
+  (`86e7` §4; `Gallformers.Catalog.GallName`):
+
+    * a token row's text is a generation;
+    * for a curated row of category "Host-scoped", "(on X)" is a Host
+      qualifier;
+    * for a curated row of category "Gall form" or "Plant part / form",
+      any other parenthetical is a form label;
+    * anything else is unread (an unknown token, authorship, a pathovar,
+      ...): only an override keeps it in the name.
+
+  Only parentheticals set off by a space count: in
+  "q-alba-(deforming-pisiformis)" the parenthesis is part of the word. A
+  "Unknown (Family)" placeholder prefix stays in the stem.
+  """
+  @spec qualifiers(t(), integer(), String.t()) :: {String.t(), [qualifier()]}
+  def qualifiers(%{tokens: tokens, galls: galls}, id, name) do
+    categories =
+      case Map.fetch(galls, id) do
+        {:ok, row} -> row.category |> String.split(",") |> Enum.map(&String.trim/1)
+        :error -> []
+      end
+
+    {stem, groups} = trailing_groups(squish(name), [])
+    {stem, Enum.map(groups, &qualifier(&1, tokens, categories))}
+  end
+
+  defp trailing_groups(text, acc) do
+    case Regex.run(@trailing_group, text) do
+      [_all, stem, group] -> trailing_groups(stem, [squish(group) | acc])
+      nil -> {text, acc}
+    end
+  end
+
+  defp qualifier(group, tokens, categories) do
+    cond do
+      Map.has_key?(tokens, normalize_token(group)) ->
+        {:generation, group}
+
+      "Host-scoped" in categories and String.starts_with?(group, "on ") ->
+        {:host, group |> String.replace_prefix("on ", "") |> String.trim()}
+
+      "Gall form" in categories or "Plant part / form" in categories ->
+        {:form, group}
+
+      true ->
+        {:unread, group}
+    end
+  end
+
   defp normalize_token(token), do: token |> squish() |> String.downcase()
 
   defp squish(text), do: text |> String.trim() |> String.replace(~r/\s+/u, " ")

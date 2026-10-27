@@ -24,7 +24,9 @@ defmodule Gallformers.Import do
        package's Source is matched (`Gallformers.Import.SourceStep`) and
        phase 6 disputes from `review.json` are queued.
     4. **Decide** (`decide_queue_item/3`): an admin answers each open item,
-       recorded with who and when.
+       recorded with who and when. The same queue holds rename proposals,
+       which come from taxonomy changes rather than packages
+       (`Gallformers.Import.GallRenames`, `list_gall_renames/1`).
     5. **Approve** (`approve_package/2`): with nothing open that a batch
        needs, the package is approved and the import worker
        (`Gallformers.Import.Worker`) applies it.
@@ -91,6 +93,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.BatchStatement
   alias Gallformers.Import.BatchUnmapped
   alias Gallformers.Import.GallMatcher
+  alias Gallformers.Import.GallRenames
   alias Gallformers.Import.Package
   alias Gallformers.Import.Queue
   alias Gallformers.Import.QueueItem
@@ -546,6 +549,14 @@ defmodule Gallformers.Import do
   @spec get_queue_item!(integer()) :: QueueItem.t()
   def get_queue_item!(id), do: Repo.get!(QueueItem, id)
 
+  @doc """
+  The rename proposals (`:gall_rename` queue items, from no package;
+  `Gallformers.Import.GallRenames`), oldest first. Options: `:status`
+  (default `:open`; `:all` for every one).
+  """
+  @spec list_gall_renames(keyword()) :: [QueueItem.t()]
+  def list_gall_renames(opts \\ []), do: GallRenames.list(opts)
+
   # -- decisions ---------------------------------------------------------------
 
   @doc """
@@ -572,7 +583,12 @@ defmodule Gallformers.Import do
         |> Repo.update()
         |> unwrap_or_rollback()
 
-      honour(item)
+      item =
+        case item.kind do
+          :gall_rename -> GallRenames.honour(actor, item)
+          _kind -> tap(item, &honour/1)
+        end
+
       log_decision(item)
       item
     end)
@@ -617,6 +633,13 @@ defmodule Gallformers.Import do
   end
 
   defp refresh_batch_status(_batch), do: :ok
+
+  defp log_decision(%QueueItem{kind: :gall_rename} = item) do
+    ReplayLog.append!(:queue_decision, GallRenames.replay_key(item), %{
+      "decision" => StableRef.encode_decision(item.decision),
+      "from" => item.proposal["from"]
+    })
+  end
 
   defp log_decision(%QueueItem{} = item) do
     package = get_package!(item.package_id)

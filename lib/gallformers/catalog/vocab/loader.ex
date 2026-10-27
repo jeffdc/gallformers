@@ -46,11 +46,12 @@ defmodule Gallformers.Catalog.Vocab.Loader do
        # Today's Gall names say "sexgen" for the sexual generation.
        {"sexual", "sexgen", nil, nil}
      ]},
+    # Today's Gall names say "(spring generation)" (86e7, Jeff 2026-10-27).
     {"seasonal",
      [
-       {"spring", "spring", nil, nil},
-       {"summer", "summer", nil, nil},
-       {"autumn", "autumn", nil, nil}
+       {"spring", "spring generation", nil, nil},
+       {"summer", "summer generation", nil, nil},
+       {"autumn", "autumn generation", nil, nil}
      ]},
     {"rust_stages",
      [
