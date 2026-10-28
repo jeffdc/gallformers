@@ -16,6 +16,9 @@ config :gallformers, Gallformers.Repo,
   hostname: System.get_env("PGHOST", "localhost"),
   # Explicit because ecto_sql defaults the port to 5432 before Postgrex reads PGPORT.
   port: String.to_integer(System.get_env("PGPORT", "5432")),
+  # No silent fallback to localhost:5432: run inside the dev shell
+  # (Gallformers.Repo.DevShell).
+  require_dev_shell: true,
   pool_size: 5,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
@@ -25,7 +28,8 @@ config :gallformers, Gallformers.Repo.WCVP,
   username: System.get_env("PGUSER", System.get_env("USER")),
   password: System.get_env("PGPASSWORD"),
   hostname: System.get_env("PGHOST", "localhost"),
-  port: String.to_integer(System.get_env("PGPORT", "5432"))
+  port: String.to_integer(System.get_env("PGPORT", "5432")),
+  require_dev_shell: true
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
