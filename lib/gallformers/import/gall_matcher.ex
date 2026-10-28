@@ -18,8 +18,11 @@ defmodule Gallformers.Import.GallMatcher do
       batch's `host_of` Facts for the Gall) and the plant part break the tie
       (a filter that would leave none is skipped).
 
-  One left is `:resolved` (method `"identified_by"`); several are
-  `:ambiguous` with a reason (e.g. a generation the Source never names);
+  One left is `:resolved` (method `"identified_by"`), unless another of the
+  batch's Galls resolves to it too (their identifying fields are equal):
+  then both are `:ambiguous`, offered that entry for an admin to decide.
+  Several are `:ambiguous` with a reason (e.g. a generation the Source never
+  names);
   none is `:new` when the Source presents the Gall as new, otherwise
   `:unresolved` — unless the Gall is `formerly_undescribed`, which is
   matched as undescribed.
@@ -75,6 +78,7 @@ defmodule Gallformers.Import.GallMatcher do
     |> Map.get("galls", [])
     |> List.wrap()
     |> Enum.map(&match_gall(&1, taxa, facts))
+    |> unshare_resolutions()
     |> unshare_proposals()
   end
 
@@ -335,6 +339,27 @@ defmodule Gallformers.Import.GallMatcher do
     if id == statement.gall_id or id in statement.candidate_ids,
       do: statement,
       else: %{statement | flags: statement.flags ++ ["supplied_id_disagrees"]}
+  end
+
+  # Two of the batch's Galls cannot be one entry: an entry resolved for
+  # several (their identifying fields are equal) is offered to each of them,
+  # for an admin to decide (no silent merges).
+  defp unshare_resolutions(statements) do
+    shared =
+      statements
+      |> Enum.filter(&(&1.resolution == :resolved))
+      |> Enum.frequencies_by(& &1.gall_id)
+      |> Enum.filter(fn {_id, n} -> n > 1 end)
+      |> MapSet.new(&elem(&1, 0))
+
+    Enum.map(statements, fn s ->
+      if s.resolution == :resolved and MapSet.member?(shared, s.gall_id) do
+        reason = "the entry matches another of this batch's Galls too"
+        ambiguous(%{s | gall_id: nil}, s.method, [%{gall_id: s.gall_id}], reason)
+      else
+        s
+      end
+    end)
   end
 
   # Two of the batch's Galls cannot be one entry: offer a shared proposal to

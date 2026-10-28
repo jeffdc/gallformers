@@ -143,6 +143,28 @@ defmodule Gallformers.Import.GallMatcherTest do
       assert ctx.wasp.id != other.id
     end
 
+    test "two of the batch's Galls matching one entry are both a curator's decision", ctx do
+      # Equal identifying fields (Jeff, 2026-10-28: an admin decides; no tiers yet).
+      ident = %{"inducer" => "t1", "generation" => generation("agamic")}
+
+      matches =
+        match(
+          [
+            gall("g1", ident, %{"name_as_written" => "the terminal stem gall"}),
+            gall("g2", ident, %{"name_as_written" => "the cryptic stem gall"})
+          ],
+          [resolved("t1", ctx.wasp)]
+        )
+
+      for ref <- ["g1", "g2"] do
+        s = matches[ref]
+        assert s.resolution == :ambiguous
+        assert s.gall_id == nil
+        assert s.candidate_ids == [ctx.agamic.id]
+        assert s.detail["reason"] =~ "another of this batch's Galls"
+      end
+    end
+
     test "an unresolved Inducer leaves the Gall unresolved" do
       %{"g1" => s} =
         match([gall("g1", %{"inducer" => "t1"})], [statement("t1", :unresolved, "Nonesuch")])
