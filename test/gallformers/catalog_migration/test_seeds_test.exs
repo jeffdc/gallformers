@@ -15,6 +15,7 @@ defmodule Gallformers.CatalogMigration.TestSeedsTest do
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Facts.AliasFact
   alias Gallformers.Catalog.Gall
+  alias Gallformers.Catalog.Vocab.GenerationGroupTaxon
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Sources
   alias Gallformers.Taxa
@@ -69,6 +70,19 @@ defmodule Gallformers.CatalogMigration.TestSeedsTest do
     assert inducer(300).id == inducer(301).id
     assert generation(Catalog.get_gall!(300)) == "agamic"
     assert generation(Catalog.get_gall!(301)) == "sexual"
+  end
+
+  test "heterogony is mapped to Cynipini, so the seed Galls' generations are in their groups" do
+    cynipini = Taxa.get_by_legacy_id(:taxonomy, 32)
+
+    assert Repo.all(
+             from(m in GenerationGroupTaxon,
+               join: g in assoc(m, :group),
+               select: {g.name, m.taxon_id}
+             )
+           ) == [{"heterogony", cynipini.id}]
+
+    assert Catalog.generation_group_flags([300, 301, 302, 303]) == []
   end
 
   test "the gall forms share one Inducer, the form kept in the name" do

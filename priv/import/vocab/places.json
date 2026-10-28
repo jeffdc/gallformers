@@ -1,4 +1,7 @@
 {
+    "vocabulary": "places",
+    "vocabulary_version": "2026-10-27",
+    "description": "Every Gallformers place, with its code, name and type (continent, country, state or province): find the code for a place the Source names. place-codes.schema.json lists the codes.",
     "places": [
         {
             "code": "AD",
@@ -22735,8 +22738,5 @@
             "name": "Mashonaland West",
             "type": "province"
         }
-    ],
-    "vocabulary": "places",
-    "description": "Every Gallformers place: code, name, type (continent, country, state, province). For mapping a Source's place names to codes; validate against place-codes.schema.json.",
-    "vocabulary_version": "2026-10-11"
+    ]
 }

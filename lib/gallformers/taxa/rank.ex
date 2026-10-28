@@ -1,18 +1,36 @@
 defmodule Gallformers.Taxa.Rank do
   @moduledoc """
-  Taxon ranks, highest first, as the import contract lists them
-  (`priv/import/vocab/ranks.schema.json`): kingdom to form. A child ranks
-  strictly below its parent in this order.
+  Taxon ranks, highest first: kingdom to form. A child ranks strictly below
+  its parent in this order. The import contract's
+  `priv/import/vocab/ranks.schema.json` is generated from this list
+  (`mix gallformers.import.vocab`).
   """
 
-  @contract Path.expand("../../../priv/import/vocab/ranks.schema.json", __DIR__)
-  @external_resource @contract
-
-  @ranks @contract
-         |> File.read!()
-         |> JSON.decode!()
-         |> Map.fetch!("enum")
-         |> Enum.map(&String.to_atom/1)
+  @ranks [
+    :kingdom,
+    :subkingdom,
+    :phylum,
+    :subphylum,
+    :class,
+    :subclass,
+    :infraclass,
+    :superorder,
+    :order,
+    :suborder,
+    :infraorder,
+    :superfamily,
+    :family,
+    :subfamily,
+    :tribe,
+    :subtribe,
+    :genus,
+    :subgenus,
+    :section,
+    :species,
+    :subspecies,
+    :variety,
+    :form
+  ]
   @positions @ranks |> Enum.with_index() |> Map.new()
 
   @type t ::

@@ -5,8 +5,9 @@ defmodule Gallformers.Catalog.Vocab.GenerationGroupTaxon do
   mapping overrides a higher one); if no ancestor is mapped, every group
   mapped below the Inducer's taxon (`8567` *Generation groups*).
 
-  Changed only by a database update. Empty until the groups settle (`9449`
-  Task 8).
+  Changed only by a database update. The catalog migration writes them from
+  `priv/catalog_migration/generation_group_taxa.csv`
+  (`Gallformers.CatalogMigration.GenerationGroupTaxa`; `294c` step 3).
   """
   use Ecto.Schema
 

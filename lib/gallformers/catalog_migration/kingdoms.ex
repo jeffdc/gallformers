@@ -31,6 +31,10 @@ defmodule Gallformers.CatalogMigration.Kingdoms do
           line: pos_integer()
         }
 
+  @doc "The kingdoms a decision may set (the GBIF backbone's)."
+  @spec kingdoms() :: [String.t()]
+  def kingdoms, do: @kingdoms
+
   @doc "Reads the decisions, by old taxonomy ID."
   @spec load(String.t()) :: {:ok, %{integer() => decision()}} | {:error, String.t()}
   def load(path) do

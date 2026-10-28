@@ -3,8 +3,9 @@ defmodule Gallformers.CatalogMigration.Curated do
   The data migration's curated inputs (`9449` Task 17): CSV files in
   `priv/catalog_migration/` holding a curator's decisions —
   `non_galls.csv`, `range_decisions.csv`, `aliases.csv`, `keys.csv`,
-  `taxon_merges.csv`, `kingdoms.csv` — and the worksheets the migration
-  writes for filling the first four
+  `taxon_merges.csv`, `kingdoms.csv`, `added_taxa.csv`,
+  `generation_group_taxa.csv` — and the worksheets the migration writes for
+  filling the first four
   (`Gallformers.CatalogMigration.Report.write_curation/2`).
 
   Columns are found by their header, so a worksheet with extra columns can
@@ -12,11 +13,29 @@ defmodule Gallformers.CatalogMigration.Curated do
   required columns; blank lines are skipped.
   """
 
+  alias Gallformers.Taxa.Rank
   alias NimbleCSV.RFC4180, as: CSV
 
-  @inputs [:non_galls, :range_decisions, :aliases, :keys, :taxon_merges, :kingdoms]
+  @inputs [
+    :non_galls,
+    :range_decisions,
+    :aliases,
+    :keys,
+    :taxon_merges,
+    :kingdoms,
+    :added_taxa,
+    :generation_group_taxa
+  ]
 
-  @type input :: :non_galls | :range_decisions | :aliases | :keys | :taxon_merges | :kingdoms
+  @type input ::
+          :non_galls
+          | :range_decisions
+          | :aliases
+          | :keys
+          | :taxon_merges
+          | :kingdoms
+          | :added_taxa
+          | :generation_group_taxa
 
   @typedoc "A row as a map of column → trimmed text, with its line number (the header is 1)."
   @type row :: {pos_integer(), %{String.t() => String.t()}}
@@ -88,6 +107,15 @@ defmodule Gallformers.CatalogMigration.Curated do
     case Integer.parse(text) do
       {n, ""} -> {:ok, n}
       _ -> {:error, "#{column} must be a number, got #{inspect(text)}"}
+    end
+  end
+
+  @doc "Parses a rank column (`Gallformers.Taxa.Rank`), or `{:error, message}`."
+  @spec rank(String.t(), String.t()) :: {:ok, Rank.t()} | {:error, String.t()}
+  def rank(text, column) do
+    case Enum.find(Rank.all(), &(Atom.to_string(&1) == text)) do
+      nil -> {:error, "#{column} must be a rank of the contract's list, got #{inspect(text)}"}
+      rank -> {:ok, rank}
     end
   end
 

@@ -101,6 +101,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Catalog.Vocab.Loader
+  alias Gallformers.Catalog.Vocab.TraitTermMapping
   alias Gallformers.Catalog.Vocab.TraitValue
   alias Gallformers.Facts
   alias Gallformers.Facts.Attribution
@@ -144,11 +145,29 @@ defmodule Gallformers.Catalog do
   @spec legacy_trait_values(String.t()) :: {:ok, LegacyTraitIds.values()} | {:error, String.t()}
   def legacy_trait_values(path \\ LegacyTraitIds.default_path()), do: LegacyTraitIds.read(path)
 
-  @doc "The generation groups, by name, with their values in order."
+  @doc """
+  Every term mapping (`Gallformers.Catalog.Vocab.TraitTermMapping`), in the
+  order added: the contract's order. Trait `"generation"`'s are the
+  generation values' other names.
+  """
+  @spec list_trait_term_mappings() :: [TraitTermMapping.t()]
+  def list_trait_term_mappings, do: Repo.all(from(m in TraitTermMapping, order_by: m.id))
+
+  @doc """
+  The generation groups, in the order defined, each with its values in
+  order and its taxa mappings (`taxon_id`s).
+  """
   @spec list_generation_groups() :: [GenerationGroup.t()]
   def list_generation_groups do
-    Repo.all(from(g in GenerationGroup, order_by: g.name, preload: :values))
+    Repo.all(from(g in GenerationGroup, order_by: g.id, preload: [:values, :taxa]))
   end
+
+  @doc """
+  The generation groups' names as `load_vocab/1` loads them (whether loaded
+  yet or not), in order.
+  """
+  @spec generation_group_names() :: [String.t()]
+  def generation_group_names, do: Loader.group_names()
 
   @doc "A generation value, with its group, or nil."
   @spec get_generation_value(String.t()) :: GenerationValue.t() | nil

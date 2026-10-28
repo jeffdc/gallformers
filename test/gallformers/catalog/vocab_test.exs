@@ -103,7 +103,10 @@ defmodule Gallformers.Catalog.VocabTest do
       end
     end
 
-    test "starts the provisional generation groups, the aphid values included, with no taxa mapped" do
+    test "starts the provisional generation groups, the aphid values included, leaving their taxa alone" do
+      # The catalog migration writes the groups' taxa (`generation_group_taxa.csv`);
+      # the loader never does.
+      mapped = Repo.aggregate(GenerationGroupTaxon, :count)
       {:ok, _counts} = Catalog.load_vocab(test_actor())
 
       groups =
@@ -129,7 +132,7 @@ defmodule Gallformers.Catalog.VocabTest do
       assert %GenerationValue{definition: "Phylloxerid generations that induce root galls."} =
                Catalog.get_generation_value("radicicolae")
 
-      assert Repo.aggregate(GenerationGroupTaxon, :count) == 0
+      assert Repo.aggregate(GenerationGroupTaxon, :count) == mapped
     end
 
     test "loads the term mappings" do

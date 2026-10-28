@@ -1,0 +1,8 @@
+group,taxon,rank,note
+heterogony,Cynipini,tribe,"Oak gall wasps (Jeff, 2026-10-27)"
+seasonal,Cecidomyiidae,family,"Gall midges (Jeff, 2026-10-27)"
+seasonal,Procecidochares,genus,"Jeff, 2026-10-27"
+rust_stages,Pucciniales,order,"The rust fungi, an added taxon (added_taxa.csv; Jeff, 2026-10-27)"
+aphid_life_cycle,Aphididae,family,"Jeff, 2026-10-27"
+aphid_life_cycle,Phylloxeridae,family,"Jeff, 2026-10-27"
+aphid_life_cycle,Adelgidae,family,"Jeff, 2026-10-27"

@@ -28,8 +28,9 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
       (`non_galls_report.csv`, `ranges_report.csv`, `aliases_report.csv`,
       `keys_report.csv`) to `DIR`, also when the run stops. Fill in a
       worksheet's `decision` column and save it as the decision file in
-      `priv/catalog_migration/`. (`taxon_merges.csv` and `kingdoms.csv`
-      there have no worksheet; their rows are written by hand.)
+      `priv/catalog_migration/`. (`taxon_merges.csv`, `kingdoms.csv`,
+      `added_taxa.csv` and `generation_group_taxa.csv` there have no
+      worksheet; their rows are written by hand.)
     * `--skip-pending` — lenient: rows of the curated inputs awaiting a
       decision (and duplicate taxon keys) are skipped and reported instead
       of stopping the run. For runs before curation is done; the production
@@ -37,7 +38,8 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
     * `--name-suffixes PATH` — another name-suffix mapping file.
     * `--curated DIR` — read the curated inputs (`non_galls.csv`,
       `range_decisions.csv`, `aliases.csv`, `keys.csv`, `taxon_merges.csv`,
-      `kingdoms.csv`) and `name_suffixes.csv` from `DIR` instead; a file
+      `kingdoms.csv`, `added_taxa.csv`, `generation_group_taxa.csv`) and
+      `name_suffixes.csv` from `DIR` instead; a file
       missing there is read from `priv/catalog_migration/` as usual
       (`--name-suffixes` wins over `DIR/name_suffixes.csv`). `make test-db`
       uses it to convert the test seeds with their own decisions

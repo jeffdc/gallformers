@@ -60,6 +60,11 @@ defmodule Gallformers.Import do
   `replay_exported/2` replays that file on production
   (`Gallformers.Import.ReplayExport`; `Gallformers.Release` runs both).
 
+  ## The contract's vocabularies
+
+  `Gallformers.Import.Vocab` writes the contract's `priv/import/vocab/`
+  files from the database and code (`mix gallformers.import.vocab`).
+
   ## Writes
 
   Every write is audited (`Gallformers.Audit`) as the given actor.
@@ -89,6 +94,7 @@ defmodule Gallformers.Import do
       ReplayEntry,
       Validator,
       Validator.Problem,
+      Vocab,
       Worker
     ]
 

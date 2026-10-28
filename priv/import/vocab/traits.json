@@ -1,30 +1,147 @@
 {
   "vocabulary": "traits",
-  "vocabulary_version": "2026-10-23",
-  "description": "What each Trait value means, and how common Source terms map onto values. A value's definition decides whether it fits; the value is shorthand for its definition. Validate values against traits.schema.json.",
+  "vocabulary_version": "2026-10-27",
+  "description": "What each Trait value means, how common Source terms map onto values, and the generation groups. A value's definition decides whether it fits; the value is shorthand for its definition. traits.schema.json lists the allowed values.",
   "traits": {
     "generation": {
-      "about": "Which generation of the Inducer's life cycle the Gall belongs to. It identifies the Gall (galls[].identified_by) and is not a Trait Fact.",
+      "about": "The stage of the Inducer's life cycle that induces the Gall. It identifies the Gall (galls[].identified_by). The values come in groups, each for the taxa it names: choose from the group for the Inducer's taxon.",
       "values": [
         {
           "value": "agamic",
-          "definition": null
+          "definition": null,
+          "other_names": []
         },
         {
           "value": "sexual",
-          "definition": null
+          "definition": null,
+          "other_names": []
         },
         {
           "value": "spring",
-          "definition": null
+          "definition": null,
+          "other_names": []
         },
         {
           "value": "summer",
-          "definition": null
+          "definition": null,
+          "other_names": []
         },
         {
           "value": "autumn",
-          "definition": null
+          "definition": null,
+          "other_names": []
+        },
+        {
+          "value": "aecial",
+          "definition": null,
+          "other_names": []
+        },
+        {
+          "value": "telial",
+          "definition": null,
+          "other_names": []
+        },
+        {
+          "value": "fundatrix",
+          "definition": "Hatches from the overwintering egg on the primary host and induces the primary gall.",
+          "other_names": [
+            "stem mother"
+          ]
+        },
+        {
+          "value": "apterae",
+          "definition": "The stem mother's wingless offspring on the primary host, where they leave her gall to induce one of their own.",
+          "other_names": [
+            "apterae fundatrigeniae"
+          ]
+        },
+        {
+          "value": "exules",
+          "definition": "Generations on the secondary host.",
+          "other_names": [
+            "alienicolae",
+            "virginoparae"
+          ]
+        },
+        {
+          "value": "gallicolae",
+          "definition": "Phylloxerid generations that induce leaf galls.",
+          "other_names": []
+        },
+        {
+          "value": "radicicolae",
+          "definition": "Phylloxerid generations that induce root galls.",
+          "other_names": []
+        }
+      ],
+      "groups": [
+        {
+          "name": "heterogony",
+          "values": [
+            "agamic",
+            "sexual"
+          ],
+          "taxa": [
+            {
+              "name": "Cynipini",
+              "rank": "tribe"
+            }
+          ]
+        },
+        {
+          "name": "seasonal",
+          "values": [
+            "spring",
+            "summer",
+            "autumn"
+          ],
+          "taxa": [
+            {
+              "name": "Cecidomyiidae",
+              "rank": "family"
+            },
+            {
+              "name": "Procecidochares",
+              "rank": "genus"
+            }
+          ]
+        },
+        {
+          "name": "rust_stages",
+          "values": [
+            "aecial",
+            "telial"
+          ],
+          "taxa": [
+            {
+              "name": "Pucciniales",
+              "rank": "order"
+            }
+          ]
+        },
+        {
+          "name": "aphid_life_cycle",
+          "values": [
+            "fundatrix",
+            "apterae",
+            "exules",
+            "gallicolae",
+            "radicicolae"
+          ],
+          "taxa": [
+            {
+              "name": "Adelgidae",
+              "rank": "family"
+            },
+            {
+              "name": "Aphididae",
+              "rank": "family"
+            },
+            {
+              "name": "Phylloxeridae",
+              "rank": "family"
+            }
+          ]
         }
       ]
     },
@@ -538,32 +655,45 @@
     {
       "term": "smooth, glossy, polished, glabrous",
       "trait": "texture",
-      "maps_to": ["hairless"]
+      "maps_to": [
+        "hairless"
+      ]
     },
     {
       "term": "rough",
       "trait": "texture",
-      "maps_to": ["mealy"]
+      "maps_to": [
+        "mealy"
+      ]
     },
     {
       "term": "fleshy",
       "trait": "texture",
-      "maps_to": ["succulent"]
+      "maps_to": [
+        "succulent"
+      ]
     },
     {
       "term": "pithy, pith-filled",
       "trait": "walls",
-      "maps_to": ["spongy"]
+      "maps_to": [
+        "spongy"
+      ]
     },
     {
       "term": "a single central larval cell, one chamber",
       "trait": "cells",
-      "maps_to": ["monothalamous"]
+      "maps_to": [
+        "monothalamous"
+      ]
     },
     {
       "term": "on the leaf, with no side, vein or midrib stated",
       "trait": "plant_part",
-      "maps_to": ["upper leaf", "lower leaf"]
+      "maps_to": [
+        "upper leaf",
+        "lower leaf"
+      ]
     },
     {
       "term": "oval, ovate, ovoid, ellipsoid, egg-shaped",

@@ -17,10 +17,12 @@ defmodule Gallformers.CatalogMigration do
   as one system actor. It never touches `replay_log` — the backscan's
   record, replayed after the migration (`Gallformers.Import.Replay`) — nor
   Sources (except creating the legacy Source once), stored Source
-  documents or the vocabularies. Taxa and Galls keep stable keys from run
-  to run (plant and Gall IDs, names, crosswalk entries); taxa that get new
-  IDs (higher taxa, Inducers) draw them afresh from `entity_id_seq`, which
-  only ever moves forward and ends above every ID used.
+  documents or the vocabularies (except the generation groups' taxa, which
+  name taxa it rebuilds). Taxa and Galls keep stable keys from run to run
+  (plant and Gall IDs, names, crosswalk entries); taxa that get new IDs
+  (higher taxa, added taxa, Inducers) draw them afresh from
+  `entity_id_seq`, which only ever moves forward and ends above every ID
+  used.
 
   Everything but the legacy Facts (and the range and gall alias Facts the
   curated decisions make) is written in one transaction; those Facts
@@ -36,39 +38,48 @@ defmodule Gallformers.CatalogMigration do
        `Gallformers.CatalogMigration.LookalikesArticle` creates when missing.
     2. `Gallformers.CatalogMigration.Taxa` — higher taxa (rows kept twice
        merged, `taxon_merges.csv`; family kingdoms a curator set,
-       `kingdoms.csv`), plants, genus placeholders (crosswalked to their
-       genus for their old URLs), `host_range` re-keyed by taxon, plants'
-       WCVP links (`host_traits`) carried to `taxon_wcvp`.
+       `kingdoms.csv`), the taxa Gallformers adds above them with their
+       children placed under them (`added_taxa.csv`, e.g. the order
+       Pucciniales above the rust families), plants, genus placeholders
+       (crosswalked to their genus for their old URLs), `host_range`
+       re-keyed by taxon, plants' WCVP links (`host_traits`) carried to
+       `taxon_wcvp`.
     3. `Gallformers.CatalogMigration.Galls` — Inducer taxa from gall names
        (`priv/catalog_migration/name_suffixes.csv`), Galls, their name parts
        and derived names (`Gallformers.CatalogMigration.GallNames`; today's
        name kept as the override only where the derived one differs).
-    4. `Gallformers.CatalogMigration.Citations` — other Sources' record-level
+    4. `Gallformers.CatalogMigration.GenerationGroupTaxa` — the taxa each
+       generation group applies to (`generation_group_taxa.csv`), found by
+       accepted name and rank once every taxon exists.
+    5. `Gallformers.CatalogMigration.Citations` — other Sources' record-level
        citations as legacy citations (not Facts).
-    5. `Gallformers.CatalogMigration.Notes` — Gallformers ID Notes, verbatim,
+    6. `Gallformers.CatalogMigration.Notes` — Gallformers ID Notes, verbatim,
        as undated note documents.
-    6. `Gallformers.CatalogMigration.Images` — each image's typed reference.
-    7. `Gallformers.CatalogMigration.LegacyFacts` — Inducer, Host and Trait
+    7. `Gallformers.CatalogMigration.Images` — each image's typed reference.
+    8. `Gallformers.CatalogMigration.LegacyFacts` — Inducer, Host and Trait
        Facts, attributed to the undated "Gallformers legacy data" Source.
-    8. `Gallformers.CatalogMigration.Ranges` — stored gall ranges, compared
+    9. `Gallformers.CatalogMigration.Ranges` — stored gall ranges, compared
        with the host union, as range Facts (`range_decisions.csv`).
-    9. `Gallformers.CatalogMigration.Aliases` — aliases sorted by meaning
-       into synonyms, common names, gall aliases (`aliases.csv`).
-    10. `Gallformers.CatalogMigration.Keys` — key couplets re-targeted
+    10. `Gallformers.CatalogMigration.Aliases` — aliases sorted by meaning
+        into synonyms, common names, gall aliases (`aliases.csv`).
+    11. `Gallformers.CatalogMigration.Keys` — key couplets re-targeted
         (`keys.csv`).
-    11. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
+    12. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
         rebuilt from all of the above. During the run no lookup-table
         refresh is enqueued (`Gallformers.Catalog.without_gall_index_refresh/1`):
         production runs it without Oban.
 
   ## Curated decisions
 
-  Steps 1 and 8–10 report what needs a curator (worksheets in the report,
+  Steps 1 and 9–11 report what needs a curator (worksheets in the report,
   written as CSV by `Report.write_curation/2`) and apply the decisions in
   `priv/catalog_migration/` (`Gallformers.CatalogMigration.Curated`); step
   2 applies `taxon_merges.csv` and `kingdoms.csv`, which have no worksheet,
   checked against today's taxonomy rows before anything is written (as
-  `range_decisions.csv` scopes are against today's places). A
+  `range_decisions.csv` scopes are against today's places), and
+  `added_taxa.csv`; step 4 applies `generation_group_taxa.csv`. Those two
+  have no worksheet either: their rows name taxa, which are found as the
+  run creates them, so a name that finds no taxon (or several) is pending. A
   **strict** run (the default; production's, `Gallformers.Release`) stops
   with nothing written when a row needs a decision it does not have, or
   taxa share an accepted name, rank and kingdom (replay would stop on
@@ -94,10 +105,12 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
   alias Gallformers.Catalog
+  alias Gallformers.CatalogMigration.AddedTaxa
   alias Gallformers.CatalogMigration.Aliases
   alias Gallformers.CatalogMigration.Citations
   alias Gallformers.CatalogMigration.Curated
   alias Gallformers.CatalogMigration.Galls
+  alias Gallformers.CatalogMigration.GenerationGroupTaxa
   alias Gallformers.CatalogMigration.Images
   alias Gallformers.CatalogMigration.Keys
   alias Gallformers.CatalogMigration.Kingdoms
@@ -170,8 +183,9 @@ defmodule Gallformers.CatalogMigration do
     * `:name_suffixes` — the name-suffix mapping file (default the shipped
       one)
     * `:non_galls`, `:range_decisions`, `:aliases`, `:keys`,
-      `:taxon_merges`, `:kingdoms` — the curated decision files (`Gallformers.CatalogMigration.Curated`; default the
-      shipped ones)
+      `:taxon_merges`, `:kingdoms`, `:added_taxa`, `:generation_group_taxa`
+      — the curated decision files (`Gallformers.CatalogMigration.Curated`;
+      default the shipped ones)
     * `:pending` — `:fail` (the default, and the only mode for production)
       stops the run, writing nothing, when a curated row needs a decision
       it does not have or taxa share a replay key; `:skip` (for runs on a
@@ -226,7 +240,7 @@ defmodule Gallformers.CatalogMigration do
     end
   end
 
-  # Step 11: the ID tool's lookup table, from everything above.
+  # Step 12: the ID tool's lookup table, from everything above.
   defp rebuild_gall_index(report) do
     :ok = Catalog.rebuild_gall_index()
 
@@ -253,7 +267,9 @@ defmodule Gallformers.CatalogMigration do
       aliases: &Aliases.load/1,
       keys: &Keys.load/1,
       taxon_merges: &TaxonMerges.load/1,
-      kingdoms: &Kingdoms.load/1
+      kingdoms: &Kingdoms.load/1,
+      added_taxa: &AddedTaxa.load/1,
+      generation_group_taxa: &GenerationGroupTaxa.load/1
     ]
 
     Enum.reduce_while(loaders, {:ok, %{}}, fn {input, load}, {:ok, acc} ->
@@ -267,7 +283,8 @@ defmodule Gallformers.CatalogMigration do
   end
 
   # The merges and kingdoms checked against today's taxonomy rows, before
-  # anything is written: `curated.taxa` for the taxa step.
+  # anything is written, with the taxa to add above them: `curated.taxa` for
+  # the taxa step.
   defp check_taxa_decisions(curated) do
     rows = Map.new(Old.taxonomy(), &{&1.id, &1})
 
@@ -276,7 +293,8 @@ defmodule Gallformers.CatalogMigration do
       taxa = %{
         merges: merges,
         kingdoms: kingdoms,
-        stale: [{"taxon_merges.csv", merges_stale}, {"kingdoms.csv", kingdoms_stale}]
+        stale: [{"taxon_merges.csv", merges_stale}, {"kingdoms.csv", kingdoms_stale}],
+        added: curated.added_taxa
       }
 
       {:ok, Map.put(curated, :taxa, taxa)}
@@ -331,6 +349,7 @@ defmodule Gallformers.CatalogMigration do
     report = LookalikesArticle.run(report)
     {taxa, report} = MigrationTaxa.run(actor, curated.taxa, report)
     {galls, report} = Galls.run(actor, suffixes, generations, taxa, report, excluded)
+    report = GenerationGroupTaxa.run(curated.generation_group_taxa, report)
 
     gall_ids = Map.new(galls, &{&1.id, true})
     gallformers = Sources.get_gallformers_source()

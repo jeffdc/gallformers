@@ -3,14 +3,20 @@ defmodule Gallformers.Catalog.Vocab.Loader do
   Loads the Catalog's vocabularies (`9449` Task 8).
 
     * Trait values, with definitions, and term mappings come from the
-      contract's `priv/import/vocab/traits.json`, today's source of truth.
-      (A later vocabulary generator reverses the direction.)
+      contract's `priv/import/vocab/traits.json`, the source of truth until
+      cutover. The vocabulary generator (`Gallformers.Import.Vocab`, `mix
+      gallformers.import.vocab`) writes the file back from the database;
+      loading it and generating reproduces it (tested). After cutover the
+      vocabularies change by database migration and the generator
+      publishes them.
     * Generation groups and values are the provisional list held here
       (`8567` *Generation groups*): heterogony (agamic, sexual), seasonal
       (spring, summer, autumn), rust stages (aecial, telial) and the aphid
       life cycle (`8567` *Aphid life-cycle values*), whose other names load
-      as term mappings of trait `"generation"`. Their taxa mappings stay
-      empty until the groups settle; the loader never writes them.
+      as term mappings of trait `"generation"`. The loader never writes
+      their taxa mappings (`generation_group_taxa`): the catalog migration
+      does, from `priv/catalog_migration/generation_group_taxa.csv`
+      (`Gallformers.CatalogMigration.GenerationGroupTaxa`).
 
   Loading is idempotent: rows are matched on their natural keys (trait +
   value, trait + term, group name, generation value), new ones inserted and
@@ -71,6 +77,10 @@ defmodule Gallformers.Catalog.Vocab.Loader do
        {"radicicolae", "radicicolae", "Phylloxerid generations that induce root galls.", nil}
      ]}
   ]
+
+  @doc "The generation groups' names, in order."
+  @spec group_names() :: [String.t()]
+  def group_names, do: for({name, _values} <- @generation_groups, do: name)
 
   @doc "The contract's `traits.json`."
   @spec traits_path() :: String.t()

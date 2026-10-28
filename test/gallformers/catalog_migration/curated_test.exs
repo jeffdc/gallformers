@@ -19,8 +19,11 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   alias Gallformers.Articles.Article
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Gall
+  alias Gallformers.Catalog.Vocab.GenerationGroupTaxon
   alias Gallformers.CatalogMigration
+  alias Gallformers.CatalogMigration.AddedTaxa
   alias Gallformers.CatalogMigration.Curated
+  alias Gallformers.CatalogMigration.GenerationGroupTaxa
   alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Report
@@ -34,7 +37,9 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     aliases: {"aliases.csv", "owner,owner_id,alias_id,name,type,decision,target,note"},
     keys: {"keys.csv", "key,couplet,lead,species_id,decision,target_gall_id,note"},
     taxon_merges: {"taxon_merges.csv", "old_taxonomy_id,into_old_taxonomy_id,note"},
-    kingdoms: {"kingdoms.csv", "old_taxonomy_id,kingdom,note"}
+    kingdoms: {"kingdoms.csv", "old_taxonomy_id,kingdom,note"},
+    added_taxa: {"added_taxa.csv", "name,rank,kingdom,children,note"},
+    generation_group_taxa: {"generation_group_taxa.csv", "group,taxon,rank,note"}
   }
 
   # The seeds' own decisions, as `make test-db` converts them (Gall 101's
@@ -1017,7 +1022,206 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     end
   end
 
-  test "the shipped merge and kingdom decisions load" do
+  # -- added taxa ----------------------------------------------------------------------
+
+  defp group_mappings do
+    Repo.all(
+      from(m in GenerationGroupTaxon,
+        join: g in assoc(m, :group),
+        order_by: [g.name, m.taxon_id],
+        select: {g.name, m.taxon_id}
+      )
+    )
+  end
+
+  describe "added taxa" do
+    setup do
+      family = taxonomy!(880_060, "Fixturpucciniaceae", "family", description: "Fungus")
+      genus = taxonomy!(880_061, "Fixturpuccinia", "genus", parent: family)
+      other = taxonomy!(880_062, "Fixturphragmidiaceae", "family", description: "Fungus")
+      plants = taxonomy!(880_063, "Fixturuncinaceae", "family", description: "Plant")
+      gall = gall!(880_273, "Fixturpuccinia sparganioides", genus)
+
+      %{r: %{family: family, genus: genus, other: other, plants: plants, gall: gall}}
+    end
+
+    defp order_row(children, note \\ ""),
+      do: "Fixturpucciniales,order,Fungi,#{Enum.join(children, ";")},#{note}"
+
+    test "an added taxon is created above its children; the ancestry follows", ctx do
+      r = ctx.r
+
+      curated!(ctx, :added_taxa, [
+        order_row(["Fixturpucciniaceae", " Fixturphragmidiaceae"], "the rusts")
+      ])
+
+      report = run!(ctx)
+      assert report.pending == []
+
+      assert [order] = Taxa.get_by_name("Fixturpucciniales", :order)
+
+      assert {order.rank, order.kingdom, order.origin, order.parent_id} ==
+               {:order, "Fungi", :curated, nil}
+
+      assert Taxa.get_by_legacy_id(:taxonomy, r.family).parent_id == order.id
+      assert Taxa.get_by_legacy_id(:taxonomy, r.other).parent_id == order.id
+
+      inducer = Taxa.get_by_legacy_id(:gall_inducer, r.gall)
+
+      assert Enum.map(Taxa.lineage(inducer), & &1.name) == [
+               "Fixturpucciniales",
+               "Fixturpucciniaceae",
+               "Fixturpuccinia",
+               "Fixturpuccinia sparganioides"
+             ]
+
+      assert length(Taxa.descendants(order)) == 4
+
+      assert {"Taxa added above today's taxonomy (added_taxa.csv)", 1} in report.counts
+      assert {"Taxa placed under an added taxon", 2} in report.counts
+      assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
+    end
+
+    test "a generation group can be mapped to an added taxon", ctx do
+      curated!(ctx, :added_taxa, [order_row(["Fixturpucciniaceae"])])
+      curated!(ctx, :generation_group_taxa, ["rust_stages,Fixturpucciniales,order,"])
+
+      assert run!(ctx).pending == []
+
+      [order] = Taxa.get_by_name("Fixturpucciniales", :order)
+      cynipini = Taxa.get_by_legacy_id(:taxonomy, 32)
+      assert group_mappings() == [{"heterogony", cynipini.id}, {"rust_stages", order.id}]
+    end
+
+    test "a child that does not resolve stops a strict run; a lenient run leaves it out", ctx do
+      curated!(ctx, :added_taxa, [
+        order_row([
+          "Fixturpucciniaceae",
+          "Fixturmissingaceae",
+          "Fixturuncinaceae",
+          "Fixturpuccinia"
+        ])
+      ])
+
+      assert {:error, {:pending_decisions, report}} = run(ctx)
+
+      assert pending(report, "added_taxa.csv") == [
+               {"Fixturpucciniales", "Fixturmissingaceae"},
+               {"Fixturpucciniales", "Fixturuncinaceae"},
+               {"Fixturpucciniales", "Fixturpuccinia"}
+             ]
+
+      [missing, other_kingdom, placed] =
+        for %{input: "added_taxa.csv", detail: d} <- report.pending, do: d
+
+      assert missing =~ "no taxon in Fungi"
+      assert other_kingdom =~ "no taxon in Fungi"
+      assert placed =~ "already under Fixturpucciniaceae"
+      assert Taxa.get_by_name("Fixturpucciniales", :order) == []
+
+      report = run!(ctx, pending: :skip)
+      assert length(pending(report, "added_taxa.csv")) == 3
+
+      [order] = Taxa.get_by_name("Fixturpucciniales", :order)
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.r.family).parent_id == order.id
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.r.plants).parent_id == nil
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.r.genus).parent_id != order.id
+    end
+
+    test "a rank or kingdom outside the contract's is an error naming the row", ctx do
+      curated!(ctx, :added_taxa, ["Fixturpucciniales,ordo,Fungi,Fixturpucciniaceae,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "added_taxa.csv row 2"
+
+      curated!(ctx, :added_taxa, ["Fixturpucciniales,order,Protista,Fixturpucciniaceae,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "added_taxa.csv row 2"
+      assert Catalog.get_gall(ctx.old.agamic) == nil
+    end
+
+    test "a taxon added twice is an error naming the row", ctx do
+      curated!(ctx, :added_taxa, [
+        order_row(["Fixturpucciniaceae"]),
+        order_row(["Fixturphragmidiaceae"])
+      ])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "added_taxa.csv row 3"
+    end
+  end
+
+  # -- generation group taxa -----------------------------------------------------------
+
+  describe "generation group taxa" do
+    test "the seeds' mapping is written: heterogony on Cynipini, no generation outside it",
+         ctx do
+      report = run!(ctx)
+
+      cynipini = Taxa.get_by_legacy_id(:taxonomy, 32)
+      assert group_mappings() == [{"heterogony", cynipini.id}]
+
+      # The fixture pair (agamic, sexgen) and the seeds' are all under Cynipini.
+      assert Catalog.generation_group_flags() == []
+
+      assert %{old: 1, new: 1} =
+               Enum.find(report.reconciliation, &(&1.label =~ "Generation group taxa"))
+    end
+
+    test "a row naming no taxon, or several, stops a strict run; a lenient run skips it",
+         ctx do
+      taxonomy!(880_070, "Fixturaphididae", "family", description: "Aphid")
+      taxonomy!(880_071, "Fixturaphididae", "family", description: "Plant")
+
+      curated!(ctx, :generation_group_taxa, [
+        "aphid_life_cycle,Fixturaphididae,family,",
+        "seasonal,Fixturmissingidae,family,",
+        "seasonal,Cynipini,genus,"
+      ])
+
+      assert {:error, {:pending_decisions, report}} = run(ctx)
+
+      assert pending(report, "generation_group_taxa.csv") == [
+               {"aphid_life_cycle", "Fixturaphididae", :family},
+               {"seasonal", "Fixturmissingidae", :family},
+               {"seasonal", "Cynipini", :genus}
+             ]
+
+      [several, none, wrong_rank] =
+        for %{input: "generation_group_taxa.csv", detail: d} <- report.pending, do: d
+
+      assert several =~ "2 taxa"
+      assert none =~ "no taxon"
+      assert wrong_rank =~ "no taxon"
+
+      report = run!(ctx, pending: :skip)
+      assert length(pending(report, "generation_group_taxa.csv")) == 3
+
+      cynipini = Taxa.get_by_legacy_id(:taxonomy, 32)
+      assert group_mappings() == [{"heterogony", cynipini.id}]
+
+      assert %{old: 4, new: 1, accounted: [{"pending", 3}]} =
+               Enum.find(report.reconciliation, &(&1.label =~ "Generation group taxa"))
+    end
+
+    test "an unknown group or rank is an error naming the row", ctx do
+      curated!(ctx, :generation_group_taxa, ["galls,Cynipini,tribe,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "generation_group_taxa.csv row 3"
+      assert message =~ ~s("galls")
+
+      curated!(ctx, :generation_group_taxa, ["seasonal,Cynipini,tribus,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "generation_group_taxa.csv row 3"
+    end
+
+    test "a mapping listed twice is an error naming the row", ctx do
+      curated!(ctx, :generation_group_taxa, ["heterogony,Cynipini,tribe,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "generation_group_taxa.csv row 3"
+    end
+  end
+
+  test "the shipped decisions load" do
     assert {:ok, merges} = TaxonMerges.load(Curated.default_path(:taxon_merges))
 
     assert merges |> Map.values() |> Enum.map(&{&1.old_id, &1.into_id}) |> Enum.sort() ==
@@ -1025,6 +1229,26 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
 
     assert {:ok, %{1140 => %{kingdom: "Chromista"}}} =
              Kingdoms.load(Curated.default_path(:kingdoms))
+
+    assert {:ok, [%{name: "Pucciniales", rank: :order, kingdom: "Fungi", children: rusts}]} =
+             AddedTaxa.load(Curated.default_path(:added_taxa))
+
+    assert rusts == ~w(Coleosporiaceae Cronartiaceae Melampsoraceae Phragmidiaceae
+                       Pileolariaceae Pucciniaceae Pucciniastraceae Raveneliaceae
+                       Uropyxidaceae Zaghouaniaceae)
+
+    assert {:ok, mappings} =
+             GenerationGroupTaxa.load(Curated.default_path(:generation_group_taxa))
+
+    assert Enum.map(mappings, &{&1.group, &1.taxon, &1.rank}) == [
+             {"heterogony", "Cynipini", :tribe},
+             {"seasonal", "Cecidomyiidae", :family},
+             {"seasonal", "Procecidochares", :genus},
+             {"rust_stages", "Pucciniales", :order},
+             {"aphid_life_cycle", "Aphididae", :family},
+             {"aphid_life_cycle", "Phylloxeridae", :family},
+             {"aphid_life_cycle", "Adelgidae", :family}
+           ]
   end
 
   # -- the replay log and duplicate taxon keys -----------------------------------------

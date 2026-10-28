@@ -21,6 +21,13 @@ defmodule Gallformers.CatalogMigration.Taxa do
       becomes no taxon of its own: its crosswalk entry points at the taxon
       of the row it merges into, and what is below it attaches there. It
       is placed after that row.
+    * **Added taxa** (`added_taxa.csv`,
+      `Gallformers.CatalogMigration.AddedTaxa`) — taxa Gallformers adds
+      above today's tree (the order Pucciniales above the rust families):
+      created after the higher taxa, origin `:curated`, with no parent; the
+      taxa the row names are placed under each (`Gallformers.Taxa.place/3`,
+      which rebuilds their subtree's ancestry). A child that cannot be
+      placed is a pending decision.
     * **Placeholders** — a placeholder genus ("Unknown (Cynipidae)") is no
       taxon: its crosswalk entry points at its family, and the "Unknown"
       family (with its "Unknown (Unknown)" genus) is no taxon at all.
@@ -41,6 +48,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
   the ancestry closure (depth-0 rows included) and validates each parent.
   """
 
+  alias Gallformers.CatalogMigration.AddedTaxa
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.Repo
@@ -90,12 +98,14 @@ defmodule Gallformers.CatalogMigration.Taxa do
   The curated decisions on taxonomy rows, checked against today's rows:
   `merges` (merged old ID → the old ID it merges into), `kingdoms` (old
   family ID → kingdom) and `stale` (rows not used, as report lines by
-  decision file).
+  decision file); and `added`, the taxa to add above them
+  (`added_taxa.csv`), in file order.
   """
   @type decisions :: %{
           merges: %{integer() => integer()},
           kingdoms: %{integer() => String.t()},
-          stale: [{String.t(), [String.t()]}]
+          stale: [{String.t(), [String.t()]}],
+          added: [AddedTaxa.decision()]
         }
 
   @doc """
@@ -111,6 +121,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
   @spec run(Gallformers.Audit.Actor.t(), decisions(), Report.t()) :: {t(), Report.t()}
   def run(actor, decisions, report) do
     {ctx, report} = higher_taxa(actor, decisions, report)
+    {ctx, report} = added_taxa(actor, decisions.added, ctx, report)
     {ctx, report} = plants(actor, ctx, report)
     report = rekey_host_range(ctx, report)
     report = carry_wcvp_links(report)
@@ -385,6 +396,96 @@ defmodule Gallformers.CatalogMigration.Taxa do
 
   defp anchor(acc, old_id, taxon_id), do: put_in(acc, [:ctx, :anchors, old_id], taxon_id)
   defp put_taxon(acc, id, info), do: put_in(acc, [:ctx, :taxa, id], info)
+
+  # -- added taxa ------------------------------------------------------------------
+
+  defp added_taxa(actor, added, ctx, report) do
+    acc = Enum.reduce(added, %{ctx: ctx, placed: 0, pending: []}, &add_taxon(actor, &1, &2))
+
+    report =
+      report
+      |> Report.count("Taxa added above today's taxonomy (added_taxa.csv)", length(added))
+      |> Report.count("Taxa placed under an added taxon", acc.placed)
+      |> Report.pending("added_taxa.csv", Enum.reverse(acc.pending))
+
+    {acc.ctx, report}
+  end
+
+  defp add_taxon(actor, decision, acc) do
+    taxon =
+      create_taxon!(actor, %{
+        rank: decision.rank,
+        origin: :curated,
+        name: decision.name,
+        parent_id: nil,
+        kingdom: decision.kingdom
+      })
+
+    info = %{name: decision.name, rank: decision.rank, kingdom: decision.kingdom, parent: nil}
+    acc = put_taxon(acc, taxon.id, info)
+
+    Enum.reduce(decision.children, acc, fn name, acc ->
+      case find_child(name, decision) do
+        {:ok, child_id} ->
+          place!(actor, child_id, taxon.id)
+
+          acc
+          |> update_in([:ctx, :taxa], &update_parent(&1, child_id, taxon.id))
+          |> Map.update!(:placed, &(&1 + 1))
+
+        {:pending, reason} ->
+          detail = "#{decision.name} (#{decision.rank}): #{name}: #{reason}"
+          Map.update!(acc, :pending, &[{{decision.name, name}, detail} | &1])
+      end
+    end)
+  end
+
+  # The one taxon with accepted name `name` in the added taxon's kingdom
+  # that ranks below it, with no parent yet.
+  defp find_child(name, decision) do
+    candidates =
+      for row <-
+            Old.rows(
+              """
+              SELECT t.id, t.rank, t.parent_id
+              FROM taxa t JOIN taxon_names n ON n.taxon_id = t.id AND n.status = 'accepted'
+              WHERE n.name = $1 AND t.kingdom = $2
+              ORDER BY t.id
+              """,
+              [name, decision.kingdom]
+            ),
+          Rank.below?(String.to_existing_atom(row.rank), decision.rank),
+          do: row
+
+    case candidates do
+      [] ->
+        {:pending,
+         "no taxon in #{decision.kingdom} ranking below #{decision.rank} has this accepted name"}
+
+      [%{id: id, parent_id: nil}] ->
+        {:ok, id}
+
+      [%{parent_id: parent}] ->
+        {:pending, "already under #{Taxa.accepted_name(parent)}; it is left there"}
+
+      several ->
+        {:pending,
+         "#{length(several)} taxa in #{decision.kingdom} have this accepted name " <>
+           "(#{Enum.map_join(several, ", ", & &1.id)})"}
+    end
+  end
+
+  defp update_parent(taxa, id, parent) when is_map_key(taxa, id),
+    do: put_in(taxa, [id, :parent], parent)
+
+  defp update_parent(taxa, _id, _parent), do: taxa
+
+  defp place!(actor, taxon_id, parent_id) do
+    case Taxa.place(actor, taxon_id, parent_id) do
+      {:ok, _taxon} -> :ok
+      {:error, reason} -> raise "could not place taxon #{taxon_id}: #{inspect(reason)}"
+    end
+  end
 
   # -- plants ----------------------------------------------------------------------
 

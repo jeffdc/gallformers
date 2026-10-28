@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/vocab/traits.schema.json",
   "title": "Gall Trait vocabularies",
-  "description": "Allowed Trait values. Their definitions and term mappings are in traits.json.",
+  "description": "The allowed values of each Trait and of generation. traits.json holds their definitions, the term mappings and the generation groups.",
   "$defs": {
     "generation": {
-      "description": "PROVISIONAL. Identifies a Gall entry rather than being a Fact. Aphid host-alternation phases are still open.",
-      "enum": ["agamic", "sexual", "spring", "summer", "autumn"]
+      "description": "Every generation value, from all the groups. Choose from the group for the Inducer's taxon (traits.json, traits.generation.groups).",
+      "enum": ["agamic", "sexual", "spring", "summer", "autumn", "aecial", "telial", "fundatrix", "apterae", "exules", "gallicolae", "radicicolae"]
     },
     "detachable": { "enum": ["integral", "detachable", "both", "unknown"] },
     "plant_part": {
