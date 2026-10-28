@@ -27,10 +27,12 @@ Every statement carries evidence: a verbatim quote and the document item it come
 | `VERIFY_GUIDE.md` | You review batches (phase 5). |
 | `GALLFORMERS_STATEMENTS.md` | Gallformers states its own Facts (observations, curator corrections). |
 | `schema/` | JSON Schemas (2020-12) for `taxonomy.json`, `gall.json` and `review.json`; `common.schema.json` holds the shared parts. |
-| `vocab/` | Controlled lists (`*.schema.json`), `places.json` (place names for codes), and `traits.json` (what each Trait value means, and how common Source terms map onto values). |
+| `vocab/` | Controlled lists (`*.schema.json`), `places.json` (place names for codes), and `traits.json` (what each Trait value means, how common Source terms map onto values, and the generation groups). |
 | `examples/` | Four complete packages with fictional Sources: `simple-paper`, `revision` (taxonomy), `retraction`, `gallformers-statement`. Start here to see the format. |
 | `validate.py` | Phase 4, and the readiness check. |
 | `tests/` | The validator's tests. |
+
+The `vocab/` files are generated from the Gallformers database: `MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.import.vocab` writes them (from the repository root, against the rehearsal database), and `--check` lists the files that differ without writing. They share one `vocabulary_version`, a date: it changes to the day of the run when their content changes, or to the date `--version` gives. The data comes from the database and code and the prose from the generator (`Gallformers.Import.Vocab`), so changes go there; until cutover the database loads its Trait values and term mappings from `traits.json`, so those are edited in that file.
 
 ## Producing a package with your own agent
 
@@ -64,5 +66,5 @@ uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" --with
 
 - **Rules:** `PRODUCER_GUIDE.md` (this directory).
 - **Why the rules are what they are, and what Gallformers does on import:** `docs/import/producer-guide-background.md`.
-- **Open questions** (aphid generations, coordinates on recorded occurrences) are listed at the end of that document.
+- **Open questions** (coordinates on recorded occurrences) are listed at the end of that document.
 - Work tracking: mull matters `294c` (this contract), `e381` (the Gallformers side), `8546` (the trial).

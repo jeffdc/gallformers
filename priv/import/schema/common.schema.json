@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/common.schema.json",
   "title": "Gallformers import — shared definitions",
-  "description": "Definitions shared by taxonomy batches and gall batches: the envelope, the Source block, taxon references, evidence, and controlled-value wrappers. See PRODUCER_GUIDE.md for the rules a schema cannot express.",
+  "description": "Definitions shared by taxonomy batches and gall batches: the envelope, the Source block, taxon references, evidence, and controlled-value wrappers. PRODUCER_GUIDE.md holds the rules beyond the schemas' shape.",
 
   "$defs": {
     "envelope": {
@@ -11,14 +11,14 @@
       "required": ["format", "format_version", "vocabulary_version", "batch_type", "mode", "batch_id", "produced_at", "producer", "source"],
       "properties": {
         "format": { "const": "gallformers-import", "description": "Identifies the file as a Gallformers import batch." },
-        "format_version": { "const": 3, "description": "Bumped only for breaking changes to the shape." },
-        "vocabulary_version": { "$ref": "#/$defs/date_full", "description": "Date of the vocabulary files (vocab/) the producer used. Vocabularies grow without a format_version bump; this tells the validator which lists apply." },
-        "batch_type": { "enum": ["taxonomy", "gall"], "description": "Taxonomy batches are applied before gall batches from the same Source." },
+        "format_version": { "const": 3, "description": "The version of the import format this batch follows." },
+        "vocabulary_version": { "$ref": "#/$defs/date_full", "description": "The vocabulary_version the vocab/ files carry (one date, shared by all of them): the lists this batch's controlled values come from." },
+        "batch_type": { "enum": ["taxonomy", "gall"], "description": "taxonomy for taxonomy.json; gall for gall.json." },
         "mode": {
           "enum": ["replace", "add"],
-          "description": "replace: a whole re-run of this Source; replaces all of the Source's existing attributions of this batch_type. add: new statements that leave existing attributions alone. Gallformers batches are always add."
+          "description": "replace: a full run over this Source, superseding every earlier batch of this batch_type from it. add: statements that supplement earlier batches from this Source. Gallformers batches use add."
         },
-        "batch_id": { "type": "string", "minLength": 8, "description": "Unique ID for this batch (a UUID is recommended). Used in the audit trail." },
+        "batch_id": { "type": "string", "minLength": 8, "description": "A unique ID for this batch, such as a UUID." },
         "produced_at": { "type": "string", "format": "date-time" },
         "producer": { "$ref": "#/$defs/producer" },
         "source": { "$ref": "#/$defs/source" }
@@ -26,7 +26,7 @@
     },
 
     "producer": {
-      "description": "Who or what produced the batch. model and instructions_version let the golden regression set trace output changes to model or prompt changes.",
+      "description": "Who or what produced the batch: the tool's name and version, plus the model and the instructions version when there are any.",
       "type": "object",
       "required": ["name", "version"],
       "properties": {
@@ -47,7 +47,7 @@
     },
 
     "gallformers_source": {
-      "description": "Gallformers' own statements (author: Gallformers Contributors). No bibliographic fields; each statement carries its own date and text in its evidence. Batches with this Source must use mode add.",
+      "description": "Gallformers' own statements (author: Gallformers Contributors). The gallformers key is the whole block; each statement carries its own date and text in its evidence. Batches with this Source use mode add.",
       "type": "object",
       "required": ["gallformers"],
       "properties": {
@@ -61,17 +61,17 @@
       "type": "object",
       "required": ["kind", "title", "authors", "authored", "citation", "license", "document"],
       "properties": {
-        "gallformers_source_id": { "type": "integer", "minimum": 1, "description": "Optional. If given, the validator checks it matches the bibliographic fields; otherwise Gallformers matches or creates the Source." },
+        "gallformers_source_id": { "type": "integer", "minimum": 1, "description": "Optional: Gallformers' ID for this Source, given only when known for certain. It must match the bibliographic fields." },
         "kind": { "enum": ["publication", "website", "database", "unpublished", "research_data"] },
         "title": { "type": "string", "minLength": 1 },
         "authors": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 },
-          "description": "Names exactly as written, in order. Not parsed."
+          "description": "The authors' names exactly as written, in order."
         },
         "authored": {
-          "description": "The single date that decides recency. For websites: the date of the version read — the stated last-modified date if the site gives one, otherwise the access date.",
+          "description": "The Source's single date, the one that decides which Source is newer. For a website: the date of the version read — its stated last-modified date, or else the access date.",
           "type": "object",
           "required": ["date", "as_written"],
           "properties": {
@@ -110,7 +110,7 @@
           "additionalProperties": false
         },
         "retracts": {
-          "description": "If this Source is a retraction notice: the Source it retracts. Retraction cancels all of that Source's stances; the Source stays visible, marked.",
+          "description": "On a retraction notice only: the Source the notice retracts.",
           "type": "object",
           "required": ["citation_as_written"],
           "properties": {
@@ -124,17 +124,17 @@
     },
 
     "taxon_ref": {
-      "description": "A taxon the Source names, declared once and referred to by ref. Write the name exactly as the Source does; Gallformers resolves it (current names plus synonyms). Never map names to IDs yourself.",
+      "description": "A taxon the Source names, declared once and referred to by ref. It is identified by its name, exactly as the Source writes it, and its rank.",
       "type": "object",
       "required": ["ref", "name_as_written", "rank"],
       "properties": {
         "ref": { "$ref": "#/$defs/taxon_ref_id" },
-        "name_as_written": { "type": "string", "minLength": 1, "description": "Verbatim from the document, so it matches the quotes — including OCR damage." },
-        "name_reading": { "type": "string", "minLength": 1, "description": "Optional. The evident printed name when the document's text of it is damaged by OCR or extraction (\"Cynips Jlocossa\" → \"Cynips flocossa\"). Never a correction of the author's own spelling. Gallformers resolves on it when name_as_written fails." },
+        "name_as_written": { "type": "string", "minLength": 1, "description": "The name verbatim from the document, OCR damage included, so it matches the quotes." },
+        "name_reading": { "type": "string", "minLength": 1, "description": "Optional. The evident printed name when the document's text of it is damaged by OCR or extraction (\"Cynips Jlocossa\" → \"Cynips flocossa\"). It repairs damaged letters only; the author's own spelling stays as written." },
         "rank": { "$ref": "../vocab/ranks.schema.json" },
-        "sensu": { "type": "string", "minLength": 1, "description": "Optional. For a misapplied name: the usage the Source means, as written (\"O. S. non Harris\"), not the species the name's author described." },
+        "sensu": { "type": "string", "minLength": 1, "description": "Optional. For a misapplied name (one used for the wrong species): the usage the Source means, as written (\"O. S. non Harris\")." },
         "new": {
-          "description": "Only when the Source itself claims novelty: sp. nov., gen. nov., subgen. nov., comb. nov., comb. rev., stat. nov., stat. rev., nom. nov. Never because a name failed to resolve.",
+          "description": "Novelty the Source itself claims: sp. nov., gen. nov., subgen. nov., comb. nov., comb. rev., stat. nov., stat. rev., nom. nov.",
           "type": "object",
           "required": ["status"],
           "properties": {
@@ -142,7 +142,7 @@
           },
           "additionalProperties": false
         },
-        "gallformers_taxon_id": { "type": "integer", "minimum": 1, "description": "Optional; checked against the name. Omit unless certain." }
+        "gallformers_taxon_id": { "type": "integer", "minimum": 1, "description": "Optional: Gallformers' ID for this taxon, given only when known for certain. It must match the name." }
       },
       "additionalProperties": false
     },
@@ -154,7 +154,7 @@
 
     "stance": {
       "enum": ["confirm", "deny"],
-      "description": "deny only where the Source corrects a published statement (PRODUCER_GUIDE.md rule 6). Omission is never denial."
+      "description": "confirm: the Source states it. deny: the Source corrects a published statement (PRODUCER_GUIDE.md rule 6)."
     },
 
     "evidence": {
@@ -170,19 +170,19 @@
     },
 
     "quote_evidence": {
-      "description": "Evidence from the Source's document: a verbatim quote anchored to the item it appears in, or a whole item. Gallformers resolves and stores the exact location (item + character span) itself; producers never give offsets.",
+      "description": "Evidence from the Source's document: a verbatim quote and the item it appears in, or a whole item.",
       "type": "object",
       "if": { "required": ["whole_item"] },
       "then": { "required": ["item"], "properties": { "quote": false } },
       "else": { "required": ["quote"] },
       "properties": {
-        "item": { "type": "string", "pattern": "^#/", "description": "Reference of the document item the evidence comes from (a DoclingDocument self_ref, e.g. '#/texts/42'). Required whenever the batch has a document. The PDF page comes from the item's provenance." },
-        "quote": { "type": "string", "minLength": 1, "description": "Verbatim text from the item, long enough to be unambiguous within it. The validator checks it appears there." },
-        "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph); Gallformers takes the text from the document. Only with item, never with quote, and only when the batch has a document." },
-        "page": { "type": "string", "description": "Page number as PRINTED in the Source (for citations), if known — not the PDF page index, which comes from the item." },
+        "item": { "type": "string", "pattern": "^#/", "description": "Reference of the document item the evidence comes from (a DoclingDocument self_ref, e.g. '#/texts/42'). Required whenever the batch has a document." },
+        "quote": { "type": "string", "minLength": 1, "description": "Verbatim text from the item, long enough to be unambiguous within it." },
+        "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph). Use it with item, in place of quote, in a batch with a document." },
+        "page": { "type": "string", "description": "The page number as printed in the Source, if known." },
         "url": { "type": "string", "format": "uri", "description": "Deep link to this place in the Source (e.g. a scanned-book page or a website's species page)." },
         "cites": {
-          "description": "Optional. The Source states this by citing another work (\"Q. alba (Kinsey 1923)\"). The Fact is still this Source's, at this Source's date; cites records where the claim came from.",
+          "description": "Optional. The work the Source cites for this statement (\"Q. alba (Kinsey 1923)\"). The statement is still this Source's own.",
           "type": "object",
           "required": ["as_written"],
           "properties": {
@@ -215,7 +215,7 @@
     },
 
     "unmapped": {
-      "description": "Source terms that fit no vocabulary value, so no Fact was made from them. They travel with the batch for review and show where the vocabulary should grow. Never force a term into the nearest value instead.",
+      "description": "Source terms that fit no vocabulary value, each recorded here with its evidence in place of a Fact. A value is used only when its definition fits; a near miss belongs here.",
       "type": "array",
       "items": {
         "type": "object",
@@ -235,7 +235,7 @@
     },
 
     "observations": {
-      "description": "Observations the statement cites. Observations are evidence, never Sources.",
+      "description": "Observations the statement cites, as its evidence.",
       "type": "array",
       "items": {
         "type": "object",

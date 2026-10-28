@@ -1,7 +1,9 @@
 """Layer 1, the schemas: every example is valid; each mutation is rejected or accepted as the contract says."""
 
+import json
+
 import pytest
-from conftest import EXAMPLES, example
+from conftest import CONTRACT, EXAMPLES, example
 
 
 BATCHES = [p for p in sorted(EXAMPLES.glob("*/*.json")) if p.name != "document.json"]
@@ -219,3 +221,38 @@ def test_range_include_adjustment_is_rejected(paper, schema_errors):
     # A place where the Gall occurs but no Host grows is a recorded occurrence.
     paper["facts"][8]["adjustment"] = "include"
     assert errors_mention(schema_errors(paper), "adjustment")
+
+
+# -- 2026-10-27: generation groups -------------------------------------------------
+# Which group applies to a Gall depends on its Inducer's taxon, which the validator can't
+# see; Gallformers checks that on import. The validator checks the value is a generation.
+
+
+def generation_vocab():
+    traits = json.loads((CONTRACT / "vocab" / "traits.json").read_text(encoding="utf-8"))
+    schema = json.loads((CONTRACT / "vocab" / "traits.schema.json").read_text(encoding="utf-8"))
+    return traits["traits"]["generation"], set(schema["$defs"]["generation"]["enum"])
+
+
+def test_unknown_generation_value_is_rejected(paper, schema_errors):
+    paper["galls"][0]["identified_by"]["generation"] = {"value": "vernal", "as_written": "vernal generation"}
+    assert errors_mention(schema_errors(paper), "galls/0/identified_by/generation")
+
+
+def test_generation_needs_as_written(paper, schema_errors):
+    del paper["galls"][0]["identified_by"]["generation"]["as_written"]
+    assert errors_mention(schema_errors(paper), "as_written")
+
+
+def test_every_generation_value_is_in_the_schema():
+    generation, allowed = generation_vocab()
+    listed = {v["value"] for v in generation["values"]}
+    assert listed == allowed
+
+
+def test_generation_groups_draw_on_the_schema_values_once_each():
+    # A value names its group, so no value is in two groups.
+    generation, allowed = generation_vocab()
+    grouped = [value for group in generation.get("groups", []) for value in group["values"]]
+    assert set(grouped) <= allowed
+    assert len(grouped) == len(set(grouped))

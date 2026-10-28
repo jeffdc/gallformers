@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/review.schema.json",
   "title": "Gallformers import — phase 5 review and phase 6 response",
-  "description": "The phase 5 check of a package's batches against its document (VERIFY_GUIDE.md), and the producer's phase 6 answer to each finding (PRODUCER_GUIDE.md). Delivered with the package: disputed findings go to a human reviewer at intake.",
+  "description": "The phase 5 check of a package's batches against its document (VERIFY_GUIDE.md), and the producer's phase 6 answer to each finding (PRODUCER_GUIDE.md). Delivered with the package.",
   "type": "object",
   "required": ["format", "reviewed", "findings"],
   "properties": {
@@ -31,7 +31,7 @@
           "suggestion": { "type": "string", "minLength": 1, "description": "Optional: what the statement should be." },
           "reviewer": { "type": "string", "minLength": 1, "description": "Which reviewer found it (its model), when several reviewed." },
           "response": {
-            "description": "Phase 6: the producer's answer. agree: the statement was fixed. disagree: the statement stands, and the finding goes to a human reviewer at intake.",
+            "description": "Phase 6: the producer's answer. agree: the statement was fixed. disagree: the statement stands as it is.",
             "type": "object",
             "required": ["decision", "reason"],
             "properties": {

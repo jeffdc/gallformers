@@ -69,7 +69,7 @@ Each evidence entry quotes the document:
 
 ### Vocabularies
 
-`vocab/` holds every controlled list (`*.schema.json`), plus `places.json` (place names for codes) and `traits.json` (Trait definitions and term mappings). Set `vocabulary_version` to the `vocabulary_version` those files carry (they share one).
+`vocab/` holds every controlled list (`*.schema.json`), plus `places.json` (place names for codes) and `traits.json` (Trait definitions and term mappings, and the generation groups). Set `vocabulary_version` to the `vocabulary_version` those files carry (they share one).
 
 ### Examples
 
@@ -125,7 +125,7 @@ Write `gall.json` (`schema/gall.schema.json`), using taxon names as they stand a
 
 - Declare each Gall in `galls[]` with `name_as_written` and `identified_by`:
   - `inducer`: a taxon ref, at the rank the Source gives (genus or family for an undescribed Gall);
-  - `generation`: when the Source distinguishes generations;
+  - `generation`: when the Source shows a clearly different Gall for a stage of the Inducer's life cycle (see "Generations");
   - `host`: when the Host distinguishes the Gall, e.g. an undescribed Gall known only from its Host;
   - `plant_part`: when two Galls of one Inducer and Host differ by where they grow (a collar gall and a spindle gall of one *Antistrophus* on one plant).
   - At least one of `inducer` and `host`.
@@ -137,6 +137,15 @@ Write `gall.json` (`schema/gall.schema.json`), using taxon names as they stand a
 - **Statements about a species rather than a generation** (distribution, "earlier records are from Q. alba") attach to a Gall when the Source ties them to a generation, or when the species has a single Gall in the Source. Otherwise they go to `unmapped` with the note "applies to the species".
 - **Statements about a group of Galls** the Source then separates (a species group split by host in a table) attach to each of them.
 - `identified_by` identifies the Gall; state its Relationships (`inducer_of`, `host_of`, …) as Facts.
+
+### Generations
+
+A generation is a stage of the Inducer's life cycle that induces a clearly different Gall. Each such Gall is its own Gall, with its generation in `identified_by`.
+
+- **Give a generation only when the Source shows a clearly different Gall for that stage.** Repeated broods that induce the same Gall are multivoltine: one Gall, with no extra generation value. *Thecabius populimonilis* apterae induce galls like the stem mother's: one Gall. *Pachypappa pseudobyrsa* apterae induce a different gall: two Galls, `fundatrix` and `apterae`.
+- **A multivoltine seasonal Gall** ("summer and autumn generations") takes one value, `summer`.
+- **Choose from the group for the Inducer's taxon.** Generation values come in groups, listed under `traits.generation.groups` in `vocab/traits.json`; each group names its values and the taxa it applies to (the heterogony group, `agamic` and `sexual`, applies to Cynipini). The groups that apply are those of the Inducer's taxon or its nearest ancestor with groups: a group on a lower taxon takes precedence over one on a higher taxon. When neither the Inducer's taxon nor any ancestor has a group (an undescribed Gall whose Inducer is known only to family), choose from the groups of the taxa below it.
+- **Choose by definition.** Each value in `traits.json` has a definition and the other names Sources use for it ("stem mother" is `fundatrix`); `as_written` carries the Source's words. A stage that fits no value of the group goes to `unmapped` (slot `generation`).
 
 ### Relationships
 

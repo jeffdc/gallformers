@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/taxonomy.schema.json",
   "title": "Gallformers import — taxonomy batch",
-  "description": "Taxonomic acts a Source states: names, placements, synonymies, splits. Applied before the gall batch from the same Source. Never contains Galls. Never changes plant taxa (except the rare gall-forming plant). Written for every Source: empty taxa and acts mean the Source states no taxonomic acts.",
+  "description": "Taxonomic acts a Source states: names, placements, synonymies, splits. Galls go in the gall batch. Acts concern plant taxa only when the plant itself forms galls. Written for every Source: empty taxa and acts mean the Source states no taxonomic acts.",
   "type": "object",
   "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
   "required": ["batch_type", "taxa", "acts"],
@@ -18,7 +18,7 @@
     "acts": {
       "type": "array",
       "items": { "$ref": "#/$defs/act" },
-      "description": "Empty means the Source states no taxonomic acts (or, on a retraction notice, that it carries none). With mode replace, that clears acts previously attributed to the Source."
+      "description": "The taxonomic acts the Source states. Empty when it states none, or on a retraction notice that carries none."
     },
     "unmapped": { "$ref": "common.schema.json#/$defs/unmapped" }
   },
@@ -26,7 +26,7 @@
 
   "$defs": {
     "act": {
-      "description": "Dispatches on kind (if/then rather than oneOf, so validation errors point at the offending field).",
+      "description": "A taxonomic act; its kind decides its fields.",
       "type": "object",
       "required": ["kind"],
       "properties": {
@@ -51,7 +51,7 @@
         "status_as_written": {
           "type": "string",
           "minLength": 1,
-          "description": "Optional. The Source's own status words for this act, as written: 'syn. nov.' (this Source makes the synonymy), 'stat. rev.', 'incorrect spelling', 'nomen dubium', 'combination by Smith (1900)'. Kept for review and later parsing; not a controlled value."
+          "description": "Optional. The Source's own status words for this act, as written: 'syn. nov.' (this Source makes the synonymy), 'stat. rev.', 'incorrect spelling', 'nomen dubium', 'combination by Smith (1900)'. Free text."
         }
       }
     },
@@ -67,7 +67,7 @@
           "type": "object",
           "required": ["as_written"],
           "properties": {
-            "as_written": { "type": "string", "minLength": 1, "description": "Exactly as written, e.g. '(Ashmead, 1881)'. Not parsed." }
+            "as_written": { "type": "string", "minLength": 1, "description": "Exactly as written, e.g. '(Ashmead, 1881)'." }
           },
           "additionalProperties": false
         }
@@ -76,7 +76,7 @@
     },
 
     "placement_act": {
-      "description": "The taxon sits under this parent. A newer placement than the current one is a move. A new intermediate rank is a name act plus placements.",
+      "description": "The taxon sits under this parent. A move is a placement under the new parent. A new intermediate rank is a name act plus placements.",
       "allOf": [{ "$ref": "#/$defs/act_base" }],
       "required": ["taxon", "parent"],
       "properties": {
@@ -100,7 +100,7 @@
     },
 
     "split_act": {
-      "description": "The taxon was divided into these taxa. States the division only; assigning existing records to the daughters is curator work.",
+      "description": "The taxon was divided into these taxa. It states the division only.",
       "allOf": [{ "$ref": "#/$defs/act_base" }],
       "required": ["taxon", "into"],
       "properties": {

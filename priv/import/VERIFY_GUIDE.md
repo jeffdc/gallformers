@@ -13,6 +13,7 @@ Check every act in `taxonomy.json` and every Fact in `gall.json`, and the taxa a
 - **Type:** the Relationship type, act kind or qualifier is the one the Source supports — the most specific the evidence allows, and no more.
 - **Stance:** `deny` only where the Source corrects a published statement (`PRODUCER_GUIDE.md` rule 6); `confirm` otherwise. Other negatives belong nowhere in the batches, so their absence is correct.
 - **Target:** the statement is about the right taxon, Gall and generation.
+- **Generation:** a Gall carries a generation only when the Source shows a clearly different Gall for that stage of the Inducer's life cycle; repeated broods that induce the same Gall are one Gall (a `rule` finding). The value comes from the group for the Inducer's taxon in `vocab/traits.json` and matches its definition (a `wrong_value` finding). `PRODUCER_GUIDE.md`, "Generations", has the rules.
 - **Rules:** the statement follows `PRODUCER_GUIDE.md` — for example, hedged statements are absent from Facts, acts are ones the Source makes or adopts, `new` and `formerly_undescribed` are claims the Source makes.
 
 Judge each statement from the document alone.
