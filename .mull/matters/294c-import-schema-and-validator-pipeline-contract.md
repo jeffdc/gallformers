@@ -103,10 +103,14 @@ The five trial Sources were rerun on the step 3 contract: phase 1 reused from th
 
 ## Open
 
-- **Jeff:**
-  - **Unverified sections:** should a Source's "unverified" entries become Galls, or stay `unmapped` (as the run now does)?
-  - **Off-hand intro Galls:** should Galls outside the Source's subject (intro photos, background) be left out, as the run now does?
-  - **Identifying Galls:** how intake should tell apart two Galls whose `identified_by` fields are equal (the rosinweed case).
+- **Decided (Jeff, 2026-10-28):**
+  - **Unverified entries are statements.** The authors publish them while saying they couldn't verify them personally. Named Galls are added as usual; unnamed ones become undescribed Galls. A later Source will likely describe them formally, and even if none does, holding the information is better than not. Hedges inside an entry still go to `unmapped`. This is in the producer guide and the background doc, and reverses the earlier "unverified = hedged" rule.
+  - **Off-hand intro Galls stay out** (the rule the run already follows).
+  - **Galls whose identifying fields are equal** (the rosinweed case; `identified_by` = Inducer, generation, Host, plant part): **a curator decision for now, no tiers yet.**
+    - Two Galls can differ only by Traits, and any Trait might be the one that tells them apart. A tiered approach (tier 1 the identifying fields, tier 2 one or more Traits) is the likely answer, but we measure how often this occurs first.
+    - Intake lists the possible entries and an admin picks. `GallMatcher` already did this when several catalog Galls match. It now also does so when two of a batch's Galls resolve to the same entry (2026-10-28), instead of silently merging them.
+    - If it becomes a continual problem, solve it in code: Trait tiers in `identified_by`, with either the catalog Gall's current Trait Facts or identifying Traits stored on the Gall (like name parts) to match against.
+    - Count it from the `ambiguous_match` queue items with the reason "the entry matches another of this batch's Galls too".
 - **Importer (`e381`):** an old Source's "new species" still needs matching to an existing entry.
 - **A 15-second connection warning, once:** during one rehearsal a process other than the migration timed out on a database connection while `host_range` was being re-keyed. It did not recur on a clean rerun. Watch for it at the rehearsal step (step 12).
 - **Deferred (Jeff, 2026-10-27):** whether recorded occurrences keep coordinates as written when a Source prints them. Left out of the schema; revisit after release.
