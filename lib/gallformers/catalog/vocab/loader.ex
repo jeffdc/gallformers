@@ -43,26 +43,39 @@ defmodule Gallformers.Catalog.Vocab.Loader do
           generation_values: non_neg_integer()
         }
 
-  # {group, [{value, name qualifier, definition, other names}]}. Definitions
-  # are null where the contract has none yet.
+  # {group, [{value, name qualifier, definition, other names}]}. The
+  # heterogony, seasonal and rust-stage definitions are best guesses, to be
+  # edited (Jeff, 2026-10-27).
   @generation_groups [
     {"heterogony",
      [
-       {"agamic", "agamic", nil, nil},
+       {"agamic", "agamic",
+        "The all-female generation, which reproduces without mating; its larvae induce the gall.",
+        nil},
        # Today's Gall names say "sexgen" for the sexual generation.
-       {"sexual", "sexgen", nil, nil}
+       {"sexual", "sexgen",
+        "The generation of males and females, which reproduces by mating; its larvae induce " <>
+          "the gall.", nil}
      ]},
     # Today's Gall names say "(spring generation)" (86e7, Jeff 2026-10-27).
+    # Season is when the gall forms and grows (the `season` Trait).
     {"seasonal",
      [
-       {"spring", "spring generation", nil, nil},
-       {"summer", "summer generation", nil, nil},
-       {"autumn", "autumn generation", nil, nil}
+       {"spring", "spring generation", "The generation whose gall forms and grows in spring.",
+        nil},
+       {"summer", "summer generation", "The generation whose gall forms and grows in summer.",
+        nil},
+       {"autumn", "autumn generation", "The generation whose gall forms and grows in autumn.",
+        nil}
      ]},
     {"rust_stages",
      [
-       {"aecial", "aecial", nil, nil},
-       {"telial", "telial", nil, nil}
+       {"aecial", "aecial",
+        "The rust stage that induces a gall bearing aecia, which release aeciospores, as " <>
+          "pine-oak gall rust does on Pinus.", nil},
+       {"telial", "telial",
+        "The rust stage that induces a gall bearing telia, which produce teliospores, as " <>
+          "cedar-apple rust does on Juniperus.", nil}
      ]},
     {"aphid_life_cycle",
      [

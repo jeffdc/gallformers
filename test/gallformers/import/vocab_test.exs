@@ -99,7 +99,12 @@ defmodule Gallformers.Import.VocabTest do
       assert values["fundatrix"]["other_names"] == ["stem mother"]
       assert values["exules"]["other_names"] == ["alienicolae", "virginoparae"]
       assert values["agamic"]["other_names"] == []
-      assert values["agamic"]["definition"] == nil
+
+      assert values["agamic"]["definition"] ==
+               "The all-female generation, which reproduces without mating; its larvae induce the gall."
+
+      # Every generation value has a definition: the guide says to choose by it.
+      assert Enum.reject(generation["values"], & &1["definition"]) == []
     end
 
     test "lists the generation groups in order with their values and the taxa mapped to them", %{

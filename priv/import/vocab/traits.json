@@ -8,37 +8,37 @@
       "values": [
         {
           "value": "agamic",
-          "definition": null,
+          "definition": "The all-female generation, which reproduces without mating; its larvae induce the gall.",
           "other_names": []
         },
         {
           "value": "sexual",
-          "definition": null,
+          "definition": "The generation of males and females, which reproduces by mating; its larvae induce the gall.",
           "other_names": []
         },
         {
           "value": "spring",
-          "definition": null,
+          "definition": "The generation whose gall forms and grows in spring.",
           "other_names": []
         },
         {
           "value": "summer",
-          "definition": null,
+          "definition": "The generation whose gall forms and grows in summer.",
           "other_names": []
         },
         {
           "value": "autumn",
-          "definition": null,
+          "definition": "The generation whose gall forms and grows in autumn.",
           "other_names": []
         },
         {
           "value": "aecial",
-          "definition": null,
+          "definition": "The rust stage that induces a gall bearing aecia, which release aeciospores, as pine-oak gall rust does on Pinus.",
           "other_names": []
         },
         {
           "value": "telial",
-          "definition": null,
+          "definition": "The rust stage that induces a gall bearing telia, which produce teliospores, as cedar-apple rust does on Juniperus.",
           "other_names": []
         },
         {

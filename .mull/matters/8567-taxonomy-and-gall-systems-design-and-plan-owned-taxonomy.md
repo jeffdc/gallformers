@@ -99,7 +99,7 @@ Jeff (2026-10-23): generation gets the full treatment ("in for a penny, in for a
   | gallicolae | | Phylloxerid generations that induce leaf galls. | grape phylloxera (*Daktulosphaira vitifoliae*) |
   | radicicolae | | Phylloxerid generations that induce root galls. | grape phylloxera |
 
-- **Settled (2026-10-27):** a multivoltine seasonal Gall ("summer and autumn generations") takes one value, `summer` (Jeff, 2026-10-26). A taxon move that carries an Inducer out of its group's subtree does not fail; it is flagged for a curator (`Catalog.ReadModels.Flags`, as built).
+- **Settled (2026-10-27):** a multivoltine seasonal Gall ("summer and autumn generations") takes one value, `summer` (Jeff, 2026-10-26), when its Inducer also induces a clearly different Gall in another season; when it is the Inducer's only Gall, it takes no generation (Jeff, 2026-10-27). A taxon move that carries an Inducer out of its group's subtree does not fail; it is flagged for a curator (`Catalog.ReadModels.Flags`, as built).
 
 ## Phases
 
