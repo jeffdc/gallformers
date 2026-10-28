@@ -52,7 +52,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
    - Metadata: unlink `ede2 needs ec68` (audit must not wait on roles).
    - `8567`: point its *Work ordering* at this punchlist.
 2. ~~Record the `8546` go/no-go~~ — go (2026-10-24).
-3. **Finish the contract (`294c`):** vocabulary generator (mix task); schema-description wording pass; golden regression set of the five trial packages; generation groups into `traits.json`, the guide and the `generation` enum once the groups settle.
+3. **Finish the contract (`294c`):** vocabulary generator (mix task); schema-description wording pass; golden regression set of the five trial packages; generation groups into `traits.json`, the guide and the `generation` enum once the groups settle. **Built 2026-10-27 (uncommitted).** The generation group mappings and Pucciniales are in the catalog migration. Still open (see `294c` *Open*): Jeff's wording review, definitions for seven generation values, the *Besbicus* placement, and one paid golden run after the review.
 4. ~~Taxonomy facade (`36ca`)~~ — dropped 2026-10-24 (`8567` *Build approach*).
 
 **New back-end** (schema: `9449`; built whole on `taxogall`; old domain code removed as each piece replaces it; the new test seeds in `priv/repo/test_seeds.sql` grow with it). **Steps 5–8 built 2026-10-25** (all 17 tasks of `9449`'s plan; see its *Status*). **Step 8 done 2026-10-26:** rehearsed on a production copy, every curated decision made, strict run clean (`9449` *First rehearsal*). The prod-data test targets move to step 9.
