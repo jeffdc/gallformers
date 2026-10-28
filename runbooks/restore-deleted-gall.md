@@ -120,15 +120,20 @@ If the session has expired, run `fly auth login` and complete the browser flow.
 Terminal 1:
 
 ```bash
-set -a; [ -f .env ] && . .env; set +a
-fly proxy 15432:5432 -a "$PG_PROD_DB_APP"
+fly proxy 15432:5432 -a gallformers-db
 ```
 
-Keep the proxy running. In Terminal 2:
+Keep the proxy running. In Terminal 2, type the production credentials for this terminal only (never kept in `.env` or your shell profile; the password is not echoed, and the variables are not exported, so they reach only the commands that name them):
 
 ```bash
-set -a; [ -f .env ] && . .env; set +a
+read -r -p "Postgres user: " PG_PROD_USERNAME
+read -r -p "Database name: " PG_PROD_DBNAME
+read -r -s -p "Postgres password: " PG_PROD_PASSWORD; echo
+```
 
+Then:
+
+```bash
 PGPASSWORD="$PG_PROD_PASSWORD" psql \
   -h localhost -p 15432 -U "$PG_PROD_USERNAME" -d postgres \
   -c 'SELECT 1'
@@ -274,15 +279,13 @@ shasum -a 256 -c "$RECOVERY_ROOT/restore-gall.sql.sha256"
 In Terminal 1, start the proxy and keep it running:
 
 ```bash
-set -a; [ -f .env ] && . .env; set +a
-fly proxy 15432:5432 -a "$PG_PROD_DB_APP"
+fly proxy 15432:5432 -a gallformers-db
 ```
 
-In Terminal 2, run the same generated SQL that passed locally:
+In Terminal 2, run the same generated SQL that passed locally. If this is a new terminal, type the credentials first, as in the backup step above (`read -r -p "Postgres user: " PG_PROD_USERNAME` and so on).
 
 ```bash
 set -o pipefail
-set -a; [ -f .env ] && . .env; set +a
 
 PGPASSWORD="$PG_PROD_PASSWORD" psql \
   -h localhost -p 15432 -U "$PG_PROD_USERNAME" -d "$PG_PROD_DBNAME" \
@@ -295,7 +298,11 @@ PGPASSWORD="$PG_PROD_PASSWORD" psql \
   | tee "$RECOVERY_ROOT/production-restore.log"
 ```
 
-Stop the proxy in Terminal 1 with `Ctrl-C`.
+Stop the proxy in Terminal 1 with `Ctrl-C`, and clear the credentials in Terminal 2:
+
+```bash
+unset PG_PROD_PASSWORD PG_PROD_USERNAME PG_PROD_DBNAME
+```
 
 Any SQL error is a stop condition. Record the transaction result in the incident document.
 

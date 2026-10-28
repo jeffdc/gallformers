@@ -6,7 +6,7 @@
 
 # Download production database for local dev
 # Downloads full pg_dump from private S3 bucket and restores into local Postgres
-# Requires AWS credentials (AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY in .env or ~/.aws)
+# Requires an AWS CLI session: run `aws login` first (temporary credentials; no access keys)
 DUMP_BUCKET ?= gallformers-full-backups
 
 download-db:
@@ -109,14 +109,14 @@ setup: deps assets check-db wcvp-check
 # Development
 # =============================================================================
 
-# Start development server (ensures deps and assets are ready)
-# Loads .env if present for Auth0 and other local config
+# Start development server (ensures deps and assets are ready).
+# Development needs no secrets (.env.sample); run it inside the dev shell.
 dev: setup
-	set -a && [ -f .env ] && . .env; set +a && PREVIEW_DEPLOY=true mix phx.server
+	PREVIEW_DEPLOY=true mix phx.server
 
 # Start dev server using production CloudFront tiles (no local build needed)
 dev-cloudfront: setup
-	set -a && [ -f .env ] && . .env; set +a && TILES_URL=https://gallformers.org/tiles/boundaries.pmtiles PREVIEW_DEPLOY=true mix phx.server
+	TILES_URL=https://gallformers.org/tiles/boundaries.pmtiles PREVIEW_DEPLOY=true mix phx.server
 
 # Start dev server on port 4002 for LAN access (dev already binds 0.0.0.0)
 # Usage: make dev-lan              # default port 4002
@@ -125,7 +125,7 @@ LAN_PORT ?= 4002
 dev-lan: setup
 	@echo "Starting LAN dev server on port $(LAN_PORT)..."
 	@echo "Access from other devices at http://$$(ipconfig getifaddr en0 2>/dev/null || hostname -I | awk '{print $$1}'):$(LAN_PORT)"
-	set -a && [ -f .env ] && . .env; set +a && PHX_BIND=0.0.0.0 PORT=$(LAN_PORT) PREVIEW_DEPLOY=true mix phx.server
+	PHX_BIND=0.0.0.0 PORT=$(LAN_PORT) PREVIEW_DEPLOY=true mix phx.server
 
 # =============================================================================
 # Production Build

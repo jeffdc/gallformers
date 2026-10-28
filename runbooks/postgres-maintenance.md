@@ -8,10 +8,18 @@ Day-to-day operations, monitoring, and maintenance for the production Postgres d
 
 ### Setup
 
-Source your env file to get the credentials:
+Production credentials are never kept in `.env` or your shell profile. Type them for this terminal only; the password is not echoed, and the variables are not exported, so they reach only the commands that name them:
 
 ```bash
-set -a; source .env; set +a
+read -r -p "Postgres user: " PG_PROD_USERNAME
+read -r -p "Database name: " PG_PROD_DBNAME
+read -r -s -p "Postgres password: " PG_PROD_PASSWORD; echo
+```
+
+When you are done:
+
+```bash
+unset PG_PROD_PASSWORD PG_PROD_USERNAME PG_PROD_DBNAME
 ```
 
 ### Connect
@@ -29,7 +37,7 @@ kill %1
 
 ### One-off query
 
-For a quick query without an interactive session:
+For a quick query without an interactive session (after the Setup above):
 
 ```bash
 fly proxy 15432:5432 -a gallformers-db &

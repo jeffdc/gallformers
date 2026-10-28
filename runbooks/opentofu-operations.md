@@ -12,8 +12,9 @@ Guide for managing AWS infrastructure using OpenTofu (an open-source Terraform f
 ## Prerequisites
 - **OpenTofu installed**: `brew install opentofu`
 - **AWS credentials configured**: Account `885187511538` (us-east-1)
-  - Via `~/.aws/credentials` or environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+  - Sign in with `aws login` (AWS CLI 2.32.0 or later; temporary credentials for up to 12 hours, no access keys). The `jeff` user needs the `SignInLocalDevelopmentAccess` managed policy.
   - Verify with: `aws sts get-caller-identity`
+  - If `tofu` does not pick up the session, export it for this terminal only: `eval "$(aws configure export-credentials --format env)"`
 - **Repository access**: Clone gallformers repo
 
 ## Important Safety Rules

@@ -23,30 +23,23 @@ Database restoration will cause **data loss** for any changes made after the bac
 
 ## Setup
 
-### 1. Set environment variables
+### 1. Enter the credentials for this terminal
 
-Source your `.env` file (copy from `.env.sample` if needed):
+Production credentials are never kept in `.env` or your shell profile. Type them here, for this terminal only; the password is not echoed, and the variables are not exported, so they reach only the commands below that name them.
+
+For production:
 
 ```bash
-set -a; source .env; set +a
+PG_DB_APP=gallformers-db
+read -r -p "Postgres user: " PG_USERNAME
+read -r -p "Database name: " PG_DBNAME
+read -r -s -p "Postgres password: " PG_PASSWORD; echo
 ```
 
-Then set the variables for the target environment. For production:
+When you are done (after stopping the proxy):
 
 ```bash
-PG_PASSWORD="$PG_PROD_PASSWORD"
-PG_USERNAME="$PG_PROD_USERNAME"
-PG_DB_APP="$PG_PROD_DB_APP"
-PG_DBNAME="$PG_PROD_DBNAME"
-```
-
-For preview:
-
-```bash
-PG_PASSWORD="$PG_PREVIEW_PASSWORD"
-PG_USERNAME="$PG_PREVIEW_USERNAME"
-PG_DB_APP="$PG_PREVIEW_DB_APP"
-PG_DBNAME="$PG_PREVIEW_DBNAME"
+unset PG_PASSWORD PG_USERNAME PG_DBNAME PG_DB_APP
 ```
 
 ### 2. Start the proxy
