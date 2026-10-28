@@ -191,7 +191,10 @@ defmodule GallformersWeb.Plugs.FetchCurrentUser do
 
   import Plug.Conn
 
+  alias Gallformers.Accounts
   alias Gallformers.Accounts.Auth0User
+
+  @bypass_id "dev|bypass"
 
   def init(opts), do: opts
 
@@ -207,20 +210,41 @@ defmodule GallformersWeb.Plugs.FetchCurrentUser do
   end
 
   defp maybe_bypass_auth(conn) do
-    if Application.get_env(:gallformers, :dev_auth_bypass) && !get_session(conn, :current_user) do
-      user = %Auth0User{
-        id: "dev|bypass",
-        email: "dev@localhost",
-        name: "Dev Admin",
-        nickname: "dev",
-        roles: ["admin", "superadmin", "operator"]
-      }
+    if Application.get_env(:gallformers, :dev_auth_bypass),
+      do: bypass_auth(conn, get_session(conn, :current_user)),
+      else: conn
+  end
 
-      conn
-      |> put_session(:current_user, user)
-      |> put_session(:db_display_name, "Dev Admin")
-    else
-      conn
-    end
+  defp bypass_auth(conn, nil) do
+    user = %Auth0User{
+      id: @bypass_id,
+      email: "dev@localhost",
+      name: "Dev Admin",
+      nickname: "dev",
+      roles: ["admin", "superadmin", "operator"]
+    }
+
+    ensure_profile(user)
+
+    conn
+    |> put_session(:current_user, user)
+    |> put_session(:db_display_name, "Dev Admin")
+  end
+
+  # A session signed in before the profile existed gets one too.
+  defp bypass_auth(conn, %{id: @bypass_id} = user) do
+    ensure_profile(user)
+    conn
+  end
+
+  defp bypass_auth(conn, _user), do: conn
+
+  # The admin's audit trail needs a local profile, which a real login
+  # creates (`Accounts.sync_user_from_auth0/1`); the bypass does the same.
+  defp ensure_profile(user) do
+    if is_nil(Accounts.get_user_by_auth0_id(user.id)),
+      do: {:ok, _profile} = Accounts.sync_user_from_auth0(user)
+
+    :ok
   end
 end
