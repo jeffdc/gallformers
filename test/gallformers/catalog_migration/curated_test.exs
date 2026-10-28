@@ -26,6 +26,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   alias Gallformers.CatalogMigration.GenerationGroupTaxa
   alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.Old
+  alias Gallformers.CatalogMigration.Placements
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.CatalogMigration.TaxonMerges
   alias Gallformers.Import
@@ -39,6 +40,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     taxon_merges: {"taxon_merges.csv", "old_taxonomy_id,into_old_taxonomy_id,note"},
     kingdoms: {"kingdoms.csv", "old_taxonomy_id,kingdom,note"},
     added_taxa: {"added_taxa.csv", "name,rank,kingdom,children,note"},
+    placements: {"placements.csv", "taxon,rank,parent,parent_rank,note"},
     generation_group_taxa: {"generation_group_taxa.csv", "group,taxon,rank,note"}
   }
 
@@ -1150,6 +1152,151 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     end
   end
 
+  # -- placements ----------------------------------------------------------------------
+
+  describe "placements" do
+    # An oak gall wasp genus directly under its family (30, Cynipidae), as
+    # today's Besbicus is, with an agamic Gall.
+    setup do
+      genus = taxonomy!(880_080, "Fixturbesbicus", "genus", parent: 30)
+      gall = gall!(880_280, "Fixturbesbicus mirabilis (agamic)", genus)
+
+      %{p: %{genus: genus, gall: gall}}
+    end
+
+    defp besbicus_row(note \\ ""), do: "Fixturbesbicus,genus,Cynipini,tribe,#{note}"
+
+    defp placements_reconciled(report),
+      do: Enum.find(report.reconciliation, &(&1.label =~ "placements.csv"))
+
+    test "without a placement the genus stays under its family, and its Gall is flagged", ctx do
+      run!(ctx)
+
+      family = Taxa.get_by_legacy_id(:taxonomy, 30)
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.p.genus).parent_id == family.id
+
+      assert [%{gall_id: gall_id, reason: :no_groups, generation: "agamic"}] =
+               Catalog.generation_group_flags()
+
+      assert gall_id == ctx.p.gall
+    end
+
+    test "a placement moves the taxon under its parent; what is below it follows", ctx do
+      curated!(ctx, :placements, [besbicus_row("an oak gall wasp")])
+
+      report = run!(ctx)
+      assert report.pending == []
+
+      cynipini = Taxa.get_by_legacy_id(:taxonomy, 32)
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.p.genus).parent_id == cynipini.id
+
+      inducer = Taxa.get_by_legacy_id(:gall_inducer, ctx.p.gall)
+
+      assert inducer |> Taxa.lineage() |> Enum.map(& &1.name) |> Enum.take(-3) == [
+               "Cynipini",
+               "Fixturbesbicus",
+               "Fixturbesbicus mirabilis"
+             ]
+
+      # Heterogony (mapped to Cynipini) now applies to the agamic Gall.
+      assert Catalog.generation_group_flags() == []
+
+      assert %{old: 1, new: 1, accounted: []} = placements_reconciled(report)
+
+      assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
+    end
+
+    test "a taxon can be placed under an added taxon", ctx do
+      family = taxonomy!(880_087, "Fixturcoleosporiaceae", "family", description: "Fungus")
+      curated!(ctx, :added_taxa, ["Fixturpucciniales,order,Fungi,,"])
+      curated!(ctx, :placements, ["Fixturcoleosporiaceae,family,Fixturpucciniales,order,"])
+
+      assert run!(ctx).pending == []
+
+      [order] = Taxa.get_by_name("Fixturpucciniales", :order)
+      assert Taxa.get_by_legacy_id(:taxonomy, family).parent_id == order.id
+    end
+
+    test "a placement that cannot be made stops a strict run; a lenient run leaves it out",
+         ctx do
+      rusts = taxonomy!(880_081, "Fixturgymnosporangiaceae", "family", description: "Fungus")
+      taxonomy!(880_082, "Fixturgymnosporangium", "genus", parent: rusts)
+      taxonomy!(880_083, "Fixturendocronartium", "genus", parent: rusts)
+      taxonomy!(880_084, "Fixturdupliidae", "family", description: "Wasp")
+      taxonomy!(880_085, "Fixturdupliidae", "family", description: "Plant")
+      carya = taxonomy!(880_086, "Fixturcarya", "genus", parent: ctx.old.fagaceae)
+      taxonomy!(880_088, "Fixturcaryasectio", "section", parent: carya)
+
+      curated!(ctx, :placements, [
+        besbicus_row(),
+        "Fixturmissing,genus,Cynipini,tribe,",
+        "Fixturgymnosporangium,genus,Fixturdupliidae,family,",
+        "Fixturendocronartium,genus,Cynipini,tribe,",
+        "Fixturquercus alba,species,Fixturcaryasectio,section,",
+        "Andricus,genus,Cynipini,tribe,"
+      ])
+
+      assert {:error, {:pending_decisions, report}} = run(ctx)
+
+      assert pending(report, "placements.csv") == [
+               {"Fixturmissing", :genus},
+               {"Fixturgymnosporangium", :genus},
+               {"Fixturendocronartium", :genus},
+               {"Fixturquercus alba", :species}
+             ]
+
+      [missing, several, other_kingdom, section] =
+        for %{input: "placements.csv", detail: d} <- report.pending, do: d
+
+      assert missing =~ "no genus has the accepted name Fixturmissing"
+      assert several =~ "2 taxa"
+      assert other_kingdom =~ "Fungi"
+      assert other_kingdom =~ "Animalia"
+      assert section =~ "must be in the section's genus, Fixturcarya"
+      assert Catalog.get_gall(ctx.p.gall) == nil
+
+      report = run!(ctx, pending: :skip)
+      assert length(pending(report, "placements.csv")) == 4
+
+      # A row that changes nothing is reported, not pending.
+      assert [already] = problems(report, "placements.csv")
+      assert already =~ "Andricus (genus) is already under Cynipini"
+
+      assert %{old: 6, new: 1, accounted: [{"already in place", 1}, {"pending", 4}]} =
+               placements_reconciled(report)
+
+      cynipini = Taxa.get_by_legacy_id(:taxonomy, 32)
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.p.genus).parent_id == cynipini.id
+
+      quercus = Taxa.get_by_legacy_id(:taxonomy, ctx.old.quercus)
+      assert Taxa.get_taxon!(ctx.old.alba).parent_id == quercus.id
+    end
+
+    test "a rank outside the contract's, or not below the parent's, is an error naming the row",
+         ctx do
+      curated!(ctx, :placements, ["Fixturbesbicus,genus,Cynipini,tribus,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "placements.csv row 2"
+
+      curated!(ctx, :placements, ["Fixturbesbicus,genus,Andricus,genus,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "placements.csv row 2"
+      assert message =~ "below"
+      assert Catalog.get_gall(ctx.old.agamic) == nil
+
+      curated!(ctx, :placements, [",genus,Cynipini,tribe,"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "placements.csv row 2"
+    end
+
+    test "a taxon placed twice is an error naming the row", ctx do
+      curated!(ctx, :placements, [besbicus_row(), "Fixturbesbicus,genus,Cynipinae,subfamily,"])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "placements.csv row 3"
+    end
+  end
+
   # -- generation group taxa -----------------------------------------------------------
 
   describe "generation group taxa" do
@@ -1236,6 +1383,12 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     assert rusts == ~w(Coleosporiaceae Cronartiaceae Melampsoraceae Phragmidiaceae
                        Pileolariaceae Pucciniaceae Pucciniastraceae Raveneliaceae
                        Uropyxidaceae Zaghouaniaceae)
+
+    assert {:ok, placements} = Placements.load(Curated.default_path(:placements))
+
+    assert Enum.map(placements, &{&1.taxon, &1.rank, &1.parent, &1.parent_rank}) == [
+             {"Besbicus", :genus, "Cynipini", :tribe}
+           ]
 
     assert {:ok, mappings} =
              GenerationGroupTaxa.load(Curated.default_path(:generation_group_taxa))

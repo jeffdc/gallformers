@@ -41,9 +41,10 @@ defmodule Gallformers.CatalogMigration do
        `kingdoms.csv`), the taxa Gallformers adds above them with their
        children placed under them (`added_taxa.csv`, e.g. the order
        Pucciniales above the rust families), plants, genus placeholders
-       (crosswalked to their genus for their old URLs), `host_range`
-       re-keyed by taxon, plants' WCVP links (`host_traits`) carried to
-       `taxon_wcvp`.
+       (crosswalked to their genus for their old URLs), taxa moved from
+       where today's tree has them (`placements.csv`, e.g. the genus
+       *Besbicus* into the tribe Cynipini), `host_range` re-keyed by
+       taxon, plants' WCVP links (`host_traits`) carried to `taxon_wcvp`.
     3. `Gallformers.CatalogMigration.Galls` — Inducer taxa from gall names
        (`priv/catalog_migration/name_suffixes.csv`), Galls, their name parts
        and derived names (`Gallformers.CatalogMigration.GallNames`; today's
@@ -76,10 +77,12 @@ defmodule Gallformers.CatalogMigration do
   `priv/catalog_migration/` (`Gallformers.CatalogMigration.Curated`); step
   2 applies `taxon_merges.csv` and `kingdoms.csv`, which have no worksheet,
   checked against today's taxonomy rows before anything is written (as
-  `range_decisions.csv` scopes are against today's places), and
-  `added_taxa.csv`; step 4 applies `generation_group_taxa.csv`. Those two
-  have no worksheet either: their rows name taxa, which are found as the
-  run creates them, so a name that finds no taxon (or several) is pending. A
+  `range_decisions.csv` scopes are against today's places), then
+  `added_taxa.csv` and `placements.csv`; step 4 applies
+  `generation_group_taxa.csv`. Those three have no worksheet either: their
+  rows name taxa, which are found as the run creates them, so a name that
+  finds no taxon (or several) is pending, as is a placement the tree
+  validator rejects. A
   **strict** run (the default; production's, `Gallformers.Release`) stops
   with nothing written when a row needs a decision it does not have, or
   taxa share an accepted name, rank and kingdom (replay would stop on
@@ -120,6 +123,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.NonGalls
   alias Gallformers.CatalogMigration.Notes
   alias Gallformers.CatalogMigration.Old
+  alias Gallformers.CatalogMigration.Placements
   alias Gallformers.CatalogMigration.Ranges
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.CatalogMigration.Taxa, as: MigrationTaxa
@@ -183,8 +187,8 @@ defmodule Gallformers.CatalogMigration do
     * `:name_suffixes` — the name-suffix mapping file (default the shipped
       one)
     * `:non_galls`, `:range_decisions`, `:aliases`, `:keys`,
-      `:taxon_merges`, `:kingdoms`, `:added_taxa`, `:generation_group_taxa`
-      — the curated decision files (`Gallformers.CatalogMigration.Curated`;
+      `:taxon_merges`, `:kingdoms`, `:added_taxa`, `:placements`,
+      `:generation_group_taxa` — the curated decision files (`Gallformers.CatalogMigration.Curated`;
       default the shipped ones)
     * `:pending` — `:fail` (the default, and the only mode for production)
       stops the run, writing nothing, when a curated row needs a decision
@@ -269,6 +273,7 @@ defmodule Gallformers.CatalogMigration do
       taxon_merges: &TaxonMerges.load/1,
       kingdoms: &Kingdoms.load/1,
       added_taxa: &AddedTaxa.load/1,
+      placements: &Placements.load/1,
       generation_group_taxa: &GenerationGroupTaxa.load/1
     ]
 
@@ -283,8 +288,8 @@ defmodule Gallformers.CatalogMigration do
   end
 
   # The merges and kingdoms checked against today's taxonomy rows, before
-  # anything is written, with the taxa to add above them: `curated.taxa` for
-  # the taxa step.
+  # anything is written, with the taxa to add above them and the taxa to
+  # move: `curated.taxa` for the taxa step.
   defp check_taxa_decisions(curated) do
     rows = Map.new(Old.taxonomy(), &{&1.id, &1})
 
@@ -294,7 +299,8 @@ defmodule Gallformers.CatalogMigration do
         merges: merges,
         kingdoms: kingdoms,
         stale: [{"taxon_merges.csv", merges_stale}, {"kingdoms.csv", kingdoms_stale}],
-        added: curated.added_taxa
+        added: curated.added_taxa,
+        placements: curated.placements
       }
 
       {:ok, Map.put(curated, :taxa, taxa)}

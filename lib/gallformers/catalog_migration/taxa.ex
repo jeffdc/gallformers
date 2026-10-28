@@ -38,6 +38,13 @@ defmodule Gallformers.CatalogMigration.Taxa do
     * **Genus placeholder plants** ("Quercus spp.") become no taxon; they
       stand for their genus taxon, with a `:genus_placeholder` crosswalk
       entry (their species ID → the genus) for their old `/host/:id` URLs.
+    * **Placements** (`placements.csv`,
+      `Gallformers.CatalogMigration.Placements`) — taxa moved from where
+      today's tree has them (the genus *Besbicus* from Cynipidae to the
+      tribe Cynipini), found by accepted name and rank once the higher,
+      added and plant taxa exist, and placed through
+      `Gallformers.Taxa.place/3`. A row that cannot be applied is a pending
+      decision.
     * **`host_range`** is re-keyed by `taxon_id`: a plant's rows to its own
       ID, a genus placeholder's rows to its genus taxon (one row per place:
       a place two placeholders of one genus both give is re-keyed once).
@@ -50,6 +57,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
 
   alias Gallformers.CatalogMigration.AddedTaxa
   alias Gallformers.CatalogMigration.Old
+  alias Gallformers.CatalogMigration.Placements
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.Repo
   alias Gallformers.Taxa
@@ -98,14 +106,15 @@ defmodule Gallformers.CatalogMigration.Taxa do
   The curated decisions on taxonomy rows, checked against today's rows:
   `merges` (merged old ID → the old ID it merges into), `kingdoms` (old
   family ID → kingdom) and `stale` (rows not used, as report lines by
-  decision file); and `added`, the taxa to add above them
-  (`added_taxa.csv`), in file order.
+  decision file); `added`, the taxa to add above them (`added_taxa.csv`),
+  and `placements`, the taxa to move (`placements.csv`), in file order.
   """
   @type decisions :: %{
           merges: %{integer() => integer()},
           kingdoms: %{integer() => String.t()},
           stale: [{String.t(), [String.t()]}],
-          added: [AddedTaxa.decision()]
+          added: [AddedTaxa.decision()],
+          placements: [Placements.decision()]
         }
 
   @doc """
@@ -123,6 +132,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
     {ctx, report} = higher_taxa(actor, decisions, report)
     {ctx, report} = added_taxa(actor, decisions.added, ctx, report)
     {ctx, report} = plants(actor, ctx, report)
+    {ctx, report} = placements(actor, decisions.placements, ctx, report)
     report = rekey_host_range(ctx, report)
     report = carry_wcvp_links(report)
     {ctx, report}
@@ -607,6 +617,98 @@ defmodule Gallformers.CatalogMigration.Taxa do
       name =~ ~r/ f\. / -> :form
       true -> :species
     end
+  end
+
+  # -- placements ------------------------------------------------------------------
+
+  defp placements(actor, placements, ctx, report) do
+    acc =
+      Enum.reduce(placements, %{ctx: ctx, placed: 0, in_place: [], pending: []}, fn decision,
+                                                                                    acc ->
+        case resolve_placement(decision) do
+          {:ok, %{parent_id: parent_id}, %{id: parent_id}} ->
+            line =
+              "#{decision.taxon} (#{decision.rank}) is already under #{decision.parent}; " <>
+                "the row changes nothing"
+
+            Map.update!(acc, :in_place, &[line | &1])
+
+          {:ok, taxon, parent} ->
+            place!(actor, taxon.id, parent.id)
+
+            acc
+            |> update_in([:ctx, :taxa], &update_parent(&1, taxon.id, parent.id))
+            |> Map.update!(:placed, &(&1 + 1))
+
+          {:pending, reason} ->
+            detail = "#{Placements.label(decision)}: #{reason}"
+            Map.update!(acc, :pending, &[{Placements.key(decision), detail} | &1])
+        end
+      end)
+
+    report =
+      report
+      |> Report.reconcile(
+        "Taxa placed elsewhere than today (placements.csv)",
+        length(placements),
+        acc.placed,
+        [{"already in place", length(acc.in_place)}, {"pending", length(acc.pending)}]
+      )
+      |> Report.problems("placements.csv", Enum.reverse(acc.in_place))
+      |> Report.pending("placements.csv", Enum.reverse(acc.pending))
+
+    {acc.ctx, report}
+  end
+
+  # The taxon and its new parent, each the one taxon of its name and rank,
+  # in one kingdom, and a move the tree validator accepts. Checked before
+  # `place!/3`: a move `Taxa.place/3` rejected would roll the run back.
+  defp resolve_placement(decision) do
+    with {:ok, taxon} <- one_taxon(decision.taxon, decision.rank),
+         {:ok, parent} <- one_taxon(decision.parent, decision.parent_rank),
+         :ok <- same_kingdom(taxon, parent, decision),
+         :ok <- placeable(taxon, parent) do
+      {:ok, taxon, parent}
+    end
+  end
+
+  defp one_taxon(name, rank) do
+    case Taxa.get_by_name(name, rank) do
+      [taxon] ->
+        {:ok, taxon}
+
+      [] ->
+        {:pending, "no #{rank} has the accepted name #{name}"}
+
+      several ->
+        {:pending,
+         "#{length(several)} taxa of rank #{rank} have the accepted name #{name} " <>
+           "(#{Enum.map_join(several, ", ", & &1.id)})"}
+    end
+  end
+
+  defp same_kingdom(%{kingdom: kingdom}, %{kingdom: kingdom}, _decision), do: :ok
+
+  defp same_kingdom(taxon, parent, decision) do
+    {:pending,
+     "#{decision.taxon} is in #{taxon.kingdom || "no kingdom"}, " <>
+       "#{decision.parent} in #{parent.kingdom || "no kingdom"}"}
+  end
+
+  defp placeable(taxon, parent) do
+    case Taxa.check_place(taxon, parent) do
+      :ok ->
+        :ok
+
+      {:error, changeset} ->
+        {:pending, "the move is rejected: #{Enum.map_join(changeset.errors, "; ", &error/1)}"}
+    end
+  end
+
+  defp error({_field, {message, opts}}) do
+    Regex.replace(~r/%{(\w+)}/, message, fn _, key ->
+      opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+    end)
   end
 
   # -- host_range ----------------------------------------------------------------

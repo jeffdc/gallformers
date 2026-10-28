@@ -176,4 +176,33 @@ defmodule Gallformers.Taxa.TreeTest do
       assert parent_id(ctx.genus) == other_family.id
     end
   end
+
+  describe "check_place/2" do
+    setup do
+      family = taxon_fixture(rank: :family, name: "Cynipidae")
+      genus = taxon_fixture(rank: :genus, name: "Andricus", parent: family)
+      species = taxon_fixture(rank: :species, name: "Andricus foo", parent: genus)
+
+      %{family: family, genus: genus, species: species}
+    end
+
+    test "rejects what place/3 rejects, writing nothing", ctx do
+      assert {:error, changeset} = Taxa.check_place(ctx.genus, ctx.species)
+      assert {_, [validation: :cycle]} = changeset.errors[:parent_id]
+
+      other_genus = taxon_fixture(rank: :genus, name: "Cynips", parent: ctx.family)
+      assert {:error, changeset} = Taxa.check_place(ctx.genus.id, other_genus.id)
+      assert {_, [validation: :rank_inversion]} = changeset.errors[:parent_id]
+
+      assert parent_id(ctx.genus) == ctx.family.id
+    end
+
+    test "accepts a valid move or a root without making it", ctx do
+      other_family = taxon_fixture(rank: :family, name: "Cecidomyiidae")
+
+      assert Taxa.check_place(ctx.genus, other_family) == :ok
+      assert Taxa.check_place(ctx.genus, nil) == :ok
+      assert parent_id(ctx.genus) == ctx.family.id
+    end
+  end
 end

@@ -493,12 +493,7 @@ defmodule Gallformers.Taxa do
 
       current = Repo.get!(Taxon, taxon_id(taxon))
       parent_id = parent && taxon_id(parent)
-
-      changeset =
-        current
-        |> Taxon.parent_changeset(parent_id)
-        |> Tree.validate_parent()
-        |> validate_section_genus(current)
+      changeset = placement_changeset(current, parent_id)
 
       cond do
         not changeset.valid? ->
@@ -522,6 +517,28 @@ defmodule Gallformers.Taxa do
           moved
       end
     end)
+  end
+
+  @doc """
+  Whether `place/3` would accept moving `taxon` under `parent`: `:ok`, or
+  the `{:error, changeset}` it would give. Writes nothing and takes no lock.
+
+  For a caller already in a transaction, which `place/3`'s rollback of a
+  rejected move would roll back too.
+  """
+  @spec check_place(taxon_ref(), taxon_ref() | nil) :: :ok | {:error, Changeset.t()}
+  def check_place(taxon, parent) do
+    current = Repo.get!(Taxon, taxon_id(taxon))
+    changeset = placement_changeset(current, parent && taxon_id(parent))
+
+    if changeset.valid?, do: :ok, else: {:error, changeset}
+  end
+
+  defp placement_changeset(current, parent_id) do
+    current
+    |> Taxon.parent_changeset(parent_id)
+    |> Tree.validate_parent()
+    |> validate_section_genus(current)
   end
 
   # A section's members share one genus: a plant at species rank or below
