@@ -8,7 +8,9 @@ defmodule Gallformers.Import do
   `import/<key>/`. The steps:
 
     1. **Register** (`register_package/3`): records the package as
-       `:received`.
+       `:received`. `submit_package/3` delivers a producer's files to the
+       bucket, registers them and takes the package through steps 2 and 3
+       (`mix gallformers.import.submit` from a package directory).
     2. **Validate** (`validate_package/3`): the contract's phase 4 checks
        and the readiness gate (`Gallformers.Import.Validator`, the same
        checks as `priv/import/validate.py`). A package with errors is
@@ -166,6 +168,49 @@ defmodule Gallformers.Import do
       )
       |> Repo.insert()
       |> unwrap_or_rollback()
+    end)
+  end
+
+  @doc """
+  Delivers a producer's package (`e381` *Delivery*): writes `files` (file
+  name to bytes: `document.json`, `taxonomy.json`, `gall.json`,
+  `review.json`) to the private bucket under `import/<key>/`, registers the
+  package as `actor` and takes it on (`advance_package/2`): validated and,
+  if valid, resolved, so it waits for review (`:awaiting_review`) or is
+  `:invalid` with its problems.
+
+  `{:error, {:unknown_files, names}}` for files that are not a package's,
+  and `{:error, :key_taken}` for a key already delivered; neither writes
+  anything.
+  """
+  @spec submit_package(Actor.t(), String.t(), Validator.package()) ::
+          {:ok, Package.t()} | {:error, term()}
+  def submit_package(%Actor{} = actor, key, files) when is_binary(key) and is_map(files) do
+    attrs = if actor.type == :user, do: %{submitter_user_id: actor.id}, else: %{}
+
+    with :ok <- package_files_only(files),
+         :ok <- key_free(key),
+         :ok <- put_files(key, files),
+         {:ok, package} <- register_package(actor, key, attrs) do
+      advance_package(actor, package.id)
+    end
+  end
+
+  defp package_files_only(files) do
+    case Map.keys(files) -- @package_files do
+      [] -> :ok
+      unknown -> {:error, {:unknown_files, Enum.sort(unknown)}}
+    end
+  end
+
+  defp key_free(key), do: if(get_package_by_key(key), do: {:error, :key_taken}, else: :ok)
+
+  defp put_files(key, files) do
+    Enum.reduce_while(files, :ok, fn {name, bytes}, :ok ->
+      case Private.put(Package.prefix(key) <> name, bytes, content_type: "application/json") do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, {name, reason}}}
+      end
     end)
   end
 

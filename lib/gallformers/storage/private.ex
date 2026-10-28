@@ -12,6 +12,10 @@ defmodule Gallformers.Storage.Private do
       # config/test.exs: an in-memory stub, so tests never reach S3
       config :gallformers, :private_storage, adapter: Gallformers.Storage.PrivateStub
 
+      # config/dev.exs: files on the local disk, so development never
+      # writes to production's private bucket
+      config :gallformers, :private_storage, adapter: Gallformers.Storage.Private.LocalAdapter
+
   The default adapter is `Gallformers.Storage.Private.S3Adapter`, which goes
   through `Gallformers.Storage.S3` and so also respects `s3_enabled`.
   """
@@ -80,5 +84,50 @@ defmodule Gallformers.Storage.Private.S3Adapter do
       {:error, {:http_error, 404, _}} -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end
+  end
+end
+
+defmodule Gallformers.Storage.Private.LocalAdapter do
+  @moduledoc """
+  The private bucket as files on the local disk, for development:
+  `<root>/<bucket>/<key>`, with the root `tmp/private_storage` (gitignored)
+  unless `:local_root` is set in the `:private_storage` config. Packages
+  imported locally and the Source documents they store stay on this
+  machine.
+  """
+  @behaviour Gallformers.Storage.Private
+
+  @doc "The directory holding the buckets."
+  @spec root() :: String.t()
+  def root do
+    :gallformers
+    |> Application.get_env(:private_storage, [])
+    |> Keyword.get(:local_root, "tmp/private_storage")
+  end
+
+  @impl true
+  def put_object(bucket, key, data, _opts) do
+    with {:ok, path} <- path(bucket, key),
+         :ok <- File.mkdir_p(Path.dirname(path)) do
+      File.write(path, data)
+    end
+  end
+
+  @impl true
+  def get_object(bucket, key) do
+    with {:ok, path} <- path(bucket, key) do
+      case File.read(path) do
+        {:ok, data} -> {:ok, data}
+        {:error, :enoent} -> {:error, :not_found}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  # A key's segments stay inside its bucket.
+  defp path(bucket, key) do
+    if ".." in Path.split(key),
+      do: {:error, :invalid_key},
+      else: {:ok, Path.join([root(), bucket, key])}
   end
 end

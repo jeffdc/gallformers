@@ -112,6 +112,10 @@ config :phoenix_live_view,
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
+# The private bucket (import packages, Source documents) on the local disk,
+# under tmp/private_storage: development never writes to production's bucket.
+config :gallformers, :private_storage, adapter: Gallformers.Storage.Private.LocalAdapter
+
 # Dev auth bypass: auto-login as admin without Auth0.
 # Useful for LAN testing where Auth0 callbacks won't work.
 config :gallformers, dev_auth_bypass: true
