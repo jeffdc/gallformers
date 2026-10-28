@@ -140,8 +140,13 @@ def load_package(path: Path) -> dict:
 # ------------------------------------------------------------------ names and text
 
 
+# Old Sources print ligatures ("cælebs"); a run or a check may spell them out.
+LIGATURES = str.maketrans({"æ": "ae", "œ": "oe"})
+
+
 def words(text: str) -> list[str]:
-    return re.findall(r"[0-9a-z]+", unicodedata.normalize("NFKC", text).casefold())
+    text = unicodedata.normalize("NFKC", text).casefold().translate(LIGATURES)
+    return re.findall(r"[0-9a-z]+", text)
 
 
 def name_tokens(name: str) -> list[str]:

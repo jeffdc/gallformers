@@ -7,6 +7,8 @@ defmodule Gallformers.Taxa.NameNormalizer do
   species).
 
     * Unicode compatibility forms are folded (NFKC: ligatures from OCR).
+    * "æ" and "œ" are spelled out ("imbrecariæ" is "imbrecariae"), as old
+      Sources print them; NFKC leaves them alone.
     * Case is ignored ("ANDRICUS RILEYI" from small caps).
     * Whitespace is collapsed.
     * The hybrid sign is dropped: "×", and a standalone "x" after the first
@@ -24,6 +26,10 @@ defmodule Gallformers.Taxa.NameNormalizer do
     |> String.normalize(:nfkc)
     |> String.replace("×", " ")
     |> String.downcase()
+    |> String.replace(["æ", "œ"], fn
+      "æ" -> "ae"
+      "œ" -> "oe"
+    end)
     |> String.split()
     |> drop_hybrid_markers()
     |> drop_subgenus()

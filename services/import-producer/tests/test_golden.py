@@ -399,6 +399,13 @@ def test_names_match_through_abbreviations_and_ocr_readings(exported, tmp_path):
     assert {r["status"] for r in report["items"]} == {"present"}
 
 
+def test_names_match_across_ligatures():
+    # The 1862 run wrote "C. q. cælebs" where the golden file has "C. q. caelebs".
+    assert golden.names_match("C. q. cælebs", "C. q. caelebs")
+    assert golden.names_match("Cœlebs", "coelebs")
+    assert golden.words("CÆLEBS") == ["caelebs"]
+
+
 def test_an_old_include_adjustment_matches_a_recorded_occurrence(exported, tmp_path):
     pkg = base_package()
     f11 = facts_of(pkg)["f11"]

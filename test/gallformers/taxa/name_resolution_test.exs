@@ -43,6 +43,12 @@ defmodule Gallformers.Taxa.NameResolutionTest do
     test "folds ligatures" do
       assert NameNormalizer.normalize("Cynips ﬂocossa") == "cynips flocossa"
     end
+
+    test "spells out æ and œ, as old Sources print them" do
+      assert NameNormalizer.normalize("ANDRICUS IMBRECARIÆ") == "andricus imbrecariae"
+      assert NameNormalizer.normalize("Cynips cælebs") == "cynips caelebs"
+      assert NameNormalizer.normalize("Cœlebs") == "coelebs"
+    end
   end
 
   describe "resolve_name/2" do
