@@ -1,0 +1,1546 @@
+{
+  "golden_format": 1,
+  "source": {
+    "id": 680,
+    "name": "Nastasi & Davis 2022",
+    "short": "nastasi-davis-2022"
+  },
+  "citation": "Nastasi, L. F. & Davis, C. K. 2022. Field Guide to the Herb & Bramble Gall Wasps of North America. 1st Edition. Frost Entomological Museum, Department of Entomology, The Pennsylvania State University.",
+  "package": "680-nastasi-davis-2022",
+  "package_format": {
+    "format_version": 3,
+    "vocabulary_version": "2026-10-15",
+    "producer": {
+      "name": "gallformers-import-producer-poc",
+      "version": "0.1.0",
+      "model": "claude-opus-5-5",
+      "instructions_version": "producer.md@d8f469023af2"
+    }
+  },
+  "check_page": "https://claude.ai/artifact/LVcz9oNbpmdys2oMgrGq4h",
+  "package_totals": {
+    "galls": 49,
+    "statements": {
+      "gall:alias": 30,
+      "gall:description": 46,
+      "gall:relationship": 111,
+      "gall:trait": 246,
+      "name:name_match": 49,
+      "taxonomy:synonymy": 2
+    }
+  },
+  "counts": {
+    "statements": {
+      "right": 40
+    },
+    "names": {
+      "right": 1,
+      "unsure": 1
+    },
+    "by_kind": {
+      "gall:alias": {
+        "right": 6
+      },
+      "gall:description": {
+        "right": 3
+      },
+      "gall:relationship": {
+        "right": 7
+      },
+      "gall:trait": {
+        "right": 24
+      },
+      "name:name_match": {
+        "right": 1,
+        "unsure": 1
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "gall-f24",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:19.210Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "catsear stem gall",
+          "inducer": {
+            "ref": "t6",
+            "name_as_written": "Phanacis hypochoeridis",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "On the stem"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "quote": "On the stem, typically midway down the length of the stem.",
+            "pdf_page": 16,
+            "page": "16"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f27",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:46:22.287Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "catsear stem gall",
+          "inducer": {
+            "ref": "t6",
+            "name_as_written": "Phanacis hypochoeridis",
+            "rank": "species"
+          }
+        },
+        "trait": "cells",
+        "value": {
+          "value": "polythalamous",
+          "as_written": "containing many chambers"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/85",
+            "quote": "Elongate, spindle-shaped swellings containing many chambers",
+            "pdf_page": 16,
+            "page": "16"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "polythalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f31",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:40.950Z",
+      "statement": {
+        "kind": "alias",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "catsear stem gall",
+          "inducer": {
+            "ref": "t6",
+            "name_as_written": "Phanacis hypochoeridis",
+            "rank": "species"
+          }
+        },
+        "name": "catsear stem gall",
+        "evidence": [
+          {
+            "item": "#/texts/89",
+            "quote": "A fresh catsear stem gall.",
+            "pdf_page": 16,
+            "page": "16"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f37",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:52.704Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g4",
+          "name_as_written": "cryptic lettuce stem galls of Aulacidea abdita",
+          "inducer": {
+            "ref": "t8",
+            "name_as_written": "Aulacidea abdita",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "galled stem"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/100",
+            "quote": "can only be located upon dissection of a galled stem",
+            "pdf_page": 17,
+            "page": "17"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f48",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:44.868Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g6",
+          "name_as_written": "lettuce node gall",
+          "inducer": {
+            "ref": "t14",
+            "name_as_written": "Aulacidea podagrae",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "throughout the stem"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/110",
+            "quote": "These galls occur throughout the stem, occasionally in multiple disjunct areas.",
+            "pdf_page": 18,
+            "page": "18"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f55",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:49.798Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t15",
+            "name_as_written": "Aulacidea tumida",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g7",
+            "name_as_written": "lettuce tumor gall",
+            "inducer": {
+              "ref": "t15",
+              "name_as_written": "Aulacidea tumida",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/118",
+            "quote": "Lettuce tumor gall wasp (Aulacidea tumida)",
+            "pdf_page": 19,
+            "page": "19"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f58",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:46:09.985Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g7",
+          "name_as_written": "lettuce tumor gall",
+          "inducer": {
+            "ref": "t15",
+            "name_as_written": "Aulacidea tumida",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "round"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/119",
+            "quote": "The most common appearance for these galls is as large, 3-5 centimeters in diameter, round, and many-chambered, sometimes baring leaves and branches.",
+            "pdf_page": 19,
+            "page": "19"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular",
+          "spindle"
+        ]
+      }
+    },
+    {
+      "id": "gall-f63",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:40.974Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g7",
+          "name_as_written": "lettuce tumor gall",
+          "inducer": {
+            "ref": "t15",
+            "name_as_written": "Aulacidea tumida",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "brown",
+          "as_written": "brown"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/119",
+            "quote": "Green and fleshy when fresh to brown and rough when old and dry.",
+            "pdf_page": 19,
+            "page": "19"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown",
+          "green"
+        ]
+      }
+    },
+    {
+      "id": "gall-f94",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:06.615Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g10",
+          "name_as_written": "skeletonplant spindle gall (Antistrophus sp.)",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t17",
+            "name_as_written": "Lygodesmia juncea",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "spindle",
+          "as_written": "spindle-shaped"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/152",
+            "quote": "Overall, these galls are spindle-shaped swellings of the branches, often around 1 centimeter in length.",
+            "pdf_page": 22,
+            "page": "22"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "spindle"
+        ]
+      }
+    },
+    {
+      "id": "gall-f101",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:24.482Z",
+      "statement": {
+        "kind": "alias",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g10",
+          "name_as_written": "skeletonplant spindle gall (Antistrophus sp.)",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t17",
+            "name_as_written": "Lygodesmia juncea",
+            "rank": "species"
+          }
+        },
+        "name": "skeletonplant spindle gall",
+        "evidence": [
+          {
+            "item": "#/texts/155",
+            "quote": "A fresh skeletonplant spindle gall on rush skeletonplant.",
+            "pdf_page": 22,
+            "page": "22"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f107",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:26.292Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g11",
+          "name_as_written": "silverpuff stem gall",
+          "inducer": {
+            "ref": "t21",
+            "name_as_written": "Antistrophus microseris",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "tapered swelling",
+          "as_written": "spindle-shaped, rounded swellings of the stems"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/164",
+            "quote": "These galls are medium-sized, spindle-shaped, rounded swellings of the stems, typically 1-3 centimeters in diameter.",
+            "pdf_page": 23,
+            "page": "23"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "tapered swelling"
+        ]
+      }
+    },
+    {
+      "id": "gall-f112",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:46:17.136Z",
+      "statement": {
+        "kind": "alias",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g11",
+          "name_as_written": "silverpuff stem gall",
+          "inducer": {
+            "ref": "t21",
+            "name_as_written": "Antistrophus microseris",
+            "rank": "species"
+          }
+        },
+        "name": "silverpuff stem gall",
+        "evidence": [
+          {
+            "item": "#/texts/159",
+            "quote": "A silverpuff stem gall on Douglas' silverpuff.",
+            "pdf_page": 23,
+            "page": "23"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f121",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:34.018Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g12",
+          "name_as_written": "Rattlesnake-root stem gall wasp galls",
+          "inducer": {
+            "ref": "t23",
+            "name_as_written": "Aulacidea nabali",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/173",
+            "quote": "Gall location: On the lower stem or roots, often partly or entirely below where the stem meets the soil.",
+            "pdf_page": 24,
+            "page": "24"
+          },
+          {
+            "item": "#/texts/174",
+            "whole_item": true,
+            "text": "Description: Typically present as a large, irregular, cylindrical to amorphous cluster of smaller, round, single-chambered galls. Clusters are normally around 1 centimeter in diameter. Internally, the galls are dense and corky, and apparently have the consistency of raw potato.",
+            "pdf_page": 24,
+            "page": "24"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f130",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:47:42.131Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "desert-chicory stem gall (Antistrophus sp.)",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t25",
+            "name_as_written": "Pyrrhopappus grandiflorus",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "texture",
+        "value": {
+          "value": "succulent",
+          "as_written": "fleshy when fresh"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/184",
+            "quote": "Green and fleshy when fresh to rough and brown when dried and old.",
+            "pdf_page": 25,
+            "page": "25"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "succulent"
+        ]
+      }
+    },
+    {
+      "id": "gall-f138",
+      "verdict": "right",
+      "note": "I would not call this clustered but the LLM could not know this without looking at the photo as the prose makes it sound like it is so techncially it is correct.",
+      "checked_at": "2026-10-15T19:47:33.541Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g14",
+          "name_as_written": "Russian knapweed stem galls",
+          "inducer": {
+            "ref": "t26",
+            "name_as_written": "Aulacidea acroptilonica",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "cluster",
+          "as_written": "Occasionally solitary but more often clustered"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/195",
+            "quote": "Occasionally solitary but more often clustered, often with multiple galls or clusters in rows along the entire length of a stem and its branches.",
+            "pdf_page": 26,
+            "page": "26"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "cluster",
+          "globular",
+          "spindle"
+        ]
+      }
+    },
+    {
+      "id": "gall-f167",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:29.581Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "flower galls of the prairie rosinweed flower gall wasp (A. sp.)",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t31",
+            "name_as_written": "Silphium integrifolium",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/219",
+            "quote": "Gall location: In the disk flowers, often concealed by the outer parts of the flower. Description: Oval-shaped, kernel-like, single-chambered galls, typically clustered at the base of the disk flowers. Galls are often hidden, but carefully teasing away the outer flower layers will reveal the galls at the center.",
+            "pdf_page": 28,
+            "page": "28"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f233",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:45.490Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g27",
+          "name_as_written": "Terminal stem galls on whorled rosinweed",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t39",
+            "name_as_written": "S. asteriscus var. trifoliatum",
+            "rank": "variety"
+          },
+          "new": true
+        },
+        "trait": "cells",
+        "value": {
+          "value": "polythalamous",
+          "as_written": "Many-chambered"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/257",
+            "quote": "Many-chambered, oval-shaped to spherical galls, 1-5 centimeters in length and usually of similar diameter.",
+            "pdf_page": 32,
+            "page": "32"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "polythalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f265",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:34.407Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t32",
+            "name_as_written": "Silphium laciniatum",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g30",
+            "name_as_written": "rosinweed cryptic leaf galls (Antistrophus spp.)",
+            "inducer": {
+              "ref": "t16",
+              "name_as_written": "Antistrophus",
+              "rank": "genus"
+            },
+            "host": {
+              "ref": "t32",
+              "name_as_written": "Silphium laciniatum",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/280",
+            "quote": "Hosts: Compass plant (S. laciniatum) and prairie dock (S. terebinthinaceum).",
+            "pdf_page": 34,
+            "page": "34"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f266",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:49.683Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g30",
+          "name_as_written": "rosinweed cryptic leaf galls (Antistrophus spp.)",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t32",
+            "name_as_written": "Silphium laciniatum",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "petiole",
+          "as_written": "in the petioles"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/281",
+            "quote": "Species belonging to this group induce galls in the petioles and occasionally larger veins of the leaves.",
+            "pdf_page": 34,
+            "page": "34"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "on leaf veins",
+          "petiole"
+        ]
+      }
+    },
+    {
+      "id": "gall-f269",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:16.369Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g30",
+          "name_as_written": "rosinweed cryptic leaf galls (Antistrophus spp.)",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Antistrophus",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t32",
+            "name_as_written": "Silphium laciniatum",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "cells",
+        "value": {
+          "value": "monothalamous",
+          "as_written": "chambers along the inside of the pith, each with a single insect"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/281",
+            "quote": "When dissected, the leaf will reveal numerous brown, oval-shaped chambers along the inside of the pith, each with a single insect.",
+            "pdf_page": 34,
+            "page": "34"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "monothalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f291",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:12.657Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g33",
+          "name_as_written": "ground-ivy galls",
+          "inducer": {
+            "ref": "t44",
+            "name_as_written": "Liposthenes glechomae",
+            "rank": "species"
+          }
+        },
+        "trait": "cells",
+        "value": {
+          "value": "monothalamous",
+          "as_written": "Single-chambered"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/304",
+            "quote": "Single-chambered, spherical to amorphous galls.",
+            "pdf_page": 36,
+            "page": "36"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "monothalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f294",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:56.232Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g33",
+          "name_as_written": "ground-ivy galls",
+          "inducer": {
+            "ref": "t44",
+            "name_as_written": "Liposthenes glechomae",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "red",
+          "as_written": "reddish when fresh"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/304",
+            "quote": "Small and reddish when fresh to larger and greener when more mature.",
+            "pdf_page": 36,
+            "page": "36"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown",
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f295",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:27.799Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g33",
+          "name_as_written": "ground-ivy galls",
+          "inducer": {
+            "ref": "t44",
+            "name_as_written": "Liposthenes glechomae",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "green",
+          "as_written": "greener when more mature"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/304",
+            "quote": "Small and reddish when fresh to larger and greener when more mature.",
+            "pdf_page": 36,
+            "page": "36"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown",
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f309",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:04.283Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t48",
+            "name_as_written": "Diastrophus fusiformans",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g35",
+            "name_as_written": "cinquefoil petiole spindle gall",
+            "inducer": {
+              "ref": "t48",
+              "name_as_written": "Diastrophus fusiformans",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/322",
+            "quote": "Cinquefoil petiole spindle gall wasp (Diastrophus fusiformans)",
+            "pdf_page": 38,
+            "page": "38"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f316",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:58.055Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g35",
+          "name_as_written": "cinquefoil petiole spindle gall",
+          "inducer": {
+            "ref": "t48",
+            "name_as_written": "Diastrophus fusiformans",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "green",
+          "as_written": "Green"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/324",
+            "quote": "Green to red when fresh to brown when dried and old.",
+            "pdf_page": 38,
+            "page": "38"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown",
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f325",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:14.830Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g36",
+          "name_as_written": "cinquefoil stem spindle gall",
+          "inducer": {
+            "ref": "t50",
+            "name_as_written": "Diastrophus niger",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "spindle",
+          "as_written": "Spindle-shaped"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/332",
+            "quote": "Spindle-shaped, multiple-chambered swellings.",
+            "pdf_page": 39,
+            "page": "39"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "spindle"
+        ]
+      }
+    },
+    {
+      "id": "gall-f331",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:46:33.226Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t51",
+            "name_as_written": "Potentilla canadensis",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g37",
+            "name_as_written": "Cinquefoil bud gall wasp gall",
+            "inducer": {
+              "ref": "t52",
+              "name_as_written": "Diastrophus potentillae",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/343",
+            "quote": "Host: Dwarf cinquefoil (Potentilla canadensis) and common cinquefoil (P. simplex).",
+            "pdf_page": 40,
+            "page": "40"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f342",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:45.999Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g37",
+          "name_as_written": "Cinquefoil bud gall wasp gall",
+          "inducer": {
+            "ref": "t52",
+            "name_as_written": "Diastrophus potentillae",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/344",
+            "whole_item": true,
+            "text": "Gall location: On the axil.",
+            "pdf_page": 40,
+            "page": "40"
+          },
+          {
+            "item": "#/texts/345",
+            "whole_item": true,
+            "text": "Description: Single-chambered, globular swellings 8-13 millimeters in diameter. Sometimes with fine hairs. The chamber resides at the center of the gall and is surrounded by fleshy material that becomes spongy as the gall matures. Often with leaf remnants growing out of the outermost layer. Green when fresh to reddish in later stages.",
+            "pdf_page": 40,
+            "page": "40"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f363",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:47.696Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g40",
+          "name_as_written": "blackberry seed galls",
+          "inducer": {
+            "ref": "t59",
+            "name_as_written": "Diastrophus cuscutaeformis",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "cluster",
+          "as_written": "large, long clusters of closely-placed, seed-like, single-chambered galls"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/372",
+            "quote": "Typically present as large, long clusters of closely-placed, seed-like, single-chambered galls.",
+            "pdf_page": 43,
+            "page": "43"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "cluster"
+        ]
+      }
+    },
+    {
+      "id": "gall-f366",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:51.519Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g40",
+          "name_as_written": "blackberry seed galls",
+          "inducer": {
+            "ref": "t59",
+            "name_as_written": "Diastrophus cuscutaeformis",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "red",
+          "as_written": "red"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/372",
+            "quote": "Green when fresh to red or brown when mature.",
+            "pdf_page": 43,
+            "page": "43"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown",
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f389",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:09.129Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g42",
+          "name_as_written": "blackberry knot gall",
+          "inducer": {
+            "ref": "t64",
+            "name_as_written": "Diastrophus nebulosus",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "On the main stem"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/391",
+            "quote": "Gall location: On the main stem.",
+            "pdf_page": 45,
+            "page": "45"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f391",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:38.553Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g42",
+          "name_as_written": "blackberry knot gall",
+          "inducer": {
+            "ref": "t64",
+            "name_as_written": "Diastrophus nebulosus",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "a globular, amorphous swelling"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/391",
+            "quote": "Often botryoidal, appearing as a globular, amorphous swelling, but extremely variable overall.",
+            "pdf_page": 45,
+            "page": "45"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f400",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:18.408Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t68",
+            "name_as_written": "R. occidentalis",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g43",
+            "name_as_written": "irregular bramble root gall",
+            "inducer": {
+              "ref": "t67",
+              "name_as_written": "Diastrophus radicum",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/401",
+            "quote": "Host: Northern dewberry (Rubus flagellaris) and black raspberry (R. occidentalis).",
+            "pdf_page": 46,
+            "page": "46"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f414",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:32.962Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g44",
+          "name_as_written": "red raspberry knot gall",
+          "inducer": {
+            "ref": "t69",
+            "name_as_written": "Diastrophus turgidus",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "brown",
+          "as_written": "brown and dry when old"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/413",
+            "quote": "Reddish to greenish and fleshy when fresh to brown and dry when old.",
+            "pdf_page": 47,
+            "page": "47"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown",
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f415",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:45:16.739Z",
+      "statement": {
+        "kind": "alias",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g44",
+          "name_as_written": "red raspberry knot gall",
+          "inducer": {
+            "ref": "t69",
+            "name_as_written": "Diastrophus turgidus",
+            "rank": "species"
+          }
+        },
+        "name": "red raspberry knot gall",
+        "evidence": [
+          {
+            "item": "#/texts/413",
+            "quote": "Unlike the blackberry knot gall, the red raspberry knot gall lacks distinct longitudinal grooves",
+            "pdf_page": 47,
+            "page": "47"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f418",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:11.851Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t72",
+            "name_as_written": "Drymocallis arguta",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g45",
+            "name_as_written": "wood beauty stem gall",
+            "host": {
+              "ref": "t71",
+              "name_as_written": "Drymocallis",
+              "rank": "genus"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/429",
+            "quote": "Galls have been reported on three wood beauty species (Drymocallis arguta, D. glandulosa, and D. lactea).",
+            "pdf_page": 48,
+            "page": "48"
+          },
+          {
+            "item": "#/texts/430",
+            "quote": "A fresh wood beauty stem gall on tall cinquefoil (Drymocallis arguta).",
+            "pdf_page": 48,
+            "page": "48"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f420",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:46:05.916Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t74",
+            "name_as_written": "D. lactea",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g45",
+            "name_as_written": "wood beauty stem gall",
+            "host": {
+              "ref": "t71",
+              "name_as_written": "Drymocallis",
+              "rank": "genus"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/429",
+            "quote": "Galls have been reported on three wood beauty species (Drymocallis arguta, D. glandulosa, and D. lactea).",
+            "pdf_page": 48,
+            "page": "48"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f423",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:48:38.790Z",
+      "statement": {
+        "kind": "alias",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g45",
+          "name_as_written": "wood beauty stem gall",
+          "host": {
+            "ref": "t71",
+            "name_as_written": "Drymocallis",
+            "rank": "genus"
+          }
+        },
+        "name": "wood beauty stem gall",
+        "evidence": [
+          {
+            "item": "#/texts/430",
+            "quote": "A fresh wood beauty stem gall on tall cinquefoil (Drymocallis arguta).",
+            "pdf_page": 48,
+            "page": "48"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f434",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:49:20.216Z",
+      "statement": {
+        "kind": "alias",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g48",
+          "name_as_written": "Mossy bramble gall",
+          "host": {
+            "ref": "t77",
+            "name_as_written": "Rubus",
+            "rank": "genus"
+          }
+        },
+        "name": "mossy bramble gall",
+        "evidence": [
+          {
+            "item": "#/texts/463",
+            "quote": "A mossy bramble gall on an unidentified bramble species.",
+            "pdf_page": 50,
+            "page": "50"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f441",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:46:15.076Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g49",
+          "name_as_written": "silverpuff basal stem galls",
+          "host": {
+            "ref": "t78",
+            "name_as_written": "Uropappus lindleyi",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "red",
+          "as_written": "reddish"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/468",
+            "quote": "Greenish to reddish",
+            "pdf_page": 51,
+            "page": "51"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "name-g50",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:42:34.608Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g50",
+          "name_as_written": "the mossy rose gall (Diplolepis rosae)",
+          "inducer": {
+            "ref": "t79",
+            "name_as_written": "Diplolepis rosae",
+            "rank": "species"
+          }
+        },
+        "inducer_as_written": "Diplolepis rosae",
+        "outcome": "resolved",
+        "entries": [
+          "Diplolepis rosae"
+        ]
+      }
+    },
+    {
+      "id": "name-g51",
+      "verdict": "unsure",
+      "note": "looking at the photo i know that this is the agamic gall. but 2 things, one this would not be known by the LLM and 2 this is a paper about wasp galls on Rubus and Herbs and A. erinacei is on Oak. That is an intro section about gall wasps in general and not really the topic of the paper.",
+      "checked_at": "2026-10-15T19:45:05.636Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g51",
+          "name_as_written": "A hedgehog oak gall (Acraspis erinacei)",
+          "inducer": {
+            "ref": "t82",
+            "name_as_written": "Acraspis erinacei",
+            "rank": "species"
+          }
+        },
+        "inducer_as_written": "Acraspis erinacei",
+        "outcome": "ambiguous",
+        "entries": [
+          "Acraspis erinacei (agamic)",
+          "Acraspis erinacei (sexgen)"
+        ]
+      }
+    }
+  ]
+}

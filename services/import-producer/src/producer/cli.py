@@ -5,6 +5,8 @@ from pathlib import Path
 
 import click
 
+from producer import paths
+
 
 @click.group()
 def cli():
@@ -109,6 +111,80 @@ def phase(package, phase, effort, models, dry_run):
     if not dry_run:
         append_run(package, record)
     click.echo(json.dumps(record, indent=2))
+
+
+@cli.group("golden")
+@click.pass_context
+def golden_group(ctx):
+    """Golden regression set: the human-checked trial statements (free, no API calls)."""
+    ctx.ensure_object(dict)
+
+
+@golden_group.command("export")
+@click.option(
+    "--verdicts",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="The check pages' exported verdicts: <dir>/<name>/checks/<doc id>.json.",
+)
+@click.option(
+    "--trial",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=paths.PROJECT / "output" / "trial",
+    show_default=True,
+    help="Directory holding the checked packages.",
+)
+@click.option(
+    "--out",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=paths.PROJECT / "golden",
+    show_default=True,
+)
+@click.pass_context
+def golden_export(ctx, verdicts, trial, out):
+    """Write golden/<source id>-<short name>.json from the verdicts and checked packages."""
+    from producer import golden
+
+    for spec in ctx.obj.get("sources", golden.SOURCES):
+        doc = golden.export_source(spec, trial / spec.package, verdicts / spec.checks / "checks")
+        path = golden.write_golden(doc, out)
+        c = doc["counts"]
+        click.echo(f"{path.name}: statements {c['statements']}, name matches {c['names']}")
+
+
+@golden_group.command("score")
+@click.argument("run_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option(
+    "--source", "source_id", type=int, help="Gallformers Source id (default: from the dir name)."
+)
+@click.option(
+    "--golden",
+    "golden_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=paths.PROJECT / "golden",
+    show_default=True,
+)
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="JSON report path (default: <run-dir>/golden-score.json).",
+)
+def golden_score(run_dir, source_id, golden_dir, out):
+    """Score a new package for one of the golden Sources against the human verdicts."""
+    from producer import golden
+
+    source_id = source_id or golden.infer_source(run_dir)
+    if source_id is None:
+        raise click.ClickException(f"can't tell which Source {run_dir} is; pass --source")
+    try:
+        golden_file = golden.find_golden(source_id, golden_dir)
+    except FileNotFoundError as e:
+        raise click.ClickException(str(e)) from e
+    report = golden.score(json.loads(golden_file.read_text(encoding="utf-8")), run_dir)
+    out = out or run_dir / golden.REPORT_NAME
+    out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    click.echo(golden.render(report))
+    click.echo(f"report: {out}")
 
 
 @cli.command("lookup-place")

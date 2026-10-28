@@ -1,0 +1,1798 @@
+{
+  "golden_format": 1,
+  "source": {
+    "id": 21,
+    "name": "Osten Sacken 1862, Additions and corrections",
+    "short": "osten-sacken-1862"
+  },
+  "citation": "Osten Sacken, R. 1862. Additions and corrections to the paper entitled: \"On the Cynipidae of the North American Oaks and their Galls.\" Proceedings of the Entomological Society of Philadelphia 1: 241-259.",
+  "package": "21-corrections-1862",
+  "package_format": {
+    "format_version": 3,
+    "vocabulary_version": "2026-10-11",
+    "producer": {
+      "name": "gallformers-import-producer-poc",
+      "version": "0.1.0",
+      "model": "claude-opus-5-5",
+      "instructions_version": "producer.md@d8f469023af2"
+    }
+  },
+  "check_page": "https://claude.ai/artifact/2ZtVyD8m1cjqoq9kXLCn1z",
+  "package_totals": {
+    "galls": 26,
+    "statements": {
+      "gall:description": 18,
+      "gall:relationship": 43,
+      "gall:trait": 106,
+      "name:name_match": 26,
+      "taxonomy:name": 11,
+      "taxonomy:placement": 7
+    }
+  },
+  "counts": {
+    "statements": {
+      "right": 38,
+      "wrong": 2
+    },
+    "names": {
+      "right": 2,
+      "unsure": 3
+    },
+    "by_kind": {
+      "gall:description": {
+        "right": 6
+      },
+      "gall:relationship": {
+        "right": 7,
+        "wrong": 1
+      },
+      "gall:trait": {
+        "right": 21,
+        "wrong": 1
+      },
+      "name:name_match": {
+        "right": 2,
+        "unsure": 3
+      },
+      "taxonomy:name": {
+        "right": 2
+      },
+      "taxonomy:placement": {
+        "right": 2
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "taxonomy-a1",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:23.581Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t2",
+          "name_as_written": "C.Q. INANIS",
+          "rank": "species"
+        },
+        "authorship": "O. S.",
+        "evidence": [
+          {
+            "item": "#/texts/29",
+            "quote": "C.Q. INANIS O. 8S.",
+            "pdf_page": 4,
+            "page": "242"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a8",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:00:24.816Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t7",
+          "name_as_written": "Cynips pezomachoides",
+          "rank": "species",
+          "new": "n. sp."
+        },
+        "evidence": [
+          {
+            "item": "#/texts/106",
+            "quote": "Cynips pezomachoides n. sp.",
+            "pdf_page": 12,
+            "page": "250"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a14",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:56:24.058Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t10",
+          "name_as_written": "CYNIPS QUERCUS JUGLANS",
+          "rank": "species",
+          "new": "n. sp."
+        },
+        "parent": {
+          "ref": "t1",
+          "name_as_written": "Cynips",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/155",
+            "quote": "CYNIPS QUERCUS JUGLANS nh. sp. (as yet unknown).",
+            "pdf_page": 17,
+            "page": "255"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a16",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:13.939Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t11",
+          "name_as_written": "Cynips quercus operator",
+          "rank": "species",
+          "new": "n. sp."
+        },
+        "parent": {
+          "ref": "t1",
+          "name_as_written": "Cynips",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/168",
+            "quote": "Cynips quercus operator n. sp.",
+            "pdf_page": 19,
+            "page": "257"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f8",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:30.306Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t3",
+            "name_as_written": "C. Q. cocctnem",
+            "name_reading": "C. q. coccineae",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g2",
+            "name_as_written": "the oak-apple gall of C. q. coccineae",
+            "inducer": {
+              "ref": "t3",
+              "name_as_written": "C. Q. cocctnem",
+              "name_reading": "C. q. coccineae",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/36",
+            "quote": "C. Q. cocctnem O. 8.",
+            "pdf_page": 5
+          },
+          {
+            "item": "#/texts/38",
+            "quote": "From this",
+            "pdf_page": 5
+          },
+          {
+            "item": "#/texts/39",
+            "quote": "gall [ have obtained this year (about the 25th of June) only one 9 specimen",
+            "pdf_page": 5
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f13",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:59:52.062Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g2",
+          "name_as_written": "the oak-apple gall of C. q. coccineae",
+          "inducer": {
+            "ref": "t3",
+            "name_as_written": "C. Q. cocctnem",
+            "name_reading": "C. q. coccineae",
+            "rank": "species"
+          }
+        },
+        "trait": "walls",
+        "value": {
+          "value": "spongy",
+          "as_written": "on the inside with a spongy substance, surrounding a kernel"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/36",
+            "quote": "on the inside with a spongy substance, surrounding a kernel in the centre",
+            "pdf_page": 5
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "spongy",
+          "thin"
+        ]
+      }
+    },
+    {
+      "id": "gall-f17",
+      "verdict": "right",
+      "note": "Unrelated but I just noticed, we do not necessarily have mappings for old plant names. Here we see Q tinctoria which is modern Q velutina. This will be a challenge and we should note it as a new thing to deal with.",
+      "checked_at": "2026-10-15T18:49:07.756Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t4",
+            "name_as_written": "©. Q. sponarrica",
+            "name_reading": "C. q. spongifica",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g3",
+            "name_as_written": "the oak-apple gall of C. q. spongifica",
+            "inducer": {
+              "ref": "t4",
+              "name_as_written": "©. Q. sponarrica",
+              "name_reading": "C. q. spongifica",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/43",
+            "quote": "On the 25th of May last I found four full-grown speeimens of this gall on the leaves of a large black oak ( Q. tinctoria), and have obtained, on June 15, three 9 specimens of the gall-fly.",
+            "pdf_page": 6,
+            "page": "244"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f26",
+      "verdict": "right",
+      "note": "As i wrote in an earelier item. the wall is not so thick as to fill the gall chamber.",
+      "checked_at": "2026-10-15T18:56:50.514Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "the oak-apple gall of C. q. spongifica",
+          "inducer": {
+            "ref": "t4",
+            "name_as_written": "©. Q. sponarrica",
+            "name_reading": "C. q. spongifica",
+            "rank": "species"
+          }
+        },
+        "trait": "walls",
+        "value": {
+          "value": "thick",
+          "as_written": "shell thick"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/42",
+            "quote": "shell thick",
+            "pdf_page": 6,
+            "page": "244"
+          },
+          {
+            "item": "#/texts/44",
+            "quote": "The shell is much thicker than that of the two previous species; the spongy mass is more dense and brownish.",
+            "pdf_page": 6,
+            "page": "244"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "spongy",
+          "thick"
+        ]
+      }
+    },
+    {
+      "id": "gall-f28",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:16.756Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "the oak-apple gall of C. q. spongifica",
+          "inducer": {
+            "ref": "t4",
+            "name_as_written": "©. Q. sponarrica",
+            "name_reading": "C. q. spongifica",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/42",
+            "quote": "Large, round gall, somewhat attenuated and pointed at the top; surface more or less opaque, as if powdered or dusted; shell thick; inside, a dense, spongy, brownish substance, surrounding the kernel. Diameter about an inch and a half.",
+            "pdf_page": 6,
+            "page": "244"
+          },
+          {
+            "item": "#/texts/44",
+            "whole_item": true,
+            "text": "Of these galls three, taken from a high branch of the tree, can be considered as typical specimens. They are slightly oblong, that is, somewhat extended into a point at the end, although not narrowed at the basis. Their diameter is about an inch and a half. Their color is drab, sometimes spotted with brown on one side; the surface is more or less opaque, as if powdered or sericeous, and shows very little gloss. The shell is much thicker than that of the two previous species; the spongy mass is more dense and brownish.",
+            "pdf_page": 6,
+            "page": "244"
+          },
+          {
+            "item": "#/texts/45",
+            "quote": "A fourth specimen, found on the same tree, is more irregular in its shape; its surface is without any gloss and altogether drab, without brown spots.",
+            "pdf_page": 6,
+            "page": "244"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f44",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:52.750Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g5",
+          "name_as_written": "the oak-apple of C. q. centricola on Q. obtusiloba",
+          "inducer": {
+            "ref": "t6",
+            "name_as_written": "Cynips q. centricola",
+            "rank": "species"
+          }
+        },
+        "trait": "walls",
+        "value": {
+          "value": "thin",
+          "as_written": "shell although thin, but harder"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/75",
+            "quote": "shell although thin, but harder",
+            "pdf_page": 9,
+            "page": "247"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "radiating-fibers",
+          "thin"
+        ]
+      }
+    },
+    {
+      "id": "gall-f54",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:56:03.523Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t24",
+            "name_as_written": "Q. palustris",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g9",
+            "name_as_written": "woody knots on the limbs of the pin oak, emitting pale yellow, conical, brittle projections",
+            "inducer": {
+              "ref": "t7",
+              "name_as_written": "CYNIPS QUERCUS CORNIGERA",
+              "rank": "species"
+            },
+            "host": {
+              "ref": "t24",
+              "name_as_written": "Q. palustris",
+              "rank": "species"
+            },
+            "formerly_undescribed": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/120",
+            "quote": "Quercus pALustRIS. Pin Ouk. Woody kuots on the limbs",
+            "pdf_page": 13,
+            "page": "251"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f62",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:00.169Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g9",
+          "name_as_written": "woody knots on the limbs of the pin oak, emitting pale yellow, conical, brittle projections",
+          "inducer": {
+            "ref": "t7",
+            "name_as_written": "CYNIPS QUERCUS CORNIGERA",
+            "rank": "species"
+          },
+          "host": {
+            "ref": "t24",
+            "name_as_written": "Q. palustris",
+            "rank": "species"
+          },
+          "formerly_undescribed": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/120",
+            "quote": "Woody kuots on the limbs, emitting pale yellow, conical, brittle projections.",
+            "pdf_page": 13,
+            "page": "251"
+          },
+          {
+            "item": "#/texts/121",
+            "quote": "It consists of woody knots on the limbs, looking usually as if many of them were closely packed together and thus forming",
+            "pdf_page": 13,
+            "page": "251"
+          },
+          {
+            "item": "#/texts/125",
+            "quote": "an oblong, woody irregular mass, sometimes two inches or more long. Its most striking character are its slightly curved conical projections, hollow",
+            "pdf_page": 14,
+            "page": "252"
+          },
+          {
+            "item": "#/texts/126",
+            "quote": "on the inside, which bud forth from all sides of the gall.",
+            "pdf_page": 14,
+            "page": "252"
+          },
+          {
+            "item": "#/texts/125",
+            "quote": "On dry, dead galls, these horn-shaped projections are for the most part broken off, so that their bases alone are visible, projecting like short tubes from the",
+            "pdf_page": 14,
+            "page": "252"
+          },
+          {
+            "item": "#/texts/126",
+            "quote": "cracks of the woody tubercle.",
+            "pdf_page": 14,
+            "page": "252"
+          },
+          {
+            "item": "#/texts/128",
+            "quote": "ones. They were of moderate size; their back was greenish and their wood soft and succulent. The conical projections were just beginning to bud forth; when laid bare, by removing with a knife the wood around them, they appeared to extend deep inside of the gall, almost down to the twig. Their color was whitish, their consistency soft, apparently fibrous, and not woody. At that time, they were not hollow yet, and I could not find any larvee in them.",
+            "pdf_page": 14,
+            "page": "252"
+          },
+          {
+            "item": "#/texts/128",
+            "quote": "When I visited the same spot during the latter part of June, 1 found some of the horn-shaped bodies already projecting about one-tenth of an inch; their substance had become harder and more woody; their inner end had become club-shaped, distinctly isolated from the surrounding wood, so that the whole of these bodies could be easily removed by cutting away the wood around them. On the inside, the inner end was hollow and contained a small larva.",
+            "pdf_page": 14,
+            "page": "252"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f75",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:00:08.711Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g10",
+          "name_as_written": "rounded, woody gall on the upper side of pin oak leaves, along the principal ribs",
+          "host": {
+            "ref": "t24",
+            "name_as_written": "Q. palustris",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/135",
+            "quote": "Rounded, woody gall on the upper side of the leaves, along the principal ribs. Diameter upwards to 0.4 to 0.5.",
+            "pdf_page": 15,
+            "page": "253"
+          },
+          {
+            "item": "#/texts/136",
+            "whole_item": true,
+            "text": "These excrescenses, occuring frequently in autumn, vary in size from 0.15 to 0.4 or 0.5; most of them, however, are about 0.2 or 0.5 long and narrower than their length. Their color is brownish, sometimes more or less yellow, or reddish or with a grey efflorescence; their surface has irregular, more or less deep wrinkles, according to the age or size of the gall; otherwise it is smooth, and has nothing of the deep and regular sculpture of C. g. pisum. They somewhat resemble the gall of Cecidomyta symmetrica O. 8. (see Monographs of N. A. Diptera, p. 200), but project only on one side of the leaf; besides, their outline is more regularly rounded and less deeply cracked. When cut open they show several (commonly three) cells, divided by partitions, somewhat converging towards the middle of the base.",
+            "pdf_page": 15,
+            "page": "253"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f78",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:35.129Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g11",
+          "name_as_written": "round, wart-like, rusty-puberulent excrescences on the upper side of pin oak leaves",
+          "host": {
+            "ref": "t24",
+            "name_as_written": "Q. palustris",
+            "rank": "species"
+          }
+        },
+        "trait": "texture",
+        "value": {
+          "value": "pubescent",
+          "as_written": "rusty-puberlent"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/138",
+            "quote": "Round, wart-like, rusty-puberlent eacrescences",
+            "pdf_page": 15,
+            "page": "253"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "pubescent"
+        ]
+      }
+    },
+    {
+      "id": "gall-f79",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:58:11.321Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g11",
+          "name_as_written": "round, wart-like, rusty-puberulent excrescences on the upper side of pin oak leaves",
+          "host": {
+            "ref": "t24",
+            "name_as_written": "Q. palustris",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "brown",
+          "as_written": "rusty"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/138",
+            "quote": "Round, wart-like, rusty-puberlent eacrescences",
+            "pdf_page": 15,
+            "page": "253"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "brown"
+        ]
+      }
+    },
+    {
+      "id": "gall-f87",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:58:41.953Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g12",
+          "name_as_written": "the cone-like gall of C. q. strobilana at the tip of twigs",
+          "inducer": {
+            "ref": "t8",
+            "name_as_written": "C. qa. STOBILANA",
+            "name_reading": "C. q. strobilana",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "cells",
+        "value": {
+          "value": "polythalamous",
+          "as_written": "Each of them contains a hollow kernel with a plump, large larva inside"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/143",
+            "quote": "Hach of them contains a hollow kernel with a plump, large larva inside.",
+            "pdf_page": 16,
+            "page": "254"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "polythalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f91",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:58:05.659Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "globular galls on the under side of swamp-chestnut oak leaves, along the principal ribs",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t27",
+            "name_as_written": "QUERCUS PRINOS",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "lower leaf",
+          "as_written": "on the under side of the leaf"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/145",
+            "quote": "Globular galls on the un",
+            "pdf_page": 16,
+            "page": "254"
+          },
+          {
+            "item": "#/texts/144",
+            "quote": "'der side of the leaf, along the principal ribs.",
+            "pdf_page": 16,
+            "page": "254"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "lower leaf",
+          "on leaf veins"
+        ]
+      }
+    },
+    {
+      "id": "gall-f92",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:53:15.383Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "globular galls on the under side of swamp-chestnut oak leaves, along the principal ribs",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t27",
+            "name_as_written": "QUERCUS PRINOS",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "on leaf veins",
+          "as_written": "along the principal ribs"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/144",
+            "quote": "'der side of the leaf, along the principal ribs.",
+            "pdf_page": 16,
+            "page": "254"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "lower leaf",
+          "on leaf veins"
+        ]
+      }
+    },
+    {
+      "id": "gall-f94",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:00:02.229Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "globular galls on the under side of swamp-chestnut oak leaves, along the principal ribs",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t27",
+            "name_as_written": "QUERCUS PRINOS",
+            "rank": "species"
+          }
+        },
+        "trait": "texture",
+        "value": {
+          "value": "pubescent",
+          "as_written": "finely downy"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/146",
+            "quote": "Their surface is finely downy",
+            "pdf_page": 16,
+            "page": "254"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "pubescent"
+        ]
+      }
+    },
+    {
+      "id": "gall-f97",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:59:59.046Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "globular galls on the under side of swamp-chestnut oak leaves, along the principal ribs",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t27",
+            "name_as_written": "QUERCUS PRINOS",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/145",
+            "quote": "Globular galls on the un",
+            "pdf_page": 16,
+            "page": "254"
+          },
+          {
+            "item": "#/texts/144",
+            "quote": "'der side of the leaf, along the principal ribs.",
+            "pdf_page": 16,
+            "page": "254"
+          },
+          {
+            "item": "#/texts/145",
+            "quote": "Diameter upwards to 0.5.",
+            "pdf_page": 16,
+            "page": "254"
+          },
+          {
+            "item": "#/texts/146",
+            "quote": "Their surface is finely downy, which gives them a peculiar brownish-cream-colored shade. They contain a kernel in the middle, nearer to their bases, from which numerous woody fibres radiate toward the stout woody shell. They occur in numbers on the same leaf, a moderate sized leaf which is in my possession, bearing eight of them, the largest of which has 0.3, the smallest hardly 0.1 in diameter.",
+            "pdf_page": 16,
+            "page": "254"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f100",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:11.053Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g14",
+          "name_as_written": "clusters of small, bell-shaped, petiolate, greenish galls along the midrib of post oak leaves",
+          "host": {
+            "ref": "t22",
+            "name_as_written": "Q. obtusiloba",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "leaf midrib",
+          "as_written": "along the midrib"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/151",
+            "quote": "greenish galls on the under side of the leaves, along the midrib.",
+            "pdf_page": 17,
+            "page": "255"
+          },
+          {
+            "item": "#/texts/152",
+            "quote": "They are attenuated at the basis into a short petiole, fastened to the midrib of the leaf",
+            "pdf_page": 17,
+            "page": "255"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "leaf midrib",
+          "lower leaf"
+        ]
+      }
+    },
+    {
+      "id": "gall-f106",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:58:46.104Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t25",
+            "name_as_written": "QuERCUS ALBA",
+            "name_reading": "Quercus alba",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g15",
+            "name_as_written": "clusters of small, round, reddish galls on the petioles of white oak leaves",
+            "host": {
+              "ref": "t25",
+              "name_as_written": "QuERCUS ALBA",
+              "name_reading": "Quercus alba",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/153",
+            "quote": "QuERCUS ALBA. White Oak. Clusters of small, round, reddish galls on the petioles of the white oak leaves",
+            "pdf_page": 17,
+            "page": "255"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f107",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:32.815Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g15",
+          "name_as_written": "clusters of small, round, reddish galls on the petioles of white oak leaves",
+          "host": {
+            "ref": "t25",
+            "name_as_written": "QuERCUS ALBA",
+            "name_reading": "Quercus alba",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "petiole",
+          "as_written": "on the petioles"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/153",
+            "quote": "Clusters of small, round, reddish galls on the petioles of the white oak leaves",
+            "pdf_page": 17,
+            "page": "255"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "petiole"
+        ]
+      }
+    },
+    {
+      "id": "gall-f115",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:00:16.491Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "the round, hard corky branch gall of C. q. juglans",
+          "inducer": {
+            "ref": "t9",
+            "name_as_written": "CYNIPS QUERCUS JUGLANS",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "texture",
+        "value": {
+          "value": "stiff",
+          "as_written": "a hard corky substance"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/155",
+            "quote": "Large, round gall of a hard corky substance",
+            "pdf_page": 17,
+            "page": "255"
+          },
+          {
+            "item": "#/texts/156",
+            "quote": "their much harder substance. It requires some effort to cut them open",
+            "pdf_page": 17,
+            "page": "255-256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stiff"
+        ]
+      }
+    },
+    {
+      "id": "gall-f118",
+      "verdict": "wrong",
+      "note": "The season they were found is not the same as the season in which they were formed. There are only really Spring and Summer/Fall galls in general. A gall can not form when the plant is not growing.",
+      "checked_at": "2026-10-15T18:50:37.660Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "the round, hard corky branch gall of C. q. juglans",
+          "inducer": {
+            "ref": "t9",
+            "name_as_written": "CYNIPS QUERCUS JUGLANS",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "season",
+        "value": {
+          "value": "Winter",
+          "as_written": "in winter"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/156",
+            "quote": "I found a couple of these galls in winter, on the ground, under an oak",
+            "pdf_page": 17,
+            "page": "255-256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "Winter"
+        ]
+      }
+    },
+    {
+      "id": "gall-f121",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:45.004Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "round, somewhat oblong, hollow, pale greenish-yellow gall on the under side of scarlet oak leaves",
+          "host": {
+            "ref": "t20",
+            "name_as_written": "Q. coccinea",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "lower leaf",
+          "as_written": "on the under side of the leaf"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/159",
+            "quote": "gall on the under side of the leaf, slightly projecting on the opposite side",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "lower leaf"
+        ]
+      }
+    },
+    {
+      "id": "gall-f122",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:57.222Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "round, somewhat oblong, hollow, pale greenish-yellow gall on the under side of scarlet oak leaves",
+          "host": {
+            "ref": "t20",
+            "name_as_written": "Q. coccinea",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "Round, somewhat oblong"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/159",
+            "quote": "Round, somewhat oblong, hollow, pale greenish-yellow gall",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f127",
+      "verdict": "right",
+      "note": "oak apples all have an outer shell. it can be very thin or slightly thicker, it is never so thick as to fill the bulk of the chamber.",
+      "checked_at": "2026-10-15T18:54:28.878Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "round, somewhat oblong, hollow, pale greenish-yellow gall on the under side of scarlet oak leaves",
+          "host": {
+            "ref": "t20",
+            "name_as_written": "Q. coccinea",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "oak apple",
+          "as_written": "Round, somewhat oblong, hollow ... gall; internally, an oblong kernel, kept in its position by filaments, radiating towards the shell"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/159",
+            "quote": "Round, somewhat oblong, hollow, pale greenish-yellow gall on the under side of the leaf, slightly projecting on the opposite side; internally, an oblong kernel, kept in its position by filaments, radiating towards the shell.",
+            "pdf_page": 18,
+            "page": "256"
+          },
+          {
+            "item": "#/texts/160",
+            "quote": "The shell is rather thin",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "oak apple"
+        ]
+      }
+    },
+    {
+      "id": "gall-f130",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:49:33.972Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t23",
+            "name_as_written": "Q. nigra",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g18",
+            "name_as_written": "the woolly twig gall of C. q. operator on the black-jack oak",
+            "inducer": {
+              "ref": "t10",
+              "name_as_written": "Cynips quercus operator",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/164",
+            "quote": "QuERCUS NIGRA. Dblack-jack Oak. Round mass, resembling wool, on the twigs",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f131",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:49.264Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the woolly twig gall of C. q. operator on the black-jack oak",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Cynips quercus operator",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "on the twigs"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/164",
+            "quote": "Round mass, resembling wool, on the twigs",
+            "pdf_page": 18,
+            "page": "256"
+          },
+          {
+            "item": "#/texts/165",
+            "quote": "I found the gall in June, on young, flowering branches",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f137",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:55:42.187Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the woolly twig gall of C. q. operator on the black-jack oak",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Cynips quercus operator",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "cells",
+        "value": {
+          "value": "polythalamous",
+          "as_written": "numerous seed-like grains inside"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/164",
+            "quote": "with numerous seed-like grains inside",
+            "pdf_page": 18,
+            "page": "256"
+          },
+          {
+            "item": "#/texts/165",
+            "quote": "The inside also contains seed-like kernels.",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "polythalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f138",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:58:19.170Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the woolly twig gall of C. q. operator on the black-jack oak",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Cynips quercus operator",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/164",
+            "quote": "Round mass, resembling wool, on the twigs, with numerous seed-like grains inside.",
+            "pdf_page": 18,
+            "page": "256"
+          },
+          {
+            "item": "#/texts/165",
+            "quote": "This gall resembles very much the beautiful gall produced on the white oak by C. seminator Harris (1. ¢. p. 69, No. 21). When fresh and growing, it also consists of whitish filaments, forming a white, round body with beautiful pink spots. The inside also contains seed-like kernels.",
+            "pdf_page": 18,
+            "page": "256"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f142",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:29.381Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g19",
+          "name_as_written": "clusters of galls crowded together round a limb of the live oak",
+          "host": {
+            "ref": "t28",
+            "name_as_written": "QuERCUS VIRENS",
+            "name_reading": "Quercus virens",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "cluster",
+          "as_written": "Clusters of galls crowded together"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/199",
+            "quote": "Clusters of galls crowded together round a limb",
+            "pdf_page": 20,
+            "page": "258"
+          },
+          {
+            "item": "#/texts/199",
+            "quote": "Their shape seems originally to be round, but from being close together they have assumed all kinds of irregular shapes",
+            "pdf_page": 20,
+            "page": "258"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "cluster"
+        ]
+      }
+    },
+    {
+      "id": "gall-f148",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:02.338Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g20",
+            "name_as_written": "woody swelling of the limb of the live oak",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Cynips",
+              "rank": "genus"
+            },
+            "host": {
+              "ref": "t28",
+              "name_as_written": "QuERCUS VIRENS",
+              "name_reading": "Quercus virens",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/209",
+            "quote": "I opened the latter and found on the inside a small empty hollow from the structure of which I have no doubt that the gall is the produce of a Cynips.",
+            "pdf_page": 21,
+            "page": "259"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f150",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:04.906Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g20",
+          "name_as_written": "woody swelling of the limb of the live oak",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t28",
+            "name_as_written": "QuERCUS VIRENS",
+            "name_reading": "Quercus virens",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "of the limb"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/200",
+            "quote": "Woody swelling of the limb.",
+            "pdf_page": 20,
+            "page": "258"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f151",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:00:13.020Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g20",
+          "name_as_written": "woody swelling of the limb of the live oak",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t28",
+            "name_as_written": "QuERCUS VIRENS",
+            "name_reading": "Quercus virens",
+            "rank": "species"
+          }
+        },
+        "trait": "texture",
+        "value": {
+          "value": "stiff",
+          "as_written": "Woody"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/200",
+            "quote": "Woody swelling of the limb.",
+            "pdf_page": 20,
+            "page": "258"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stiff"
+        ]
+      }
+    },
+    {
+      "id": "gall-f152",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:57:09.857Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g20",
+          "name_as_written": "woody swelling of the limb of the live oak",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t28",
+            "name_as_written": "QuERCUS VIRENS",
+            "name_reading": "Quercus virens",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/200",
+            "quote": "Woody swelling of the limb.",
+            "pdf_page": 20,
+            "page": "258"
+          },
+          {
+            "item": "#/texts/201",
+            "whole_item": true,
+            "text": "The specimen, communicated by Mr. Glover, is a fragment of a branch about 14 inches long with two such swellings; the one is rounded about",
+            "pdf_page": 20,
+            "page": "258"
+          },
+          {
+            "item": "#/texts/209",
+            "quote": "0.7 long and 0.5 broad ;the other much smaller. I opened the latter and found on the inside a small empty hollow",
+            "pdf_page": 21,
+            "page": "259"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f157",
+      "verdict": "right",
+      "checked_at": "2026-10-15T18:50:44.896Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g21",
+          "name_as_written": "small, round, woolly galls on the underside of live oak leaves",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Cynips",
+            "rank": "genus"
+          },
+          "host": {
+            "ref": "t28",
+            "name_as_written": "QuERCUS VIRENS",
+            "name_reading": "Quercus virens",
+            "rank": "species"
+          }
+        },
+        "trait": "texture",
+        "value": {
+          "value": "woolly",
+          "as_written": "wooly"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/210",
+            "quote": "Small, round, wooly galls on the underside of the leaves.",
+            "pdf_page": 21,
+            "page": "259"
+          },
+          {
+            "item": "#/texts/212",
+            "quote": "galls, only the wool is much longer.",
+            "pdf_page": 21,
+            "page": "259"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "woolly"
+        ]
+      }
+    },
+    {
+      "id": "gall-f159",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:00:20.535Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t14",
+            "name_as_written": "C. g. caelebs",
+            "name_reading": "C. q. caelebs",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g22",
+            "name_as_written": "the spindle-shaped gall of C. q. caelebs",
+            "inducer": {
+              "ref": "t14",
+              "name_as_written": "C. g. caelebs",
+              "name_reading": "C. q. caelebs",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/93",
+            "quote": "as its spindle-shaped gall occurs also on a species of oak",
+            "pdf_page": 10,
+            "page": "248"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f162",
+      "verdict": "wrong",
+      "note": "Technically the 1st passage is correct but it is using it as a comparison. The fact is fine though. The second passage here is about a different gall.",
+      "checked_at": "2026-10-15T18:52:56.703Z",
+      "revision": {
+        "reason": "Trial log (2026-10-15): the Fact is right, but its second evidence is a heading about a different gall. Fixed when that quote goes and the Fact stays."
+      },
+      "wrong_part": "evidence",
+      "wrong_quotes": [
+        "QuERCUS ALBA. White Oak."
+      ],
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t25",
+            "name_as_written": "QuERCUS ALBA",
+            "name_reading": "Quercus alba",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g23",
+            "name_as_written": "the gall produced on the white oak by C. seminator Harris",
+            "inducer": {
+              "ref": "t15",
+              "name_as_written": "C. seminator",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/165",
+            "quote": "the beautiful gall produced on the white oak by C. seminator Harris",
+            "pdf_page": 18,
+            "page": "256"
+          },
+          {
+            "item": "#/texts/153",
+            "quote": "QuERCUS ALBA. White Oak.",
+            "pdf_page": 17,
+            "page": "255"
+          }
+        ]
+      }
+    },
+    {
+      "id": "name-g7",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:01:01.402Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g7",
+          "name_as_written": "the autumnal galls of C. q. tubicola",
+          "inducer": {
+            "ref": "t12",
+            "name_as_written": "CYNIPS QUERCUS TUBICOLA",
+            "rank": "species"
+          }
+        },
+        "inducer_as_written": "CYNIPS QUERCUS TUBICOLA",
+        "outcome": "resolved",
+        "entries": [
+          "Callirhytis tubicola (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g8",
+      "verdict": "unsure",
+      "note": "same as before with the asex/agamic gen",
+      "checked_at": "2026-10-15T19:01:27.206Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g8",
+          "name_as_written": "the gall of C. q. palustris on the pin-oak",
+          "inducer": {
+            "ref": "t13",
+            "name_as_written": "CYNIPS QUERCUS PALUSTRIS",
+            "rank": "species"
+          }
+        },
+        "inducer_as_written": "CYNIPS QUERCUS PALUSTRIS",
+        "outcome": "ambiguous",
+        "entries": [
+          "Dryocosmus quercuspalustris (agamic)",
+          "Dryocosmus quercuspalustris (sexgen)"
+        ]
+      }
+    },
+    {
+      "id": "name-g9",
+      "verdict": "unsure",
+      "note": "same as before with the asex/agamic gen",
+      "checked_at": "2026-10-15T19:01:29.472Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g9",
+          "name_as_written": "woody knots on the limbs of the pin oak, emitting pale yellow, conical, brittle projections",
+          "inducer": {
+            "ref": "t7",
+            "name_as_written": "CYNIPS QUERCUS CORNIGERA",
+            "rank": "species"
+          },
+          "host": {
+            "ref": "t24",
+            "name_as_written": "Q. palustris",
+            "rank": "species"
+          },
+          "formerly_undescribed": true
+        },
+        "inducer_as_written": "CYNIPS QUERCUS CORNIGERA",
+        "outcome": "ambiguous",
+        "entries": [
+          "Callirhytis quercuscornigera (agamic)",
+          "Callirhytis quercuscornigera (sexgen)"
+        ]
+      }
+    },
+    {
+      "id": "name-g16",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:01:06.572Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "the round, hard corky branch gall of C. q. juglans",
+          "inducer": {
+            "ref": "t9",
+            "name_as_written": "CYNIPS QUERCUS JUGLANS",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "CYNIPS QUERCUS JUGLANS",
+        "outcome": "resolved",
+        "entries": [
+          "Amphibolips quercusjuglans (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g18",
+      "verdict": "unsure",
+      "note": "same as before with the asex/agamic gen",
+      "checked_at": "2026-10-15T19:01:32.461Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the woolly twig gall of C. q. operator on the black-jack oak",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Cynips quercus operator",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "Cynips quercus operator",
+        "outcome": "ambiguous",
+        "entries": [
+          "Callirhytis quercusoperator (agamic)",
+          "Callirhytis quercusoperator (sexgen)"
+        ]
+      }
+    }
+  ]
+}

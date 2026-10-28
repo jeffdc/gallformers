@@ -71,6 +71,23 @@ For a web page: `uv run produce convert-url <url or saved .html> -o output/<name
 - `scripts/seed_errors.py`: plants known errors in a copy of a package, to test phase 5.
 - `scripts/smoke.py`: the setup check above.
 
+## Golden regression set
+
+`golden/` holds Jeff's verdicts from the trial's five human check pages: 177 statements (173 right, 2 wrong, 2 unsure) and 18 name matches, one file per Source (`<source id>-<short name>.json`). Each item keeps the verdict, the note and the whole statement as it was checked, with local ids replaced by what they stand for (the Gall by its Inducer, Host, generation and name as written; taxa by their names; quotes and pages), so a new run can be scored without the trial packages. Two verdicts carry a revision from the trial log: Ashmead f141 was recounted right, and 1862 f162 is wrong only in its second citation (fixed when that quote goes and the Fact stays).
+
+Run it after any change to the guide, the prompts, the vocabulary or the model, and before the backscan. Re-running the five Sources costs money (phases 2–6 each); scoring is free and makes no API calls.
+
+```
+uv run python scripts/dryrun.py output/<run> <source id>   # optional: name matches (local database)
+uv run produce golden score output/<run>                   # Source id from the dir name, or --source <id>
+```
+
+The scorer matches each golden item in the run by meaning, never by local id (`g3`, `f41` are renumbered every run). Galls are paired by their identifying fields, then by the name as written; statements by a natural key per kind (a Relationship by its subject and object, a Trait by Gall and trait and value, a range adjustment by Gall and place, a description by Gall and word overlap, a taxonomic act by its names). Each item is `present`, `changed` (same key, different value or stance, both shown) or `missing`. The report lists possible regressions (right, now changed or missing), wrong statements still present and those fixed, and the unsure ones for a person to look at. It prints and writes `golden-score.json` in the run dir (`--out` elsewhere). Name matches are scored only when the run has a `dryrun.json`.
+
+The checked packages predate the 2026-10-17 and 2026-10-26 contract decisions. An old `include` range adjustment is scored as an `occurrence` Fact at the same place; the season, detachable and generation changes keep their fields' shapes, so a value they change shows as `changed` (or, for a generation, as a change in the Gall mapping) for a person to judge.
+
+`uv run produce golden export --verdicts <dir>` rebuilds the files from the local trial packages and the check pages' exported verdicts (`<dir>/<name>/checks/<doc id>.json`); revisions live in `src/producer/golden.py`.
+
 ## Known limits
 
 - **Web pages:** the producer can't know a page's URL or access date; pass them in (not yet automated). Docling's HTML conversion fragments text at every italic name and may duplicate the page inside a layout table; quotes still verify.

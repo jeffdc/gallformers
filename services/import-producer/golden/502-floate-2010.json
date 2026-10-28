@@ -1,0 +1,1442 @@
+{
+  "golden_format": 1,
+  "source": {
+    "id": 502,
+    "name": "Floate 2010",
+    "short": "floate-2010"
+  },
+  "citation": "Floate, K. D. 2010. Gall-Inducing Aphids and Mites Associated with the Hybrid Complex of Cottonwoods, Populus spp. (Salicaceae), on Canada's Grasslands. In Arthropods of Canadian Grasslands (Volume 1): Ecology and Interactions in Grassland Habitats. Edited by J. D. Shorthouse and K. D. Floate. Biological Survey of Canada. pp. 281-300.",
+  "package": "502-floate-2010-v2",
+  "package_format": {
+    "format_version": 3,
+    "vocabulary_version": "2026-10-11",
+    "producer": {
+      "name": "gallformers-import-producer-poc",
+      "version": "0.1.0",
+      "model": "claude-opus-5-5",
+      "instructions_version": "producer.md@d8f469023af2"
+    }
+  },
+  "check_page": "https://claude.ai/artifact/LQ1sAQ6GFvC6csYnhCiiad",
+  "package_totals": {
+    "galls": 18,
+    "statements": {
+      "gall:description": 18,
+      "gall:relationship": 50,
+      "gall:trait": 76,
+      "name:name_match": 18,
+      "taxonomy:name": 18,
+      "taxonomy:synonymy": 4
+    }
+  },
+  "counts": {
+    "statements": {
+      "right": 38,
+      "unsure": 2
+    },
+    "names": {
+      "right": 1
+    },
+    "by_kind": {
+      "gall:description": {
+        "right": 6
+      },
+      "gall:relationship": {
+        "right": 14
+      },
+      "gall:trait": {
+        "right": 14,
+        "unsure": 2
+      },
+      "name:name_match": {
+        "right": 1
+      },
+      "taxonomy:name": {
+        "right": 3
+      },
+      "taxonomy:synonymy": {
+        "right": 1
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "taxonomy-a2",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:38.030Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t2",
+          "name_as_written": "Pachypappa pseudobyrsa",
+          "rank": "species"
+        },
+        "authorship": "(Walsh, 1863)",
+        "evidence": [
+          {
+            "item": "#/texts/38",
+            "quote": "2. Pachypappa pseudobyrsa (Walsh, 1863) (Byrsocrypta)",
+            "pdf_page": 6,
+            "page": "286"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a4",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:47.707Z",
+      "statement": {
+        "kind": "synonymy",
+        "stance": "confirm",
+        "name": {
+          "ref": "t4",
+          "name_as_written": "Pachypappa pseudobursa",
+          "rank": "species"
+        },
+        "accepted": {
+          "ref": "t2",
+          "name_as_written": "Pachypappa pseudobyrsa",
+          "rank": "species"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/39",
+            "quote": "and Pachypappa pseudobursa (Floate and Whitham 1993)",
+            "pdf_page": 6,
+            "page": "286",
+            "cites": "Floate and Whitham 1993"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a8",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:02:28.897Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t8",
+          "name_as_written": "Pemphigus junctisensoriatus",
+          "rank": "species"
+        },
+        "authorship": "Maxson, 1934",
+        "evidence": [
+          {
+            "item": "#/texts/57",
+            "quote": "5. Pemphigus junctisensoriatus Maxson, 1934",
+            "pdf_page": 8,
+            "page": "288"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a23",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:50.872Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t23",
+          "name_as_written": "Aceria parapopuli",
+          "rank": "species"
+        },
+        "authorship": "(Keifer, 1940)",
+        "evidence": [
+          {
+            "item": "#/texts/104",
+            "quote": "18. Aceria parapopuli (Keifer, 1940) (Eriophyes).",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f1",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:52.332Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t1",
+            "name_as_written": "Mordwilkoja vagabunda",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "gall of Mordwilkoja vagabunda",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Mordwilkoja vagabunda",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/36",
+            "quote": "Mordwilkoja vagabunda (Walsh, 1863) (Byrsocrypta) [Poplar vagabond aphid]. The stem mother attacks the terminal bud of shoots to form a hollow, convoluted, bladdershaped structure",
+            "pdf_page": 6,
+            "page": "286"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f10",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:04:50.020Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g2",
+          "name_as_written": "gall of Pachypappa pseudobyrsa",
+          "inducer": {
+            "ref": "t2",
+            "name_as_written": "Pachypappa pseudobyrsa",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "pocket",
+          "as_written": "pocket-like pseudogall"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/39",
+            "quote": "Feeding by the stem mother induces a pocket-like pseudogall adjacent to the midrib of the leaf blade",
+            "pdf_page": 6,
+            "page": "286"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "pocket"
+        ]
+      }
+    },
+    {
+      "id": "gall-f13",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:33.887Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g2",
+          "name_as_written": "gall of Pachypappa pseudobyrsa",
+          "inducer": {
+            "ref": "t2",
+            "name_as_written": "Pachypappa pseudobyrsa",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "green",
+          "as_written": "light green"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/39",
+            "quote": "Galls are light green but occasionally have a tinge of red along the midvein of the leaf.",
+            "pdf_page": 6,
+            "page": "286"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f20",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:15.828Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "gall of Pemphigus betae",
+          "inducer": {
+            "ref": "t3",
+            "name_as_written": "Pemphigus betae",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "pocket",
+          "as_written": "pocket-like structures"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/41",
+            "quote": "Fully formed galls are pocket-like structures about 10 mm in length with a depth of 5 mm extending below the leaf surface.",
+            "pdf_page": 6,
+            "page": "286"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "pocket"
+        ]
+      }
+    },
+    {
+      "id": "gall-f25",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:31.656Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "gall of Pemphigus betae",
+          "inducer": {
+            "ref": "t3",
+            "name_as_written": "Pemphigus betae",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/41",
+            "quote": "Galls are initiated on the upper leaf surface, usually along the midrib. Fully formed galls are pocket-like structures about 10 mm in length with a depth of 5 mm extending below the leaf surface. Developing galls are green, with mature galls frequently turning reddish. There is typically one gall per leaf that most often occurs near the base of the leaf blade.",
+            "pdf_page": 6,
+            "page": "286"
+          },
+          {
+            "item": "#/texts/41",
+            "quote": "Gall densities can be highly variable, with particularly susceptible trees having five or more galls per leaf (Fig. 8).",
+            "pdf_page": 6,
+            "page": "286-288"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f26",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:04:45.310Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t4",
+            "name_as_written": "Pemphigus bursarius",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g4",
+            "name_as_written": "gall of Pemphigus bursarius",
+            "inducer": {
+              "ref": "t4",
+              "name_as_written": "Pemphigus bursarius",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/55",
+            "quote": "Pemphigus bursarius (Linnaeus, 1758) (Aphis) [Lettuce root aphid*]. Stem mothers form flask-shaped galls on the leaf petiole or occasionally on young shoots (Harper 1966).",
+            "pdf_page": 8,
+            "page": "288",
+            "cites": "Harper 1966"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f27",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:08.281Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t22",
+            "name_as_written": "Populus nigra var. italica",
+            "rank": "variety"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g4",
+            "name_as_written": "gall of Pemphigus bursarius",
+            "inducer": {
+              "ref": "t4",
+              "name_as_written": "Pemphigus bursarius",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/56",
+            "quote": "Populus nigra L. var. italica is the primary host (Harper 1959a; Alleyne and Morrison 1977).",
+            "pdf_page": 8,
+            "page": "288",
+            "cites": "Harper 1959a; Alleyne and Morrison 1977"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f44",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:21.883Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g6",
+          "name_as_written": "gall of Pemphigus monophagus",
+          "inducer": {
+            "ref": "t6",
+            "name_as_written": "Pemphigus monophagus",
+            "rank": "species"
+          }
+        },
+        "trait": "walls",
+        "value": {
+          "value": "ostiole",
+          "as_written": "a circular opening on the underside of the leaf"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/61",
+            "quote": "The gall has a circular opening on the underside of the leaf",
+            "pdf_page": 9,
+            "page": "289",
+            "cites": "Maxson 1934"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "ostiole"
+        ]
+      }
+    },
+    {
+      "id": "gall-f51",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:02:22.636Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g7",
+          "name_as_written": "gall of Pemphigus nortonii",
+          "inducer": {
+            "ref": "t7",
+            "name_as_written": "Pemphigus nortonii",
+            "rank": "species"
+          }
+        },
+        "trait": "season",
+        "value": {
+          "value": "Summer",
+          "as_written": "exiting beginning in late June to mid-July and being 90% complete by August 6"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/63",
+            "quote": "In southern Alberta, each gall produces an average of 315 (range: 20-812) alatae, with exiting beginning in late June to mid-July and being 90% complete by August 6 (Harper 1959b).",
+            "pdf_page": 9,
+            "page": "289",
+            "cites": "Harper 1959b"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "Summer"
+        ]
+      }
+    },
+    {
+      "id": "gall-f60",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:25.410Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t9",
+            "name_as_written": "Pemphigus populiglobuli",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g9",
+            "name_as_written": "gall of Pemphigus populiglobuli",
+            "inducer": {
+              "ref": "t9",
+              "name_as_written": "Pemphigus populiglobuli",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/78",
+            "quote": "Pemphigus populiglobuli Fitch 1859 [Poplar bullet gall aphid]. Galls are semiglobular structures formed by the swelling of the leaf blade at the junction with the petiole",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f62",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:08:03.249Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t21",
+            "name_as_written": "Populus balsamifera",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g9",
+            "name_as_written": "gall of Pemphigus populiglobuli",
+            "inducer": {
+              "ref": "t9",
+              "name_as_written": "Pemphigus populiglobuli",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/79",
+            "quote": "Primary hosts include P. angustifolia, P. balsamifera, and hybrid intermediates (Maxson and Knowlton 1929; Gillette and Palmer 1934; Harper 1959a; Floate and Whitham 1993).",
+            "pdf_page": 11,
+            "page": "291",
+            "cites": "Maxson and Knowlton 1929; Gillette and Palmer 1934; Harper 1959a; Floate and Whitham 1993"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f63",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:42.048Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g9",
+          "name_as_written": "gall of Pemphigus populiglobuli",
+          "inducer": {
+            "ref": "t9",
+            "name_as_written": "Pemphigus populiglobuli",
+            "rank": "species"
+          }
+        },
+        "trait": "shape",
+        "value": {
+          "value": "hemispherical",
+          "as_written": "semiglobular"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/78",
+            "quote": "Galls are semiglobular structures formed by the swelling of the leaf blade at the junction with the petiole and extend above the plane of the upper leaf surface (Fig. 11).",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "hemispherical"
+        ]
+      }
+    },
+    {
+      "id": "gall-f64",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:05:17.746Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g9",
+          "name_as_written": "gall of Pemphigus populiglobuli",
+          "inducer": {
+            "ref": "t9",
+            "name_as_written": "Pemphigus populiglobuli",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "upper leaf",
+          "as_written": "extend above the plane of the upper leaf surface"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/78",
+            "quote": "extend above the plane of the upper leaf surface",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "upper leaf"
+        ]
+      }
+    },
+    {
+      "id": "gall-f67",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:09:08.480Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g9",
+          "name_as_written": "gall of Pemphigus populiglobuli",
+          "inducer": {
+            "ref": "t9",
+            "name_as_written": "Pemphigus populiglobuli",
+            "rank": "species"
+          }
+        },
+        "trait": "color",
+        "value": {
+          "value": "red",
+          "as_written": "reddish tinge"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/78",
+            "quote": "Mature galls are green, often with a reddish tinge.",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "green",
+          "red"
+        ]
+      }
+    },
+    {
+      "id": "gall-f72",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:53.452Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g10",
+          "name_as_written": "gall of Pemphigus populiramulorum",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Pemphigus populiramulorum",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "twigs of the current year"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/80",
+            "quote": "galls of P. populiramulorum occur on twigs of the current year",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f77",
+      "verdict": "unsure",
+      "note": "As before with the seasons.",
+      "checked_at": "2026-10-15T19:08:19.720Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g10",
+          "name_as_written": "gall of Pemphigus populiramulorum",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Pemphigus populiramulorum",
+            "rank": "species"
+          }
+        },
+        "trait": "season",
+        "value": {
+          "value": "Winter",
+          "as_written": "vacant galls frequently being retained on the tree during winter months"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/80",
+            "quote": "The location of galls on the woody tissues of the twig results in vacant galls frequently being retained on the tree during winter months.",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "Summer",
+          "Winter"
+        ]
+      }
+    },
+    {
+      "id": "gall-f78",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:09:21.056Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g10",
+          "name_as_written": "gall of Pemphigus populiramulorum",
+          "inducer": {
+            "ref": "t10",
+            "name_as_written": "Pemphigus populiramulorum",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/80",
+            "quote": "Whereas galls of other Pemphigus species are formed from tissues of the leaf blade and/or petiole, galls of P. populiramulorum occur on twigs of the current year. Feeding on the young twigs causes swelling of the tissues that expand into a hollow globular structure that surrounds the stem mother and her offspring (Fig. 12). The exit opening is a narrow slit with slightly protruding lips. The location of galls on the woody tissues of the twig results in vacant galls frequently being retained on the tree during winter months. The point of attachment left by abscised galls is a characteristic flattened \"button\" region on the twig (Fig. 13).",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f81",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:39.018Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g11",
+          "name_as_written": "gall of Pemphigus populitransversus",
+          "inducer": {
+            "ref": "t11",
+            "name_as_written": "Pemphigus populitransversus",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "petiole",
+          "as_written": "petioles"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/82",
+            "quote": "The stem mother feeds on petioles to cause the swelling of tissues that form a hollow, globular structure",
+            "pdf_page": 11,
+            "page": "291"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "petiole"
+        ]
+      }
+    },
+    {
+      "id": "gall-f92",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:04:39.749Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g12",
+          "name_as_written": "gall of Pemphigus populivenae",
+          "inducer": {
+            "ref": "t12",
+            "name_as_written": "Pemphigus populivenae",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "upper leaf",
+          "as_written": "project above the upper plane of the leaf blade"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/87",
+            "quote": "Galls are oval to semi-oblong, open on the underside of the leaf, and project above the upper plane of the leaf blade.",
+            "pdf_page": 12,
+            "page": "292"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "upper leaf"
+        ]
+      }
+    },
+    {
+      "id": "gall-f95",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:27.011Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t13",
+            "name_as_written": "Pemphigus spyrothecae",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g13",
+            "name_as_written": "gall of Pemphigus spyrothecae",
+            "inducer": {
+              "ref": "t13",
+              "name_as_written": "Pemphigus spyrothecae",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/89",
+            "quote": "Feeding by the stem mother causes the leaf petiole to twist into spirals (usually three) that surround the aphid.",
+            "pdf_page": 12,
+            "page": "292"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f102",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:33.498Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "gall of Pemphigus spyrothecae",
+          "inducer": {
+            "ref": "t13",
+            "name_as_written": "Pemphigus spyrothecae",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/89",
+            "quote": "Feeding by the stem mother causes the leaf petiole to twist into spirals (usually three) that surround the aphid. The spirals swell, with their seams becoming tightly pressed together to form a hollow, spiralshaped gall that completely surrounds the stem mother and her offspring (Fig. 15). Galls mature in late August or early September and are initially green, but often become reddish. Alatae exit the mature gall via a series of small pores that form along the seams of the spirals.",
+            "pdf_page": 12,
+            "page": "292"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f104",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:04:58.636Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t21",
+            "name_as_written": "Populus balsamifera",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g14",
+            "name_as_written": "gall of Thecabius gravicornis",
+            "inducer": {
+              "ref": "t14",
+              "name_as_written": "Thecabius gravicornis",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/92",
+            "quote": "Primary hosts include P. balsamifera (Gillette and Palmer 1934)",
+            "pdf_page": 12,
+            "page": "292",
+            "cites": "Gillette and Palmer 1934"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f106",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:09:13.442Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t22",
+            "name_as_written": "Populus nigra var. italica",
+            "rank": "variety"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g14",
+            "name_as_written": "gall of Thecabius gravicornis",
+            "inducer": {
+              "ref": "t14",
+              "name_as_written": "Thecabius gravicornis",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/92",
+            "quote": "There has been one report of T. gravicornis on P. nigra L. var. italica (Alleyne and Morrison 1977).",
+            "pdf_page": 12,
+            "page": "292",
+            "cites": "Alleyne and Morrison 1977"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f110",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:08:22.469Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g14",
+          "name_as_written": "gall of Thecabius gravicornis",
+          "inducer": {
+            "ref": "t14",
+            "name_as_written": "Thecabius gravicornis",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/91",
+            "quote": "Feeding by the stem mother adjacent to the midrib on the lower surface of the leaf blade initiates a small cavity in which apterae are produced. The apterae leave the cavity to feed on expanding terminal leaves. Their feeding causes the leaves to fold ventrally along the midrib to form a purse-shaped pseudogall similar to that of P. pseudobyrsa.",
+            "pdf_page": 12,
+            "page": "292"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f111",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:35.657Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t15",
+            "name_as_written": "Thecabius populiconduplifolius",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g15",
+            "name_as_written": "gall of Thecabius populiconduplifolius",
+            "inducer": {
+              "ref": "t15",
+              "name_as_written": "Thecabius populiconduplifolius",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/93",
+            "quote": "15. Thecabius populiconduplifolius (Cowen, 1895) (Pemphigus) [Folded-leaf poplar aphid]. Feeding by the stem mother at the leaf margin causes the edge of the leaf blade to fold under and form a small gall (Fig. 16).",
+            "pdf_page": 12,
+            "page": "292"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f113",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:05:10.390Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t21",
+            "name_as_written": "Populus balsamifera",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g15",
+            "name_as_written": "gall of Thecabius populiconduplifolius",
+            "inducer": {
+              "ref": "t15",
+              "name_as_written": "Thecabius populiconduplifolius",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/94",
+            "quote": "P. balsamifera (Harper 1966)",
+            "pdf_page": 12,
+            "page": "292",
+            "cites": "Harper 1966"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f114",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:05:01.891Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t22",
+            "name_as_written": "Populus nigra var. italica",
+            "rank": "variety"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g15",
+            "name_as_written": "gall of Thecabius populiconduplifolius",
+            "inducer": {
+              "ref": "t15",
+              "name_as_written": "Thecabius populiconduplifolius",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/94",
+            "quote": "and P. nigra L. var. italica (Alleyne and Morrison 1977)",
+            "pdf_page": 12,
+            "page": "292",
+            "cites": "Alleyne and Morrison 1977"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f115",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:05:07.282Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g15",
+          "name_as_written": "gall of Thecabius populiconduplifolius",
+          "inducer": {
+            "ref": "t15",
+            "name_as_written": "Thecabius populiconduplifolius",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "leaf edge fold",
+          "as_written": "the edge of the leaf blade to fold under"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/93",
+            "quote": "causes the edge of the leaf blade to fold under and form a small gall",
+            "pdf_page": 12,
+            "page": "292"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "leaf edge fold"
+        ]
+      }
+    },
+    {
+      "id": "gall-f120",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:46.281Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t21",
+            "name_as_written": "Populus balsamifera",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g16",
+            "name_as_written": "gall of Thecabius populimonilis",
+            "inducer": {
+              "ref": "t16",
+              "name_as_written": "Thecabius populimonilis",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/99",
+            "quote": "Primary hosts include P. angustifolia and P. balsamifera (Maxson and Knowlton 1929; Gillette and Palmer 1934; Harper 1959a; Floate and Whitham 1993).",
+            "pdf_page": 13,
+            "page": "293",
+            "cites": "Maxson and Knowlton 1929; Gillette and Palmer 1934; Harper 1959a; Floate and Whitham 1993"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f121",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:05:16.002Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "gall of Thecabius populimonilis",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Thecabius populimonilis",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "leaf blister",
+          "as_written": "blister-like pseudogall"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/98",
+            "quote": "causing formation of a blister-like pseudogall that projects above the upper plane of the leaf surface",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "leaf blister"
+        ]
+      }
+    },
+    {
+      "id": "gall-f122",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:05:13.252Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "gall of Thecabius populimonilis",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Thecabius populimonilis",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "upper leaf",
+          "as_written": "projects above the upper plane of the leaf surface"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/98",
+            "quote": "a blister-like pseudogall that projects above the upper plane of the leaf surface",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "upper leaf"
+        ]
+      }
+    },
+    {
+      "id": "gall-f124",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:06:48.741Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "gall of Thecabius populimonilis",
+          "inducer": {
+            "ref": "t16",
+            "name_as_written": "Thecabius populimonilis",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/98",
+            "quote": "The stem mother feeds on the underside of the leaf blade, causing formation of a blister-like pseudogall that projects above the upper plane of the leaf surface. Her offspring (the second generation) are apterae that leave the gall shortly after birth to each induce their own similarly shaped gall, either on the same leaf or on adjacent leaves of the same shoot. This results in one or more rows of galls forming parallel to the midrib, with each gall containing one aphid (Fig. 17).",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f125",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:45.539Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t17",
+            "name_as_written": "Aceria neoessigi",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g17",
+            "name_as_written": "gall of Aceria neoessigi",
+            "inducer": {
+              "ref": "t17",
+              "name_as_written": "Aceria neoessigi",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/102",
+            "quote": "Attacked flowers become malformed and enlarged and group tightly together such that the catkin forms a large pendant gall that may exceed 20 cm in length (Fig. 18).",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f130",
+      "verdict": "unsure",
+      "note": "These season assignments are tough. Techically the gall was formed in the Summer/Fall and the mites overwintered and emerge in the Spring. I think we need better defintions for the seasons. Note this and I will take it to Adam.",
+      "checked_at": "2026-10-15T19:06:26.747Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "gall of Aceria neoessigi",
+          "inducer": {
+            "ref": "t17",
+            "name_as_written": "Aceria neoessigi",
+            "rank": "species"
+          }
+        },
+        "trait": "season",
+        "value": {
+          "value": "Spring",
+          "as_written": "emerge in the spring to attack the flowers of the catkin"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/102",
+            "quote": "Mites overwintering in the buds of Populus emerge in the spring to attack the flowers of the catkin.",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "Spring",
+          "Summer"
+        ]
+      }
+    },
+    {
+      "id": "gall-f132",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:07:02.055Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inquiline_of",
+        "subject": {
+          "taxon": {
+            "ref": "t24",
+            "name_as_written": "Aceria populinquis",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g17",
+            "name_as_written": "gall of Aceria neoessigi",
+            "inducer": {
+              "ref": "t17",
+              "name_as_written": "Aceria neoessigi",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/102",
+            "quote": "Galled catkins may also contain Aceria populinquis Keifer, which occurs as an inquiline (Wilson and Oldfield 1966).",
+            "pdf_page": 13,
+            "page": "293",
+            "cites": "Wilson and Oldfield 1966"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f133",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:09:17.062Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "gall of Aceria neoessigi",
+          "inducer": {
+            "ref": "t17",
+            "name_as_written": "Aceria neoessigi",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/102",
+            "quote": "Attacked flowers become malformed and enlarged and group tightly together such that the catkin forms a large pendant gall that may exceed 20 cm in length (Fig. 18). Galled catkins remain on the tree until early summer, long after unattacked catkins have dehisced.",
+            "pdf_page": 13,
+            "page": "293"
+          }
+        ]
+      }
+    },
+    {
+      "id": "name-g5",
+      "verdict": "right",
+      "checked_at": "2026-10-15T19:02:02.335Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g5",
+          "name_as_written": "gall of Pemphigus junctisensoriatus",
+          "inducer": {
+            "ref": "t5",
+            "name_as_written": "Pemphigus junctisensoriatus",
+            "rank": "species"
+          }
+        },
+        "inducer_as_written": "Pemphigus junctisensoriatus",
+        "outcome": "resolved",
+        "entries": [
+          "Pemphigus tartareus"
+        ]
+      }
+    }
+  ]
+}

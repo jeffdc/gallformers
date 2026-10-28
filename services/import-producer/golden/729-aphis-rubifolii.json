@@ -1,0 +1,823 @@
+{
+  "golden_format": 1,
+  "source": {
+    "id": 729,
+    "name": "InfluentialPoints, Aphis rubifolii",
+    "short": "aphis-rubifolii"
+  },
+  "citation": "InfluentialPoints. Aphis rubifolii (Small blackberry aphid) identification, images, ecology, control. InfluentialPoints.com. Accessed 2026-10-15.",
+  "package": "729-aphis-rubifolii",
+  "package_format": {
+    "format_version": 3,
+    "vocabulary_version": "2026-10-15",
+    "producer": {
+      "name": "gallformers-import-producer-poc",
+      "version": "0.1.0",
+      "model": "claude-opus-5-5",
+      "instructions_version": "producer.md@d8f469023af2"
+    }
+  },
+  "check_page": "https://claude.ai/artifact/CcjPZXZBZV58LsFNs9K81F",
+  "package_totals": {
+    "galls": 1,
+    "statements": {
+      "gall:description": 1,
+      "gall:range": 1,
+      "gall:relationship": 13,
+      "gall:trait": 2,
+      "name:name_match": 1
+    }
+  },
+  "counts": {
+    "statements": {
+      "right": 17
+    },
+    "names": {
+      "right": 1
+    },
+    "by_kind": {
+      "gall:description": {
+        "right": 1
+      },
+      "gall:range": {
+        "right": 1
+      },
+      "gall:relationship": {
+        "right": 13
+      },
+      "gall:trait": {
+        "right": 2
+      },
+      "name:name_match": {
+        "right": 1
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "gall-f1",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:37.491Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t1",
+            "name_as_written": "Aphis rubifolii",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/27",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/28",
+            "quote": "lives in curled-leaf"
+          },
+          {
+            "item": "#/texts/29",
+            "whole_item": true,
+            "text": "pseudogalls"
+          },
+          {
+            "item": "#/texts/80",
+            "quote": "found it \"very common in Illinois, curling and injuring the foliage of the cultivated and wild blackberry.\"",
+            "cites": "Davis (1910)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f2",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:09:06.391Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t2",
+            "name_as_written": "Rubus",
+            "rank": "genus"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/28",
+            "quote": "lives in curled-leaf"
+          },
+          {
+            "item": "#/texts/29",
+            "whole_item": true,
+            "text": "pseudogalls"
+          },
+          {
+            "item": "#/texts/30",
+            "quote": "of various species of blackberry ("
+          },
+          {
+            "item": "#/texts/31",
+            "whole_item": true,
+            "text": "Rubus"
+          },
+          {
+            "item": "#/texts/32",
+            "quote": "species)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f3",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:41.457Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t3",
+            "name_as_written": "Rubus allegheliensis",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus allegheliensis"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f4",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:16.164Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t4",
+            "name_as_written": "Rubus cuneifolius",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus cuneifolius"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f5",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:28.234Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t5",
+            "name_as_written": "Rubus ellipticus",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus ellipticus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f6",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:40.291Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t6",
+            "name_as_written": "Rubus flagellaris",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus flagellaris"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f7",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:09:12.028Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t7",
+            "name_as_written": "Rubus laciniatus",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus laciniatus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f8",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:25.465Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t8",
+            "name_as_written": "Rubus leucodermis",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus leucodermis (=Melanobatus leucodermis)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f9",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:26.654Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t9",
+            "name_as_written": "Rubus occidentalis",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus occidentalis"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f10",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:42.305Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t10",
+            "name_as_written": "Rubus procerus",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus procerus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f11",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:10.731Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t11",
+            "name_as_written": "Rubus strigosus",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus strigosus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f12",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:30.485Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t12",
+            "name_as_written": "Rubus ursinus var. loganobaccus",
+            "rank": "variety"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus ursinus var. loganobaccus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f13",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:44.705Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t13",
+            "name_as_written": "Rubus villosus var. frondosus",
+            "rank": "variety"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g1",
+            "name_as_written": "curled-leaf pseudogalls",
+            "inducer": {
+              "ref": "t1",
+              "name_as_written": "Aphis rubifolii",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/84",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/85",
+            "quote": "has been recorded from 11 different species of"
+          },
+          {
+            "item": "#/texts/88",
+            "quote": "Rubus villosus var. frondosus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f14",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:09:01.359Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "curled-leaf pseudogalls",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Aphis rubifolii",
+            "rank": "species"
+          }
+        },
+        "trait": "form",
+        "value": {
+          "value": "leaf curl",
+          "as_written": "curled-leaf pseudogalls"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/28",
+            "quote": "lives in curled-leaf"
+          },
+          {
+            "item": "#/texts/29",
+            "whole_item": true,
+            "text": "pseudogalls"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "leaf curl"
+        ]
+      }
+    },
+    {
+      "id": "gall-f15",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:09:09.731Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "curled-leaf pseudogalls",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Aphis rubifolii",
+            "rank": "species"
+          }
+        },
+        "trait": "texture",
+        "value": {
+          "value": "wrinkly",
+          "as_written": "crinkled leaf pseudogalls"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/69",
+            "quote": "Small blackberry aphids live in crinkled leaf pseudogalls"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "wrinkly"
+        ]
+      }
+    },
+    {
+      "id": "gall-f16",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:21.544Z",
+      "statement": {
+        "kind": "range",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "curled-leaf pseudogalls",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Aphis rubifolii",
+            "rank": "species"
+          }
+        },
+        "adjustment": "exclude",
+        "place": {
+          "value": "XE",
+          "as_written": "Europe"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/80",
+            "quote": "The species is found widely in North America, but (so far at least) not in Europe."
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f17",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:08:54.277Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "curled-leaf pseudogalls",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Aphis rubifolii",
+            "rank": "species"
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/27",
+            "whole_item": true,
+            "text": "Aphis rubifolii"
+          },
+          {
+            "item": "#/texts/28",
+            "whole_item": true,
+            "text": "lives in curled-leaf"
+          },
+          {
+            "item": "#/texts/29",
+            "whole_item": true,
+            "text": "pseudogalls"
+          },
+          {
+            "item": "#/texts/30",
+            "quote": "of various species of blackberry ("
+          },
+          {
+            "item": "#/texts/31",
+            "whole_item": true,
+            "text": "Rubus"
+          },
+          {
+            "item": "#/texts/32",
+            "quote": "species)."
+          },
+          {
+            "item": "#/texts/69",
+            "whole_item": true,
+            "text": "Small blackberry aphids live in crinkled leaf pseudogalls on both cultivated and wild species of blackberries ("
+          },
+          {
+            "item": "#/texts/70",
+            "whole_item": true,
+            "text": "Rubus"
+          },
+          {
+            "item": "#/texts/71",
+            "quote": "). On cultivated varieties they are often found near the tips of the blackberry canes."
+          },
+          {
+            "item": "#/texts/80",
+            "quote": "\"very common in Illinois, curling and injuring the foliage of the cultivated and wild blackberry.\"",
+            "cites": "Davis (1910)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "name-g1",
+      "verdict": "right",
+      "checked_at": "2026-10-15T20:06:33.703Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "curled-leaf pseudogalls",
+          "inducer": {
+            "ref": "t1",
+            "name_as_written": "Aphis rubifolii",
+            "rank": "species"
+          }
+        },
+        "inducer_as_written": "Aphis rubifolii",
+        "outcome": "resolved",
+        "entries": [
+          "Aphis rubifolii"
+        ]
+      }
+    }
+  ]
+}

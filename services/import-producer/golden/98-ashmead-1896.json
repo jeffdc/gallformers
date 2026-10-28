@@ -1,0 +1,1704 @@
+{
+  "golden_format": 1,
+  "source": {
+    "id": 98,
+    "name": "Ashmead 1896",
+    "short": "ashmead-1896"
+  },
+  "citation": "Ashmead, W. H. 1897. Descriptions of new cynipidous galls and gallwasps in the United States National Museum. Proceedings of the United States National Museum 19 (No. 1102): 113-136.",
+  "package": "98-ashmead-1896",
+  "package_format": {
+    "format_version": 3,
+    "vocabulary_version": "2026-10-11",
+    "producer": {
+      "name": "gallformers-import-producer-poc",
+      "version": "0.1.0",
+      "model": "claude-opus-5-5",
+      "instructions_version": "producer.md@d8f469023af2"
+    }
+  },
+  "check_page": "https://claude.ai/artifact/Ns3bRDFP95sUKkT3NUzW1x",
+  "package_totals": {
+    "galls": 39,
+    "statements": {
+      "gall:description": 34,
+      "gall:relationship": 73,
+      "gall:trait": 153,
+      "name:name_match": 39,
+      "taxonomy:name": 44,
+      "taxonomy:placement": 42
+    }
+  },
+  "counts": {
+    "statements": {
+      "right": 40
+    },
+    "names": {
+      "right": 6,
+      "unsure": 3
+    },
+    "by_kind": {
+      "gall:description": {
+        "right": 5
+      },
+      "gall:relationship": {
+        "right": 7
+      },
+      "gall:trait": {
+        "right": 17
+      },
+      "name:name_match": {
+        "right": 6,
+        "unsure": 3
+      },
+      "taxonomy:name": {
+        "right": 6
+      },
+      "taxonomy:placement": {
+        "right": 5
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "taxonomy-a1",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:32:01.712Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t8",
+          "name_as_written": "COMPSODRYOXENUS",
+          "name_reading": "Compsodryoxenus",
+          "rank": "genus",
+          "new": "new genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/249",
+            "quote": "COMPSODRYOXENUS, new genus.",
+            "pdf_page": 18,
+            "page": "128"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a6",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:28:27.754Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t16",
+          "name_as_written": "DRYOPHANTA EMORYY",
+          "name_reading": "Dryophanta emoryi",
+          "rank": "species",
+          "new": "new species"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/42",
+            "quote": "DRYOPHANTA EMORYY, new gpecies.",
+            "pdf_page": 5,
+            "page": "115"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a7",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:32:19.990Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t16",
+          "name_as_written": "DRYOPHANTA EMORYY",
+          "name_reading": "Dryophanta emoryi",
+          "rank": "species",
+          "new": "new species"
+        },
+        "parent": {
+          "ref": "t2",
+          "name_as_written": "DRYOPHANTA",
+          "name_reading": "Dryophanta",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/32",
+            "quote": "Genus DRYOPHANTA, Forster.",
+            "pdf_page": 4,
+            "page": "114"
+          },
+          {
+            "item": "#/texts/42",
+            "quote": "DRYOPHANTA EMORYY, new gpecies.",
+            "pdf_page": 5,
+            "page": "115"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a13",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:54.926Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t19",
+          "name_as_written": "ANDRICUS MORRISONI",
+          "name_reading": "Andricus morrisoni",
+          "rank": "species",
+          "new": "new species"
+        },
+        "parent": {
+          "ref": "t3",
+          "name_as_written": "ANDRICUS",
+          "name_reading": "Andricus",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/68",
+            "quote": "Genus ANDRICUS, Hartig.",
+            "pdf_page": 6,
+            "page": "116"
+          },
+          {
+            "item": "#/texts/69",
+            "quote": "ANDRICUS MORRISONI, new species.",
+            "pdf_page": 6,
+            "page": "116"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a16",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:28:44.969Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t21",
+          "name_as_written": "ANDRICUS DASYDACTYLI",
+          "name_reading": "Andricus dasydactyli",
+          "rank": "species",
+          "new": "new species"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/87",
+            "quote": "ANDRICUS DASYDACTYLI, new species.",
+            "pdf_page": 7,
+            "page": "117"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a21",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:28:32.976Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t23",
+          "name_as_written": "ANDRICUS WISLICENI",
+          "name_reading": "Andricus wisliceni",
+          "rank": "species",
+          "new": "new species"
+        },
+        "parent": {
+          "ref": "t3",
+          "name_as_written": "ANDRICUS",
+          "name_reading": "Andricus",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/68",
+            "quote": "Genus ANDRICUS, Hartig.",
+            "pdf_page": 6,
+            "page": "116"
+          },
+          {
+            "item": "#/texts/103",
+            "quote": "ANDRICUS WISLICENI, new species.",
+            "pdf_page": 9,
+            "page": "119"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a24",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:57.161Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t25",
+          "name_as_written": "ANDRICUS APICALIS",
+          "name_reading": "Andricus apicalis",
+          "rank": "species",
+          "new": "new species"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/118",
+            "quote": "ANDRICUS APICALIS, new species.",
+            "pdf_page": 10,
+            "page": "120"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a30",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:28.542Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t28",
+          "name_as_written": "ANDRICUS RILEYI",
+          "name_reading": "Andricus rileyi",
+          "rank": "species",
+          "new": "new species"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/140",
+            "quote": "ANDRICUS RILEYI, new species.",
+            "pdf_page": 11,
+            "page": "121"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a32",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:40.385Z",
+      "statement": {
+        "kind": "name",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t29",
+          "name_as_written": "ANDRICUS PERPLEXUS",
+          "name_reading": "Andricus perplexus",
+          "rank": "species",
+          "new": "new species"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/148",
+            "quote": "ANDRICUS PERPLEXUS, new species.",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a35",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:59.444Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t30",
+          "name_as_written": "ANDRICUS IMBRECARIZ:",
+          "name_reading": "Andricus imbrecariae",
+          "rank": "species",
+          "new": "new species"
+        },
+        "parent": {
+          "ref": "t3",
+          "name_as_written": "ANDRICUS",
+          "name_reading": "Andricus",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/68",
+            "quote": "Genus ANDRICUS, Hartig.",
+            "pdf_page": 6,
+            "page": "116"
+          },
+          {
+            "item": "#/texts/153",
+            "quote": "ANDRICUS IMBRECARIZ:, new species.",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      }
+    },
+    {
+      "id": "taxonomy-a86",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:32:16.967Z",
+      "statement": {
+        "kind": "placement",
+        "stance": "confirm",
+        "taxon": {
+          "ref": "t56",
+          "name_as_written": "RHODITES SIMILIS",
+          "name_reading": "Rhodites similis",
+          "rank": "species",
+          "new": "new species"
+        },
+        "parent": {
+          "ref": "t13",
+          "name_as_written": "RHODITES",
+          "name_reading": "Rhodites",
+          "rank": "genus"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/378",
+            "quote": "RHODITES SIMILIS, new species.",
+            "pdf_page": 26,
+            "page": "136"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f5",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:52.371Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "the root gall of Trigonaspis radicis",
+          "inducer": {
+            "ref": "t21",
+            "name_as_written": "TRIGONASPIS RADICIS",
+            "name_reading": "Trigonaspis radicis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "shape",
+        "value": {
+          "value": "cluster",
+          "as_written": "occurring in clusters"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/19",
+            "quote": "occurring in clusters on the roots",
+            "pdf_page": 3,
+            "page": "113"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "cluster",
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f7",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:38.244Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "the root gall of Trigonaspis radicis",
+          "inducer": {
+            "ref": "t21",
+            "name_as_written": "TRIGONASPIS RADICIS",
+            "name_reading": "Trigonaspis radicis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "color",
+        "value": {
+          "value": "white",
+          "as_written": "white galls"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/20",
+            "quote": "Large, soft, white galls, purple on top.",
+            "pdf_page": 3,
+            "page": "113"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "purple",
+          "white"
+        ]
+      }
+    },
+    {
+      "id": "gall-f14",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:01.199Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t20",
+            "name_as_written": "D. vesicula",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g3",
+            "name_as_written": "the gall produced by D. vesicula, Bassett",
+            "inducer": {
+              "ref": "t20",
+              "name_as_written": "D. vesicula",
+              "rank": "species"
+            }
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/34",
+            "quote": "the gall produced by D. vesicula, Bassett",
+            "pdf_page": 4,
+            "page": "114"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f16",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:27:26.135Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g3",
+          "name_as_written": "the gall produced by D. vesicula, Bassett",
+          "inducer": {
+            "ref": "t20",
+            "name_as_written": "D. vesicula",
+            "rank": "species"
+          }
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "bud",
+          "as_written": "the buds"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/34",
+            "quote": "whereas that species is developed from the buds of Q. alba",
+            "pdf_page": 4,
+            "page": "114"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "bud"
+        ]
+      }
+    },
+    {
+      "id": "gall-f23",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:26:45.715Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g4",
+          "name_as_written": "the leaf gall of Dryophanta emoryi",
+          "inducer": {
+            "ref": "t23",
+            "name_as_written": "DRYOPHANTA EMORYY",
+            "name_reading": "Dryophanta emoryi",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "cells",
+        "value": {
+          "value": "monothalamous",
+          "as_written": "a small, central kernel"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/43",
+            "quote": "Internally there is a small, central kernel",
+            "pdf_page": 5,
+            "page": "115"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "monothalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f34",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:19.221Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g5",
+          "name_as_written": "the leaf gall of Dryophanta pulchripennis",
+          "inducer": {
+            "ref": "t24",
+            "name_as_written": "DRYOPHANTA PULCHRIPENNIS",
+            "name_reading": "Dryophanta pulchripennis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "texture",
+        "value": {
+          "value": "hairy",
+          "as_written": "some short white hairs"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/50",
+            "quote": "which have some short white hairs basally",
+            "pdf_page": 5,
+            "page": "115"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "bumpy",
+          "hairy"
+        ]
+      }
+    },
+    {
+      "id": "gall-f36",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:22.948Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t25",
+            "name_as_written": "DRYOPHANTA RADICOLA",
+            "name_reading": "Dryophanta radicola",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g6",
+            "name_as_written": "the root gall of Dryophanta radicola",
+            "inducer": {
+              "ref": "t25",
+              "name_as_written": "DRYOPHANTA RADICOLA",
+              "name_reading": "Dryophanta radicola",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/61",
+            "quote": "DRYOPHANTA RADICOLA, new species.",
+            "pdf_page": 6,
+            "page": "116"
+          },
+          {
+            "item": "#/texts/62",
+            "quote": "Gall.—This gall also could not be found in the collection.",
+            "pdf_page": 6,
+            "page": "116"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f53",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:52.446Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g8",
+          "name_as_written": "the gall of Andricus murtfeldtae",
+          "inducer": {
+            "ref": "t27",
+            "name_as_written": "ANDRICUS MURTFELDT2Z",
+            "name_reading": "Andricus murtfeldtae",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/82",
+            "whole_item": true,
+            "text": "Gall.—An irregular, hard, pithy, brown, globular gall; externally finely granulated and with a few short blunt spines; interiorly of a hard, pithy, brown substance; polythalamous. Diameter,8mm.; length, 10 mm.",
+            "pdf_page": 7,
+            "page": "117"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f94",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:09.155Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g13",
+          "name_as_written": "the root galls of Andricus apicalis",
+          "inducer": {
+            "ref": "t32",
+            "name_as_written": "ANDRICUS APICALIS",
+            "name_reading": "Andricus apicalis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "Irregular ... globular"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/119",
+            "quote": "Irregular, brownish black globular galls",
+            "pdf_page": 10,
+            "page": "120"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f116",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:43.563Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g15",
+          "name_as_written": "the fissure gall of Andricus excavatus in branches of the red oak",
+          "inducer": {
+            "ref": "t34",
+            "name_as_written": "ANDRICUS EXCAVATUS",
+            "name_reading": "Andricus excavatus",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/134",
+            "whole_item": true,
+            "text": "Gall_—In the branches of the red oak, Quercus rubrum, toward the end of summer, appear long longitudinal slits or fissures, filled with irregularly shaped cells or kernels, which are usually smooth and polished, and generally of an oval, flattened form. These are the larval cells of a Cynipid, which fall to the ground in the fali, where the larva within undergo their final transformation.",
+            "pdf_page": 11,
+            "page": "121"
+          },
+          {
+            "item": "#/texts/135",
+            "whole_item": true,
+            "text": "After the larval cells have fallen to the ground from their matrices, the twigs present broad grooves, fissures, and excavations, the relative length, depth, and appearance depending entirely upon the number of cells they had contained. One twig in the collection of the National Museum from which these larval cells had fallen exhibits a broad excavation over 2 inches long.",
+            "pdf_page": 11,
+            "page": "121"
+          },
+          {
+            "item": "#/texts/136",
+            "whole_item": true,
+            "text": "The flattened larval cell varies considerably in shape and size, but usually it is from 5 to 6 mm. long by 3 to 5 mm. in diameter.",
+            "pdf_page": 11,
+            "page": "121"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f117",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:07.936Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t35",
+            "name_as_written": "ANDRICUS RILEYI",
+            "name_reading": "Andricus rileyi",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g16",
+            "name_as_written": "the midrib gall of Andricus rileyi",
+            "inducer": {
+              "ref": "t35",
+              "name_as_written": "ANDRICUS RILEYI",
+              "name_reading": "Andricus rileyi",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/140",
+            "quote": "ANDRICUS RILEYI, new species.",
+            "pdf_page": 11,
+            "page": "121"
+          },
+          {
+            "item": "#/texts/141",
+            "quote": "Gall._A small brown globular gall",
+            "pdf_page": 11,
+            "page": "121"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f118",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:24.121Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t8",
+            "name_as_written": "Quercus rubrum",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g16",
+            "name_as_written": "the midrib gall of Andricus rileyi",
+            "inducer": {
+              "ref": "t35",
+              "name_as_written": "ANDRICUS RILEYI",
+              "name_reading": "Andricus rileyi",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/147",
+            "quote": "The gall oceurs on Quercus rubrum.",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f132",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:15.532Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g17",
+          "name_as_written": "the gall of Andricus perplexus",
+          "inducer": {
+            "ref": "t36",
+            "name_as_written": "ANDRICUS PERPLEXUS",
+            "name_reading": "Andricus perplexus",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/149",
+            "whole_item": true,
+            "text": "Gall.—A small globular gall, somewhat pointed at apex and covered externally with an exceeding fine, short, grayish pubescence or bloom. Internally the larval cell occupies most of the gall. Diameter, 5 mm.",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f133",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:32:10.183Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "inducer_of",
+        "subject": {
+          "taxon": {
+            "ref": "t37",
+            "name_as_written": "ANDRICUS IMBRECARIZ:",
+            "name_reading": "Andricus imbrecariae",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g18",
+            "name_as_written": "the twig gall of Andricus imbrecariae",
+            "inducer": {
+              "ref": "t37",
+              "name_as_written": "ANDRICUS IMBRECARIZ:",
+              "name_reading": "Andricus imbrecariae",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/153",
+            "quote": "ANDRICUS IMBRECARIZ:, new species.",
+            "pdf_page": 12,
+            "page": "122"
+          },
+          {
+            "item": "#/texts/154",
+            "quote": "Gall.—A brownish, hard, globular gall",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f141",
+      "verdict": "right",
+      "note": "The gall itself is not split, rather it comes from a split in the twig.",
+      "checked_at": "2026-10-15T17:28:11.760Z",
+      "revision": {
+        "from": "wrong",
+        "reason": "Recount (trial log, 2026-10-15): Jeff confirmed the ruptured/split definition is right, so this statement is right (Ashmead 40/40)."
+      },
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the twig gall of Andricus imbrecariae",
+          "inducer": {
+            "ref": "t37",
+            "name_as_written": "ANDRICUS IMBRECARIZ:",
+            "name_reading": "Andricus imbrecariae",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "texture",
+        "value": {
+          "value": "ruptured/split",
+          "as_written": "issuing ... from a fissure"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/154",
+            "quote": "issuing, usually several together, from a fissure in a twig",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "ruptured/split",
+          "stiff"
+        ]
+      }
+    },
+    {
+      "id": "gall-f144",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:33:09.587Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the twig gall of Andricus imbrecariae",
+          "inducer": {
+            "ref": "t37",
+            "name_as_written": "ANDRICUS IMBRECARIZ:",
+            "name_reading": "Andricus imbrecariae",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/154",
+            "whole_item": true,
+            "text": "Gall.—A brownish, hard, globular gall, from 7 to 10 mm. in diameter, issuing, usually several together, from a fissure in a twig of Quercus imbrecaria and (. ilicifolia. The larval cell is nearly always closely cemented to the thick, hard, outer rind, but in a single instance there are a few fibers separating it.",
+            "pdf_page": 12,
+            "page": "122"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f162",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:28:22.107Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g22",
+          "name_as_written": "the gall of Amphibolips trizonata",
+          "inducer": {
+            "ref": "t41",
+            "name_as_written": "AMPHIBOLIPS TRIZONATA",
+            "name_reading": "Amphibolips trizonata",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "globular"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/197",
+            "quote": "A large, globular gall",
+            "pdf_page": 15,
+            "page": "125"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f170",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:25.066Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g23",
+          "name_as_written": "the oak apple of Amphibolips acuminata",
+          "inducer": {
+            "ref": "t42",
+            "name_as_written": "AMPHIBOLIPS ACUMINATA",
+            "name_reading": "Amphibolips acuminata",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "form",
+        "value": {
+          "value": "oak apple",
+          "as_written": "constructed on the same principle as most of the apple galls"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/207",
+            "quote": "constructed on the same principle as most of the apple galls, having a central kernel, held place by a spongy substance, and a very thin shell",
+            "pdf_page": 16,
+            "page": "126"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "oak apple"
+        ]
+      }
+    },
+    {
+      "id": "gall-f184",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:11.756Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g25",
+          "name_as_written": "the twig gall of Holcaspis truckeensis",
+          "inducer": {
+            "ref": "t44",
+            "name_as_written": "HOLCASPIS TRUCKEENSIS",
+            "name_reading": "Holcaspis truckeensis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "stem",
+          "as_written": "a terminal twig"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/225",
+            "quote": "issuing from a slit in a terminal twig",
+            "pdf_page": 17,
+            "page": "127"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "stem"
+        ]
+      }
+    },
+    {
+      "id": "gall-f191",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:32:06.507Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g26",
+          "name_as_written": "the squash-shaped leaf gall of Holcaspis douglasii",
+          "inducer": {
+            "ref": "t45",
+            "name_as_written": "HOLCASPIS DOUGLASII",
+            "name_reading": "Holcaspis douglasii",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "plant_part",
+        "value": {
+          "value": "lower leaf",
+          "as_written": "the lower side on the leaves"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/236",
+            "quote": "The gall occurs on the lower side on the leaves of Q. douglasii.",
+            "pdf_page": 17,
+            "page": "127"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "lower leaf"
+        ]
+      }
+    },
+    {
+      "id": "gall-f203",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:33.584Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g29",
+          "name_as_written": "the oak apple of Callirhytis vacciniifoliae",
+          "inducer": {
+            "ref": "t48",
+            "name_as_written": "CALLIRHYTIS VACCINIIFOLIZ",
+            "name_reading": "Callirhytis vacciniifoliae",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "globular"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/283",
+            "quote": "A_ thin-shelled, globular gall",
+            "pdf_page": 20,
+            "page": "130"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f214",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:36.064Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g30",
+          "name_as_written": "the seed-like twig gall of Callirhytis crassicornis",
+          "inducer": {
+            "ref": "t49",
+            "name_as_written": "CALLIRHYTIS CRASSICORNIS",
+            "name_reading": "Callirhytis crassicornis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "texture",
+        "value": {
+          "value": "glaucous",
+          "as_written": "covered with a whitish efflorescence"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/289",
+            "quote": "most of them being covered with a whitish efflorescence",
+            "pdf_page": 20,
+            "page": "130"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "glaucous",
+          "stiff",
+          "wrinkly"
+        ]
+      }
+    },
+    {
+      "id": "gall-f233",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:28:52.070Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g33",
+          "name_as_written": "the woolly leaf gall of Callirhytis lasius",
+          "inducer": {
+            "ref": "t52",
+            "name_as_written": "CALLIRHYTIS LASIUS",
+            "name_reading": "Callirhytis lasius",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "color",
+        "value": {
+          "value": "yellow",
+          "as_written": "pale, yellowish"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/316",
+            "quote": "covered with a pale, yellowish wool",
+            "pdf_page": 22,
+            "page": "132"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "red",
+          "yellow"
+        ]
+      }
+    },
+    {
+      "id": "gall-f237",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:31:26.097Z",
+      "statement": {
+        "kind": "description",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g33",
+          "name_as_written": "the woolly leaf gall of Callirhytis lasius",
+          "inducer": {
+            "ref": "t52",
+            "name_as_written": "CALLIRHYTIS LASIUS",
+            "name_reading": "Callirhytis lasius",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "evidence": [
+          {
+            "item": "#/texts/316",
+            "whole_item": true,
+            "text": "Gall.—A hemispherical, hard gall, occurring on the upper or lower surface of the leaves of Q. chrysolepis, and covered with a pale, yellowish wool, more or less ringed with ferruginous, some being entirely rust-red; it is polythalamous and in general appearance not unlike A flocci, Walsh, but the larval cells are held closely together, embedded in the hard substance composing the gall. Diameter from 5 to9 mm.",
+            "pdf_page": 22,
+            "page": "132"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f244",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:57.532Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t16",
+            "name_as_written": "Sonchus oleraceus",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g35",
+            "name_as_written": "the stem gall of Aulax sonchicola",
+            "inducer": {
+              "ref": "t54",
+              "name_as_written": "AULAX SONCHICOLA",
+              "name_reading": "Aulax sonchicola",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/346",
+            "quote": "from a gall occurring on the stem of a species of wild lettuce, Sonchus oleraceus",
+            "pdf_page": 24,
+            "page": "134"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f251",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:33:04.878Z",
+      "statement": {
+        "kind": "relationship",
+        "stance": "confirm",
+        "type": "host_of",
+        "subject": {
+          "taxon": {
+            "ref": "t19",
+            "name_as_written": "S. herbacea",
+            "rank": "species"
+          }
+        },
+        "object": {
+          "gall": {
+            "ref": "g37",
+            "name_as_written": "the stem swelling of Diastrophus smilacis",
+            "inducer": {
+              "ref": "t56",
+              "name_as_written": "DIASTROPHUS SMILACIS",
+              "name_reading": "Diastrophus smilacis",
+              "rank": "species"
+            },
+            "new": true
+          }
+        },
+        "evidence": [
+          {
+            "item": "#/texts/363",
+            "quote": "usually surrounding the stems of Smilax rotundifolia and S. herbacea",
+            "pdf_page": 25,
+            "page": "135"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gall-f255",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:29:39.968Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g37",
+          "name_as_written": "the stem swelling of Diastrophus smilacis",
+          "inducer": {
+            "ref": "t56",
+            "name_as_written": "DIASTROPHUS SMILACIS",
+            "name_reading": "Diastrophus smilacis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "cells",
+        "value": {
+          "value": "polythalamous",
+          "as_written": "polythalamous"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/364",
+            "quote": "It is polythalamous",
+            "pdf_page": 25,
+            "page": "135"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "polythalamous"
+        ]
+      }
+    },
+    {
+      "id": "gall-f258",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:30:44.635Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g38",
+          "name_as_written": "the rose gall of Rhodites gracilis",
+          "inducer": {
+            "ref": "t57",
+            "name_as_written": "RHODITES GRACILIS",
+            "name_reading": "Rhodites gracilis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "shape",
+        "value": {
+          "value": "globular",
+          "as_written": "irregular, inflated, rounded"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/370",
+            "quote": "An irregular, inflated, rounded gall",
+            "pdf_page": 25,
+            "page": "135"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "globular"
+        ]
+      }
+    },
+    {
+      "id": "gall-f260",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:33:07.532Z",
+      "statement": {
+        "kind": "trait",
+        "stance": "confirm",
+        "gall": {
+          "ref": "g38",
+          "name_as_written": "the rose gall of Rhodites gracilis",
+          "inducer": {
+            "ref": "t57",
+            "name_as_written": "RHODITES GRACILIS",
+            "name_reading": "Rhodites gracilis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "trait": "season",
+        "value": {
+          "value": "Fall",
+          "as_written": "first noticed in September"
+        },
+        "evidence": [
+          {
+            "item": "#/texts/377",
+            "quote": "The galls were first noticed in September.",
+            "pdf_page": 26,
+            "page": "136"
+          }
+        ]
+      },
+      "context": {
+        "slot_values": [
+          "Fall"
+        ]
+      }
+    },
+    {
+      "id": "name-g1",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:34:04.196Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g1",
+          "name_as_written": "the root gall of Trigonaspis radicis",
+          "inducer": {
+            "ref": "t21",
+            "name_as_written": "TRIGONASPIS RADICIS",
+            "name_reading": "Trigonaspis radicis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "TRIGONASPIS RADICIS",
+        "outcome": "resolved",
+        "entries": [
+          "Xanthoteras pumiliventris (sexgen)"
+        ]
+      }
+    },
+    {
+      "id": "name-g12",
+      "verdict": "unsure",
+      "note": "Both names were applied. It is unclear which one it should land in. Looking at the paper and lookng at current gallformers data, I think it would appy to Heteroecus chrysolepidis. This is ambigious and would certainly need to go to an admin for review before applying.",
+      "checked_at": "2026-10-15T17:37:26.730Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g12",
+          "name_as_written": "the gall of Andricus chrysolepidis",
+          "inducer": {
+            "ref": "t31",
+            "name_as_written": "ANDRICUS CHRYSOLEPIDIS",
+            "name_reading": "Andricus chrysolepidis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "ANDRICUS CHRYSOLEPIDIS",
+        "outcome": "ambiguous",
+        "entries": [
+          "Disholandricus chrysolepidis (agamic)",
+          "Heteroecus chrysolepidis (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g16",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:37:31.938Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g16",
+          "name_as_written": "the midrib gall of Andricus rileyi",
+          "inducer": {
+            "ref": "t35",
+            "name_as_written": "ANDRICUS RILEYI",
+            "name_reading": "Andricus rileyi",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "ANDRICUS RILEYI",
+        "outcome": "resolved",
+        "entries": [
+          "Kokkocynips rileyi (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g18",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:37:49.506Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g18",
+          "name_as_written": "the twig gall of Andricus imbrecariae",
+          "inducer": {
+            "ref": "t37",
+            "name_as_written": "ANDRICUS IMBRECARIZ:",
+            "name_reading": "Andricus imbrecariae",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "ANDRICUS IMBRECARIZ:",
+        "outcome": "resolved",
+        "entries": [
+          "Kokkocynips imbricariae (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g20",
+      "verdict": "unsure",
+      "note": "This one is interesting as Ashmead did not understand the sexgen/agamic split of these. This would likely apply to the agamic gen gall because it is a stem swelling. But an admin would have to decide I think.",
+      "checked_at": "2026-10-15T17:40:20.978Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g20",
+          "name_as_written": "the twig swelling of Cynips chrysolepidicola",
+          "inducer": {
+            "ref": "t39",
+            "name_as_written": "CYNIPS CHRYSOLEPIDICOLA",
+            "name_reading": "Cynips chrysolepidicola",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "CYNIPS CHRYSOLEPIDICOLA",
+        "outcome": "ambiguous",
+        "entries": [
+          "Andricus chrysolepidicola (agamic)",
+          "Andricus chrysolepidicola (sexgen)"
+        ]
+      }
+    },
+    {
+      "id": "name-g26",
+      "verdict": "unsure",
+      "note": "As with the previous one.",
+      "checked_at": "2026-10-15T17:40:29.492Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g26",
+          "name_as_written": "the squash-shaped leaf gall of Holcaspis douglasii",
+          "inducer": {
+            "ref": "t45",
+            "name_as_written": "HOLCASPIS DOUGLASII",
+            "name_reading": "Holcaspis douglasii",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "HOLCASPIS DOUGLASII",
+        "outcome": "ambiguous",
+        "entries": [
+          "Antron quercusechinus (agamic)",
+          "Antron quercusechinus (sexgen)"
+        ]
+      }
+    },
+    {
+      "id": "name-g27",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:40:34.726Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g27",
+          "name_as_written": "the gall of Compsodryoxenus maculipennis",
+          "inducer": {
+            "ref": "t46",
+            "name_as_written": "COMPSODRYOXENUS MACULIPENNIS",
+            "name_reading": "Compsodryoxenus maculipennis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "COMPSODRYOXENUS MACULIPENNIS",
+        "outcome": "resolved",
+        "entries": [
+          "Loxaulus maculipennis (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g28",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:40:37.428Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g28",
+          "name_as_written": "the gall of Compsodryoxenus brunneus",
+          "inducer": {
+            "ref": "t47",
+            "name_as_written": "COMPSODRYOXENUS BRUNNEUS",
+            "name_reading": "Compsodryoxenus brunneus",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "COMPSODRYOXENUS BRUNNEUS",
+        "outcome": "resolved",
+        "entries": [
+          "Loxaulus brunneus (agamic)"
+        ]
+      }
+    },
+    {
+      "id": "name-g37",
+      "verdict": "right",
+      "checked_at": "2026-10-15T17:40:39.660Z",
+      "statement": {
+        "kind": "name_match",
+        "gall": {
+          "ref": "g37",
+          "name_as_written": "the stem swelling of Diastrophus smilacis",
+          "inducer": {
+            "ref": "t56",
+            "name_as_written": "DIASTROPHUS SMILACIS",
+            "name_reading": "Diastrophus smilacis",
+            "rank": "species"
+          },
+          "new": true
+        },
+        "inducer_as_written": "DIASTROPHUS SMILACIS",
+        "outcome": "resolved",
+        "entries": [
+          "Aprostocetus smilax"
+        ]
+      }
+    }
+  ]
+}
