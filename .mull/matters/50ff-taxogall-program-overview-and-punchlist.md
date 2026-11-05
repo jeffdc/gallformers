@@ -69,10 +69,10 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 
 **Release:**
 
-11. **Backscan (`b5bd` M4)** on the preview environment (`f465`): trial batches end to end, including the kinds the trial didn't test (a long scanned catalogue such as Gagné 2008; a key such as Felt 1917, which may exceed one batch), then every existing Source except the Gallformers ID Notes (they migrate verbatim; `20e5`); curators approve; track coverage; legacy Facts the backscan doesn't confirm stay, marked unconfirmed (M0, decided 2026-10-27).
+11. **Backscan (`b5bd` M4)** on the preview environment (`f465`): trial batches end to end, including the kinds the trial didn't test (a long scanned catalogue such as Gagné 2008; a key such as Felt 1917, which may exceed one batch), then every existing Source, including the Gallformers ID Notes (changed 2026-10-28: processed before release, undescribed Galls first; needs the `294c` contract change; `20e5`); curators approve; track coverage; legacy Facts the backscan doesn't confirm stay, marked unconfirmed (M0, decided 2026-10-27).
 12. **Rehearsal (`b5bd` M5)** until boring, including timing on the preview environment (`f465`) and a rollback rehearsal.
 13. **Cutover (`b5bd` M6).**
-14. **After release (`b5bd` M7):** drop the old tables; replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, onboarding and runbooks; reconcile the after-release matters above. **Process the Gallformers notes** through the normal pipeline (`20e5`): note → `document.json` → Gallformers batch quoting it; needs the contract change in `294c` and the legacy-notes date decided. **Fix wrong Host ranges on the Host** (curator, editorial): stored gall ranges become no Facts (`b5bd` M0, option A), so cases where a curator widened a gall's range instead of its Host's now surface as Galls missing from regions — fix the Host.
+14. **After release (`b5bd` M7):** drop the old tables; replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, onboarding and runbooks; reconcile the after-release matters above. (Processing the Gallformers notes moved to the backscan, step 11, on 2026-10-28.) **Fix wrong Host ranges on the Host** (curator, editorial): stored gall ranges become no Facts (`b5bd` M0, option A), so cases where a curator widened a gall's range instead of its Host's now surface as Galls missing from regions — fix the Host.
 15. **Phase 2 (`b5bd` M8):** the taxonomy system, its own plan.
 
 ## Open decisions

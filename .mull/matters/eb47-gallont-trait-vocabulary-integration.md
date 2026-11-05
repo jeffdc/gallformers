@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-02-14
-updated: 2026-10-24
+updated: 2026-11-02
 epic: gall-traits
-relates: [85c0]
+relates: [85c0, d213]
 ---
 
 # GallOnt trait vocabulary integration

@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-03
-updated: 2026-10-27
+updated: 2026-11-02
 epic: taxonomy
-relates: [8567, 294c, a856]
+relates: [8567, 294c, a856, 6611, d213]
 ---
 
 # Import interface: pipeline to Gallformers
@@ -35,3 +35,7 @@ The Gallformers side of import: taking a package (contract `294c`, `priv/import/
 - Store recorded occurrences for the range map and the phenology tool.
 - Update the ID tool's season filter wording to the new meaning.
 - Test the "no silent merges" gate (taxonomy batch applied before name resolution) once the importer exists.
+
+
+**Pending contract change (2026-11-02):** trait values move to Source sub-terms placed under categories, decided in `d213`. `controlled_value` and producer guide rule 5 change accordingly; see `d213`.
+

@@ -43,7 +43,7 @@ From starting the replacement system to running it in production. Covers **phase
 1. Run some high-value existing Sources through the pipeline → JSON.
 2. A one-off tool (`b119`) compares that JSON with the data stored today for the same species (where the species is on both sides; the pipeline may produce more).
 3. Iterate pipeline and diff until satisfied the pipeline produces accurate data (`8546`).
-4. Run **all** current Sources through the pipeline → JSON. (Gallformers ID Notes excepted, 2026-10-24: they migrate verbatim and are processed after release, `20e5`.)
+4. Run **all** current Sources through the pipeline → JSON. (Gallformers ID Notes included: they migrate verbatim and are processed before release, undescribed Galls first; changed 2026-10-28, `20e5`.)
 5. Bulk-import the JSON into the new system.
 6. One-off sanity check, old database vs new: they should be similar, the new much better. Needs human judgement. (Possibly the same tool as step 2.)
 7. Not good enough → back to step 1, tweak the pipeline.
@@ -69,7 +69,7 @@ What else migrates is open until step 6 shows what the pipeline doesn't reproduc
 - Aliases: gall "scientific" aliases → taxon synonymy; gall common names → gall alias Facts. **Sort by meaning, not by field** (2026-10-24): the "scientific" ones are only mostly synonyms. Former undescribed-gall labels and informal codes are not synonyms, and in taxon synonymy they would feed import name resolution and cause silent wrong matches.
 - Galls named after an associate, not an Inducer (e.g. 1148 *Synergus lignicola*, named after an inquiline; the suffix list catches only 2419): audit rows named after inquiline genera for a missing *modified form of*.
 - Sources: existing records → Sources with kind, authorship date, license; record-level citations (`species_source`) → attributions on the legacy-data Source or the cited Source, per the M0 decision.
-- Source 58 ("Gallformers ID Notes", 1,323 Galls) → **each Gall's note, verbatim** (2026-10-24, `20e5`): shown as "Notes on ID and Taxonomy", Gallformers' own document for that Gall; audit author unknown for legacy text. Facts are extracted from the notes after release through the normal pipeline, not at migration.
+- Source 58 ("Gallformers ID Notes", 1,323 Galls) → **each Gall's note, verbatim** (2026-10-24, `20e5`): shown as "Notes on ID and Taxonomy", Gallformers' own document for that Gall; audit author unknown for legacy text. Facts are extracted from the notes through the normal pipeline during the backscan, before release (changed 2026-10-28), not at migration.
 - Gall ranges: diff each stored range against the Gall's host union (as of the migration); keep only the differences as inclusion/exclusion Facts. Expect the 232k rows to shrink to a small fraction — measure on the next inventory refresh.
 - Non-galls: hand-review all 120; don't migrate; record their IDs for redirects.
 - Images: attach to Gall entries (paths unchanged); parse the 5,365 iNat image URLs for observation IDs.

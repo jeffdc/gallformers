@@ -1,9 +1,9 @@
 ---
 status: planned
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-30
 epic: taxonomy
-relates: [50ff, b5bd, 8567, e381, 20e5, 86e7, 803b]
+relates: [50ff, b5bd, 8567, e381, 20e5, 86e7, 803b, 6611]
 ---
 
 # Taxogall step 10: minimal admin on the new back-end
@@ -167,3 +167,40 @@ Use cases, logic worth carrying forward, and where each goes. File references ar
 
 **Follow-ups:** stale docs describing deleted modules — `CODING_STANDARDS.md` ("Taxonomy Naming API", "Schema Associations"), `docs/architecture/*` (range-system, elixir-architecture, core-architecture-rules, C4); track `source` in Carbonite; image audit after release; the content-image upload hook fix (`ContentImageUpload` sent its events to the page, not its component — also a production bug; fix on a branch off main).
 
+
+## Queue triage of the five local packages (2026-10-30)
+
+Every open item in the five locally imported packages was judged (report: `docs/plans/2026-10-30-queue-triage.md`, local). Of 189 open items, 112 are noise, 48 could be one-click confirms, and 29 are real decisions. Ashmead 1896: 88 / 17 / 5.
+
+**Rules that remove the noise**, by items removed:
+1. No separate item for a Gall that only waits on its Inducer (40): show it under the Inducer's item, and match it again once that is decided.
+2. One decision per name per package (37): today a name is queued for the taxonomy batch and again for the gall batch, and a decision on one doesn't carry over.
+3. An original description doesn't disagree with a later recombination (28): where the Source presents a name as new and the tree holds that combination as a synonym, resolve to the tree's taxon and record the act as history (as the original combination, never a current-name Fact). Never across families; item 65 has a cynipid as a synonym of a eulophid.
+4. An old genus used only as the parent of the Source's own species (4).
+5. One item per generation pair (3).
+
+**Rules that make one-click confirms:** a WCVP lookup for Host names (20 of 21), showing authors and never applied automatically; epithet and spelling variants; proposing the tree's taxon for synonyms with another epithet; plant part, sibling exclusion and `emerged_from` as tie-breakers for undescribed Galls; preferring a name's accepted entry over its synonym entry.
+
+**Bugs found:**
+- Ten names resolve "new" though the tree holds them under another genus or spelling (e.g. ANDRICUS DASYDACTYLI = *Heteroecus dasydactyli*), which would create duplicate taxa and two duplicate Galls (the `e381` duplicate risk, now measured).
+- Applying the taxonomy batches would add about 105 more taxonomy disagreements; 45 are common names, which the tree holds none of.
+- "Skip" on a dispute about a taxon or a Gall does nothing: drops only reach act and Fact ids (`apply_taxonomy.ex` and `apply_gall.ex`, `ctx.drop`).
+- `GallMatcher.related?/2` accepts any Inducer in the same family, so oak-gall-wasp entries are offered for *Antistrophus* Galls.
+- The tree holds no taxonomic Facts (synonymy, name and placement Fact tables are empty), so recency can't settle an old Source's placements against it.
+- Migration data: 8 non-oak "Unknown (Cynipidae)" Galls have tribe Cynipini as Inducer.
+
+
+## Queue fixes from the triage (built 2026-10-30, uncommitted)
+
+All rules from the triage are built and tested (precommit 2,594 tests). On the five local packages, resolved again: **189 open items became 114, and 82 of those carry a proposed answer.** Ashmead 1896: 110 → 51.
+
+- **Resolver** (`resolver.ex`, new `name_variants.ex`, `name_suggestions.ex`, `host_suggestions.ex`): C original description of a combination the tree holds as a synonym, same family only → the tree's taxon, flag `original_combination`, no item; D a genus used only as a parent → flag `parent_only`, no item; G before resolving `:new`, "C. q. X" readings, spelling and ending variants, and the epithet within the family → a proposal (methods `cynips_name`, `spelling_variant`, `epithet_in_family`), never automatic; H held-valid in a gall batch → proposed; J an accepted-name hit proposed over a synonym hit; F Host suggestions from the tree and WCVP (exact, synonym, × sign, variants, a variety's species, edit distance as a last resort), authors shown, homonyms all listed, never applied. The oak-gall regex now handles æ.
+- **GallMatcher**: the undescribed scope is the stated taxon, its descendants and its ancestors up to the family (no cousins); B a Gall waiting on an open Inducer has no item (flag `waits_on_inducer`, `detail["waits_on"]`), and is queued on its own if the Inducer is skipped; E a generation pair is one item, `settle_pairs/1` settles the other; I plant part, sibling exclusion, "new" proposed, `emerged_from`; a lone candidate with a generation the Source doesn't name, in a heterogony group, is proposed rather than resolved. A Gall a note batch names with the note's ID resolves to it (method `note`).
+- **Queue/import**: A one item per name per package (`subject["also"]` names the other copies; replay finds a logged decision through `also`); a decision re-resolves the package, keeping open items' IDs; a vanished item returns `{:error, :gone}`; a first common name is recorded with no item; acts on an `original_combination` taxon are history only (no Fact, no item); skip on a taxon or Gall dispute drops it in every batch; a name (not a Host) can be decided new.
+
+**Open, for the redesign session:**
+- Ashmead's 22 Galls whose 1896 text names no generation are now one-click confirms (the heterogony guard). Decide whether agreeing plant parts should resolve them automatically.
+- Host suggestions need decisions that act on them: "add this synonym" and "add from WCVP" (today a Host item takes only `taxon_id` or skip). Hybrid formulas aren't looked up (the WCVP lookup doesn't read `hybrid_formula`).
+- The UI doesn't yet show `pair`, `proposed: "new"`, Host suggestions or "decides N Galls" (count `waits_on_inducer` Galls through `also`).
+- COMPSODRYOXENUS (a `:new` genus) would still be created. The original combination lives only in `batch_statements`; a lasting home is a Taxa change.
+- Migration data: 8 non-oak "Unknown (Cynipidae)" Galls have tribe Cynipini as Inducer.

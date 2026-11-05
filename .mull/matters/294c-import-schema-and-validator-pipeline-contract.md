@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-06
-updated: 2026-10-27
+updated: 2026-11-02
 epic: taxonomy
-relates: [8567, e381, 20e5]
+relates: [8567, e381, 20e5, d213]
 ---
 
 # Import schema and validator (pipeline contract)
@@ -118,4 +118,3 @@ The five trial Sources were rerun on the step 3 contract: phase 1 reused from th
   - a Gallformers batch may quote a document (the Gall's note) instead of only carrying statement text, and the validator checks those quotes;
   - a section in `GALLFORMERS_STATEMENTS.md` on reading notes: commentary, ID tips and links go to `unmapped`; copied passages are cited to their paper.
 - **Small:** the mix tasks' `start_repo/0` helper now exists in three copies (`id_parity`, `export_legacy_trait_ids`, `import.vocab`).
-
