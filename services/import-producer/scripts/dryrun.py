@@ -306,9 +306,16 @@ def descriptor(entry_name: str) -> set[str]:
     return {p for p in parts[2:] if p not in DESCRIPTOR_STOP} if len(parts) > 2 else set()
 
 
+def trait_value(f: dict) -> str | None:
+    """A trait Fact's value: format 3 value.value, format 4 category.value (None: no category)."""
+    if "value" in f:
+        return (f.get("value") or {}).get("value")
+    return (f.get("category") or {}).get("value")
+
+
 def gall_words(g: dict, batch: dict) -> set[str]:
     traits = {
-        (f.get("value") or {}).get("value", "")
+        trait_value(f) or ""
         for f in batch.get("facts", [])
         if f.get("gall") == g["ref"] and f.get("kind") == "trait"
     }
@@ -417,10 +424,10 @@ def diff_facts(batch: dict, taxa: dict, galls: dict, index: Index, doc: dict) ->
         trait_rows = {}
         for trait in [*TRAIT_TABLES, "detachable"]:
             batch_values = {
-                f["value"]["value"]
+                trait_value(f)
                 for f in facts
                 if f["kind"] == "trait" and f["trait"] == trait and f["stance"] == "confirm"
-            }
+            } - {None}
             db_values = index.traits[entry].get(trait, set())
             if batch_values or db_values:
                 trait_rows[trait] = {

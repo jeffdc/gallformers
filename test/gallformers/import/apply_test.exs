@@ -15,8 +15,10 @@ defmodule Gallformers.Import.ApplyTest do
 
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Facts.AliasFact
+  alias Gallformers.DoclingFixtures
   alias Gallformers.Facts
   alias Gallformers.Import
+  alias Gallformers.Import.ApplyTaxonomy
   alias Gallformers.Import.BatchStatement
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
@@ -376,6 +378,130 @@ defmodule Gallformers.Import.ApplyTest do
     end
   end
 
+  describe "Gallformers statements quoting a Gall's note (20e5)" do
+    @note "Quercus douglasii is added as a host based on this observation in California in " <>
+            "[June](https://www.inaturalist.org/observations/123)."
+
+    defp note_files(gall_id, text) do
+      doc =
+        DoclingFixtures.document()
+        |> Map.put("texts", [
+          %{
+            "self_ref" => "#/texts/0",
+            "label" => "text",
+            "content_layer" => "body",
+            "text" => text,
+            "prov" => [],
+            "children" => []
+          }
+        ])
+        |> Map.put("body", %{"self_ref" => "#/body", "children" => [%{"$ref" => "#/texts/0"}]})
+        |> Map.merge(%{"tables" => [], "pictures" => []})
+
+      doc_json = DoclingFixtures.document_json(doc)
+
+      gall = %{
+        "format" => "gallformers-import",
+        "format_version" => 3,
+        "vocabulary_version" => "2026-10-11",
+        "batch_type" => "gall",
+        "mode" => "add",
+        "batch_id" => "note-#{System.unique_integer([:positive])}-0000",
+        "produced_at" => "2026-10-30T14:00:00Z",
+        "producer" => %{"name" => "notes", "version" => "0"},
+        "source" => %{
+          "gallformers" => true,
+          "note" => %{"gallformers_gall_id" => gall_id, "stated_on" => "2026-10-30"},
+          "document" => %{"file" => "document.json", "sha256" => sha256(doc_json)}
+        },
+        "taxa" => [
+          %{
+            "ref" => "t1",
+            "name_as_written" => "Andricus quercuscalifornicus",
+            "rank" => "species"
+          },
+          %{"ref" => "t2", "name_as_written" => "Quercus douglasii", "rank" => "species"}
+        ],
+        "galls" => [
+          %{
+            "ref" => "g1",
+            "name_as_written" => "agamic gall",
+            "identified_by" => %{
+              "inducer" => "t1",
+              "generation" => %{"value" => "agamic", "as_written" => "agamic"}
+            },
+            "gallformers_gall_id" => gall_id
+          }
+        ],
+        "facts" => [
+          %{
+            "id" => "f1",
+            "stance" => "confirm",
+            "kind" => "relationship",
+            "type" => "host_of",
+            "subject" => "t2",
+            "object" => "g1",
+            "evidence" => [
+              %{
+                "item" => "#/texts/0",
+                "quote" => "Quercus douglasii is added as a host based on this observation",
+                "observations" => [%{"provider" => "inaturalist", "id" => "123"}]
+              }
+            ]
+          }
+        ]
+      }
+
+      %{"document.json" => doc_json, "gall.json" => Jason.encode!(gall)}
+    end
+
+    test "a Fact quotes the stored note and takes the note's date", ctx do
+      gallformers = gallformers_source()
+      {:ok, note} = Sources.store_note(test_actor(), gallformers, ctx.gall.id, @note)
+      [item] = Sources.list_document_items(note)
+
+      package = ctx.gall.id |> note_files(@note) |> deliver!(review: false) |> approve!()
+      assert package.status == :approved
+      assert package.source_id == gallformers.id
+
+      fact_id = fact_statement(package, "gall.json", "f1").fact_id
+      attribution = attribution(fact_id, gallformers.id)
+
+      assert attribution.stated_on == ~D[2026-10-30]
+
+      assert attribution.statement_text ==
+               "Quercus douglasii is added as a host based on this observation"
+
+      assert [%{document_item_id: item_id, quote: "Quercus douglasii" <> _}] =
+               attribution.evidence
+
+      assert item_id == item.id
+      assert [%{provider: :inaturalist, external_id: "123"}] = attribution.observations
+      assert [^note] = Sources.list_gall_notes(ctx.gall.id)
+    end
+
+    test "a note version Gallformers doesn't hold yet is stored with the note's date", ctx do
+      gallformers_source()
+      package = ctx.gall.id |> note_files(@note) |> deliver!(review: false) |> approve!()
+      assert package.status == :approved
+
+      assert [%{version_date: ~D[2026-10-30]} = note] = Sources.list_gall_notes(ctx.gall.id)
+      assert [%{text: @note}] = Sources.list_document_items(note)
+    end
+
+    test "a note of a Gall Gallformers doesn't have is queued" do
+      gallformers_source()
+      package = 999_999_999 |> note_files(@note) |> deliver!(review: false)
+
+      assert [%QueueItem{statement_ref: "note", reason: reason}] =
+               Repo.all(
+                 from q in QueueItem, where: q.package_id == ^package.id and is_nil(q.batch_id)
+               )
+
+      assert reason =~ "999999999"
+    end
+  end
+
   describe "new Galls' names (86e7 Task 5)" do
     # The fixture gall batch with g1 a new Gall written `as_written` and
     # identified by `ident`, stated only by its Inducer Fact (f1). t4 is the
@@ -612,6 +738,225 @@ defmodule Gallformers.Import.ApplyTest do
     end
   end
 
+  describe "a taxonomy batch's common names" do
+    test "a first common name is recorded with no item; one beside the tree's is an item", ctx do
+      {:ok, _} = Taxa.add_common_name(test_actor(), ctx.torymus, "torymid wasp")
+
+      taxonomy =
+        taxonomy_batch()
+        |> unique_batch_id()
+        |> Map.update!(
+          "taxa",
+          &(&1 ++ [%{"ref" => "t2", "name_as_written" => "Torymus", "rank" => "genus"}])
+        )
+        |> Map.update!("acts", fn acts ->
+          acts ++
+            for {id, ref, common_name} <- [
+                  {"a2", "t1", "California gall wasp"},
+                  {"a3", "t2", "seed chalcid"}
+                ] do
+              %{
+                "id" => id,
+                "stance" => "confirm",
+                "kind" => "common_name",
+                "taxon" => ref,
+                "common_name" => common_name,
+                "evidence" => [
+                  %{"item" => "#/texts/1", "quote" => "Andricus quercuscalifornicus"}
+                ]
+              }
+            end
+        end)
+
+      package =
+        package(gall: nil, taxonomy: taxonomy) |> with_review() |> deliver!() |> approve!()
+
+      # The wasp held no common name: its first is recorded, with no item.
+      assert %BatchStatement{fact_id: fact_id} = fact_statement(package, "taxonomy.json", "a2")
+      assert is_integer(fact_id)
+
+      # Torymus holds another: that one is for a curator.
+      assert [%QueueItem{statement_ref: "a3"}] =
+               Import.list_queue_items(package, kind: :taxonomy_disagreement)
+
+      # The tree is unchanged.
+      assert Taxa.list_common_names(ctx.wasp.id) == []
+    end
+  end
+
+  describe "an original combination (taxon flagged original_combination)" do
+    test "its name and placement acts are history: no Fact, no item" do
+      callirhytis = taxon_fixture(name: "Callirhytis", rank: :genus, kingdom: "Animalia")
+      morrisoni = taxon_fixture(name: "Callirhytis morrisoni", parent: callirhytis)
+      {:ok, _} = Taxa.add_synonym(test_actor(), morrisoni, "Andricus morrisoni")
+
+      taxonomy =
+        taxonomy_batch()
+        |> unique_batch_id()
+        |> Map.put("taxa", [
+          %{
+            "ref" => "t1",
+            "name_as_written" => "ANDRICUS MORRISONI",
+            "rank" => "species",
+            "new" => %{"status" => "n. sp."}
+          },
+          %{"ref" => "t2", "name_as_written" => "ANDRICUS", "rank" => "genus"}
+        ])
+        |> Map.put("acts", [
+          %{
+            "id" => "a1",
+            "stance" => "confirm",
+            "kind" => "name",
+            "taxon" => "t1",
+            "evidence" => [%{"item" => "#/texts/1", "quote" => "Andricus quercuscalifornicus"}]
+          },
+          %{
+            "id" => "a2",
+            "stance" => "confirm",
+            "kind" => "placement",
+            "taxon" => "t1",
+            "parent" => "t2",
+            "evidence" => [%{"item" => "#/texts/1", "quote" => "Andricus quercuscalifornicus"}]
+          }
+        ])
+
+      package = package(gall: nil, taxonomy: taxonomy) |> with_review() |> deliver!()
+      [batch] = Import.list_batches(package)
+
+      # The resolver flags the original description of a combination the
+      # tree holds as a synonym and resolves it to the tree's taxon.
+      taxa =
+        for %{kind: :taxon} = s <- Import.list_statements(batch), into: %{} do
+          case s.ref do
+            "t1" ->
+              {"t1",
+               %{
+                 s
+                 | resolution: :resolved,
+                   taxon_id: morrisoni.id,
+                   flags: ["original_combination"]
+               }}
+
+            ref ->
+              {ref, s}
+          end
+        end
+
+      ctx = %{
+        actor: test_actor(),
+        source: source_fixture("Ashmead", "1896"),
+        batch: batch,
+        items: %{},
+        note: nil,
+        taxa: taxa,
+        galls: %{},
+        drop: %{}
+      }
+
+      assert {:ok, %{queue: [], statements: rows}} = ApplyTaxonomy.run(ctx)
+
+      for ref <- ["a1", "a2"] do
+        row = Enum.find(rows, &(&1.ref == ref))
+        assert %{fact_id: nil, resolution: :resolved} = row
+        assert "original_combination" in row.flags
+      end
+
+      # Never a claim to the current name.
+      assert {:ok, nil} =
+               Taxa.find_act_fact(:name, %{
+                 taxon_id: morrisoni.id,
+                 name: "ANDRICUS MORRISONI",
+                 rank: "species"
+               })
+
+      assert Taxa.accepted_name(morrisoni.id) == "Callirhytis morrisoni"
+    end
+  end
+
+  describe "skipping a dispute about a taxon or a Gall" do
+    defp dispute(file, ref) do
+      %{
+        "batch" => file,
+        "id" => ref,
+        "problem" => "unsupported",
+        "reason" => "the Source does not present it as new",
+        "response" => %{"decision" => "disagree", "reason" => "it does"}
+      }
+    end
+
+    defp skip_dispute!(package, ref) do
+      [item] =
+        Enum.filter(Import.list_queue_items(package, kind: :dispute), &(&1.statement_ref == ref))
+
+      {:ok, _} = Import.decide_queue_item(test_actor(), item, %{"skip" => true})
+    end
+
+    test "a skipped taxon is not created, in either batch, and nothing that needs it is applied" do
+      taxonomy =
+        taxonomy_batch()
+        |> unique_batch_id()
+        |> put_in(["taxa", Access.at(0)], %{
+          "ref" => "t1",
+          "name_as_written" => "Andricus novus",
+          "rank" => "species",
+          "new" => %{"status" => "sp. nov."}
+        })
+
+      # The gall batch names the same new taxon, as the parasitoid t3.
+      gall =
+        gall_batch()
+        |> put_in(["taxa", Access.at(2)], %{
+          "ref" => "t3",
+          "name_as_written" => "Andricus novus",
+          "rank" => "species"
+        })
+
+      package =
+        package(gall: gall, taxonomy: taxonomy)
+        |> with_review([dispute("taxonomy.json", "t1")], responded: true)
+        |> deliver!()
+
+      skip_dispute!(package, "t1")
+      package = approve!(package)
+      assert package.status == :approved
+
+      assert Taxa.resolve_name("Andricus novus", rank: :species) == :none
+      assert %BatchStatement{fact_id: nil} = fact_statement(package, "taxonomy.json", "a1")
+      assert %BatchStatement{fact_id: nil} = fact_statement(package, "gall.json", "f3")
+      assert %BatchStatement{fact_id: nil} = fact_statement(package, "gall.json", "f4")
+      assert is_integer(fact_statement(package, "gall.json", "f2").fact_id)
+
+      [taxonomy_row, gall_row] = Import.list_batches(package)
+
+      for row <- [taxonomy_row, gall_row] do
+        s =
+          Enum.find(
+            Import.list_statements(row),
+            &(&1.kind == :taxon and &1.detail["name_as_written"] == "Andricus novus")
+          )
+
+        assert %BatchStatement{resolution: :unresolved, taxon_id: nil} = s
+        assert "skipped" in s.flags
+      end
+    end
+
+    test "a skipped Gall is not applied, nor any Fact about it", ctx do
+      package =
+        package(gall: gall_batch())
+        |> with_review([dispute("gall.json", "g1")], responded: true)
+        |> deliver!()
+
+      skip_dispute!(package, "g1")
+      package = approve!(package)
+      assert package.status == :approved
+
+      for ref <- ["f1", "f2", "f3", "f4"],
+          do: assert(%BatchStatement{fact_id: nil} = fact_statement(package, "gall.json", ref))
+
+      assert Catalog.gall_summary(ctx.gall.id).hosts == []
+    end
+  end
+
   describe "retraction" do
     test "a retraction package flips the retracted Source's Facts" do
       paper = package(gall: gall_batch()) |> with_review() |> deliver!() |> approve!()
@@ -659,8 +1004,15 @@ defmodule Gallformers.Import.ApplyTest do
       assert {taxonomy_row.status, gall_row.status} == {:applied, :applied}
 
       facts = for {{:fact, _}, s} <- statements(gall_row), do: s
-      assert length(facts) == 15
+      assert length(facts) == 16
       assert Enum.reject(facts, &is_integer(&1.fact_id)) == []
+
+      # The readers agreed on every new term: each is placed for every
+      # Source, and no term waits on a question.
+      assert Import.list_queue_items(package, kind: :trait_term, status: :all) == []
+
+      assert %{status: :placed, categories: ["stiff"], placed_by: :agreement} =
+               Catalog.get_term("texture", "lignified")
 
       # g1 is the seeded Gall; g2 a new undescribed Gall.
       s = statements(gall_row)
@@ -680,6 +1032,8 @@ defmodule Gallformers.Import.ApplyTest do
       assert Enum.map(summary.hosts, & &1.taxon_id) == [ctx.lobata.id]
       assert summary.traits["color"] == ["tan"]
       assert summary.traits["detachable"] == ["integral"]
+      assert summary.traits["texture"] == ["stiff"]
+      assert Catalog.gall_summary(new_gall).traits["plant_part"] == ["leaf midrib"]
 
       # The denied Host is withdrawn.
       assert Facts.get_fact!(s[{:fact, "f3"}].fact_id).standing == :withdrawn

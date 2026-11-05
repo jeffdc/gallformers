@@ -4,7 +4,29 @@
   "title": "Gallformers import — gall batch",
   "description": "What a Source states about Galls: Relationships (including Hosts and Inducers), qualifiers, Traits, range adjustments, recorded occurrences, common names, and descriptions (quotes). Taxonomic acts go in the taxonomy batch.",
   "type": "object",
-  "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/envelope" },
+    {
+      "description": "Format 3 trait Facts carry value + as_written; format 4 trait Facts carry the Source's term and a suggested category, and its unmapped entries take no Trait slot.",
+      "if": { "properties": { "format_version": { "const": 3 } }, "required": ["format_version"] },
+      "then": { "properties": { "facts": { "items": { "$ref": "#/$defs/fact_v3" } } } },
+      "else": {
+        "properties": {
+          "facts": { "items": { "$ref": "#/$defs/fact" } },
+          "unmapped": {
+            "items": {
+              "properties": {
+                "slot": {
+                  "description": "A Trait term is a trait Fact (category null when no value fits), never an unmapped entry.",
+                  "enum": ["generation", "relationship_type", "lethality", "parasitism_mode", "place", "rank", "taxonomic_act", "other"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "required": ["batch_type", "taxa", "galls", "facts"],
   "properties": {
     "format": true, "format_version": true, "vocabulary_version": true, "mode": true,
@@ -22,8 +44,7 @@
     },
     "facts": {
       "type": "array",
-      "items": { "$ref": "#/$defs/fact" },
-      "description": "The Facts the Source states. Empty only on a retraction notice."
+      "description": "The Facts the Source states (#/$defs/fact; in format 3, #/$defs/fact_v3). Empty only on a retraction notice."
     },
     "unmapped": { "$ref": "common.schema.json#/$defs/unmapped" }
   },
@@ -81,6 +102,22 @@
 
     "fact": {
       "description": "A Fact; its kind decides its fields.",
+      "allOf": [
+        { "$ref": "#/$defs/fact_kinds" },
+        { "if": { "properties": { "kind": { "const": "trait" } } }, "then": { "$ref": "#/$defs/trait_fact" } }
+      ]
+    },
+
+    "fact_v3": {
+      "description": "A Fact in a format 3 batch: as in format 4, except trait Facts (#/$defs/trait_fact_v3).",
+      "allOf": [
+        { "$ref": "#/$defs/fact_kinds" },
+        { "if": { "properties": { "kind": { "const": "trait" } } }, "then": { "$ref": "#/$defs/trait_fact_v3" } }
+      ]
+    },
+
+    "fact_kinds": {
+      "description": "The kinds of Fact, and the fields of each kind but trait (which differs by format).",
       "type": "object",
       "required": ["kind"],
       "properties": {
@@ -89,7 +126,6 @@
       "allOf": [
         { "if": { "properties": { "kind": { "const": "relationship" } } }, "then": { "$ref": "#/$defs/relationship_fact" } },
         { "if": { "properties": { "kind": { "const": "qualifier" } } }, "then": { "$ref": "#/$defs/qualifier_fact" } },
-        { "if": { "properties": { "kind": { "const": "trait" } } }, "then": { "$ref": "#/$defs/trait_fact" } },
         { "if": { "properties": { "kind": { "const": "range" } } }, "then": { "$ref": "#/$defs/range_fact" } },
         { "if": { "properties": { "kind": { "const": "occurrence" } } }, "then": { "$ref": "#/$defs/occurrence_fact" } },
         { "if": { "properties": { "kind": { "const": "alias" } } }, "then": { "$ref": "#/$defs/alias_fact" } },
@@ -171,8 +207,50 @@
       "unevaluatedProperties": false
     },
 
+    "trait_name": { "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season"] },
+
     "trait_fact": {
-      "description": "One Trait value of a Gall. Multi-valued Traits get one Fact per value; detachable takes one value. Generation goes in galls[].identified_by: it identifies the Gall.",
+      "description": "One Source term for a Trait of a Gall, with the category (Trait value) the producer suggests for it. Gallformers decides the category on import (PRODUCER_GUIDE.md, Phase 3, Traits). One Fact per term; detachable takes one. Generation goes in galls[].identified_by: it identifies the Gall.",
+      "allOf": [
+        { "$ref": "#/$defs/fact_base" },
+        { "$ref": "#/$defs/trait_category_for" }
+      ],
+      "required": ["gall", "trait", "term", "category"],
+      "properties": {
+        "kind": { "const": "trait" },
+        "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+        "trait": { "$ref": "#/$defs/trait_name" },
+        "term": { "type": "string", "minLength": 1, "description": "The Source's term for this Trait, verbatim: the shortest phrase that is the term (\"ovoid\", \"pale tan\", \"covered in short hairs\"). The sentence stays in the quote." },
+        "category": {
+          "description": "The value of this Trait the term fits by its definition (vocab/traits.json), or null when none fits.",
+          "type": ["object", "null"],
+          "required": ["value"],
+          "properties": { "value": true },
+          "additionalProperties": false
+        },
+        "depends_on_gall": { "const": true, "description": "The term's category depends on this Gall: the term means different values for different Galls (\"swelling\": abrupt swelling, tapered swelling or stem club)." }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "trait_category_for": {
+      "description": "The allowed categories for each trait (format 4).",
+      "allOf": [
+        { "if": { "properties": { "trait": { "const": "detachable" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/detachable" } } } } } },
+        { "if": { "properties": { "trait": { "const": "plant_part" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/plant_part" } } } } } },
+        { "if": { "properties": { "trait": { "const": "form" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/form" } } } } } },
+        { "if": { "properties": { "trait": { "const": "shape" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/shape" } } } } } },
+        { "if": { "properties": { "trait": { "const": "color" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/color" } } } } } },
+        { "if": { "properties": { "trait": { "const": "texture" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/texture" } } } } } },
+        { "if": { "properties": { "trait": { "const": "alignment" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/alignment" } } } } } },
+        { "if": { "properties": { "trait": { "const": "walls" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/walls" } } } } } },
+        { "if": { "properties": { "trait": { "const": "cells" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/cells" } } } } } },
+        { "if": { "properties": { "trait": { "const": "season" } } }, "then": { "properties": { "category": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/season" } } } } } }
+      ]
+    },
+
+    "trait_fact_v3": {
+      "description": "Format 3: one Trait value of a Gall, with the Source's wording in as_written.",
       "allOf": [
         { "$ref": "#/$defs/fact_base" },
         { "$ref": "#/$defs/trait_value_for" }
@@ -181,14 +259,14 @@
       "properties": {
         "kind": { "const": "trait" },
         "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
-        "trait": { "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season"] },
+        "trait": { "$ref": "#/$defs/trait_name" },
         "value": { "$ref": "#/$defs/controlled_value" }
       },
       "unevaluatedProperties": false
     },
 
     "trait_value_for": {
-      "description": "The allowed values for each trait.",
+      "description": "The allowed values for each trait (format 3).",
       "allOf": [
         { "if": { "properties": { "trait": { "const": "detachable" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/detachable" } } } } } },
         { "if": { "properties": { "trait": { "const": "plant_part" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/plant_part" } } } } } },

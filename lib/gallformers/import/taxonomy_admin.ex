@@ -111,6 +111,19 @@ defmodule Gallformers.Import.TaxonomyAdmin do
     end)
   end
 
+  @doc "The rank a WCVP record's name is at, read from its infraspecific marker."
+  @spec wcvp_rank(map()) :: Rank.t()
+  def wcvp_rank(%{taxon_name: name}) do
+    words = String.split(name)
+
+    cond do
+      "var." in words -> :variety
+      "subsp." in words -> :subspecies
+      "f." in words -> :form
+      true -> :species
+    end
+  end
+
   defp find_or_create_plant_taxon(actor, name, rank, parent_id) do
     case Taxa.resolve_name(name, rank: rank, kingdom: "Plantae") do
       {:ok, taxon} ->

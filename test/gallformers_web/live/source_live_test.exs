@@ -17,6 +17,8 @@ defmodule GallformersWeb.SourceLiveTest do
   # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
 
   import Gallformers.CatalogFixtures
+  import Gallformers.DataCase, only: [audit_test_metadata: 1]
+  import Gallformers.ImportFixtures, only: [applied_package!: 3, imported_source!: 2]
 
   alias Gallformers.Catalog
   alias Gallformers.DataCase
@@ -96,6 +98,75 @@ defmodule GallformersWeb.SourceLiveTest do
 
       assert has_element?(view, "#source-images img[alt]")
       assert html =~ "Source Photographer"
+    end
+  end
+
+  describe "when the Source came to Gallformers" do
+    setup :audit_test_metadata
+
+    test "says when it was added and last updated", %{conn: conn} do
+      source = imported_source!("Added and updated", ~U[2026-10-01 09:00:00Z])
+      applied_package!(source, ~U[2026-11-02 12:00:00Z], [])
+
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
+
+      assert has_element?(
+               view,
+               "#source-dates",
+               "Added to Gallformers October 01, 2026 · updated November 02, 2026"
+             )
+    end
+
+    test "leaves out an update on the day it was added", %{conn: conn} do
+      source = imported_source!("Added once", ~U[2026-10-01 09:00:00Z])
+      applied_package!(source, ~U[2026-10-01 17:00:00Z], [])
+
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
+
+      assert has_element?(view, "#source-dates", "Added to Gallformers October 01, 2026")
+      refute has_element?(view, "#source-dates", "updated")
+    end
+
+    test "a Source from the old data says so instead of a date", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/source/59")
+
+      assert has_element?(view, "#source-dates", "From the original Gallformers data")
+      refute has_element?(view, "#source-dates", "Added to Gallformers")
+    end
+  end
+
+  describe "What this Source says" do
+    test "its Facts, grouped by Gall then category, read-only", %{conn: conn} do
+      source = source_fixture("Says things", "1990")
+      gall = gall_fixture(name: "Speaking gall")
+
+      {:ok, _} =
+        Catalog.assert_alias(
+          DataCase.test_actor(),
+          %{gall_id: gall.id, name: "the talking gall"},
+          confirm(source)
+        )
+
+      # An admin sees what a visitor sees: no edits, no review links.
+      {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
+      {:ok, view, _html} = live(admin_conn, ~p"/source/#{source.id}")
+
+      assert has_element?(view, "#source-facts h2", "What this Source says")
+      assert has_element?(view, "#source-facts h3", "Speaking gall")
+      assert has_element?(view, "#source-facts a[href='/gall/#{gall.id}']")
+      assert has_element?(view, "#source-facts [data-category=aliases]", "the talking gall")
+
+      refute has_element?(view, "#source-facts [data-role=fact-menu]")
+      refute has_element?(view, "#source-facts a[href^='/admin']")
+      refute has_element?(view, "#source-facts .gf-mark-new")
+    end
+
+    test "a Source that says nothing says so", %{conn: conn} do
+      source = source_fixture("Silent", "2000")
+
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
+
+      assert has_element?(view, "#source-facts", "No Facts from this Source yet.")
     end
   end
 

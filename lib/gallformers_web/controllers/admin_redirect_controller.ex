@@ -1,7 +1,9 @@
 defmodule GallformersWeb.AdminRedirectController do
   @moduledoc """
   Permanent redirects from the URLs of the deleted old-domain admin screens
-  to the screens that replaced them (matter a856). Old admin URLs with no
+  to the screens that replaced them (matter a856), and from the item-first
+  review queue's to the Source-down review (`6611`), and from the
+  vocabulary requests to the vocabulary page (`d213`). Old admin URLs with no
   sensible new screen have no route and are not found.
 
   Plant IDs are taxon IDs and Gall IDs are the old species IDs, so a
@@ -54,6 +56,27 @@ defmodule GallformersWeb.AdminRedirectController do
       _ -> not_found(conn)
     end
   end
+
+  @doc """
+  `/admin/queue` (the item-first review queue, `6611`) → the Sources to
+  review; filtered to rename proposals (`?kind=gall_rename`), their page.
+  """
+  @spec queue(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def queue(conn, %{"kind" => "gall_rename"}), do: moved(conn, ~p"/admin/review/renames")
+  def queue(conn, _params), do: moved(conn, ~p"/admin/review")
+
+  @doc "`/admin/queue/packages/:id` → the package's review page."
+  @spec queue_package(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def queue_package(conn, %{"id" => id}) do
+    case Integer.parse(id) do
+      {package_id, ""} -> moved(conn, ~p"/admin/review/packages/#{package_id}")
+      _ -> not_found(conn)
+    end
+  end
+
+  @doc "`/admin/vocab-requests` (6611's vocabulary backlog) → the vocabulary page (`d213`)."
+  @spec vocab_requests(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def vocab_requests(conn, _params), do: moved(conn, ~p"/admin/vocabulary")
 
   defp images_path(id) do
     cond do

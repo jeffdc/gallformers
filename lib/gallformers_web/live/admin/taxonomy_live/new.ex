@@ -18,6 +18,10 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
   through `Gallformers.Import` as the signed-in admin
   (`Gallformers.Import.TaxonomyAdmin`), so they are audited and in the
   replay log, each all or nothing.
+
+  A link may start the by-name form (`?name=…&rank=…&kingdom=…&parent_id=…`,
+  each optional): a review's Host question that neither Gallformers nor
+  WCVP holds links here with the Source's name for the plant (matter f14c).
   """
   use GallformersWeb, :live_view
   use GallformersWeb.Admin.FormHelpers
@@ -59,6 +63,46 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
      |> assign(duplicate_warnings: [], children: [], selected_children: MapSet.new())
      |> assign(:plant?, false)}
   end
+
+  # A link may start the form by name (a review's Host question, matter
+  # f14c): `name`, `rank`, `kingdom` and `parent_id`, each optional; a rank
+  # or parent it doesn't know is left out.
+  @impl true
+  def handle_params(params, _uri, socket) do
+    prefill = Map.take(params, ~w(name rank kingdom parent_id))
+
+    if prefill == %{},
+      do: {:noreply, socket},
+      else: {:noreply, prefill(socket, prefill)}
+  end
+
+  defp prefill(socket, params) do
+    rank =
+      if Map.get(params, "rank") in Enum.map(Rank.all(), &Atom.to_string/1), do: params["rank"]
+
+    form =
+      taxon_form(%{
+        "name" => Map.get(params, "name", ""),
+        "rank" => rank || "species",
+        "kingdom" => Map.get(params, "kingdom", "")
+      })
+
+    socket
+    |> assign(:form, form)
+    |> assign(:selected_parent, prefilled_parent(params["parent_id"]))
+    |> refresh()
+  end
+
+  defp prefilled_parent(id) when is_binary(id) do
+    with {id, ""} <- Integer.parse(id),
+         %{} = taxon <- Taxa.get_taxon(id) do
+      %{id: taxon.id, name: Taxa.accepted_name(taxon), rank: taxon.rank, kingdom: taxon.kingdom}
+    else
+      _ -> nil
+    end
+  end
+
+  defp prefilled_parent(_id), do: nil
 
   def close_form(socket), do: push_navigate(socket, to: ~p"/admin/taxonomy")
 

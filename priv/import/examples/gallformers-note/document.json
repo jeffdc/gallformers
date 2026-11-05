@@ -1,0 +1,26 @@
+{
+  "schema_name": "DoclingDocument",
+  "version": "1.7.0",
+  "name": "gallformers-note-587",
+  "origin": { "mimetype": "text/markdown", "binary_hash": 0, "filename": "gallformers-note-587.md" },
+  "furniture": { "self_ref": "#/furniture", "children": [], "content_layer": "furniture", "name": "_root_", "label": "unspecified" },
+  "body": { "self_ref": "#/body", "children": [{ "$ref": "#/texts/0" }], "content_layer": "body", "name": "_root_", "label": "unspecified" },
+  "groups": [],
+  "texts": [
+    {
+      "self_ref": "#/texts/0",
+      "parent": { "$ref": "#/body" },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [],
+      "orig": "Quercus douglasii is added as a host based on this observation in California in [June](https://www.inaturalist.org/observations/123456789).\n\nObserved in Contra Costa County, California in [July](https://www.inaturalist.org/observations/123456791).\n\nThis gall closely resembles that of [Andricus brunneus](https://www.gallformers.org/gall/1234); the host oak is the only reliable way to separate the two.",
+      "text": "Quercus douglasii is added as a host based on this observation in California in [June](https://www.inaturalist.org/observations/123456789).\n\nObserved in Contra Costa County, California in [July](https://www.inaturalist.org/observations/123456791).\n\nThis gall closely resembles that of [Andricus brunneus](https://www.gallformers.org/gall/1234); the host oak is the only reliable way to separate the two."
+    }
+  ],
+  "pictures": [],
+  "tables": [],
+  "key_value_items": [],
+  "form_items": [],
+  "pages": {}
+}

@@ -22,6 +22,11 @@ Format changes since the trial (2026-10-17 and 2026-10-26 decisions):
   values come from the Inducer's generation group. None of these changes a field's shape,
   so values are compared as they are: a season value replaced by another shows as
   `changed`, a generation added to or removed from a Gall shows in the Gall mapping.
+- format 4 (2026-11-02, matter d213): a trait Fact carries the Source's `term` and a
+  suggested `category` (null when none fits) in place of value.as_written and
+  value.value. Trait statements are read in either shape (`trait_parts`): matched by
+  Gall and Trait, compared by category, and a term the run put in another category, or
+  in none, shows as `changed`.
 """
 
 import json
@@ -231,7 +236,10 @@ class Described:
         for f in gall.get("facts", []):
             if f["kind"] == "trait":
                 key = (f["gall"], f["trait"])
-                self.slot_values.setdefault(key, set()).add(f["value"]["value"])
+                category = trait_parts(f)[1]
+                values = self.slot_values.setdefault(key, set())
+                if category is not None:
+                    values.add(category)
 
     @staticmethod
     def taxon(t: dict) -> dict:
@@ -310,7 +318,16 @@ class Described:
                 out["gall"] = self.galls.get(f["gall"], {"ref": f["gall"], "name_as_written": "?"})
             if kind == "qualifier":
                 out |= {"of": relationships.get(f["of"]), "qualifier": f["qualifier"]}
-            for key in ("trait", "value", "adjustment", "place", "name"):
+            for key in (
+                "trait",
+                "value",
+                "term",
+                "category",
+                "depends_on_gall",
+                "adjustment",
+                "place",
+                "name",
+            ):
                 if key in f:
                     out[key] = f[key]
             for key in ("when_as_written", "stage_as_written"):
@@ -345,6 +362,19 @@ class Described:
         return {"galls": len(self.galls), "statements": dict(sorted(counts.items()))}
 
 
+def trait_parts(s: dict) -> tuple[str | None, str | None]:
+    """A trait statement's (term, category), from format 3 (value.as_written, value.value) or
+    format 4 (term, category.value; category None when none fits)."""
+    if "value" in s:
+        return s["value"].get("as_written"), s["value"].get("value")
+    return s.get("term"), (s.get("category") or {}).get("value")
+
+
+def trait_display(s: dict) -> str:
+    term, category = trait_parts(s)
+    return category if category is not None else f"no category ({term})"
+
+
 def item_order(item_id: str) -> tuple:
     batch, local = item_id.split("-", 1)
     return BATCHES.index(batch), int(re.sub(r"\D", "", local) or 0)
@@ -366,7 +396,7 @@ def label(s: dict) -> str:
         return f"{s['gall']['name_as_written']} -> {', '.join(s['entries']) or 'no entry'} ({s['outcome']})"
     gall = f" | {s['gall']['name_as_written']}" if "gall" in s else ""
     if kind == "trait":
-        return f"{s['trait']} = {s['value']['value']}{deny}{gall}"
+        return f"{s['trait']} = {trait_display(s)}{deny}{gall}"
     if kind in ("range", "occurrence"):
         adj = s.get("adjustment", "occurs")
         return f"{adj} {s['place']['value']} ({s['place']['as_written']}){deny}{gall}"
@@ -644,7 +674,9 @@ class Scorer:
         deny = " (deny)" if s.get("stance") == "deny" else ""
         if kind == "relationship":
             return (s["type"], s["stance"]), s["type"] + deny
-        if kind in ("qualifier", "trait"):
+        if kind == "trait":
+            return (trait_parts(s)[1], s["stance"]), f"{trait_display(s)}{deny}"
+        if kind == "qualifier":
             return (s["value"]["value"], s["stance"]), f"{s['value']['value']}{deny}"
         if kind == "range":
             return (s["adjustment"], s["stance"]), s["adjustment"] + deny
@@ -719,7 +751,8 @@ class Scorer:
         return {"golden": self.value(g)[1], "run": self.value(n)[1]}
 
     def match_trait(self, item: dict, g: dict, candidates: list) -> dict:
-        exact = [(sid, n) for sid, n in candidates if n["value"]["value"] == g["value"]["value"]]
+        term, category = trait_parts(g)
+        exact = [(sid, n) for sid, n in candidates if trait_parts(n)[1] == category]
         same = [(sid, n) for sid, n in exact if n["stance"] == g["stance"]]
         if same:
             return {"status": "present", "run_id": same[0][0]} | self.evidence_check(
@@ -728,10 +761,18 @@ class Scorer:
         if exact:  # the same value, now denied (or confirmed)
             sid, n = exact[0]
             return {"status": "changed", "run_id": sid} | self.both(g, n)
-        before = set(item.get("context", {}).get("slot_values", [g["value"]["value"]]))
-        new = sorted({n["value"]["value"] for _, n in candidates} - before)
+        same_term = [
+            (sid, n)
+            for sid, n in candidates
+            if term and words(trait_parts(n)[0] or "") == words(term)
+        ]
+        if same_term:  # the same term, in another category or in none
+            sid, n = same_term[0]
+            return {"status": "changed", "run_id": sid} | self.both(g, n)
+        before = set(item.get("context", {}).get("slot_values", [category]))
+        new = sorted({trait_parts(n)[1] for _, n in candidates} - before - {None})
         if new:
-            return {"status": "changed", "golden": g["value"]["value"], "run": new}
+            return {"status": "changed", "golden": category, "run": new}
         return {"status": "missing"} | self.why_missing(g)
 
     def match_description(self, g: dict, candidates: list) -> dict:

@@ -3,7 +3,7 @@
 import json
 
 import pytest
-from conftest import CONTRACT, EXAMPLES, example
+from conftest import CONTRACT, EXAMPLES, as_v3, example
 
 
 BATCHES = [p for p in sorted(EXAMPLES.glob("*/*.json")) if p.name != "document.json"]
@@ -30,14 +30,15 @@ def errors_mention(errors, *words):
 # -- rejections that predate the 2026-10-08 changes ------------------------------
 
 
-def test_unknown_trait_value(paper, schema_errors):
-    paper["facts"][5]["value"]["value"] = "beige"
-    assert errors_mention(schema_errors(paper), "facts/5/value/value")
+def test_unknown_trait_category(paper, schema_errors):
+    paper["facts"][5]["category"]["value"] = "beige"
+    assert errors_mention(schema_errors(paper), "facts/5/category/value")
 
 
 def test_controlled_value_needs_as_written(paper, schema_errors):
-    del paper["facts"][5]["value"]["as_written"]
-    assert errors_mention(schema_errors(paper), "as_written")
+    # f5, a qualifier: controlled values other than Traits keep value + as_written.
+    del paper["facts"][4]["value"]["as_written"]
+    assert errors_mention(schema_errors(paper), "facts/4/value", "as_written")
 
 
 def test_extra_property(paper, schema_errors):
@@ -211,7 +212,7 @@ def test_occurrence_when_and_stage_are_not_empty(paper, schema_errors):
 
 def test_occurrence_takes_no_coordinates(paper, schema_errors):
     paper["facts"].append(occurrence(coordinates="37.88 N, 121.91 W"))
-    assert errors_mention(schema_errors(paper), "facts/15", "coordinates")
+    assert errors_mention(schema_errors(paper), "facts/16", "coordinates")
 
 
 # -- 2026-10-26: a Gall's range never leaves its Hosts' ranges --------------------
@@ -221,6 +222,34 @@ def test_range_include_adjustment_is_rejected(paper, schema_errors):
     # A place where the Gall occurs but no Host grows is a recorded occurrence.
     paper["facts"][8]["adjustment"] = "include"
     assert errors_mention(schema_errors(paper), "adjustment")
+
+
+# -- 2026-10-30: Gallformers statements quoting a Gall's note ----------------------
+
+
+def note_example():
+    return example("gallformers-note")
+
+
+def test_a_note_needs_its_document(schema_errors):
+    batch = note_example()
+    del batch["source"]["document"]
+    assert errors_mention(schema_errors(batch), "source", "document")
+
+
+def test_a_gallformers_document_needs_a_note(schema_errors):
+    batch = note_example()
+    del batch["source"]["note"]
+    assert errors_mention(schema_errors(batch), "source", "note")
+
+
+def test_a_note_names_its_gall_and_date(schema_errors):
+    batch = note_example()
+    del batch["source"]["note"]["stated_on"]
+    assert errors_mention(schema_errors(batch), "stated_on")
+    batch = note_example()
+    batch["source"]["note"]["gallformers_gall_id"] = "587"
+    assert errors_mention(schema_errors(batch), "gallformers_gall_id")
 
 
 # -- 2026-10-27: generation groups -------------------------------------------------
@@ -256,3 +285,168 @@ def test_generation_groups_draw_on_the_schema_values_once_each():
     grouped = [value for group in generation.get("groups", []) for value in group["values"]]
     assert set(grouped) <= allowed
     assert len(grouped) == len(set(grouped))
+
+
+# -- 2026-11-02: format v4, Traits carry the Source's term and a suggested category (d213) ----
+# A trait Fact has `term` (the Source's term, verbatim) and `category` (a value of its Trait, or
+# null when none fits), and may say `depends_on_gall`. Format v3 batches (value + as_written)
+# still validate: packages already delivered are v3.
+
+
+def test_examples_are_format_v4():
+    assert {example(p.parent.name, p.name)["format_version"] for p in BATCHES} == {4}
+
+
+def test_a_trait_fact_has_a_term_and_a_category(paper, schema_errors):
+    assert paper["facts"][5]["term"] == "pale tan"
+    assert paper["facts"][5]["category"] == {"value": "tan"}
+    assert schema_errors(paper) == []
+
+
+def test_no_category_when_none_fits(paper, schema_errors):
+    paper["facts"][5]["category"] = None
+    assert schema_errors(paper) == []
+
+
+def test_the_category_is_required(paper, schema_errors):
+    del paper["facts"][5]["category"]
+    assert errors_mention(schema_errors(paper), "facts/5", "category")
+
+
+def test_the_term_is_required_and_not_empty(paper, schema_errors):
+    paper["facts"][5]["term"] = ""
+    assert errors_mention(schema_errors(paper), "facts/5/term")
+    del paper["facts"][5]["term"]
+    assert errors_mention(schema_errors(paper), "facts/5", "term")
+
+
+def test_the_category_is_only_a_value(paper, schema_errors):
+    paper["facts"][5]["category"] = {"value": "tan", "as_written": "pale tan"}
+    assert errors_mention(schema_errors(paper), "facts/5/category")
+
+
+def test_depends_on_gall(paper, schema_errors):
+    paper["facts"][5]["depends_on_gall"] = True
+    assert schema_errors(paper) == []
+    paper["facts"][5]["category"] = None
+    assert schema_errors(paper) == []
+    paper["facts"][5]["depends_on_gall"] = False
+    assert errors_mention(schema_errors(paper), "facts/5/depends_on_gall")
+
+
+def test_a_v4_trait_fact_takes_no_value(paper, schema_errors):
+    paper["facts"][5]["value"] = {"value": "tan", "as_written": "pale tan"}
+    assert errors_mention(schema_errors(paper), "facts/5", "value")
+
+
+def test_v4_unmapped_takes_no_trait_slot(paper, schema_errors):
+    # A Trait term that fits no value is a trait Fact with category null.
+    entry = {"term": "lignified", "slot": "texture", "gall": "g1",
+             "evidence": [{"item": "#/texts/44", "quote": "becoming lignified in the second year"}]}  # fmt: skip
+    paper["unmapped"] = [entry]
+    assert errors_mention(schema_errors(paper), "unmapped/0/slot")
+    for slot in ("other", "generation", "place"):
+        paper["unmapped"] = [{**entry, "slot": slot}]
+        assert schema_errors(paper) == [], slot
+
+
+def test_format_versions_3_and_4_only(paper, schema_errors):
+    paper["format_version"] = 5
+    assert errors_mention(schema_errors(paper), "format_version")
+
+
+def test_a_v3_batch_still_validates(paper, schema_errors):
+    v3 = as_v3(paper)
+    assert v3["facts"][5]["value"] == {"value": "tan", "as_written": "pale tan"}
+    assert schema_errors(v3) == []
+    v3["unmapped"] = [{"term": "lignified", "slot": "texture", "gall": "g1",
+                       "evidence": [{"item": "#/texts/44", "quote": "becoming lignified in the second year"}]}]  # fmt: skip
+    assert schema_errors(v3) == []
+
+
+def test_v3_unknown_trait_value(paper, schema_errors):
+    v3 = as_v3(paper)
+    v3["facts"][5]["value"]["value"] = "beige"
+    assert errors_mention(schema_errors(v3), "facts/5/value/value")
+
+
+def test_v3_trait_value_needs_as_written(paper, schema_errors):
+    v3 = as_v3(paper)
+    del v3["facts"][5]["value"]["as_written"]
+    assert errors_mention(schema_errors(v3), "facts/5/value", "as_written")
+
+
+def test_a_v3_trait_fact_takes_no_term(paper, schema_errors):
+    v3 = as_v3(paper)
+    v3["facts"][5]["term"] = "pale tan"
+    assert errors_mention(schema_errors(v3), "facts/5", "term")
+
+
+def test_taxonomy_batches_take_either_version(revision, schema_errors):
+    for version in (3, 4):
+        assert schema_errors({**revision, "format_version": version}) == []
+
+
+# -- 2026-11-03: each unmapped entry's topic, for grouping the Hedges (d213) -------------------
+# Optional: v4 packages delivered before it lack it, and the review shows those under "Other".
+
+
+TOPICS = ("names", "inducer", "host", "range", "gall", "other")
+
+
+def hedge(**fields):
+    return {"term": "probably the same as C. confluens", "slot": "other", "gall": "g1",
+            "evidence": [{"item": "#/texts/44", "quote": "becoming lignified in the second year"}], **fields}  # fmt: skip
+
+
+def test_an_unmapped_entry_takes_a_topic(paper, schema_errors):
+    for topic in TOPICS:
+        paper["unmapped"] = [hedge(topic=topic)]
+        assert schema_errors(paper) == [], topic
+    paper["unmapped"] = [hedge()]
+    assert schema_errors(paper) == []
+
+
+def test_an_unknown_topic_is_rejected(paper, schema_errors):
+    paper["unmapped"] = [hedge(topic="taxonomy")]
+    assert errors_mention(schema_errors(paper), "unmapped/0/topic")
+
+
+def test_topics_in_taxonomy_and_v3_batches(paper, revision, schema_errors):
+    revision["unmapped"] = [{**hedge(topic="names"), "slot": "taxonomic_act"}]
+    del revision["unmapped"][0]["gall"]
+    assert schema_errors(revision) == []
+    v3 = as_v3(paper)
+    v3["unmapped"] = [hedge(topic="gall")]
+    assert schema_errors(v3) == []
+
+
+# -- 2026-11-03: a Host declared by its common name (d213 Task 6) ---------------
+
+
+def test_a_host_declared_by_its_common_name(paper, schema_errors):
+    """A common name never paired with a scientific name: the Source's words, no rank needed."""
+    paper["taxa"][2] = {"ref": "t3", "name_as_written": "the black oak", "common_name": True}
+    assert schema_errors(paper) == []
+    paper["taxa"][2]["name_reading"] = "the black oak"
+    paper["taxa"][2]["rank"] = "species"
+    assert schema_errors(paper) == []
+
+
+def test_a_scientific_name_still_needs_its_rank(paper, schema_errors):
+    del paper["taxa"][2]["rank"]
+    assert errors_mention(schema_errors(paper), "taxa/2", "rank")
+
+
+def test_common_name_is_a_flag(paper, schema_errors):
+    paper["taxa"][2]["common_name"] = "black oak"
+    assert errors_mention(schema_errors(paper), "taxa/2/common_name")
+
+
+@pytest.mark.parametrize("field,value", [("new", {"status": "sp. nov."}), ("sensu", "non Harris"), ("gallformers_taxon_id", 7)])
+def test_a_common_name_takes_no_scientific_claims(paper, schema_errors, field, value):
+    paper["taxa"][2] = {"ref": "t3", "name_as_written": "the black oak", "common_name": True, field: value}
+    assert errors_mention(schema_errors(paper), "taxa/2")
+    del paper["taxa"][2]["common_name"]
+    paper["taxa"][2]["rank"] = "species"
+    assert schema_errors(paper) == []

@@ -28,6 +28,7 @@
             "description": "unsupported: the evidence does not say it. wrong_value: a controlled value doesn't match its definition or the quote. wrong_type: the wrong Relationship type, act kind or qualifier. wrong_stance: confirm/deny is wrong. wrong_target: the wrong taxon, Gall or generation. rule: a PRODUCER_GUIDE.md rule is broken."
           },
           "reason": { "type": "string", "minLength": 1, "description": "What is wrong, citing the document." },
+          "summary": { "type": "string", "minLength": 1, "description": "Optional: the checker's position in one sentence, plain words, no rule numbers or #/texts refs (the full argument is reason)." },
           "suggestion": { "type": "string", "minLength": 1, "description": "Optional: what the statement should be." },
           "reviewer": { "type": "string", "minLength": 1, "description": "Which reviewer found it (its model), when several reviewed." },
           "response": {
@@ -36,10 +37,33 @@
             "required": ["decision", "reason"],
             "properties": {
               "decision": { "enum": ["agree", "disagree"] },
-              "reason": { "type": "string", "minLength": 1, "description": "For agree, what was changed; for disagree, why the statement stands, citing the document or the guide." }
+              "reason": { "type": "string", "minLength": 1, "description": "For agree, what was changed; for disagree, why the statement stands, citing the document or the guide." },
+              "summary": { "type": "string", "minLength": 1, "description": "Optional: the producer's position in one sentence, plain words, no rule numbers or #/texts refs (the full argument is reason)." }
             },
             "additionalProperties": false
           }
+        },
+        "additionalProperties": false
+      }
+    },
+    "placements": {
+      "description": "Phase 5, format 4 gall batches: the reviewer's own placement of every trait Fact's term, made from a copy of gall.json without the producer's categories (VERIFY_GUIDE.md). One entry per trait Fact per reviewer.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^f[0-9]+$", "description": "The trait Fact." },
+          "category": {
+            "description": "The value of the Fact's Trait the term fits by its definition, or null when none fits.",
+            "type": ["object", "null"],
+            "required": ["value"],
+            "properties": { "value": { "type": "string", "minLength": 1 } },
+            "additionalProperties": false
+          },
+          "depends_on_gall": { "const": true, "description": "The term's category depends on this Gall: the term means different values for different Galls." },
+          "reason": { "type": "string", "minLength": 1, "description": "Optional: why, when the category is null or depends on the Gall." },
+          "reviewer": { "type": "string", "minLength": 1, "description": "Which reviewer placed it (its model), when several reviewed." }
         },
         "additionalProperties": false
       }

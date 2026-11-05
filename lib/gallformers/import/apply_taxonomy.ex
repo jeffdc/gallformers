@@ -5,8 +5,9 @@ defmodule Gallformers.Import.ApplyTaxonomy do
 
     1. **New taxa.** Each taxon the Source presents as new (`taxa[].new`,
        resolved `:new`) is created in the editorial tree — under the parent
-       its `placement` act names when that parent resolves (or is itself
-       new), otherwise unplaced (flagged `"unplaced"` for a curator).
+       a curator chose deciding it new, else the parent its `placement` act
+       names when that parent resolves (or is itself new), otherwise
+       unplaced (flagged `"unplaced"` for a curator).
     2. **Every act is recorded** as a Fact (`Gallformers.Taxa.assert_*`)
        with the Source's attribution: quotes as evidence, `status_as_written`,
        the name act's `authorship_as_written`, and the taxa it names
@@ -19,14 +20,28 @@ defmodule Gallformers.Import.ApplyTaxonomy do
        it lacks, any split (assigning records to the daughters is curator
        work), or a denial of what the tree holds — becomes a
        `:taxonomy_disagreement` queue item for a curator to apply
-       editorially or leave. The tree is otherwise unchanged.
+       editorially or leave. The tree is otherwise unchanged. A first
+       common name, for a taxon that holds none, is new information rather
+       than a disagreement: recorded, with no item.
+    4. **Original combinations are history.** The name and placement acts
+       of a taxon the resolver flags `"original_combination"` (the
+       Source's original description of a combination the tree now holds
+       as a synonym) write no Fact and raise no item: the act's statement
+       records the name and parent as written and the taxon it now is, and
+       is never a claim on the taxon's current name or place. Its parent
+       need not resolve.
+
+  A taxon skipped by a curator (`"skipped"`: decided skip, or its dispute
+  decided skip) is not created, and the acts that name it are not written.
 
   ## The context
 
   `run/1` takes a map: `:actor`, `:source`, `:batch` (with its decoded
   `content`), `:items` (the stored document's item IDs by ref), `:taxa` and
   `:galls` (the batch's resolved taxon and Gall statements by ref, decisions
-  honoured), and `:drop` (statement refs a curator dropped, with why).
+  honoured), `:drop` (statement refs a curator dropped, with why) and
+  `:set_aside` (the batch's decided set-aside items,
+  `Gallformers.Import.SetAside`; only a gall batch writes what they state).
   """
 
   alias Gallformers.Facts
@@ -102,17 +117,22 @@ defmodule Gallformers.Import.ApplyTaxonomy do
     end
   end
 
-  defp known_id(%{resolution: resolution, taxon_id: id})
+  # A skipped taxon (decided skip, or its dispute decided skip) is no taxon.
+  defp known_id(%{flags: flags} = s) do
+    if "skipped" not in flags, do: unskipped_id(s)
+  end
+
+  defp unskipped_id(%{resolution: resolution, taxon_id: id})
        when resolution in [:resolved, :new] and is_integer(id),
        do: id
 
   # A name held as a synonym while this Source treats it as valid: its acts
   # are recorded against the tree's taxon.
-  defp known_id(%{resolution: :unresolved, flags: flags, candidate_ids: [id | _]}) do
+  defp unskipped_id(%{resolution: :unresolved, flags: flags, candidate_ids: [id | _]}) do
     if "synonym_held_valid" in flags, do: id
   end
 
-  defp known_id(_statement), do: nil
+  defp unskipped_id(_statement), do: nil
 
   # Creates a new taxon, its new parent first; `visiting` guards cycles.
   defp create(ctx, ref, declared, placements, {:ok, ids, _created, _updates} = acc, visiting) do
@@ -128,6 +148,9 @@ defmodule Gallformers.Import.ApplyTaxonomy do
 
         parent =
           cond do
+            chosen = chosen_parent(ctx.taxa[ref]) ->
+              {:ok, chosen, acc}
+
             parent_ref == nil ->
               {:ok, nil, acc}
 
@@ -151,6 +174,14 @@ defmodule Gallformers.Import.ApplyTaxonomy do
         end
     end
   end
+
+  @doc """
+  The parent a curator chose for a taxon decided new
+  (`Gallformers.Import.Queue`), from its statement; nil when none was.
+  """
+  @spec chosen_parent(map() | nil) :: integer() | nil
+  def chosen_parent(%{detail: %{"chosen_parent_id" => id}}) when is_integer(id), do: id
+  def chosen_parent(_statement), do: nil
 
   defp new?(ctx, ref) do
     case ctx.taxa[ref] do
@@ -222,21 +253,74 @@ defmodule Gallformers.Import.ApplyTaxonomy do
   end
 
   defp write_act(ctx, diff, act, refs) do
-    if Map.has_key?(ctx.drop, act["id"]) do
-      {:ok, Diff.unresolved("dropped by a curator: #{ctx.drop[act["id"]]}"), nil}
-    else
-      case key_and_extra(act, refs) do
-        {:ok, kind, key, extra} ->
-          attribution = Attributions.build(act, ctx.source.kind, ctx.batch.id, ctx.items, extra)
+    cond do
+      Map.has_key?(ctx.drop, act["id"]) ->
+        {:ok, Diff.unresolved("dropped by a curator: #{ctx.drop[act["id"]]}"), nil}
 
-          with {:ok, outcome} <-
-                 Diff.write(diff, %{kind: kind, key: key, attribution: attribution}) do
-            {:ok, outcome, key}
-          end
+      original_combination?(ctx, act) ->
+        {:ok, original_combination(act, refs), nil}
 
-        {:skip, reason} ->
-          {:ok, Diff.unresolved(reason), nil}
-      end
+      true ->
+        write_fact(ctx, diff, act, refs)
+    end
+  end
+
+  # A name or placement act on the original description of a combination
+  # the tree now holds as a synonym (the resolver flags its taxon
+  # `"original_combination"`): history, not a claim on the taxon's current
+  # name or place.
+  defp original_combination?(ctx, %{"kind" => kind, "taxon" => ref})
+       when kind in ["name", "placement"] do
+    case ctx.taxa[ref] do
+      %{flags: flags} -> "original_combination" in flags and "skipped" not in flags
+      nil -> false
+    end
+  end
+
+  defp original_combination?(_ctx, _act), do: false
+
+  # The act as the batch's record of the original combination: the name as
+  # the Source wrote it (and the parent it placed it under), and the
+  # taxon it now is. No Fact.
+  defp original_combination(act, refs) do
+    written = fn ref -> declared_name(refs.declared[ref]) end
+
+    history =
+      %{
+        "name" => written.(act["taxon"]),
+        "parent" => act["kind"] == "placement" && written.(act["parent"]),
+        "taxon_id" => refs.taxa[act["taxon"]]
+      }
+      |> Map.reject(fn {_k, v} -> v in [nil, false] end)
+
+    %{
+      fact_id: nil,
+      resolution: :resolved,
+      delta: nil,
+      flags: ["original_combination"],
+      detail: %{
+        "original_combination" => history,
+        "recorded" => "as the original combination: history, not a claim on the current name"
+      },
+      conflicts: []
+    }
+  end
+
+  defp write_fact(ctx, diff, act, refs) do
+    case key_and_extra(act, refs) do
+      {:ok, kind, key, extra} ->
+        attribution =
+          act
+          |> Attributions.build(ctx.source.kind, ctx.batch.id, ctx.items, extra)
+          |> Attributions.with_note(ctx.note)
+
+        with {:ok, outcome} <-
+               Diff.write(diff, %{kind: kind, key: key, attribution: attribution}) do
+          {:ok, outcome, key}
+        end
+
+      {:skip, reason} ->
+        {:ok, Diff.unresolved(reason), nil}
     end
   end
 
@@ -374,13 +458,16 @@ defmodule Gallformers.Import.ApplyTaxonomy do
     "a split of #{name(key.taxon_id)}: assigning existing records to the daughters is curator work"
   end
 
+  # A first common name, for a taxon that holds none, is new information,
+  # not a disagreement: it is recorded with no item.
   defp disagreement(%{"kind" => "common_name", "stance" => stance}, key, _refs) do
-    held? =
-      key.taxon_id
-      |> Taxa.list_common_names()
-      |> Enum.any?(&(String.downcase(&1.name) == String.downcase(key.common_name)))
+    names = Taxa.list_common_names(key.taxon_id)
+    held? = Enum.any?(names, &(String.downcase(&1.name) == String.downcase(key.common_name)))
 
     cond do
+      stance == "confirm" and names == [] ->
+        nil
+
       stance == "confirm" and not held? ->
         "the tree does not hold the common name #{key.common_name} for #{name(key.taxon_id)}"
 

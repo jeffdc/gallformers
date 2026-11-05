@@ -63,6 +63,9 @@ defmodule Gallformers.CatalogMigration do
        with the host union, as range Facts (`range_decisions.csv`).
     10. `Gallformers.CatalogMigration.Aliases` — aliases sorted by meaning
         into synonyms, common names, gall aliases (`aliases.csv`).
+        `Gallformers.CatalogMigration.UndescribedGalls` then confirms each
+        undescribed Gall's legacy Facts as the Gallformers Source's own,
+        dated `:stated_on`.
     11. `Gallformers.CatalogMigration.Keys` — key couplets re-targeted
         (`keys.csv`).
     12. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
@@ -128,6 +131,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.CatalogMigration.Taxa, as: MigrationTaxa
   alias Gallformers.CatalogMigration.TaxonMerges
+  alias Gallformers.CatalogMigration.UndescribedGalls
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Taxa.NameNormalizer
@@ -194,6 +198,9 @@ defmodule Gallformers.CatalogMigration do
       stops the run, writing nothing, when a curated row needs a decision
       it does not have or taxa share a replay key; `:skip` (for runs on a
       copy before curation is done) leaves those rows out and reports them
+    * `:stated_on` — the date Gallformers' statements without a date of
+      their own take (default today: in the maintenance window, the cutover
+      date)
 
   Loads the Catalog vocabularies first (idempotent). Returns the report;
   `{:error, {:pending_decisions, report}}` from a strict run that stopped
@@ -212,6 +219,7 @@ defmodule Gallformers.CatalogMigration do
   defp migrate(opts) do
     actor = Keyword.get_lazy(opts, :actor, fn -> Actor.system("catalog_migration") end)
     path = Keyword.get_lazy(opts, :name_suffixes, &NameSuffixes.default_path/0)
+    stated_on = Keyword.get_lazy(opts, :stated_on, &Date.utc_today/0)
 
     with {:ok, mode} <- pending_mode(opts),
          {:ok, suffixes} <- NameSuffixes.load(path),
@@ -223,7 +231,7 @@ defmodule Gallformers.CatalogMigration do
          {:ok, generations} <- generations(suffixes),
          {:ok, {plan, curated_facts, report}} <-
            transaction(actor, "catalog_migration.run", fn ->
-             skeleton(actor, suffixes, generations, curated, mode)
+             skeleton(actor, suffixes, generations, curated, mode, stated_on)
            end) do
       :ok = LegacyFacts.assert_all(actor, plan)
       :ok = LegacyFacts.assert_all(actor, %{plan | assertions: curated_facts})
@@ -346,7 +354,7 @@ defmodule Gallformers.CatalogMigration do
 
   # Everything but the legacy Facts, which it plans. A strict run with
   # rows awaiting decisions rolls everything back here.
-  defp skeleton(actor, suffixes, generations, curated, mode) do
+  defp skeleton(actor, suffixes, generations, curated, mode, stated_on) do
     clear!()
     advance_sequence!("species")
 
@@ -379,12 +387,13 @@ defmodule Gallformers.CatalogMigration do
       )
 
     {aliases, report} = Aliases.run(actor, curated.aliases, taxa, galls, legacy, report)
+    {undescribed, report} = UndescribedGalls.assertions(plan, gallformers, stated_on, report)
     report = Keys.run(curated.keys, gall_ids, report)
     report = %{report | duplicates: duplicates()}
 
     if mode == :fail and Report.blocking?(report),
       do: Repo.rollback({:pending_decisions, report}),
-      else: {plan, ranges ++ aliases, report}
+      else: {plan, ranges ++ aliases ++ undescribed, report}
   end
 
   defp clear! do

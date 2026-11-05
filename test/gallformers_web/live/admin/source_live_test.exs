@@ -16,7 +16,8 @@ defmodule GallformersWeb.Admin.SourceLiveTest do
 
   import Ecto.Query, only: [from: 2]
   import Gallformers.CatalogFixtures
-  import Gallformers.DataCase, only: [test_audit_changes: 0]
+  import Gallformers.DataCase, only: [audit_test_metadata: 1, test_audit_changes: 0]
+  import Gallformers.ImportFixtures, only: [applied_package!: 3, imported_source!: 2]
   import GallformersWeb.AdminLiveHelpers
 
   alias Gallformers.Audit.Actor
@@ -81,6 +82,59 @@ defmodule GallformersWeb.Admin.SourceLiveTest do
 
       assert has_element?(view, "#source-#{source.id}", "Retracted")
       refute has_element?(view, "#source-#{notice.id}", "Retracted")
+    end
+  end
+
+  describe "the list's dates" do
+    setup :audit_test_metadata
+
+    test "shows when each Source was ingested and last updated", %{conn: conn} do
+      source = imported_source!("Xxqzy ingested", ~U[2026-10-01 09:00:00Z])
+      applied_package!(source, ~U[2026-10-20 15:30:00Z], [])
+      old = source_fixture("Xxqzy of old", "1920")
+
+      {:ok, view, _html} = live(conn, ~p"/admin/sources")
+      view |> form("#source-search-form", %{query: "xxqzy"}) |> render_change()
+
+      assert has_element?(view, "#sources-table th", "Ingested")
+      assert has_element?(view, "#sources-table th", "Updated")
+      assert has_element?(view, "#source-#{source.id} [data-role=ingested]", "Oct 01, 2026")
+      assert has_element?(view, "#source-#{source.id} [data-role=updated]", "Oct 20, 2026")
+
+      assert has_element?(
+               view,
+               "#source-#{old.id} [data-role=ingested]",
+               "From the original Gallformers data"
+             )
+
+      refute has_element?(view, "#source-#{old.id} [data-role=updated]", "20")
+    end
+  end
+
+  describe "the Source's dates" do
+    setup :audit_test_metadata
+
+    test "the editor shows when the Source was added and updated", %{conn: conn} do
+      source = imported_source!("Dated source", ~U[2026-10-01 09:00:00Z])
+      applied_package!(source, ~U[2026-10-20 15:30:00Z], [])
+
+      {:ok, view, _html} = live(conn, ~p"/admin/sources/#{source.id}")
+
+      assert has_element?(
+               view,
+               "#source-dates",
+               "Added to Gallformers Oct 01, 2026 · updated Oct 20, 2026"
+             )
+
+      refute has_element?(view, "#source-review")
+    end
+
+    test "a Source from the old data says so", %{conn: conn} do
+      source = source_fixture("Undated source", "1920")
+
+      {:ok, view, _html} = live(conn, ~p"/admin/sources/#{source.id}")
+
+      assert has_element?(view, "#source-dates", "From the original Gallformers data")
     end
   end
 

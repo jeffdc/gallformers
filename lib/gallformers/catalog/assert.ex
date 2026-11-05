@@ -71,22 +71,7 @@ defmodule Gallformers.Catalog.Assert do
   def assert(module, %Actor{} = actor, key_attrs, attribution_attrs)
       when is_map(key_attrs) and is_map(attribution_attrs) do
     Audit.transaction(actor, "catalog.assert_#{module.kind()}", fn ->
-      changeset = module.changeset(struct(module), key_attrs)
-
-      changeset =
-        if changeset.valid? and function_exported?(module, :prepare, 1),
-          do: module.prepare(changeset),
-          else: changeset
-
-      key = changeset |> Changeset.apply_action(:insert) |> ok_or_rollback()
-
-      lock(module.kind(), module.natural_key(key))
-
-      detail =
-        case Repo.one(module.existing_query(key)) do
-          nil -> create(module, actor, changeset, key)
-          existing -> update_existing(module, existing, changeset)
-        end
+      detail = find_or_create!(module, actor, key_attrs)
 
       %{attribution: attribution, conflicts: conflicts} =
         actor
@@ -100,6 +85,37 @@ defmodule Gallformers.Catalog.Assert do
         conflicts: conflicts
       }
     end)
+  end
+
+  @doc """
+  Finds the details of the Fact of kind `module` with the natural key in
+  `key_attrs`, creating the Fact (with no attribution: `:unsupported`)
+  when there is none, as `assert/4` does before attributing it; for moving
+  an attribution onto it (`Gallformers.Facts.move_attribution/3`).
+  """
+  @spec find_or_create(module(), Actor.t(), map()) :: {:ok, detail()} | {:error, Changeset.t()}
+  def find_or_create(module, %Actor{} = actor, key_attrs) when is_map(key_attrs) do
+    Audit.transaction(actor, "catalog.find_or_create_#{module.kind()}", fn ->
+      find_or_create!(module, actor, key_attrs)
+    end)
+  end
+
+  defp find_or_create!(module, actor, key_attrs) do
+    changeset = module.changeset(struct(module), key_attrs)
+
+    changeset =
+      if changeset.valid? and function_exported?(module, :prepare, 1),
+        do: module.prepare(changeset),
+        else: changeset
+
+    key = changeset |> Changeset.apply_action(:insert) |> ok_or_rollback()
+
+    lock(module.kind(), module.natural_key(key))
+
+    case Repo.one(module.existing_query(key)) do
+      nil -> create(module, actor, changeset, key)
+      existing -> update_existing(module, existing, changeset)
+    end
   end
 
   @doc """

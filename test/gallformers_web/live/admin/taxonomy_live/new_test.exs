@@ -246,6 +246,59 @@ defmodule GallformersWeb.Admin.TaxonomyLive.NewTest do
       assert {:taxonomy_edit, "place"} in ops()
     end
 
+    test "starts from the link's name, rank, kingdom and parent", %{conn: conn} do
+      genus = plant_fixture(rank: :genus, name: "Prefillus#{uniq()}")
+      name = "#{Taxa.accepted_name(genus)} villosus var. frondosus"
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/taxonomy/new?#{[name: name, rank: "variety", kingdom: "Plantae", parent_id: genus.id]}"
+        )
+
+      assert has_element?(view, "#taxon-form input[name='taxon[name]'][value='#{name}']")
+
+      assert has_element?(
+               view,
+               "#taxon-form select[name='taxon[rank]'] option[value=variety][selected]"
+             )
+
+      assert get_assign(view, :selected_parent).id == genus.id
+      assert has_element?(view, "#host-range-map")
+
+      render_click(view, "toggle_region", %{"code" => "US-CA"})
+      view |> form("#taxon-form", taxon: %{name: name, rank: "variety"}) |> render_submit()
+
+      plant = resolve(name)
+      assert plant.parent_id == genus.id
+      assert plant.rank == :variety
+    end
+
+    test "with no parent, starts in the link's kingdom", %{conn: conn} do
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/taxonomy/new?#{[name: "Q. lobata", rank: "species", kingdom: "Plantae"]}"
+        )
+
+      assert has_element?(view, "#taxon-form input[name='taxon[kingdom]'][value=Plantae]")
+      assert has_element?(view, "#taxon-form input[name='taxon[name]'][value='Q. lobata']")
+      assert get_assign(view, :selected_parent) == nil
+      assert has_element?(view, "#host-range-map")
+    end
+
+    test "a rank or parent it doesn't know is left out", %{conn: conn} do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/taxonomy/new?#{[name: "Odd name", rank: "bogus", parent_id: "0"]}")
+
+      assert has_element?(
+               view,
+               "#taxon-form select[name='taxon[rank]'] option[value=species][selected]"
+             )
+
+      assert get_assign(view, :selected_parent) == nil
+    end
+
     test "a new plant needs a Host range, drawn on the map", %{conn: conn} do
       genus = plant_fixture(rank: :genus, name: "Drawgenus#{uniq()}")
       name = "#{Taxa.accepted_name(genus)} mapped"

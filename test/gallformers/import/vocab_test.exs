@@ -129,6 +129,62 @@ defmodule Gallformers.Import.VocabTest do
              ]
     end
 
+    test "lists the terms one per row, each with its status and category or candidates", %{
+      files: files
+    } do
+      mappings = ordered(files["traits.json"])["mappings"]
+
+      for mapping <- mappings do
+        keys = Enum.map(mapping, &elem(&1, 0))
+        assert Enum.take(keys, 3) == ["term", "trait", "status"]
+        assert keys -- ["term", "trait", "status", "categories", "candidates", "rule"] == []
+      end
+
+      by_term = Map.new(mappings, &{&1["term"], &1})
+
+      assert by_term["ovoid"].values == [
+               {"term", "ovoid"},
+               {"trait", "shape"},
+               {"status", "placed"},
+               {"categories", ["globular"]}
+             ]
+
+      assert Enum.map(by_term["swelling"], &elem(&1, 0)) ==
+               ["term", "trait", "status", "candidates", "rule"]
+
+      assert by_term["swelling"]["status"] == "ambiguous"
+
+      # No seeded term names several values: "on the leaf" is under `leaf` alone (d213).
+      assert Enum.filter(mappings, &(length(&1["categories"] || []) > 1)) == []
+
+      assert by_term["on the leaf"].values == [
+               {"term", "on the leaf"},
+               {"trait", "plant_part"},
+               {"status", "placed"},
+               {"categories", ["leaf"]}
+             ]
+
+      # A term fitting no category is listed with its status alone.
+      {:ok, _} = Catalog.mark_term_no_fit(test_actor(), "texture", "crusty", :curator)
+
+      assert List.last(ordered(Vocab.render(@version)["traits.json"])["mappings"]).values == [
+               {"term", "crusty"},
+               {"trait", "texture"},
+               {"status", "no_fit"}
+             ]
+
+      # A term naming several values is listed under each.
+      {:ok, _} =
+        Catalog.place_term(test_actor(), "color", "green-yellow", ["green", "yellow"], :curator)
+
+      assert List.last(ordered(Vocab.render(@version)["traits.json"])["mappings"]).values == [
+               {"term", "green-yellow"},
+               {"trait", "color"},
+               {"status", "placed"},
+               {"categories", ["green", "yellow"]}
+             ]
+    end
+
     test "keeps the generation values' other names out of the term mappings", %{files: files} do
       mappings = ordered(files["traits.json"])["mappings"]
       refute Enum.any?(mappings, &(&1["trait"] == "generation"))

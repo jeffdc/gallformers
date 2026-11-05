@@ -145,7 +145,7 @@ defmodule Gallformers.Facts do
     * `:fact_id`, `:source_id`, `:stance` (`:confirm | :deny`) — required
     * `:stated` — a partial date (`"1897"`, `"1897-05"`, `"1897-05-14"`) or
       nil for an undated statement; when absent, the Source's authored date
-    * `:value_as_written`, `:batch_id`, `:when_as_written`,
+    * `:value_as_written`, `:term` (a Trait's term), `:batch_id`, `:when_as_written`,
       `:stage_as_written`, `:status_as_written`, `:authorship_as_written`
     * `:statement_text` — required for the Gallformers Source
     * `:evidence` — a list of `%{document_item_id, quote}` or
@@ -209,6 +209,52 @@ defmodule Gallformers.Facts do
   end
 
   @doc """
+  Moves attribution `attribution_id` (with its evidence, names and
+  Observations) onto Fact `to_fact_id`, as when a Source's Trait term is
+  moved to another category (`d213`), then recomputes the standings of
+  both Facts and their slot siblings. When the Source already attributes
+  the target Fact, that attribution stands and the moved one is removed
+  (one attribution per Fact and Source).
+
+  Returns `%{moved: true | false, conflicts}` (`moved` false when the
+  target's own attribution stood), or `{:error, :not_found}`.
+  """
+  @spec move_attribution(Actor.t(), integer(), integer()) ::
+          {:ok, %{moved: boolean(), conflicts: [Conflict.t()]}} | {:error, :not_found}
+  def move_attribution(%Actor{} = actor, attribution_id, to_fact_id)
+      when is_integer(attribution_id) and is_integer(to_fact_id) do
+    Audit.transaction(actor, "facts.move_attribution", fn ->
+      with %Attribution{} = attribution <- Repo.get(Attribution, attribution_id),
+           %Fact{} <- Repo.get(Fact, to_fact_id) do
+        from_fact_id = attribution.fact_id
+        lock_facts(Enum.uniq([from_fact_id, to_fact_id]))
+
+        moved =
+          cond do
+            from_fact_id == to_fact_id ->
+              false
+
+            Repo.exists?(
+              from(a in Attribution,
+                where: a.fact_id == ^to_fact_id and a.source_id == ^attribution.source_id
+              )
+            ) ->
+              Repo.delete!(attribution)
+              false
+
+            true ->
+              attribution |> Changeset.change(fact_id: to_fact_id) |> Repo.update!()
+              true
+          end
+
+        %{moved: moved, conflicts: recompute(Enum.uniq([from_fact_id, to_fact_id]))}
+      else
+        nil -> Repo.rollback(:not_found)
+      end
+    end)
+  end
+
+  @doc """
   Recomputes the standings of every Fact Source `source_id` attributes, and
   of their slot siblings. Call it after the Source is retracted (or its
   retraction is undone), since a retraction cancels all its stances.
@@ -239,6 +285,24 @@ defmodule Gallformers.Facts do
     )
     |> Repo.all()
     |> Map.new(&{&1.fact_id, &1})
+  end
+
+  @doc """
+  When each of `source_ids` last had an attribution written (made or
+  changed: its `updated_at`), by Source ID; a Source with none is absent.
+  A removed attribution leaves no time here.
+  """
+  @spec last_attribution_changes([integer()]) :: %{integer() => DateTime.t()}
+  def last_attribution_changes([]), do: %{}
+
+  def last_attribution_changes(source_ids) when is_list(source_ids) do
+    from(a in Attribution,
+      where: a.source_id in ^source_ids,
+      group_by: a.source_id,
+      select: {a.source_id, max(a.updated_at)}
+    )
+    |> Repo.all()
+    |> Map.new()
   end
 
   @doc """

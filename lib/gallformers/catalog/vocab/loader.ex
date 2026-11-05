@@ -2,28 +2,38 @@ defmodule Gallformers.Catalog.Vocab.Loader do
   @moduledoc """
   Loads the Catalog's vocabularies (`9449` Task 8).
 
-    * Trait values, with definitions, and term mappings come from the
-      contract's `priv/import/vocab/traits.json`, the source of truth until
-      cutover. The vocabulary generator (`Gallformers.Import.Vocab`, `mix
-      gallformers.import.vocab`) writes the file back from the database;
-      loading it and generating reproduces it (tested). After cutover the
-      vocabularies change by database migration and the generator
-      publishes them.
+    * Trait values, with definitions, and terms (one per row, placed,
+      ambiguous or fitting no category: `Gallformers.Catalog.Vocab.TraitTermMapping`)
+      are seeded from the contract's `priv/import/vocab/traits.json`
+      (`mappings`), each term as placed by the seed. The database owns
+      them (`6611`, `d213`): a value is added through
+      `Gallformers.Catalog.add_trait_value/2` and a term placed, marked or
+      moved through `Gallformers.Catalog.Vocab.Terms` (recorded for replay
+      by `Gallformers.Import.record_trait_value_added/2` and
+      `record_term_edit/3`), and the vocabulary generator
+      (`Gallformers.Import.Vocab`, `mix gallformers.import.vocab`) writes
+      the file from the database, so the committed file is generated
+      output that seeds a fresh database. Loading it and generating
+      reproduces it (tested).
     * Generation groups and values are the provisional list held here
       (`8567` *Generation groups*): heterogony (agamic, sexual), seasonal
       (spring, summer, autumn), rust stages (aecial, telial) and the aphid
       life cycle (`8567` *Aphid life-cycle values*), whose other names load
-      as term mappings of trait `"generation"`. The loader never writes
+      as terms of trait `"generation"`, placed under their values. The loader never writes
       their taxa mappings (`generation_group_taxa`): the catalog migration
       does, from `priv/catalog_migration/generation_group_taxa.csv`
       (`Gallformers.CatalogMigration.GenerationGroupTaxa`).
 
   Loading is idempotent: rows are matched on their natural keys (trait +
-  value, trait + term, group name, generation value), new ones inserted and
-  changed ones updated, and unchanged ones left untouched, so a reload with
-  nothing new writes nothing (and leaves no audit records). Nothing is ever
-  deleted: a value dropped from the contract may still be referenced by
-  Facts, so its removal is a migration.
+  value, trait + normalized term, group name, generation value) and new
+  ones inserted. Trait values and terms are only seeded: one the database
+  already holds is never overwritten, so a definition edited, or a term
+  placed, in the database stays.
+  Generation values are the code's list, so a changed one is updated.
+  Unchanged rows are left untouched, so a reload with nothing new writes
+  nothing (and leaves no audit records). Nothing is ever deleted: a value
+  dropped from the file may still be referenced by Facts, so its removal is
+  a migration.
   """
 
   import Ecto.Query, only: [from: 2]
@@ -81,11 +91,12 @@ defmodule Gallformers.Catalog.Vocab.Loader do
      [
        {"fundatrix", "fundatrix",
         "Hatches from the overwintering egg on the primary host and induces the primary gall.",
-        "stem mother"},
+        ["stem mother"]},
        {"apterae", "apterae",
         "The stem mother's wingless offspring on the primary host, where they leave her gall " <>
-          "to induce one of their own.", "apterae fundatrigeniae"},
-       {"exules", "exules", "Generations on the secondary host.", "alienicolae, virginoparae"},
+          "to induce one of their own.", ["apterae fundatrigeniae"]},
+       {"exules", "exules", "Generations on the secondary host.",
+        ["alienicolae", "virginoparae"]},
        {"gallicolae", "gallicolae", "Phylloxerid generations that induce leaf galls.", nil},
        {"radicicolae", "radicicolae", "Phylloxerid generations that induce root galls.", nil}
      ]}
@@ -139,55 +150,48 @@ defmodule Gallformers.Catalog.Vocab.Loader do
   end
 
   defp upsert_trait_values(contract) do
-    rows = trait_value_rows(contract)
-
-    on_conflict =
-      from(t in TraitValue,
-        where: fragment("? IS DISTINCT FROM EXCLUDED.definition", t.definition),
-        update: [set: [definition: fragment("EXCLUDED.definition")]]
-      )
-
-    upsert(TraitValue, rows, on_conflict, [:trait, :value])
+    upsert(TraitValue, trait_value_rows(contract), :nothing, [:trait, :value])
   end
 
   defp upsert_term_mappings(%{"mappings" => mappings}) do
+    placed_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
     contract_rows =
       for mapping <- mappings do
-        %{
-          trait: mapping["trait"],
-          term: mapping["term"],
-          maps_to: mapping["maps_to"] || [],
+        term_row(mapping["trait"], mapping["term"], placed_at, %{
+          status: String.to_existing_atom(mapping["status"]),
+          categories: mapping["categories"] || [],
           candidates: mapping["candidates"] || [],
           rule: mapping["rule"]
-        }
+        })
       end
 
     generation_rows =
       for {_group, values} <- @generation_groups,
           {value, _qualifier, _definition, other_names} <- values,
-          other_names != nil do
-        %{trait: "generation", term: other_names, maps_to: [value], candidates: [], rule: nil}
+          name <- other_names || [] do
+        term_row("generation", name, placed_at, %{
+          status: :placed,
+          categories: [value],
+          candidates: [],
+          rule: nil
+        })
       end
 
-    on_conflict =
-      from(m in TraitTermMapping,
-        where:
-          fragment(
-            "(?, ?, ?) IS DISTINCT FROM (EXCLUDED.maps_to, EXCLUDED.candidates, EXCLUDED.rule)",
-            m.maps_to,
-            m.candidates,
-            m.rule
-          ),
-        update: [
-          set: [
-            maps_to: fragment("EXCLUDED.maps_to"),
-            candidates: fragment("EXCLUDED.candidates"),
-            rule: fragment("EXCLUDED.rule")
-          ]
-        ]
-      )
+    upsert(TraitTermMapping, contract_rows ++ generation_rows, :nothing, [
+      :trait,
+      :normalized_term
+    ])
+  end
 
-    upsert(TraitTermMapping, contract_rows ++ generation_rows, on_conflict, [:trait, :term])
+  defp term_row(trait, term, placed_at, attrs) do
+    Map.merge(attrs, %{
+      trait: trait,
+      term: term,
+      normalized_term: TraitTermMapping.normalize(term),
+      placed_by: :seed,
+      placed_at: placed_at
+    })
   end
 
   defp upsert_generation_groups do

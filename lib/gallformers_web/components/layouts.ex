@@ -517,7 +517,7 @@ defmodule GallformersWeb.Layouts do
     # The domain screens (matter a856), then the content ones.
     admin_nav_links = [
       %{href: "/admin", label: "Dashboard", icon: "ph-house"},
-      %{href: "/admin/queue", label: "Queue", icon: "ph-check-circle"},
+      %{href: "/admin/review", label: "Review", icon: "ph-check-circle"},
       %{href: "/admin/galls", label: "Galls", icon: "gf-gall"},
       %{href: "/admin/taxonomy", label: "Taxonomy", icon: "gf-taxon"},
       %{href: "/admin/sources", label: "Sources", icon: "gf-source"},
@@ -526,7 +526,9 @@ defmodule GallformersWeb.Layouts do
       %{href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
     ]
 
-    superadmin_nav_links = []
+    superadmin_nav_links = [
+      %{href: "/admin/vocabulary", label: "Vocabulary", icon: "ph-book-open"}
+    ]
 
     is_superadmin = Gallformers.Accounts.superadmin?(assigns.current_user)
     is_operator = Gallformers.Accounts.operator?(assigns.current_user)

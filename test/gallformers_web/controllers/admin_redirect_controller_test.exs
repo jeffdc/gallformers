@@ -71,6 +71,29 @@ defmodule GallformersWeb.AdminRedirectControllerTest do
     end
   end
 
+  describe "the review queue (6611)" do
+    test "goes to the Sources to review", %{conn: conn} do
+      assert_moved(conn, "/admin/queue", "/admin/review")
+      assert_moved(conn, "/admin/queue?kind=unresolved_host", "/admin/review")
+    end
+
+    test "filtered to rename proposals, goes to their page", %{conn: conn} do
+      assert_moved(conn, "/admin/queue?kind=gall_rename", "/admin/review/renames")
+    end
+
+    test "a package's page goes to its review page", %{conn: conn} do
+      assert_moved(conn, "/admin/queue/packages/42", "/admin/review/packages/42")
+    end
+
+    test "is not found for a package ID that isn't one", %{conn: conn} do
+      assert conn |> get("/admin/queue/packages/abc") |> response(404)
+    end
+  end
+
+  test "the vocabulary requests go to the vocabulary page (d213)", %{conn: conn} do
+    assert_moved(conn, "/admin/vocab-requests", "/admin/vocabulary")
+  end
+
   describe "the other old screens" do
     test "are not found", %{conn: conn} do
       for path <- ~w(/admin/gall-range /admin/image-audit /admin/filter-terms

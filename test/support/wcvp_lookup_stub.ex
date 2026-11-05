@@ -8,6 +8,14 @@ defmodule Gallformers.Wcvp.LookupStub do
     - "700" / "Wcvptestus alpinus" — for tests that create their own host data
     - "800" / "Wcvpseedus rangeus" — regions that map to seeded places: California
       (US-CA) native, Alberta (CA-AB) introduced
+    - "900" / "Wcvphybridus × crossus" — an artificial hybrid, accepted in itself
+      (as WCVP holds the loganberry), native in California; "901" is its synonym
+    - "902" / "Wcvpunplacedus vagus" — unplaced, with no accepted name; "903" is
+      its synonym (as WCVP holds Rubus villosus var. frondosus)
+
+  Like `Gallformers.Wcvp.Lookup`, `search/2` leaves out records that are not
+  Accepted unless asked for synonyms, and `get_accepted_name/1` returns the
+  accepted record without its distributions.
   """
   @behaviour Gallformers.Wcvp.LookupBehaviour
 
@@ -61,6 +69,54 @@ defmodule Gallformers.Wcvp.LookupStub do
       taxon_status: "Accepted",
       native_distribution: ["CAL"],
       introduced_distribution: ["ABT"]
+    },
+    "900" => %WcvpName{
+      plant_name_id: "900",
+      taxon_name: "Wcvphybridus × crossus",
+      family: "Hybridaceae",
+      genus: "Wcvphybridus",
+      species: "crossus",
+      taxon_authors: "Test",
+      taxon_status: "Artificial Hybrid",
+      accepted_plant_name_id: "900",
+      native_distribution: ["CAL"],
+      introduced_distribution: []
+    },
+    "901" => %WcvpName{
+      plant_name_id: "901",
+      taxon_name: "Wcvphybridus parentus var. crossus",
+      family: "Hybridaceae",
+      genus: "Wcvphybridus",
+      species: "parentus",
+      taxon_authors: "Test",
+      taxon_status: "Synonym",
+      accepted_plant_name_id: "900",
+      native_distribution: [],
+      introduced_distribution: []
+    },
+    "902" => %WcvpName{
+      plant_name_id: "902",
+      taxon_name: "Wcvpunplacedus vagus",
+      family: "Hybridaceae",
+      genus: "Wcvpunplacedus",
+      species: "vagus",
+      taxon_authors: "Test",
+      taxon_status: "Unplaced",
+      accepted_plant_name_id: "",
+      native_distribution: [],
+      introduced_distribution: []
+    },
+    "903" => %WcvpName{
+      plant_name_id: "903",
+      taxon_name: "Wcvpunplacedus vagus var. alter",
+      family: "Hybridaceae",
+      genus: "Wcvpunplacedus",
+      species: "vagus",
+      taxon_authors: "Test",
+      taxon_status: "Synonym",
+      accepted_plant_name_id: "902",
+      native_distribution: [],
+      introduced_distribution: []
     }
   }
 
@@ -75,8 +131,8 @@ defmodule Gallformers.Wcvp.LookupStub do
     limit = Keyword.get(opts, :limit, 20)
     pattern = String.downcase(query)
 
-    @names
-    |> Map.values()
+    opts
+    |> listed()
     |> Enum.filter(&String.starts_with?(String.downcase(&1.taxon_name), pattern))
     |> Enum.sort_by(& &1.taxon_name)
     |> Enum.take(limit)
@@ -87,14 +143,23 @@ defmodule Gallformers.Wcvp.LookupStub do
     limit = Keyword.get(opts, :limit, 20)
     terms = query |> String.split(~r/\s+/, trim: true) |> Enum.map(&String.downcase/1)
 
-    @names
-    |> Map.values()
+    opts
+    |> listed()
     |> Enum.filter(fn name ->
       lower = String.downcase(name.taxon_name)
       Enum.all?(terms, &String.contains?(lower, &1))
     end)
     |> Enum.sort_by(& &1.taxon_name)
     |> Enum.take(limit)
+  end
+
+  # The records a search sees: Accepted ones, unless asked for synonyms.
+  defp listed(opts) do
+    names = Map.values(@names)
+
+    if Keyword.get(opts, :include_synonyms),
+      do: names,
+      else: Enum.filter(names, &(&1.taxon_status == "Accepted"))
   end
 
   @impl true
@@ -110,7 +175,19 @@ defmodule Gallformers.Wcvp.LookupStub do
   end
 
   @impl true
-  def get_accepted_name(_plant_name_id) do
-    nil
+  def get_accepted_name(plant_name_id) do
+    case get(plant_name_id) do
+      %{accepted_plant_name_id: accepted} when accepted in [nil, "", plant_name_id] ->
+        nil
+
+      %{accepted_plant_name_id: accepted} ->
+        case get(accepted) do
+          nil -> nil
+          record -> %{record | native_distribution: [], introduced_distribution: []}
+        end
+
+      nil ->
+        nil
+    end
   end
 end

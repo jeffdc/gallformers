@@ -33,6 +33,7 @@ def test_prompt_carries_contract_document_and_envelope(package):
     assert "#/texts/1 p2 [text] Galls of Asphondylia" in prompt
     env = envelope(prompt)
     assert env["batch_type"] == "gall"
+    assert env["format_version"] == 4
     assert env["mode"] == "replace"
     expected = hashlib.sha256((package / "document.json").read_bytes()).hexdigest()
     assert env["source"]["document"]["sha256"] == expected

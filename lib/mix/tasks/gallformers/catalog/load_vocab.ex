@@ -2,10 +2,11 @@ defmodule Mix.Tasks.Gallformers.Catalog.LoadVocab do
   use Boundary, check: [in: false, out: false]
 
   @moduledoc """
-  Loads the Catalog's vocabularies: Trait values and term mappings from
-  `priv/import/vocab/traits.json`, and the provisional generation groups
-  (`Gallformers.Catalog.load_vocab/1`). Idempotent: run it after a contract
-  change; unchanged rows are left alone and nothing is deleted.
+  Loads the Catalog's vocabularies: seeds the Trait values and term
+  mappings in `priv/import/vocab/traits.json` that the database lacks, and
+  the provisional generation groups (`Gallformers.Catalog.load_vocab/1`).
+  The database owns the Trait vocabulary, so a value or mapping it already
+  holds is never overwritten. Idempotent; nothing is deleted.
 
   ## Usage
 

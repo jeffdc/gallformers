@@ -19,7 +19,12 @@ defmodule Gallformers.Import.Replay do
       found by its batch, kind and statement ref (resolving the package
       again if a later resolution made it), and decided with the logged
       decision, its taxa, Galls and Sources found by their stable
-      references. A rename proposal's decision (`"kind" => "gall_rename"`,
+      references. A Host decision that added a synonym or a plant is done
+      when no item asks for the Host any more because it resolves to that
+      plant: the synonym or plant, logged and replayed before it, resolved
+      it; so is a synonym decision that split a name off or moved it,
+      whose tree edits, replayed before it, resolve the name. A rename
+      proposal's decision (`"kind" => "gall_rename"`,
       no package) is found by its Gall and the name it was decided for
       (`Gallformers.Import.GallRenames.find/2`): replaying the taxonomy
       change before it made the proposal again.
@@ -35,6 +40,21 @@ defmodule Gallformers.Import.Replay do
     * `:source_edit` (`%{"op", "source"}`) — the Source editor's edit, made
       again on the Sources found by title
       (`Gallformers.Import.SourceEdits.from_entry/2`).
+    * `:trait_value_added` (`%{"trait", "value"}`), `:trait_term_edit`
+      (`%{"op", "trait", "term"}`) and 6611's `:term_mapping_added`
+      (`%{"trait", "term"}`) — a change to the Trait vocabulary (a value
+      added; a term placed, marked ambiguous or unambiguous or as fitting
+      no category, moved or spot-checked), made again unless the database
+      holds it (`Gallformers.Import.VocabEdits`). A term a superadmin placed
+      settles its uses again (`Gallformers.Import.settle_placed_term/4`).
+    * `:fact_edit`, `:fact_edit_removed` (`%{"package", "batch_id",
+      "statement_ref", "kind"}`) — a curator's edit on a package's Fact
+      before approval, made again (or removed) on the package made ready
+      as above (`Gallformers.Import.FactEdits`), before its batch is
+      applied.
+    * `:vocab_requests_decided` — 6611's vocabulary backlog, replaced by
+      the superadmin vocabulary page (`d213`); no longer written, and not
+      replayed.
 
   Each step goes through the same functions as on preview, so the log is
   written again as it is replayed. The first entry that cannot be replayed
@@ -45,13 +65,17 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Audit.Actor
   alias Gallformers.Import
   alias Gallformers.Import.Batch
+  alias Gallformers.Import.FactEdits
   alias Gallformers.Import.GallRenames
+  alias Gallformers.Import.HostDecisions
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.ReplayEntry
   alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.StableRef
+  alias Gallformers.Import.SynonymDecisions
   alias Gallformers.Import.TaxonomyEdits
+  alias Gallformers.Import.VocabEdits
 
   @typedoc "A log entry: a `ReplayEntry` or a map with its `kind`, `key` and `payload`."
   @type entry :: ReplayEntry.t() | map()
@@ -124,14 +148,21 @@ defmodule Gallformers.Import.Replay do
   end
 
   defp replay(actor, %{kind: :queue_decision, key: key, payload: %{"decision" => decision}}) do
-    with {:ok, package} <- ensure_package(actor, key["package"]),
-         {:ok, item} <- find_item(actor, package, key) do
-      if item.status == :decided do
-        :ok
-      else
-        with {:ok, decision} <- StableRef.decode_decision(decision) do
-          ok(Import.decide_queue_item(actor, item, decision))
-        end
+    with {:ok, package} <- ensure_package(actor, key["package"]) do
+      case find_item(actor, package, key) do
+        {:ok, %QueueItem{status: :decided}} ->
+          :ok
+
+        {:ok, item} ->
+          with {:ok, decision} <- StableRef.decode_decision(decision) do
+            ok(Import.decide_queue_item(actor, item, decision))
+          end
+
+        {:error, {:no_queue_item, _key}} = error ->
+          if host_done?(package, key, decision), do: :ok, else: error
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end
@@ -196,6 +227,31 @@ defmodule Gallformers.Import.Replay do
       :done -> :ok
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  # A superadmin's placement settles the term's uses again (`Import.place_term/4`),
+  # under its one category or each of several.
+  defp replay(actor, %{
+         kind: :trait_term_edit,
+         key: %{"op" => "place", "trait" => trait, "term" => term} = key,
+         payload: %{"placed_by" => "superadmin"} = payload
+       }) do
+    with :ok <- VocabEdits.replay(actor, :trait_term_edit, key, payload) do
+      case VocabEdits.logged_categories_of(payload) do
+        {:ok, categories} -> ok(Import.settle_placed_term(actor, trait, term, categories))
+        :error -> :ok
+      end
+    end
+  end
+
+  defp replay(actor, %{kind: kind, key: key, payload: payload})
+       when kind in [:trait_value_added, :trait_term_edit, :term_mapping_added],
+       do: VocabEdits.replay(actor, kind, key, payload)
+
+  defp replay(actor, %{kind: kind, key: %{"package" => key} = entry_key, payload: payload})
+       when kind in [:fact_edit, :fact_edit_removed] do
+    with {:ok, package} <- ensure_package(actor, key),
+         do: FactEdits.replay(actor, package, kind, entry_key, payload)
   end
 
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
@@ -288,18 +344,51 @@ defmodule Gallformers.Import.Replay do
 
   defp resolve_again(_actor, package), do: {:ok, package}
 
+  # A name both batches declare is queued once, on one batch's item, which
+  # names the other batch's ref in `subject["also"]` (`Queue.share_names/1`).
+  # A decision logged on the other copy (or before names were shared) is
+  # found on that item, whatever its kind.
   defp lookup_item(package, key) do
-    batch_id =
+    batch =
       key["batch_id"] &&
-        Enum.find_value(
-          Import.list_batches(package),
-          &(&1.producer_batch_id == key["batch_id"] && &1.id)
-        )
+        Enum.find(Import.list_batches(package), &(&1.producer_batch_id == key["batch_id"]))
 
-    Enum.find(
-      Import.list_queue_items(package, status: :all, kind: String.to_existing_atom(key["kind"])),
-      &(&1.batch_id == batch_id and &1.statement_ref == key["statement_ref"])
-    )
+    batch_id = batch && batch.id
+    items = Import.list_queue_items(package, status: :all)
+    kind = String.to_existing_atom(key["kind"])
+
+    Enum.find(items, fn item ->
+      item.kind == kind and item.batch_id == batch_id and
+        item.statement_ref == key["statement_ref"]
+    end) ||
+      (batch &&
+         Enum.find(items, fn item ->
+           %{"batch" => batch.file, "ref" => key["statement_ref"]} in List.wrap(
+             item.subject["also"]
+           )
+         end))
+  end
+
+  # A Host decision that added a synonym or a plant is done when the Host
+  # resolves to its plant without it: the synonym or plant, replayed before
+  # it (`Gallformers.Import.HostDecisions`), resolved the name when the
+  # package was resolved, so no item asks for it. So is a synonym decision
+  # that split a name off or moved it (`Gallformers.Import.SynonymDecisions`):
+  # its tree edits, replayed before it, resolve the name to its taxon.
+  defp host_done?(package, key, decision) do
+    with true <- HostDecisions.adds?(decision) or SynonymDecisions.changes_tree?(decision),
+         {:ok, %{"taxon_id" => taxon_id}} <- StableRef.decode_decision(decision) do
+      Enum.any?(Import.list_batches(package), fn batch ->
+        batch.producer_batch_id == key["batch_id"] and
+          Enum.any?(
+            Import.list_statements(batch),
+            &(&1.kind == :taxon and &1.ref == key["statement_ref"] and &1.resolution == :resolved and
+                &1.taxon_id == taxon_id)
+          )
+      end)
+    else
+      _ -> false
+    end
   end
 
   defp ok({:ok, _value}), do: :ok

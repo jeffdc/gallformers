@@ -16,7 +16,14 @@ defmodule Gallformers.Import.StableRef do
 
   A decision (`Gallformers.Import.Queue`) is stored with its
   `"taxon_id"`, `"gall_id"` and `"source_id"` replaced by `"taxon"`,
-  `"gall"` and `"source"` references.
+  `"gall"` and `"source"` references, in a `"state"` spec too
+  (`Gallformers.Import.SetAside`) and a Gall decision's `"host_reading"`
+  (`Gallformers.Import.GallDecisions`); a synonym decision's `"synonym_of"`
+  is a taxon reference (`Gallformers.Import.SynonymDecisions`), as is a
+  name decided new's `"parent_id"`, stored as `"parent"`, and a Host
+  dispute's plant chosen for its statements (`"host_taxon_id"`,
+  `Gallformers.Import.Disputes`), stored as `"host_taxon"`. A WCVP record's
+  ID (`"wcvp_id"`, a Host decision) is stable as it is.
   """
   import Ecto.Query, only: [from: 2]
 
@@ -114,6 +121,11 @@ defmodule Gallformers.Import.StableRef do
       {"taxon_id", id} -> {"taxon", taxon(id)}
       {"gall_id", id} -> {"gall", gall(id)}
       {"source_id", id} -> {"source", source(id)}
+      {"state", %{} = spec} -> {"state", encode_decision(spec)}
+      {"host_reading", %{} = reading} -> {"host_reading", encode_decision(reading)}
+      {"synonym_of", id} when is_integer(id) -> {"synonym_of", taxon(id)}
+      {"parent_id", id} when is_integer(id) -> {"parent", taxon(id)}
+      {"host_taxon_id", id} when is_integer(id) -> {"host_taxon", taxon(id)}
       other -> other
     end)
   end
@@ -137,6 +149,21 @@ defmodule Gallformers.Import.StableRef do
 
   defp decode_pair("source", ref),
     do: with({:ok, id} <- resolve_source(ref), do: {:ok, {"source_id", id}})
+
+  defp decode_pair("state", %{} = spec),
+    do: with({:ok, spec} <- decode_decision(spec), do: {:ok, {"state", spec}})
+
+  defp decode_pair("synonym_of", %{} = ref),
+    do: with({:ok, id} <- resolve_taxon(ref), do: {:ok, {"synonym_of", id}})
+
+  defp decode_pair("parent", %{} = ref),
+    do: with({:ok, id} <- resolve_taxon(ref), do: {:ok, {"parent_id", id}})
+
+  defp decode_pair("host_taxon", %{} = ref),
+    do: with({:ok, id} <- resolve_taxon(ref), do: {:ok, {"host_taxon_id", id}})
+
+  defp decode_pair("host_reading", %{} = reading),
+    do: with({:ok, reading} <- decode_decision(reading), do: {:ok, {"host_reading", reading}})
 
   defp decode_pair(key, value), do: {:ok, {key, value}}
 

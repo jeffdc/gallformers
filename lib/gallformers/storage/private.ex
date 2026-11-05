@@ -20,6 +20,8 @@ defmodule Gallformers.Storage.Private do
   through `Gallformers.Storage.S3` and so also respects `s3_enabled`.
   """
 
+  @no_writes {__MODULE__, :no_writes}
+
   @doc "Stores `data` under `key` in `bucket`."
   @callback put_object(
               bucket :: String.t(),
@@ -39,7 +41,26 @@ defmodule Gallformers.Storage.Private do
   """
   @spec put(String.t(), binary(), keyword()) :: :ok | {:error, term()}
   def put(key, data, opts \\ []) when is_binary(key) and is_binary(data) do
-    adapter().put_object(bucket(), key, data, opts)
+    if Process.get(@no_writes, false),
+      do: :ok,
+      else: adapter().put_object(bucket(), key, data, opts)
+  end
+
+  @doc """
+  Runs `fun` with `put/3` writing nothing for this process (it returns
+  `:ok`), returning its result: for work inside a transaction that is
+  rolled back, whose stored objects would be left behind (the Facts
+  preview, `Gallformers.Import.preview_package/2`).
+  """
+  @spec without_writes((-> result)) :: result when result: var
+  def without_writes(fun) when is_function(fun, 0) do
+    previous = Process.put(@no_writes, true)
+
+    try do
+      fun.()
+    after
+      if previous, do: Process.put(@no_writes, previous), else: Process.delete(@no_writes)
+    end
   end
 
   @doc "Reads the object under `key`; `{:error, :not_found}` when there is none."

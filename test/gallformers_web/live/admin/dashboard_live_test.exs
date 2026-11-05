@@ -167,14 +167,16 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
       assert has_element?(view, "#admin-stats a[href='/admin/sources']", "Sources")
     end
 
-    test "the review queue action leads the quick actions", %{conn: conn} do
+    test "the review action leads the quick actions", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
       assert has_element?(
                view,
-               "#admin-quick-actions a[href='/admin/queue']",
-               "Review the Queue"
+               "#admin-quick-actions a[href='/admin/review']",
+               "Review Sources"
              )
+
+      refute has_element?(view, "a[href^='/admin/queue']")
     end
 
     test "links to no deleted old screen", %{conn: conn} do
@@ -220,6 +222,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
       refute has_element?(view, "a[href='/admin/jobs']")
+      refute has_element?(view, "a[href='/admin/vocabulary']")
       refute render(view) =~ "Super Admin"
     end
   end
@@ -257,42 +260,36 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
       |> Repo.insert!()
     end
 
-    test "counts the open items, linking to the queue and to each kind", %{conn: conn} do
+    test "counts the open questions, linking to the review", %{conn: conn} do
       before = Import.count_open_queue_items()
       rename_item!(1)
       rename_item!(2)
       renames = Map.get(before, :gall_rename, 0) + 2
-      total = before |> Map.values() |> Enum.sum() |> Kernel.+(2)
+      questions = before |> Map.delete(:gall_rename) |> Map.values() |> Enum.sum()
 
       {:ok, view, _html} = live(conn, ~p"/admin")
 
-      assert has_element?(view, "#admin-queue a[href='/admin/queue']", "Open items")
-      assert has_element?(view, "#admin-queue a[href='/admin/queue']", to_string(total))
+      assert has_element?(view, "#admin-queue a[href='/admin/review']", "Questions to decide")
+      assert has_element?(view, "#admin-queue a[href='/admin/review']", to_string(questions))
 
       assert has_element?(
                view,
-               "#admin-queue a[href='/admin/queue?kind=gall_rename']",
-               "Gall rename proposal"
+               "#admin-queue a[href='/admin/review/renames']",
+               "Gall rename proposals"
              )
 
       assert has_element?(
                view,
-               "#admin-queue a[href='/admin/queue?kind=gall_rename']",
+               "#admin-queue a[href='/admin/review/renames']",
                to_string(renames)
              )
     end
 
-    test "lists only the kinds with open items", %{conn: conn} do
-      rename_item!(3)
-      counts = Import.count_open_queue_items()
+    test "shows the rename proposals only when one is open", %{conn: conn} do
+      for item <- Import.list_gall_renames(), do: Repo.delete!(item)
 
       {:ok, view, _html} = live(conn, ~p"/admin")
-
-      for kind <- QueueItem.kinds() do
-        assert has_element?(view, "#admin-queue a[href='/admin/queue?kind=#{kind}']") ==
-                 Map.has_key?(counts, kind),
-               "kind #{kind}"
-      end
+      refute has_element?(view, "#admin-queue a[href='/admin/review/renames']")
     end
   end
 
@@ -325,7 +322,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
         |> LazyHTML.query("#admin-nav a[data-nav-href]")
         |> LazyHTML.attribute("href")
 
-      assert hrefs == ~w(/admin /admin/queue /admin/galls /admin/taxonomy /admin/sources
+      assert hrefs == ~w(/admin /admin/review /admin/galls /admin/taxonomy /admin/sources
                          /admin/glossary /admin/articles /admin/keys)
     end
 
@@ -363,6 +360,13 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
       assert html =~ "Super Admin"
       assert html =~ "Jobs Dashboard"
       assert has_element?(view, "a[href='/admin/jobs']")
+    end
+
+    test "links to the vocabulary, on the dashboard and in the nav", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(view, "a[href='/admin/vocabulary']", "Vocabulary")
+      assert has_element?(view, "#admin-nav a[href='/admin/vocabulary']", "Vocabulary")
     end
   end
 

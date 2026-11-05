@@ -7,6 +7,11 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   date; and undoing a retraction. There is no delete: Facts and legacy
   citations refer to Sources.
 
+  It shows when the Source was added to Gallformers and last updated
+  (`Gallformers.Import.source_dates/1`), and, while a package of it is
+  under review, a link to its review with the questions left (matter
+  `f14c`).
+
   Every write goes through `Gallformers.Import.record_source_edit/2` as the
   signed-in admin (the `:admin` live session's actor), which recomputes the
   standings of the Facts the Source supports and records the edit in the
@@ -16,11 +21,13 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   use GallformersWeb.Admin.FormHelpers
 
   import GallformersWeb.Admin.FormComponents, only: [form_actions: 1]
+  import GallformersWeb.ReviewComponents, only: [review_in_progress_link: 1]
 
   alias Gallformers.Import
   alias Gallformers.Licenses
   alias Gallformers.Sources
   alias Gallformers.Sources.Source
+  alias GallformersWeb.Admin.ReviewLive.Loader
   alias Phoenix.HTML.Form
 
   @notice_results 10
@@ -166,6 +173,8 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
     |> assign(:page_title, source.title)
     |> assign(:form, to_form(Sources.change_source(source)))
     |> assign(:retracted_by, source.retracted_by_id && Sources.get_source(source.retracted_by_id))
+    |> assign(:dates, Map.fetch!(Import.source_dates([source.id]), source.id))
+    |> assign(:review, Map.get(Loader.reviews_by_source(), source.id))
   end
 
   defp clear_notice(socket) do
@@ -244,6 +253,13 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
           Sources arrive with imports. Correct a Source's details here, or record that it was
           retracted. Saving recomputes the standing of every Fact the Source supports.
         </:intro>
+
+        <div class="mb-6 space-y-1 text-sm">
+          <.source_dates id="source-dates" dates={@dates} format={:short} class="text-gray-600" />
+          <p :if={@review} id="source-review">
+            <.review_in_progress_link review={@review} />
+          </p>
+        </div>
 
         <.form for={@form} id="source-form" phx-change="validate" phx-submit="save">
           <h2 class="text-lg font-semibold text-gray-800 mb-2">Citation</h2>

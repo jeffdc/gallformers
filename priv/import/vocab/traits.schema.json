@@ -10,7 +10,7 @@
     },
     "detachable": { "enum": ["integral", "detachable", "both", "unknown"] },
     "plant_part": {
-      "enum": ["at leaf vein angles", "between leaf veins", "bud", "flower", "fruit", "leaf edge", "leaf midrib", "lower leaf", "on leaf veins", "petiole", "stem", "underground (roots+)", "upper leaf"]
+      "enum": ["at leaf vein angles", "between leaf veins", "bud", "flower", "fruit", "leaf edge", "leaf midrib", "lower leaf", "on leaf veins", "petiole", "stem", "underground (roots+)", "upper leaf", "leaf"]
     },
     "form": {
       "enum": ["abrupt swelling", "bullet", "hat", "hidden cell", "jacket", "leaf blister", "leaf curl", "leaf edge fold", "leaf edge roll", "leaf snap", "leaf spot", "modified capitulum", "oak apple", "pip", "plum", "pocket", "rust", "scale", "stem club", "tapered swelling", "wig", "witches broom"]

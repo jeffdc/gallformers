@@ -3,10 +3,20 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
   The Source editor's list (matter a856, Task 10): the Sources by title,
   searched by title or author and paginated, each linking to its editor.
   Sources are created by imports; there is no "new" and no delete.
+
+  Each Source shows when it was ingested and last updated
+  (`Gallformers.Import.source_dates/1`; a Source from the old data says
+  so), and, while a package of it is under review, a link to its review
+  with the questions left (`GallformersWeb.Admin.ReviewLive.Loader.reviews_by_source/0`,
+  read once on mount) (matter `f14c`).
   """
   use GallformersWeb, :live_view
 
+  import GallformersWeb.ReviewComponents, only: [review_in_progress_link: 1]
+
+  alias Gallformers.Import
   alias Gallformers.Sources
+  alias GallformersWeb.Admin.ReviewLive.Loader
 
   @page_size 25
 
@@ -18,6 +28,7 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
      |> assign(:query, "")
      |> assign(:page, 1)
      |> assign(:page_size, @page_size)
+     |> assign(:reviews, Loader.reviews_by_source())
      |> load_sources()}
   end
 
@@ -39,8 +50,15 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
         page_size: @page_size
       )
 
-    assign(socket, sources: sources, total: total)
+    assign(socket,
+      sources: sources,
+      total: total,
+      dates: sources |> Enum.map(& &1.id) |> Import.source_dates()
+    )
   end
+
+  defp date_text(nil), do: nil
+  defp date_text(datetime), do: format_date(datetime, :short)
 
   defp total_pages(total, page_size), do: max(1, ceil(total / page_size))
 
@@ -74,6 +92,8 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
                 <th>Author</th>
                 <th>Year</th>
                 <th>Kind</th>
+                <th>Ingested</th>
+                <th>Updated</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -90,7 +110,17 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
                 <td class="text-gray-500">{source.author}</td>
                 <td class="text-gray-500">{source.pubyear}</td>
                 <td class="text-gray-500">{source.kind}</td>
+                <% dates = @dates[source.id] %>
+                <td data-role="ingested" class="text-gray-500">
+                  {if dates.legacy?, do: legacy_source_text(), else: date_text(dates.ingested)}
+                </td>
+                <td data-role="updated" class="text-gray-500 whitespace-nowrap">
+                  {date_text(dates.updated)}
+                </td>
                 <td>
+                  <div :if={@reviews[source.id]} class="text-sm">
+                    <.review_in_progress_link review={@reviews[source.id]} />
+                  </div>
                   <.badge :if={source.retracted_by_id} variant="warning">Retracted</.badge>
                   <.badge :if={!source.retracted_by_id && source.datacomplete} variant="success">
                     Complete
@@ -98,7 +128,7 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
                 </td>
               </tr>
               <tr :if={@sources == []}>
-                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                <td colspan="7" class="px-6 py-8 text-center text-gray-500">
                   No sources found. Try a different search term.
                 </td>
               </tr>

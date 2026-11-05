@@ -6,6 +6,42 @@ defmodule Gallformers.SourcesTest do
 
   alias Gallformers.Sources
 
+  describe "short_name/1" do
+    alias Gallformers.Sources.Source
+
+    test "the authors' surnames and the year" do
+      assert Sources.short_name(%Source{authors: ["Ashmead, W. H."], pubyear: "1897"}) ==
+               "Ashmead 1897"
+
+      assert Sources.short_name(%Source{
+               authors: ["Nastasi, L. F.", "Davis, C. M."],
+               authored_date: ~D[2022-01-01]
+             }) == "Nastasi & Davis 2022"
+
+      assert Sources.short_name(%Source{
+               authors: ["Osten Sacken, C. R.", "Bassett, H. F.", "Walsh, B. D."],
+               pubyear: "c. 1862"
+             }) == "Osten Sacken et al. 1862"
+    end
+
+    test "the old single author field, a name without a comma, and no year" do
+      assert Sources.short_name(%Source{authors: [], author: "Weld, L. H.", pubyear: "1959"}) ==
+               "Weld 1959"
+
+      assert Sources.short_name(%Source{authors: ["Lewis Weld"], pubyear: nil}) == "Weld"
+    end
+
+    test "nil when the Source names no author" do
+      assert Sources.short_name(%Source{authors: [], author: nil, pubyear: "1900"}) == nil
+      assert Sources.short_name(%Source{authors: [], author: "", pubyear: "1900"}) == nil
+    end
+
+    test "from authors and a year, for a Source not held yet" do
+      assert Sources.short_name(["Ashmead, W. H."], 1897) == "Ashmead 1897"
+      assert Sources.short_name([], 1897) == nil
+    end
+  end
+
   describe "list_sources_by_id/1" do
     test "the Sources with the given IDs, by ID; unknown IDs are left out" do
       assert [%{id: 58}, %{id: 59}] = Sources.list_sources_by_id([59, 58, 999_999])

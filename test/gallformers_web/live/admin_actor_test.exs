@@ -101,7 +101,12 @@ defmodule GallformersWeb.Live.AdminActorTest do
   # Plugs don't run on live navigation; the on_mount hook is what checks the
   # admin when one of the session's screens mounts over the socket.
   describe "the :admin live session" do
-    for path <- ["/admin/queue", "/admin/queue/packages/1"] do
+    for path <- [
+          "/admin/review",
+          "/admin/review/renames",
+          "/admin/review/sources/1",
+          "/admin/review/packages/1"
+        ] do
       test "#{path} mounts through the :require_admin_actor hook" do
         %{phoenix_live_view: {_view, _action, _opts, live_session}} =
           Phoenix.Router.route_info(GallformersWeb.Router, "GET", unquote(path), "localhost")

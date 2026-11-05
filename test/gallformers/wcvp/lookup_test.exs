@@ -205,6 +205,11 @@ defmodule Gallformers.Wcvp.LookupTest do
     test "returns nil for nonexistent plant_name_id" do
       assert Lookup.get("999") == nil
     end
+
+    test "includes taxon_status and accepted_plant_name_id" do
+      assert %{taxon_status: "Accepted", accepted_plant_name_id: "100"} = Lookup.get("100")
+      assert %{taxon_status: "Synonym", accepted_plant_name_id: "101"} = Lookup.get("400")
+    end
   end
 
   describe "search/2 with include_synonyms" do
@@ -302,6 +307,7 @@ defmodule Gallformers.Wcvp.LookupTest do
       assert result.plant_name_id == "101"
       assert result.taxon_name == "Quercus rubra"
       assert result.taxon_status == "Accepted"
+      assert result.accepted_plant_name_id == "101"
     end
 
     test "returns nil for an already-accepted name" do

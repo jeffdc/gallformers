@@ -14,6 +14,17 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
       species-rank plant, `{rank, name}` for a higher taxon (a genus Host
       links to its genus page);
     * `traits` — current Trait values by Trait;
+    * `trait_terms` — the Sources' terms under each current Trait value
+      (`d213`: "Shape: globular (ovoid, oval)"), by Trait then value: the
+      distinct terms of the value's confirming attributions, compared
+      normalized (`Gallformers.Catalog.Vocab.TraitTermMapping.normalize/1`)
+      and written as the first Source to use them wrote them, by term,
+      leaving out the value's own name. Values without terms are absent;
+    * `text_terms` — the terms with no category on the Gall, by Trait, as
+      text: a Source's term waiting on a question, or kept as text once
+      settled (`Gallformers.Catalog.list_pending_terms/2`), distinct and by
+      term, leaving out one the Trait already shows under a value. Neither
+      list has a retracted Source's terms;
     * `common_names` (current alias Facts of kind `:common_name`), `labels`
       (the other current alias Facts — former labels and codes —
       `%{name, kind}`) and `synonyms` (the Inducers' synonyms,
@@ -38,10 +49,12 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
 
   alias Gallformers.Catalog.Gall
   alias Gallformers.Catalog.LegacyCitation
+  alias Gallformers.Catalog.PendingTerms
   alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.ReadModels.GallSummary
   alias Gallformers.Catalog.ReadModels.PotentialRange
   alias Gallformers.Catalog.Vocab.GenerationValue
+  alias Gallformers.Catalog.Vocab.TraitTermMapping
   alias Gallformers.Catalog.Vocab.TraitValue
   alias Gallformers.Facts
   alias Gallformers.Facts.Attribution
@@ -105,6 +118,8 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
           inducers: [inducer()],
           hosts: [host()],
           traits: %{String.t() => [String.t()]},
+          trait_terms: %{String.t() => %{String.t() => [String.t()]}},
+          text_terms: %{String.t() => [String.t()]},
           common_names: [String.t()],
           labels: [%{name: String.t(), kind: :former_label | :code}],
           synonyms: [%{name: String.t(), sensu: String.t() | nil}],
@@ -132,6 +147,8 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
     inducers: [],
     hosts: [],
     traits: %{},
+    trait_terms: %{},
+    text_terms: %{},
     common_names: [],
     labels: [],
     synonyms: [],
@@ -154,6 +171,8 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
     summary = GallSummary.for_gall(gall.id)
     undescribed? = not Enum.any?(summary.inducers, &(&1.rank in @species_ranks))
     {common_names, labels} = aliases(gall.id)
+    attributions = attributions(gall.id)
+    trait_terms = trait_terms(attributions)
 
     %__MODULE__{
       id: gall.id,
@@ -166,6 +185,8 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
       inducers: Enum.map(summary.inducers, &Map.put(&1, :lineage, Taxa.lineage(&1.taxon_id))),
       hosts: Enum.map(summary.hosts, &Map.put(&1, :link, host_link(&1))),
       traits: summary.traits,
+      trait_terms: trait_terms,
+      text_terms: text_terms(gall.id, summary.traits, trait_terms),
       common_names: common_names,
       labels: labels,
       synonyms: synonyms(summary.inducers),
@@ -173,7 +194,7 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
       sources: sources(gall),
       images: Images.list_images_for_gall(gall.id),
       display_range: PotentialRange.for_display(gall.id),
-      attributions: attributions(gall.id),
+      attributions: attributions,
       inserted_at: gall.inserted_at,
       updated_at: gall.updated_at
     }
@@ -305,6 +326,65 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
       externallink: externallink,
       note?: note?
     }
+  end
+
+  # -- the Sources' terms (`d213`) ----------------------------------------------
+
+  # The terms under each current Trait value, by Trait then value.
+  defp trait_terms(attributions) do
+    for {{:trait, trait, value}, attributions} <- attributions,
+        terms =
+          attributions
+          |> Enum.filter(&(&1.stance == :confirm))
+          |> unretracted()
+          |> Enum.map(& &1.term)
+          |> distinct_terms([value]),
+        terms != [],
+        reduce: %{} do
+      acc -> Map.update(acc, trait, %{value => terms}, &Map.put(&1, value, terms))
+    end
+  end
+
+  # The terms on the Gall with no category, by Trait: waiting on a question,
+  # or settled as text.
+  defp text_terms(gall_id, traits, trait_terms) do
+    gall_id
+    |> PendingTerms.list(include_settled: true)
+    |> Enum.filter(&(&1.settled_categories == []))
+    |> unretracted()
+    |> Enum.group_by(& &1.trait, & &1.term)
+    |> Enum.flat_map(fn {trait, terms} ->
+      shown = Map.get(traits, trait, []) ++ (trait_terms |> Map.get(trait, %{}) |> shown_terms())
+
+      case distinct_terms(terms, shown) do
+        [] -> []
+        terms -> [{trait, terms}]
+      end
+    end)
+    |> Map.new()
+  end
+
+  defp shown_terms(by_value), do: by_value |> Map.values() |> List.flatten()
+
+  # `items` (attributions, waiting terms) less those of retracted Sources:
+  # a retraction cancels every statement of its Source.
+  defp unretracted(items) do
+    retracted = items |> Enum.map(& &1.source_id) |> Enum.uniq() |> Sources.retracted_source_ids()
+    Enum.reject(items, &(&1.source_id in retracted))
+  end
+
+  # `terms` (nil for none), each once as first written, compared normalized,
+  # by term; leaving out those among `left_out`.
+  defp distinct_terms(terms, left_out) do
+    left_out = MapSet.new(left_out, &TraitTermMapping.normalize/1)
+
+    terms
+    |> Enum.reject(&(is_nil(&1) or String.trim(&1) == ""))
+    |> Enum.map(&{TraitTermMapping.normalize(&1), String.trim(&1)})
+    |> Enum.uniq_by(&elem(&1, 0))
+    |> Enum.reject(&MapSet.member?(left_out, elem(&1, 0)))
+    |> Enum.sort()
+    |> Enum.map(&elem(&1, 1))
   end
 
   # -- attributions ------------------------------------------------------------

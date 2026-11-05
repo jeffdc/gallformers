@@ -13,6 +13,7 @@ defmodule Gallformers.Import.Validator.Checks do
     :batch,
     :doc,
     :sha,
+    note?: false,
     problems: [],
     taxa: MapSet.new(),
     galls: MapSet.new(),
@@ -31,12 +32,14 @@ defmodule Gallformers.Import.Validator.Checks do
   @doc false
   @spec run(map(), map() | nil, String.t() | nil) :: [{:error | :warning, String.t()}]
   def run(batch, doc, sha) do
-    %__MODULE__{batch: batch, doc: doc, sha: sha}
+    %__MODULE__{batch: batch, doc: doc, sha: sha, note?: note?(batch["source"])}
     |> declared("taxa", :taxa)
     |> declared("galls", :galls)
     |> ranks()
     |> document_hash()
+    |> note_document()
     |> batch_checks()
+    |> common_names()
     |> unmapped()
     |> unused()
     |> Map.fetch!(:problems)
@@ -93,6 +96,18 @@ defmodule Gallformers.Import.Validator.Checks do
       else: c
   end
 
+  # A batch of Gallformers statements quoting a Gall's note.
+  defp note?(%{"gallformers" => true, "note" => _}), do: true
+  defp note?(_source), do: false
+
+  defp note_document(%{note?: true, doc: %{} = doc} = c) do
+    if Enum.map(Docling.items(doc), & &1["self_ref"]) == ["#/texts/0"],
+      do: c,
+      else: error(c, "a note's document.json holds one text item, #/texts/0: the whole note")
+  end
+
+  defp note_document(c), do: c
+
   defp taxon(c, nil, _where), do: c
 
   defp taxon(c, ref, where) do
@@ -122,6 +137,9 @@ defmodule Gallformers.Import.Validator.Checks do
   end
 
   defp evidence(c, _evidence, _where), do: c
+
+  defp one_evidence(%{note?: true} = c, %{"statement" => _}, path),
+    do: error(c, "#{path}: a note batch quotes its note; give a quote, not a statement")
 
   defp one_evidence(%{doc: nil} = c, _ev, _path), do: c
   defp one_evidence(c, %{"statement" => _}, _path), do: c
@@ -291,7 +309,7 @@ defmodule Gallformers.Import.Validator.Checks do
   end
 
   defp fact_checks(c, seen, fact, _by_id, where) do
-    c = gall(c, fact["gall"], where)
+    c = c |> gall(fact["gall"], where) |> term(fact, where)
     seen = about(seen, [fact["gall"]])
 
     seen =
@@ -301,6 +319,41 @@ defmodule Gallformers.Import.Validator.Checks do
 
     {c, seen}
   end
+
+  # A format 4 trait Fact's term is the Source's own words: found, ignoring
+  # case, in one of its quotes or whole items. Statements (no document)
+  # aren't checked.
+  defp term(%{doc: %{} = doc} = c, %{"kind" => "trait", "term" => term} = fact, where)
+       when is_binary(term) do
+    texts =
+      for %{} = ev <- List.wrap(fact["evidence"]),
+          not Map.has_key?(ev, "statement"),
+          do: evidence_text(doc, ev)
+
+    if texts == [] or
+         Enum.any?(texts, &quote_in?(String.downcase(term), String.downcase(&1))) do
+      c
+    else
+      error(
+        c,
+        "#{where}: term #{inspect(term)} is not in its evidence: give the Source's own words"
+      )
+    end
+  end
+
+  defp term(c, _fact, _where), do: c
+
+  defp evidence_text(doc, %{"whole_item" => whole, "item" => ref})
+       when whole not in [nil, false] and is_binary(ref) do
+    case Docling.resolve(doc, ref) do
+      %{} = item -> Docling.item_text(item)
+      _ -> ""
+    end
+  end
+
+  defp evidence_text(_doc, %{"whole_item" => whole}) when whole not in [nil, false], do: ""
+  defp evidence_text(_doc, %{"quote" => quote}) when is_binary(quote), do: quote
+  defp evidence_text(_doc, _ev), do: ""
 
   defp relationship_refs(c, seen, fact, where) do
     {subject, object, context} = {fact["subject"], fact["object"], fact["gall_context"]}
@@ -397,6 +450,48 @@ defmodule Gallformers.Import.Validator.Checks do
     else
       c
     end
+  end
+
+  # -- common names ------------------------------------------------------------
+
+  # A taxon declared by a common name is only ever a Host: a host_of subject
+  # or identified_by.host.
+  defp common_names(c) do
+    common =
+      for %{"common_name" => true, "ref" => ref} <- list(c, "taxa"), into: MapSet.new(), do: ref
+
+    c
+    |> common_name_uses()
+    |> Enum.filter(fn {ref, _where} -> MapSet.member?(common, ref) end)
+    |> Enum.reduce(c, fn {ref, where}, acc ->
+      error(
+        acc,
+        "#{where}: taxon #{ref} is declared by a common name, so it may only be a Host " <>
+          "(a host_of subject or identified_by.host)"
+      )
+    end)
+  end
+
+  # Every use of a taxon ref other than as a Host, as {ref, where}.
+  defp common_name_uses(%{batch: %{"batch_type" => "taxonomy"}} = c) do
+    for {act, i} <- Enum.with_index(list(c, "acts")),
+        ref <-
+          Enum.map(["taxon", "parent", "name", "accepted"], &act[&1]) ++ List.wrap(act["into"]),
+        do: {ref, "acts/#{i}"}
+  end
+
+  defp common_name_uses(c) do
+    galls =
+      for {g, i} <- Enum.with_index(list(c, "galls")),
+          do: {identified_by(g)["inducer"], "galls/#{i}/identified_by"}
+
+    facts =
+      for {%{"kind" => "relationship"} = fact, i} <- Enum.with_index(list(c, "facts")),
+          ref <-
+            if(fact["type"] == "host_of", do: [], else: [fact["subject"]]) ++ [fact["object"]],
+          do: {ref, "facts/#{i}"}
+
+    galls ++ facts
   end
 
   # -- the rest ----------------------------------------------------------------

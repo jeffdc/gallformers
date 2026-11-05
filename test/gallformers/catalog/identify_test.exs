@@ -18,6 +18,8 @@ defmodule Gallformers.Catalog.IdentifyTest do
 
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Vocab.TraitValue
+  alias Gallformers.Facts
+  alias Gallformers.Sources
 
   setup do
     load_vocab!()
@@ -195,6 +197,44 @@ defmodule Gallformers.Catalog.IdentifyTest do
     end
   end
 
+  describe "identify/1, leaf and the leaf values (d213)" do
+    # g1 is on upper leaf and lower leaf, g2 on upper leaf only.
+    setup ctx do
+      galls =
+        for {key, part} <- [leaf: "leaf", lower: "lower leaf", petiole: "petiole"], into: %{} do
+          gall = gall!("Fixtura #{key}", ctx.andricus, [ctx.alba], ctx.source)
+          traits!(gall, [{"plant_part", part}], ctx.source)
+          {key, gall}
+        end
+
+      %{galls: Map.merge(ctx.galls, galls)}
+    end
+
+    defp parts(ctx, values, logic \\ :or) do
+      ctx
+      |> found(%{traits: %{"plant_part" => values}, trait_logic: %{"plant_part" => logic}})
+      |> Enum.sort()
+    end
+
+    test "leaf finds the Galls on the leaf and on every leaf value, not the petiole", ctx do
+      assert parts(ctx, ["leaf"]) == [:g1, :g2, :leaf, :lower]
+    end
+
+    test "a leaf value finds the Galls on it and those only on the leaf, not another leaf value",
+         ctx do
+      assert parts(ctx, ["lower leaf"]) == [:g1, :leaf, :lower]
+      assert parts(ctx, ["upper leaf"]) == [:g1, :g2, :leaf]
+    end
+
+    test "all of several leaf values: each is that value or leaf", ctx do
+      assert parts(ctx, ["upper leaf", "lower leaf"], :and) == [:g1, :leaf]
+    end
+
+    test "the petiole is not on the leaf", ctx do
+      assert parts(ctx, ["petiole"]) == [:petiole]
+    end
+  end
+
   describe "identify/1, filters combined" do
     test "every filter must hold", ctx do
       filters = %{host_group_id: ctx.quercus.id, place_codes: ["US-CA"], detachable: "integral"}
@@ -235,6 +275,149 @@ defmodule Gallformers.Catalog.IdentifyTest do
       three = Enum.find(results, &(&1.id == ctx.galls.g3.id))
       assert %{undescribed: true, image_url: nil} = three
     end
+  end
+
+  describe "filter_identified/2, the results' text search (d213)" do
+    setup ctx do
+      kinsey = source_fixture("Kinsey", "1959")
+
+      # A term placed for every Source: any Gall on its category is found by it.
+      {:ok, _} =
+        Catalog.place_term(test_actor(), "shape", "Fixturoval", "globular", :agreement)
+
+      {:ok, _} =
+        Catalog.assert_trait(
+          test_actor(),
+          %{gall_id: ctx.galls.g4.id, trait: "shape", value: "globular"},
+          confirm(kinsey, %{term: "fixturbulbous egg-shaped"})
+        )
+
+      traits!(ctx.galls.g5, [{"shape", "globular"}], ctx.source)
+      :ok
+    end
+
+    defp searched(ctx, text) do
+      keys = Map.new(ctx.galls, fn {key, gall} -> {gall.id, key} end)
+      results = Catalog.identify(%{host_group_id: ctx.quercus.id})
+      for %{id: id} <- Catalog.filter_identified(results, text), key = keys[id], do: key
+    end
+
+    test "finds a Gall by its name, ignoring case", ctx do
+      assert searched(ctx, "fixtura ON") == [:g1]
+      assert searched(ctx, "fixtura") == [:g5, :g4, :g1, :g3, :g2]
+      assert searched(ctx, "") == [:g5, :g4, :g1, :g3, :g2]
+      assert searched(ctx, "  ") == [:g5, :g4, :g1, :g3, :g2]
+    end
+
+    test "finds a Gall by a Trait value", ctx do
+      assert searched(ctx, "globular") == [:g5, :g4]
+      assert searched(ctx, "Upper Leaf") == [:g1, :g2]
+    end
+
+    test "finds a Gall on a term's category through the term table", ctx do
+      assert searched(ctx, "fixturoval") == [:g5, :g4]
+      assert searched(ctx, "FixturOval") == [:g5, :g4]
+    end
+
+    test "finds a Gall by the term its Source used", ctx do
+      assert searched(ctx, "fixturbulbous") == [:g4]
+      assert searched(ctx, "egg-shaped fixturbulbous") == [:g4]
+    end
+
+    test "every word must match; a word in a term matches whole", ctx do
+      assert searched(ctx, "fixtura fixturoval") == [:g5, :g4]
+      assert searched(ctx, "red hairy") == [:g1]
+      # "hair" is in neither "hairy" nor "hairless" as a word, nor in a name.
+      assert searched(ctx, "hair") == []
+      assert searched(ctx, "fixturbulb") == []
+      # A word such as "on" or "the" (of the leaf rule, "on the leaf") finds nothing on its own.
+      assert searched(ctx, "the") == []
+      assert searched(ctx, "on") == [:g1]
+    end
+
+    test "a term waiting on a question is not searched", ctx do
+      origin = package_and_batch()
+
+      {:ok, _} =
+        Catalog.put_pending_term(
+          test_actor(),
+          Map.merge(origin, %{
+            gall_id: ctx.galls.g3.id,
+            source_id: ctx.source.id,
+            trait: "texture",
+            term: "fixturrugose"
+          })
+        )
+
+      assert searched(ctx, "fixturrugose") == []
+    end
+
+    test "a retracted Source's term is not searched", ctx do
+      retracted = source_fixture("Retracted", "1960")
+      notice = source_fixture("Retraction notice", "1961")
+
+      {:ok, _} =
+        Catalog.assert_trait(
+          test_actor(),
+          %{gall_id: ctx.galls.g5.id, trait: "shape", value: "globular"},
+          confirm(retracted, %{term: "fixturlenticular"})
+        )
+
+      assert searched(ctx, "fixturlenticular") == [:g5]
+
+      {:ok, _} = Sources.retract_source(test_actor(), retracted, notice, ~D[1961-06-01])
+      {:ok, _} = Facts.recompute_for_source(test_actor(), retracted.id)
+
+      assert searched(ctx, "fixturlenticular") == []
+      assert searched(ctx, "globular") == [:g5, :g4]
+    end
+
+    test "the filter lists stay the Trait values, without terms", ctx do
+      assert searched(ctx, "fixturoval") != []
+      refute "Fixturoval" in Enum.map(Catalog.identify_options()["shape"], & &1.value)
+      assert found(ctx, %{traits: %{"shape" => ["Fixturoval"]}}) == []
+    end
+  end
+
+  defp package_and_batch do
+    n = System.unique_integer([:positive])
+    now = ~U[2026-11-01 00:00:00Z]
+
+    {1, [%{id: package_id}]} =
+      Repo.insert_all(
+        "import_packages",
+        [
+          %{
+            key: "pkg-#{n}",
+            s3_prefix: "import/pkg-#{n}/",
+            submitter_name: "test",
+            inserted_at: now,
+            updated_at: now
+          }
+        ],
+        returning: [:id]
+      )
+
+    {1, [%{id: batch_id}]} =
+      Repo.insert_all(
+        "import_batches",
+        [
+          %{
+            package_id: package_id,
+            file: "gall.json",
+            batch_type: "gall",
+            mode: "add",
+            producer_batch_id: "batch-#{n}",
+            sha256: "0",
+            content: %{},
+            inserted_at: now,
+            updated_at: now
+          }
+        ],
+        returning: [:id]
+      )
+
+    %{package_id: package_id, batch_id: batch_id}
   end
 
   describe "identify_options/0" do

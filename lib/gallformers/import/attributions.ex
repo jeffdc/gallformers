@@ -14,6 +14,9 @@ defmodule Gallformers.Import.Attributions do
       rows: the attribution takes the statement's text and date
       (`statement_text`, `stated`). With several statements on one Fact,
       the newest decides the date and their texts are joined, newest first.
+    * **Gallformers statements quoting a Gall's note** keep their quote
+      evidence and take the note's date, with what they quote as their
+      statement text (`with_note/2`).
     * Other Sources' attributions take the Source's authored date (no
       `stated`).
   """
@@ -77,6 +80,20 @@ defmodule Gallformers.Import.Attributions do
   end
 
   defp statement_attrs(_evidence, _source_kind), do: %{}
+
+  @doc """
+  `attrs` for a statement of a batch quoting a Gall's Gallformers note
+  (`Gallformers.Import.SourceStep.note/2`), or unchanged when there is no
+  note: the attribution takes the note's date, and its statement text is
+  what it quotes (the whole note for a `whole_item`), joined by " … ".
+  """
+  @spec with_note(map(), map() | nil) :: map()
+  def with_note(attrs, nil), do: attrs
+
+  def with_note(attrs, %{stated_on: stated_on, text: text}) do
+    quoted = Enum.map_join(attrs.evidence, " … ", &if(&1.whole_item, do: text, else: &1.quote))
+    Map.merge(attrs, %{stated: stated_on, statement_text: quoted})
+  end
 
   @doc """
   An attribution name for a declared taxon (`taxa[]`) in `role`, or nil when

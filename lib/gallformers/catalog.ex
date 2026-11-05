@@ -60,6 +60,7 @@ defmodule Gallformers.Catalog do
       GallName,
       LegacyCitation,
       LegacyTraitIds,
+      PendingTraitTerm,
       ReadModels.GallPage,
       ReadModels.GallSummary,
       RelationshipTypes,
@@ -91,6 +92,8 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.LegacyCitation
   alias Gallformers.Catalog.LegacyTraitIds
   alias Gallformers.Catalog.NonGallRedirect
+  alias Gallformers.Catalog.PendingTerms
+  alias Gallformers.Catalog.PendingTraitTerm
   alias Gallformers.Catalog.ReadModels.Browse
   alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.ReadModels.Flags
@@ -101,6 +104,8 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Catalog.Vocab.Loader
+  alias Gallformers.Catalog.Vocab.Terms
+  alias Gallformers.Catalog.Vocab.TermUsage
   alias Gallformers.Catalog.Vocab.TraitTermMapping
   alias Gallformers.Catalog.Vocab.TraitValue
   alias Gallformers.Facts
@@ -114,9 +119,10 @@ defmodule Gallformers.Catalog do
   # -- vocabularies ------------------------------------------------------------
 
   @doc """
-  Loads the Trait values, term mappings and generation groups
-  (`Gallformers.Catalog.Vocab.Loader`). Idempotent; returns how many rows
-  of each table were inserted or updated.
+  Loads the Trait values, terms and generation groups
+  (`Gallformers.Catalog.Vocab.Loader`): seeds the Trait values and terms
+  the database lacks, never overwriting one it holds. Idempotent;
+  returns how many rows of each table were inserted or updated.
   """
   @spec load_vocab(Actor.t()) :: {:ok, Loader.counts()}
   def load_vocab(%Actor{} = actor), do: Loader.load(actor)
@@ -146,12 +152,204 @@ defmodule Gallformers.Catalog do
   def legacy_trait_values(path \\ LegacyTraitIds.default_path()), do: LegacyTraitIds.read(path)
 
   @doc """
-  Every term mapping (`Gallformers.Catalog.Vocab.TraitTermMapping`), in the
-  order added: the contract's order. Trait `"generation"`'s are the
+  Every term (`Gallformers.Catalog.Vocab.TraitTermMapping`, one per row),
+  in the order added: the contract's order. Trait `"generation"`'s are the
   generation values' other names.
   """
   @spec list_trait_term_mappings() :: [TraitTermMapping.t()]
-  def list_trait_term_mappings, do: Repo.all(from(m in TraitTermMapping, order_by: m.id))
+  defdelegate list_trait_term_mappings(), to: Terms, as: :list
+
+  @doc """
+  Adds a Trait value (`6611`: the database owns the vocabulary). `attrs`
+  (atom keys): `:trait` (one of `Gallformers.Catalog.Vocab.TraitValue.traits/0`),
+  `:value` and `:definition`, all required; the value must be new to its
+  Trait. The vocabulary generator publishes it (`mix
+  gallformers.import.vocab`). To have it replayed after the cutover, add it
+  through `Gallformers.Import.record_trait_value_added/2`.
+  """
+  @spec add_trait_value(Actor.t(), map()) :: {:ok, TraitValue.t()} | {:error, Changeset.t()}
+  def add_trait_value(%Actor{} = actor, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "catalog.add_trait_value", fn ->
+      case %TraitValue{} |> TraitValue.changeset(attrs) |> Repo.insert() do
+        {:ok, value} -> value
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  # -- terms (`d213`) ------------------------------------------------------------
+  #
+  # A Source's term for a Trait, placed once for every Source
+  # (`Gallformers.Catalog.Vocab.Terms`, which gives the options and errors).
+  # To have a change replayed after the cutover, make it through
+  # `Gallformers.Import.record_term_edit/3`.
+
+  @doc "A term by its trait and term (compared normalized: case and spacing don't matter), or nil."
+  @spec get_term(String.t(), String.t()) :: TraitTermMapping.t() | nil
+  defdelegate get_term(trait, term), to: Terms, as: :get
+
+  @doc """
+  Places `term` for every Source under `categories` (a value of `trait`,
+  or a list: each value the term's words name); `placed_by` `:seed`,
+  `:agreement`, `:curator` or `:superadmin`. Refuses a term placed under
+  other categories (`{:error, {:placed, term}}`) and an ambiguous one
+  (`{:error, {:ambiguous, term}}`).
+  """
+  @spec place_term(Actor.t(), String.t(), String.t(), Terms.categories(), atom(), keyword()) ::
+          Terms.result()
+  defdelegate place_term(actor, trait, term, categories, placed_by, opts \\ []),
+    to: Terms,
+    as: :place
+
+  @doc "Marks `term` ambiguous between `candidates`: each use is then decided on its own."
+  @spec mark_term_ambiguous(Actor.t(), String.t(), String.t(), [String.t()], atom(), keyword()) ::
+          Terms.result()
+  defdelegate mark_term_ambiguous(actor, trait, term, candidates, placed_by, opts \\ []),
+    to: Terms,
+    as: :mark_ambiguous
+
+  @doc "Places an ambiguous `term` under `categories` (one or several), so it maps automatically again."
+  @spec mark_term_unambiguous(
+          Actor.t(),
+          String.t(),
+          String.t(),
+          Terms.categories(),
+          atom(),
+          keyword()
+        ) :: Terms.result()
+  defdelegate mark_term_unambiguous(actor, trait, term, categories, placed_by, opts \\ []),
+    to: Terms,
+    as: :mark_unambiguous
+
+  @doc "Marks a new or ambiguous `term` as fitting no category (it stays text)."
+  @spec mark_term_no_fit(Actor.t(), String.t(), String.t(), atom(), keyword()) :: Terms.result()
+  defdelegate mark_term_no_fit(actor, trait, term, placed_by, opts \\ []),
+    to: Terms,
+    as: :mark_no_fit
+
+  @doc """
+  Moves a placed `term` to `category`; returns `%{term, from, to}`: the
+  attributions carrying the term must move from the Facts on `from` to the
+  Fact on `to` (the caller's).
+  """
+  @spec move_term(Actor.t(), String.t(), String.t(), String.t(), keyword()) ::
+          {:ok, Terms.move()} | {:error, Terms.error()}
+  defdelegate move_term(actor, trait, term, category, opts \\ []), to: Terms, as: :move
+
+  @typedoc "An attribution moved with its term: from one Fact to another."
+  @type term_attribution_move :: %{
+          from_fact_id: integer(),
+          to_fact_id: integer(),
+          source_id: integer(),
+          batch_id: integer() | nil,
+          moved: boolean()
+        }
+
+  @doc """
+  After `move_term/5`: moves the Trait attributions carrying `term`
+  (compared normalized) from the Facts on `from` (values of `trait`) to the
+  Fact on `to` of the same Gall, created if need be
+  (`Gallformers.Facts.move_attribution/3`). Attributions of other terms
+  stay; a Fact left with none is no longer current. Returns each
+  attribution moved (`moved` false when the Source already supported the
+  target Fact, so its attribution there stands).
+  """
+  @spec move_term_attributions(Actor.t(), String.t(), String.t(), [String.t()], String.t()) ::
+          {:ok, [term_attribution_move()]} | {:error, term()}
+  def move_term_attributions(%Actor{} = actor, trait, term, from, to)
+      when is_binary(trait) and is_binary(term) and is_list(from) and is_binary(to) do
+    normalized = TraitTermMapping.normalize(term)
+    from = List.delete(from, to)
+
+    Audit.transaction(actor, "catalog.move_term_attributions", fn ->
+      from(a in Attribution,
+        join: d in TraitFact,
+        on: d.fact_id == a.fact_id,
+        join: v in TraitValue,
+        on: v.id == d.trait_value_id,
+        where: v.trait == ^trait and v.value in ^from and not is_nil(a.term),
+        order_by: a.id,
+        select: %{attribution: a, gall_id: d.gall_id}
+      )
+      |> Repo.all()
+      |> Enum.filter(&(TraitTermMapping.normalize(&1.attribution.term) == normalized))
+      |> Enum.map(fn %{attribution: a, gall_id: gall_id} ->
+        with {:ok, target} <-
+               Assert.find_or_create(TraitFact, actor, %{
+                 gall_id: gall_id,
+                 trait: trait,
+                 value: to
+               }),
+             {:ok, %{moved: moved}} <- Facts.move_attribution(actor, a.id, target.fact_id) do
+          %{
+            from_fact_id: a.fact_id,
+            to_fact_id: target.fact_id,
+            source_id: a.source_id,
+            batch_id: a.batch_id,
+            moved: moved
+          }
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end)
+  end
+
+  @doc """
+  How many Galls use each term: those whose Trait attributions carry it or
+  that wait on it (`Gallformers.Catalog.Vocab.TermUsage`), by
+  `{trait, normalized term}`.
+  """
+  @spec term_gall_counts() :: %{{String.t(), String.t()} => pos_integer()}
+  defdelegate term_gall_counts(), to: TermUsage, as: :gall_counts
+
+  @doc "Records that `term`'s placement was spot-checked."
+  @spec record_term_spot_check(Actor.t(), String.t(), String.t(), keyword()) :: Terms.result()
+  defdelegate record_term_spot_check(actor, trait, term, opts \\ []),
+    to: Terms,
+    as: :record_spot_check
+
+  # -- terms waiting on a question (`d213`) --------------------------------------
+
+  @doc """
+  Stores a Source's Trait term on a Gall that has no Fact yet
+  (`Gallformers.Catalog.PendingTraitTerm`): shown on the Gall's page, not
+  in the ID tool. `attrs`: `:gall_id`, `:source_id`, `:package_id`,
+  `:batch_id`, `:trait`, `:term`, and `:evidence`, `:statement_ref`,
+  `:queue_item_id`. Putting a Source's term on a Gall again updates it.
+  """
+  @spec put_pending_term(Actor.t(), map()) ::
+          {:ok, PendingTraitTerm.t()} | {:error, Changeset.t()}
+  defdelegate put_pending_term(actor, attrs), to: PendingTerms, as: :put
+
+  @doc "The terms waiting on Gall `gall_id`; `include_settled: true` adds the settled ones."
+  @spec list_pending_terms(integer(), keyword()) :: [PendingTraitTerm.t()]
+  defdelegate list_pending_terms(gall_id, opts \\ []), to: PendingTerms, as: :list
+
+  @doc """
+  Settles the waiting uses of `term` under `categories` (a value, or the
+  values a term names; nil or none: as text): every Gall's by default, or
+  narrowed by `:gall_ids`, `:source_id`, `:queue_item_id`. Returns the
+  uses settled; writing their Facts is the caller's.
+  """
+  @spec settle_pending_terms(
+          Actor.t(),
+          String.t(),
+          String.t(),
+          String.t() | [String.t()] | nil,
+          keyword()
+        ) ::
+          {:ok, [PendingTraitTerm.t()]} | {:error, {:not_a_value, String.t(), String.t()}}
+  defdelegate settle_pending_terms(actor, trait, term, categories, opts \\ []),
+    to: PendingTerms,
+    as: :settle
+
+  @doc """
+  The terms that fit no category, each with how many uses are kept as text
+  on a Gall, most first.
+  """
+  @spec list_no_fit_terms() :: [PendingTerms.no_fit()]
+  defdelegate list_no_fit_terms(), to: PendingTerms, as: :list_no_fit
 
   @doc """
   The generation groups, in the order defined, each with its values in
@@ -556,14 +754,25 @@ defmodule Gallformers.Catalog do
 
   @doc """
   Records a Source's stance on a Trait value: `key` is
-  `%{gall_id, trait, value}` (names, e.g. `"color"`, `"red"`). `detachable`
-  Facts compete in the slot `"gall:<id>:detachable"`. Give the Source's own
-  word as `:value_as_written` in `attribution`.
+  `%{gall_id, trait, value}` (names, e.g. `"color"`, `"red"`): the value
+  is the category. `detachable` Facts compete in the slot
+  `"gall:<id>:detachable"`. Give the Source's term, verbatim ("ovoid" for
+  globular), as `:term` in `attribution` (`d213`); with none, the term is
+  `:value_as_written`, the Source's own words.
   """
   @spec assert_trait(Actor.t(), map(), map()) ::
           {:ok, Assert.result()} | {:error, Changeset.t()}
   def assert_trait(actor, key, attribution),
-    do: Assert.assert(TraitFact, actor, key, attribution)
+    do: Assert.assert(TraitFact, actor, key, with_term(attribution))
+
+  # A Trait attribution's term, when not given: the value as written.
+  defp with_term(attribution) do
+    case attribution do
+      %{term: term} when is_binary(term) -> attribution
+      %{value_as_written: written} when is_binary(written) -> Map.put(attribution, :term, written)
+      _ -> attribution
+    end
+  end
 
   @doc """
   Records a Source's stance on a range adjustment: `key` is
@@ -632,6 +841,8 @@ defmodule Gallformers.Catalog do
   """
   @spec assert_fact(fact_kind(), Actor.t(), map(), map()) ::
           {:ok, Assert.result()} | {:error, Changeset.t()}
+  def assert_fact(:trait, actor, key, attribution), do: assert_trait(actor, key, attribution)
+
   def assert_fact(kind, actor, key, attribution),
     do: Assert.assert(Map.fetch!(@fact_kinds, kind), actor, key, attribution)
 
@@ -896,6 +1107,14 @@ defmodule Gallformers.Catalog do
   @doc "How many Galls match the ID tool's `filters` (`identify/1`)."
   @spec count_identified(Identify.filters()) :: non_neg_integer()
   defdelegate count_identified(filters), to: Identify
+
+  @doc """
+  The ID tool's text search over its results (`identify/1`'s): the Galls
+  whose name, Trait values, or the terms placed under them or used by
+  their Sources ("oval" for globular) hold every word of `text`.
+  """
+  @spec filter_identified([Identify.result()], String.t()) :: [Identify.result()]
+  defdelegate filter_identified(results, text), to: Identify, as: :filter_by_text
 
   @doc "The ID tool's Trait options: each Trait's values, by Trait, each list by value."
   @spec identify_options() :: %{String.t() => [TraitValue.t()]}

@@ -204,18 +204,94 @@ defmodule Gallformers.ImportFixtures do
   Adds a `review.json` to `package`: `reviewed` holds the batches' hashes;
   with `responded: true`, `responded.result` too. `override` replaces
   top-level keys.
+
+  A format 4 gall batch's trait Facts are placed (`placements`), by default
+  as the producer placed them (its `category` and `depends_on_gall`): the
+  readers agree. `placements:` gives the list instead.
   """
   def with_review(package, findings \\ [], opts \\ []) do
     hashes = batch_hashes(package)
 
     review =
       %{"format" => "gallformers-review", "reviewed" => hashes, "findings" => findings}
+      |> put_placements(Keyword.get_lazy(opts, :placements, fn -> placements(package) end))
       |> then(fn r ->
         if opts[:responded], do: Map.put(r, "responded", %{"result" => hashes}), else: r
       end)
       |> Map.merge(Keyword.get(opts, :override, %{}))
 
     Map.put(package, "review.json", Jason.encode!(review))
+  end
+
+  defp put_placements(review, []), do: review
+  defp put_placements(review, placements), do: Map.put(review, "placements", placements)
+
+  # The producer's own placement of each trait Fact of a format 4 gall batch.
+  defp placements(package) do
+    case package["gall.json"] && Jason.decode!(package["gall.json"]) do
+      %{"format_version" => 4, "facts" => facts} ->
+        for %{"kind" => "trait"} = f <- facts do
+          %{"id" => f["id"], "category" => f["category"]}
+          |> then(&if f["depends_on_gall"], do: Map.put(&1, "depends_on_gall", true), else: &1)
+        end
+
+      _ ->
+        []
+    end
+  end
+
+  @doc """
+  A package of `source` with one batch applied at `applied_at`, written
+  straight to the tables (no delivery, no review). Options: `:status`
+  (the package's, default `:approved`), `:batch_status` (default
+  `:applied`; any other leaves `applied_at` nil), `:inserted_at` (the
+  package's, default now).
+  """
+  def applied_package!(source, applied_at, opts \\ []) do
+    n = System.unique_integer([:positive])
+    batch_status = Keyword.get(opts, :batch_status, :applied)
+
+    package =
+      Gallformers.Repo.insert!(%Gallformers.Import.Package{
+        key: "applied-#{n}",
+        s3_prefix: "import/applied-#{n}/",
+        status: Keyword.get(opts, :status, :approved),
+        source_id: source.id,
+        submitter_name: "Test",
+        inserted_at: Keyword.get(opts, :inserted_at, DateTime.utc_now(:second))
+      })
+
+    Gallformers.Repo.insert!(%Gallformers.Import.Batch{
+      package_id: package.id,
+      file: "gall.json",
+      batch_type: :gall,
+      mode: :add,
+      producer_batch_id: "applied-#{n}",
+      sha256: String.duplicate("0", 64),
+      content: %{},
+      status: batch_status,
+      applied_at: if(batch_status == :applied, do: applied_at)
+    })
+
+    package
+  end
+
+  @doc """
+  A Source an import brought (`Gallformers.CatalogFixtures.source_fixture/2`
+  with `title` and `authored`): created when its package was applied, at
+  `applied_at`, with no edit since.
+  """
+  def imported_source!(title, applied_at, authored \\ "1957") do
+    require Ecto.Query
+    source = Gallformers.CatalogFixtures.source_fixture(title, authored)
+
+    Gallformers.Repo.update_all(
+      Ecto.Query.where(Gallformers.Sources.Source, id: ^source.id),
+      set: [inserted_at: applied_at, updated_at: applied_at]
+    )
+
+    applied_package!(source, applied_at, inserted_at: applied_at)
+    Gallformers.Repo.reload!(source)
   end
 
   @doc "The sha256 of each batch file in `package`."

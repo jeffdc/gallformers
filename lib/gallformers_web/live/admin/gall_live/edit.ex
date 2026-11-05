@@ -24,7 +24,7 @@ defmodule GallformersWeb.Admin.GallLive.Edit do
       restore an excluded one, a statement, and Save: one Gallformers
       statement through the import path
       (`GallformersWeb.Admin.GallLive.RangeExclusions`), whose outcome is
-      shown — applied, or awaiting review in the queue.
+      shown — applied, or awaiting review (`/admin/review`).
 
   There is no delete (merges come later, `3e8c`).
   """
@@ -771,14 +771,14 @@ defmodule GallformersWeb.Admin.GallLive.Edit do
                 <% {:approved, package} -> %>
                   <.alert variant="info">
                     Approved; the statement is being applied.
-                    <.link navigate={~p"/admin/queue/packages/#{package.id}"} class="underline">
-                      View it in the queue
+                    <.link navigate={~p"/admin/review/packages/#{package.id}"} class="underline">
+                      View it
                     </.link>
                   </.alert>
                 <% {:awaiting_review, package} -> %>
                   <.alert variant="warning">
-                    Your statement awaits review in the queue before it is applied.
-                    <.link navigate={~p"/admin/queue/packages/#{package.id}"} class="underline">
+                    Your statement awaits review before it is applied.
+                    <.link navigate={~p"/admin/review/packages/#{package.id}"} class="underline">
                       Review it
                     </.link>
                   </.alert>
@@ -792,8 +792,8 @@ defmodule GallformersWeb.Admin.GallLive.Edit do
                 <% {status, package} -> %>
                   <.alert variant="info">
                     The statement is {status}.
-                    <.link navigate={~p"/admin/queue/packages/#{package.id}"} class="underline">
-                      View it in the queue
+                    <.link navigate={~p"/admin/review/packages/#{package.id}"} class="underline">
+                      View it
                     </.link>
                   </.alert>
               <% end %>

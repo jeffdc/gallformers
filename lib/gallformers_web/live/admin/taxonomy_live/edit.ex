@@ -4,7 +4,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
   `/admin/taxonomy/:id`, for a taxon of any rank:
 
     * rename — the old accepted name stays a synonym; Galls whose derived
-      names change get rename proposals in the review queue (`86e7`);
+      names change get rename proposals (`86e7`), reviewed at
+      `/admin/review/renames`;
     * move — a new parent, through the tree validator;
     * synonyms and common names, added and removed;
     * section membership: a plant's section within its genus, or a
@@ -511,10 +512,10 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
               <.button type="submit" variant="secondary">Rename</.button>
             </.form>
             <p class="mt-2 text-xs text-gray-500">
-              The old name is kept as a synonym. Galls whose names it changes get rename proposals in the <.link
-                navigate={~p"/admin/queue"}
+              The old name is kept as a synonym. Galls whose names it changes get <.link
+                navigate={~p"/admin/review/renames"}
                 class="underline"
-              >review queue</.link>.
+              >rename proposals</.link>.
             </p>
           </.card>
 

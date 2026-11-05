@@ -2,9 +2,14 @@ defmodule Gallformers.Import.BatchUnmapped do
   @moduledoc """
   A batch's `unmapped` entry (`9449` §5): a Source term that fits no
   vocabulary value, kept with the batch for review and to show where the
-  vocabularies should grow. Never a Fact (`9449` §4).
+  vocabularies should grow. Never a Fact by itself (`9449` §4): resolving
+  queues each term for a curator, who may map or state it
+  (`Gallformers.Import.SetAside`).
 
-  Copied from the batch when it is validated, so not audited.
+  Copied from the batch when it is validated, so not audited. A dispute
+  decided `skip` on a Trait Fact adds one after the batch's own, keeping
+  the Source's words as text on the Gall (`Gallformers.Import.Disputes`),
+  inside the decision's audited transaction.
   """
   use Ecto.Schema
 

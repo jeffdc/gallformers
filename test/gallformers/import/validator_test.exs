@@ -61,6 +61,8 @@ defmodule Gallformers.Import.ValidatorTest do
         end
 
       assert warnings == [
+               "gallformers-note/gall.json: Gall g1 is identified by Inducer t1 but has " <>
+                 "no confirmed inducer_of Fact from t1",
                "gallformers-statement/gall.json: Gall g1 is identified by Inducer t1 but has " <>
                  "no confirmed inducer_of Fact from t1"
              ]
@@ -68,14 +70,15 @@ defmodule Gallformers.Import.ValidatorTest do
   end
 
   describe "schemas: rejections" do
-    test "an unknown Trait value" do
-      batch = put(paper(), ["facts", 5, "value", "value"], "beige")
-      assert errors_mention?(schema_errors(batch), ["facts/5/value/value"])
+    test "an unknown Trait category" do
+      batch = put(paper(), ["facts", 5, "category", "value"], "beige")
+      assert errors_mention?(schema_errors(batch), ["facts/5/category/value"])
     end
 
     test "a controlled value needs as_written" do
-      batch = delete(paper(), ["facts", 5, "value", "as_written"])
-      assert errors_mention?(schema_errors(batch), ["as_written"])
+      # f5, a qualifier: controlled values other than Traits keep value + as_written.
+      batch = delete(paper(), ["facts", 4, "value", "as_written"])
+      assert errors_mention?(schema_errors(batch), ["facts/4/value", "as_written"])
     end
 
     test "an extra property" do
@@ -286,9 +289,189 @@ defmodule Gallformers.Import.ValidatorTest do
       fact = occurrence_fact(%{"coordinates" => "37.88 N, 121.91 W"})
 
       assert errors_mention?(schema_errors(append(paper(), "facts", fact)), [
-               "facts/15",
+               "facts/16",
                "coordinates"
              ])
+    end
+  end
+
+  # 2026-11-02, format v4 (d213): a trait Fact carries the Source's term and
+  # a suggested category (null when none fits), and may say depends_on_gall.
+  # Format v3 batches (value + as_written) still validate.
+  describe "schemas: format v4 trait Facts" do
+    defp lignified_entry(slot) do
+      %{
+        "term" => "lignified",
+        "slot" => slot,
+        "gall" => "g1",
+        "evidence" => [
+          %{"item" => "#/texts/44", "quote" => "becoming lignified in the second year"}
+        ]
+      }
+    end
+
+    test "the examples are format v4" do
+      versions =
+        for name <- example_names(),
+            file <- ["taxonomy.json", "gall.json"],
+            File.exists?(Path.join([examples_dir(), name, file])),
+            uniq: true,
+            do: example(name, file)["format_version"]
+
+      assert versions == [4]
+    end
+
+    test "a trait Fact has a term and a category" do
+      assert %{"term" => "pale tan", "category" => %{"value" => "tan"}} =
+               Enum.at(paper()["facts"], 5)
+
+      assert schema_errors(paper()) == []
+    end
+
+    test "no category when none fits" do
+      assert schema_errors(put(paper(), ["facts", 5, "category"], nil)) == []
+    end
+
+    test "the category is required" do
+      batch = delete(paper(), ["facts", 5, "category"])
+      assert errors_mention?(schema_errors(batch), ["facts/5", "category"])
+    end
+
+    test "the term is required and not empty" do
+      assert errors_mention?(schema_errors(put(paper(), ["facts", 5, "term"], "")), [
+               "facts/5/term"
+             ])
+
+      assert errors_mention?(schema_errors(delete(paper(), ["facts", 5, "term"])), [
+               "facts/5",
+               "term"
+             ])
+    end
+
+    test "the category is only a value" do
+      batch = put(paper(), ["facts", 5, "category", "as_written"], "pale tan")
+      assert errors_mention?(schema_errors(batch), ["facts/5/category"])
+    end
+
+    test "depends_on_gall" do
+      batch = put(paper(), ["facts", 5, "depends_on_gall"], true)
+      assert schema_errors(batch) == []
+      assert schema_errors(put(batch, ["facts", 5, "category"], nil)) == []
+
+      assert errors_mention?(schema_errors(put(batch, ["facts", 5, "depends_on_gall"], false)), [
+               "facts/5/depends_on_gall"
+             ])
+    end
+
+    test "a v4 trait Fact takes no value" do
+      batch = put(paper(), ["facts", 5, "value"], %{"value" => "tan", "as_written" => "pale tan"})
+      assert errors_mention?(schema_errors(batch), ["facts/5", "value"])
+    end
+
+    test "v4 unmapped takes no Trait slot" do
+      batch = Map.put(paper(), "unmapped", [lignified_entry("texture")])
+      assert errors_mention?(schema_errors(batch), ["unmapped/0/slot"])
+
+      for slot <- ~w(other generation place) do
+        assert schema_errors(Map.put(paper(), "unmapped", [lignified_entry(slot)])) == [], slot
+      end
+    end
+
+    test "format versions 3 and 4 only" do
+      assert errors_mention?(schema_errors(Map.put(paper(), "format_version", 5)), [
+               "format_version"
+             ])
+    end
+
+    test "a v3 batch still validates" do
+      v3 = as_v3(paper())
+      assert Enum.at(v3["facts"], 5)["value"] == %{"value" => "tan", "as_written" => "pale tan"}
+      assert schema_errors(v3) == []
+      assert schema_errors(Map.put(v3, "unmapped", [lignified_entry("texture")])) == []
+    end
+
+    test "v3: an unknown Trait value" do
+      batch = put(as_v3(paper()), ["facts", 5, "value", "value"], "beige")
+      assert errors_mention?(schema_errors(batch), ["facts/5/value/value"])
+    end
+
+    test "v3: a Trait value needs as_written" do
+      batch = delete(as_v3(paper()), ["facts", 5, "value", "as_written"])
+      assert errors_mention?(schema_errors(batch), ["facts/5/value", "as_written"])
+    end
+
+    test "v3: a trait Fact takes no term" do
+      batch = put(as_v3(paper()), ["facts", 5, "term"], "pale tan")
+      assert errors_mention?(schema_errors(batch), ["facts/5", "term"])
+    end
+
+    test "taxonomy batches take either version" do
+      for version <- [3, 4] do
+        assert schema_errors(Map.put(revision(), "format_version", version)) == [], "v#{version}"
+      end
+    end
+  end
+
+  # 2026-11-03 (d213): each unmapped entry's topic, for grouping the Hedges.
+  # Optional: v4 packages delivered before it lack it, and the review shows
+  # those under "Other".
+  describe "schemas: unmapped topics" do
+    defp hedge(fields \\ %{}) do
+      Map.merge(
+        %{
+          "term" => "probably the same as C. confluens",
+          "slot" => "other",
+          "gall" => "g1",
+          "evidence" => [
+            %{"item" => "#/texts/44", "quote" => "becoming lignified in the second year"}
+          ]
+        },
+        fields
+      )
+    end
+
+    test "an unmapped entry takes a topic" do
+      for topic <- ~w(names inducer host range gall other) do
+        batch = Map.put(paper(), "unmapped", [hedge(%{"topic" => topic})])
+        assert schema_errors(batch) == [], topic
+      end
+
+      assert schema_errors(Map.put(paper(), "unmapped", [hedge()])) == []
+    end
+
+    test "an unknown topic is rejected" do
+      batch = Map.put(paper(), "unmapped", [hedge(%{"topic" => "taxonomy"})])
+      assert errors_mention?(schema_errors(batch), ["unmapped/0/topic"])
+    end
+
+    test "topics in taxonomy and v3 batches" do
+      entry = hedge(%{"topic" => "names", "slot" => "taxonomic_act"}) |> Map.delete("gall")
+      assert schema_errors(Map.put(revision(), "unmapped", [entry])) == []
+
+      v3 = Map.put(as_v3(paper()), "unmapped", [hedge(%{"topic" => "gall"})])
+      assert schema_errors(v3) == []
+    end
+  end
+
+  describe "schemas: a Gall's Gallformers note" do
+    defp note_example, do: example("gallformers-note")
+
+    test "a note needs its document" do
+      b = delete(note_example(), ["source", "document"])
+      assert errors_mention?(schema_errors(b), ["source", "document"])
+    end
+
+    test "a Gallformers document needs a note" do
+      b = delete(note_example(), ["source", "note"])
+      assert errors_mention?(schema_errors(b), ["source", "note"])
+    end
+
+    test "a note names its Gall and date" do
+      b = delete(note_example(), ["source", "note", "stated_on"])
+      assert errors_mention?(schema_errors(b), ["stated_on"])
+
+      b = put(note_example(), ["source", "note", "gallformers_gall_id"], "587")
+      assert errors_mention?(schema_errors(b), ["gallformers_gall_id"])
     end
   end
 
@@ -432,6 +615,116 @@ defmodule Gallformers.Import.ValidatorTest do
     end
   end
 
+  describe "package checks: format v4 trait terms" do
+    test "a v4 package is clean" do
+      assert problems(package(gall: batch_v4())) == []
+    end
+
+    test "the term is in its evidence" do
+      b = put(batch_v4(), ["facts", 4, "term"], "light brown")
+      assert [error] = problems(package(gall: b))
+      assert error =~ "facts/4"
+      assert error =~ "term"
+      assert error =~ "light brown"
+    end
+
+    test "the term is matched as quotes are, ignoring case" do
+      b =
+        batch_v4()
+        |> update_in(
+          access(["facts", 4]),
+          &Map.merge(&1, %{
+            "trait" => "shape",
+            "term" => "Globular",
+            "category" => %{"value" => "globular"},
+            "evidence" => [%{"item" => "#/texts/1", "quote" => "are globular  and pale tan"}]
+          })
+        )
+
+      assert problems(package(gall: b)) == []
+      assert problems(package(gall: put(b, ["facts", 4, "term"], "glob- ular"))) == []
+    end
+
+    test "the term may come from a whole item" do
+      b =
+        batch_v4()
+        |> put(["facts", 4, "term"], "large stem galls")
+        |> put(["facts", 4, "evidence"], [%{"item" => "#/texts/1", "whole_item" => true}])
+
+      assert problems(package(gall: b)) == []
+    end
+
+    test "a statement's term is not checked" do
+      statement = %{"statement" => %{"text" => "Seen on Q. lobata.", "stated_on" => "2026-10-30"}}
+
+      b =
+        batch_v4()
+        |> Map.merge(%{"source" => %{"gallformers" => true}, "mode" => "add"})
+        |> Map.update!("facts", fn facts ->
+          Enum.map(facts, &Map.put(&1, "evidence", [statement]))
+        end)
+
+      assert problems(%{"gall.json" => Jason.encode!(b)}) == []
+    end
+  end
+
+  describe "package checks: a Gall's Gallformers note" do
+    # batch/0 as Gallformers statements quoting a Gall's note: the fixture
+    # document's #/texts/2.
+    defp note_batch do
+      b =
+        batch()
+        |> Map.put("mode", "add")
+        |> Map.put("source", %{
+          "gallformers" => true,
+          "note" => %{"gallformers_gall_id" => 587, "stated_on" => "2026-10-30"},
+          "document" => %{"file" => "document.json", "sha256" => String.duplicate("0", 64)}
+        })
+        |> Map.update!("taxa", &List.delete_at(&1, 2))
+
+      host = b["facts"] |> Enum.at(1) |> put(["evidence", 0, "item"], "#/texts/0")
+      Map.put(b, "facts", [host])
+    end
+
+    defp note_document do
+      doc = DoclingFixtures.document()
+      note = doc["texts"] |> Enum.at(2) |> Map.put("self_ref", "#/texts/0")
+
+      doc
+      |> Map.put("texts", [note])
+      |> put(["body", "children"], [%{"$ref" => "#/texts/0"}])
+      |> Map.merge(%{"tables" => [], "pictures" => []})
+    end
+
+    test "a note batch quotes its note" do
+      assert problems(package(doc: note_document(), gall: note_batch())) == []
+    end
+
+    test "a note batch takes no statement evidence" do
+      statement = %{"statement" => %{"text" => "Seen on Q. lobata.", "stated_on" => "2026-10-30"}}
+      b = put(note_batch(), ["facts", 0, "evidence"], [statement])
+
+      assert errors_mention?(problems(package(doc: note_document(), gall: b)), [
+               "quotes its note"
+             ])
+    end
+
+    test "a note's document is one text item" do
+      assert errors_mention?(problems(package(gall: note_batch())), ["one text item"])
+    end
+
+    test "Gallformers statements without a note are unchanged" do
+      statement = %{"statement" => %{"text" => "Seen on Q. lobata.", "stated_on" => "2026-10-30"}}
+
+      b =
+        note_batch()
+        |> Map.put("source", %{"gallformers" => true})
+        |> put(["facts", 0, "evidence"], [statement])
+
+      assert problems(%{"gall.json" => Jason.encode!(b)}) == []
+    end
+  end
+
   describe "package checks: taxonomy batches" do
     defp above_family(kind, ranks, fields) do
       taxa =
@@ -480,6 +773,82 @@ defmodule Gallformers.Import.ValidatorTest do
     test "an empty taxonomy batch validates" do
       tb = %{taxonomy_batch() | "taxa" => [], "acts" => []}
       assert problems(package(gall: nil, taxonomy: tb)) == []
+    end
+  end
+
+  describe "a Host declared by its common name (d213 Task 6)" do
+    @black_oak %{"ref" => "t3", "name_as_written" => "the black oak", "common_name" => true}
+
+    test "is a common name never paired with a scientific name: no rank needed" do
+      batch = put(paper(), ["taxa", 2], @black_oak)
+      assert schema_errors(batch) == []
+
+      batch =
+        put(
+          batch,
+          ["taxa", 2],
+          Map.merge(@black_oak, %{"name_reading" => "the black oak", "rank" => "species"})
+        )
+
+      assert schema_errors(batch) == []
+    end
+
+    test "a scientific name still needs its rank" do
+      assert errors_mention?(schema_errors(delete(paper(), ["taxa", 2, "rank"])), [
+               "taxa/2",
+               "rank"
+             ])
+    end
+
+    test "common_name is a flag" do
+      batch = put(paper(), ["taxa", 2, "common_name"], "black oak")
+      assert errors_mention?(schema_errors(batch), ["taxa/2/common_name"])
+    end
+
+    test "takes no scientific claims" do
+      for {field, value} <- [
+            {"new", %{"status" => "sp. nov."}},
+            {"sensu", "non Harris"},
+            {"gallformers_taxon_id", 7}
+          ] do
+        batch = put(paper(), ["taxa", 2], Map.put(@black_oak, field, value))
+        assert errors_mention?(schema_errors(batch), ["taxa/2"]), field
+
+        scientific =
+          @black_oak
+          |> Map.delete("common_name")
+          |> Map.merge(%{field => value, "rank" => "species"})
+
+        assert schema_errors(put(paper(), ["taxa", 2], scientific)) == [], field
+      end
+    end
+
+    defp common_name_host(batch, ref) do
+      Map.update!(batch, "taxa", fn taxa ->
+        Enum.map(taxa, fn
+          %{"ref" => ^ref} ->
+            %{"ref" => ref, "name_as_written" => "the black oak", "common_name" => true}
+
+          t ->
+            t
+        end)
+      end)
+    end
+
+    test "may be a Host" do
+      b = batch() |> common_name_host("t2") |> put(["galls", 0, "identified_by", "host"], "t2")
+      assert problems(package(gall: b)) == []
+    end
+
+    test "is only ever a Host" do
+      errors = problems(package(gall: common_name_host(batch(), "t1")))
+      assert errors_mention?(errors, ["t1", "common name", "Host"]), inspect(errors)
+    end
+
+    test "takes no taxonomic act" do
+      tb = common_name_host(taxonomy_batch(), "t1")
+      errors = problems(package(gall: nil, taxonomy: tb))
+      assert errors_mention?(errors, ["t1", "common name"]), inspect(errors)
     end
   end
 
@@ -665,5 +1034,188 @@ defmodule Gallformers.Import.ValidatorTest do
     test "gate problems are filed under review.json" do
       assert [%{file: "review.json"}] = Validator.validate(package(), review: true)
     end
+  end
+
+  # 2026-11-03 (d213): one-sentence positions. A finding's `summary` is the
+  # checker's position, its response's `summary` the producer's. Both
+  # optional: the review falls back to each side's first sentence.
+  describe "readiness gate: one-sentence positions" do
+    defp disputed(summary, response_summary) do
+      %{
+        "batch" => "gall.json",
+        "id" => "f2",
+        "problem" => "wrong_value",
+        "reason" => "the quote says Q. douglasii",
+        "summary" => summary,
+        "response" => %{
+          "decision" => "disagree",
+          "reason" => "checked against #/texts/42",
+          "summary" => response_summary
+        }
+      }
+    end
+
+    test "findings and responses take a summary" do
+      finding =
+        disputed(
+          "The quote names Q. douglasii, not Q. lobata.",
+          "The Source means Q. lobata here."
+        )
+
+      pkg = with_review(package(), [finding], responded: true)
+      assert problems(pkg, :error, review: true) == []
+    end
+
+    test "a summary is not empty" do
+      pkg = with_review(package(), [disputed("", "x")], responded: true)
+      assert errors_mention?(problems(pkg, :error, review: true), ["findings/0/summary"])
+
+      pkg = with_review(package(), [disputed("x", "")], responded: true)
+      assert errors_mention?(problems(pkg, :error, review: true), ["findings/0/response/summary"])
+    end
+  end
+
+  # 2026-11-02, format v4 (d213): review.json `placements` hold the
+  # reviewer's own, blind placement of every trait Fact's term.
+  describe "readiness gate: format v4 placements" do
+    defp placement(id \\ "f5", category \\ "tan", fields \\ %{}) do
+      Map.merge(
+        %{"id" => id, "category" => if(category, do: %{"value" => category})},
+        fields
+      )
+    end
+
+    defp placed(gall, placements, opts \\ []) do
+      {findings, opts} = Keyword.pop(opts, :findings, [])
+
+      package(gall: gall)
+      |> with_review(findings, Keyword.put(opts, :override, %{"placements" => placements}))
+      |> gate_v4()
+    end
+
+    defp placed_warnings(gall, placements, opts) do
+      {findings, opts} = Keyword.pop(opts, :findings, [])
+
+      package(gall: gall)
+      |> with_review(findings, Keyword.put(opts, :override, %{"placements" => placements}))
+      |> gate_v4(:warning)
+    end
+
+    defp gate_v4(pkg, level \\ :error), do: problems(pkg, level, review: true)
+
+    defp agreed,
+      do: [
+        Map.merge(@finding, %{
+          "response" => %{"decision" => "agree", "reason" => "checked against #/texts/42"}
+        })
+      ]
+
+    test "a v4 review places every trait Fact" do
+      assert [error] = gate_v4(with_review(package(gall: batch_v4()), [], placements: []))
+      assert error =~ "f5"
+      assert error =~ "placement"
+      assert placed(batch_v4(), [placement()]) == []
+    end
+
+    test "a placement may be no category, or depend on the Gall" do
+      for p <- [
+            placement("f5", nil, %{"reason" => "no colour value fits"}),
+            placement("f5", "tan", %{"depends_on_gall" => true})
+          ] do
+        assert placed(batch_v4(), [p]) == [], inspect(p)
+      end
+    end
+
+    test "a placement is a value of the Fact's Trait" do
+      assert [error] = placed(batch_v4(), [placement("f5", "globular")])
+      assert error =~ "f5"
+      assert error =~ "globular"
+      assert error =~ "color"
+    end
+
+    test "a placement names a trait Fact" do
+      errors = placed(batch_v4(), [placement(), placement("f2"), placement("f99")])
+      assert errors_mention?(errors, ["f2", "not a trait Fact"])
+      assert errors_mention?(errors, ["f99", "not a trait Fact"])
+    end
+
+    test "one placement per Fact per reviewer" do
+      two = [
+        placement("f5", "tan", %{"reviewer" => "opus"}),
+        placement("f5", "tan", %{"reviewer" => "sonnet"})
+      ]
+
+      assert placed(batch_v4(), two) == []
+
+      same = [
+        placement("f5", "tan", %{"reviewer" => "opus"}),
+        placement("f5", "brown", %{"reviewer" => "opus"})
+      ]
+
+      assert errors_mention?(placed(batch_v4(), same), ["f5", "more than once"])
+    end
+
+    test "a malformed placement" do
+      errors = placed(batch_v4(), [%{"id" => "f5", "category" => "tan"}])
+      assert errors_mention?(errors, ["placements/0/category"])
+    end
+
+    test "after phase 6 a trait Fact without a placement goes to intake" do
+      b =
+        append(
+          batch_v4(),
+          "facts",
+          batch_v4()["facts"] |> Enum.at(4) |> Map.merge(%{"id" => "f6", "term" => "pale"})
+        )
+
+      opts = [findings: agreed(), responded: true]
+      assert placed(b, [placement()], opts) == []
+      assert errors_mention?(placed_warnings(b, [placement()], opts), ["f6", "placement"])
+    end
+
+    test "after phase 6 a placement may outlive its Fact" do
+      opts = [findings: agreed(), responded: true]
+      assert placed(batch_v4(), [placement(), placement("f9")], opts) == []
+    end
+
+    test "a v3 batch needs no placements" do
+      assert gate_v4(with_review(package())) == []
+    end
+  end
+
+  # -- format v4 helpers -----------------------------------------------------------
+
+  # A format v4 trait Fact on g1 (validate.py's conftest trait_fact).
+  defp trait_fact do
+    %{
+      "id" => "f5",
+      "stance" => "confirm",
+      "kind" => "trait",
+      "gall" => "g1",
+      "trait" => "color",
+      "term" => "pale tan",
+      "category" => %{"value" => "tan"},
+      "evidence" => [%{"item" => "#/texts/1", "quote" => "pale tan when mature"}]
+    }
+  end
+
+  # The fixture batch in format v4, with one trait Fact (f5).
+  defp batch_v4, do: batch() |> Map.put("format_version", 4) |> append("facts", trait_fact())
+
+  # A format v4 gall batch as format v3: each trait Fact's term and category
+  # as value.as_written and value.value; trait Facts with no category dropped.
+  defp as_v3(batch) do
+    facts =
+      for f <- batch["facts"], f["kind"] != "trait" or f["category"] != nil do
+        if f["kind"] == "trait" do
+          f
+          |> Map.drop(["term", "category", "depends_on_gall"])
+          |> Map.put("value", %{"value" => f["category"]["value"], "as_written" => f["term"]})
+        else
+          f
+        end
+      end
+
+    %{batch | "format_version" => 3, "facts" => facts}
   end
 end

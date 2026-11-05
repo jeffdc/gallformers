@@ -13,17 +13,17 @@ A task-oriented guide for Gallformers admins. Whether you're brand new or return
 
 ### The Admin Navigation
 
-The bar at the top of every admin page leads to: **Dashboard**, **Queue** (the review queue), **Galls**, **Taxonomy** (taxa of every rank, plants and their Host ranges included), **Sources**, then the content screens **Glossary**, **Articles** and **Keys**. **My Profile** is on the right; operators also see **Ops**.
+The bar at the top of every admin page leads to: **Dashboard**, **Review** (the import review), **Galls**, **Taxonomy** (taxa of every rank, plants and their Host ranges included), **Sources**, then the content screens **Glossary**, **Articles** and **Keys**. **My Profile** is on the right; superadmins also see **Vocabulary** (the vocabulary requests), and operators **Ops**.
 
 ### The Dashboard
 
 The dashboard is organized into sections:
 
-- **Quick Actions** — review the queue, find a Gall, find a Source, review Host ranges
-- **Review Queue** — how many queue items are open, in all and by kind; each count opens the queue filtered to it
+- **Quick Actions** — review Sources, find a Gall, find a Source, review Host ranges
+- **Review** — how many questions the imports have left to decide (opens the Sources to review), and how many Gall rename proposals are open, when there are any (opens them)
 - **Taxonomy** — create a new Host (a plant) or a new taxon, browse the taxonomy
 - **Content & Reference** — articles, identification keys, glossary entries
-- **Super Admin** — user management, the jobs dashboard and the live dashboard (only visible to superadmins)
+- **Super Admin** — user management, the vocabulary requests, the jobs dashboard and the live dashboard (only visible to superadmins)
 - **Stats** — current counts for Galls, Hosts, Sources and images; the first three open their lists
 
 There's also a **Discord** link and a link to this help doc in the top right for help.
@@ -32,9 +32,9 @@ There's also a **Discord** link and a link to this help doc in the top right for
 
 Before diving in, a few things that apply everywhere in the admin:
 
-**Most data arrives as imports.** Galls, their Hosts, Traits and common names, and what Sources say about them, come into Gallformers as **import packages**: batches of statements extracted from Sources. A package is checked and matched against what Gallformers already knows; whatever can't be settled on its own (an ambiguous name, an unknown Host, a dispute) becomes an item in the **review queue**, and a package needing review waits there for an admin to approve or deny it. The admin screens are for that review and for what is Gallformers' own: Gall editorial fields, the Gallformers note, range exclusions, the taxonomy, Sources' details and images.
+**Most data arrives as imports.** Galls, their Hosts, Traits and common names, and what Sources say about them, come into Gallformers as **import packages**: batches of statements extracted from Sources. A package is checked and matched against what Gallformers already knows; whatever can't be settled on its own (an ambiguous name, an unknown Host, a dispute) becomes a **question** for an admin, and a package needing review waits on its Source's review page for an admin to approve or deny it. The admin screens are for that review and for what is Gallformers' own: Gall editorial fields, the Gallformers note, range exclusions, the taxonomy, Sources' details and images.
 
-**Every edit is yours.** Saves are recorded under your name in the audit history, and edits that must survive a re-import (taxonomy edits, Source edits, queue decisions) are also kept in the replay log.
+**Every edit is yours.** Saves are recorded under your name in the audit history, and edits that must survive a re-import (taxonomy edits, Source edits, review decisions) are also kept in the replay log.
 
 **Saving.** Pages are split into sections (cards), each with its own **Save** button that saves just that section. On forms with a **Cancel** button, leaving with unsaved changes asks you to confirm.
 
@@ -42,42 +42,58 @@ Before diving in, a few things that apply everywhere in the admin:
 
 **Edit shortcuts on public pages.** When you're logged in as an admin, small pencil icons appear on the public site: next to a Gall's name (its Gall page in admin), a Host's or a rank page's name (its taxon page in admin), a Source's title (the Source editor), each Gall in a Host's table, and on image galleries (the images section of the Gall or taxon page; **Add images** when there are none). This is often the fastest way to edit something: find it on the public site, click the pencil.
 
-**Old links.** Links to the old admin screens still work where a new screen replaces them: `/admin/hosts…` and `/admin/section…` go to the taxonomy admin, `/admin/species-sources…` to the Source editor, `/admin/gallhost?id=…` to that Gall's page, and `/admin/images?species_id=…` to the images of that Gall's or taxon's page. Other old admin URLs are gone.
+**Old links.** Links to the old admin screens still work where a new screen replaces them: `/admin/hosts…` and `/admin/section…` go to the taxonomy admin, `/admin/species-sources…` to the Source editor, `/admin/gallhost?id=…` to that Gall's page, `/admin/images?species_id=…` to the images of that Gall's or taxon's page, `/admin/queue` to the Sources to review (`?kind=gall_rename` to the rename proposals), `/admin/queue/packages/:id` to that package's review page, and `/admin/vocab-requests` to the vocabulary page. Other old admin URLs are gone.
 
 ---
 
-## How Do I Work the Review Queue?
+## How Do I Review Imports?
 
-Go to **Queue** (`/admin/queue`). The page has two parts.
+The review goes Source by Source: each Source's statements are checked on its own page, and nothing on one Source's page depends on another's.
 
-### Open items
+### The Sources to review
 
-Everything imports could not settle on their own, oldest first, filtered by kind with a count for each:
+Go to **Review** (`/admin/review`). Each Source with a package under review is one row: its title and citation, its kind, how many questions are left and how many have a proposed answer, what holds its approval, and its status. Filter to **Needs decisions** (the default), **Ready to approve** or **All**, and sort by **Closest to done**, **Most to decide** or **Oldest Source first**. Click a row to open the Source's page. A package not matched to a Source yet has a row of its own; the Gallformers notes are one row (see below). While any Gall rename proposal is open, a row **Gall rename proposals** leads to them.
 
-| Kind | What you decide |
-|---|---|
-| **Ambiguous match** | A name matched more than one taxon, Gall or Source: pick the right candidate (or another taxon by ID), or skip it. A Gall can also be new. |
-| **Unresolved name** / **Unresolved Host** | A name or Host matched nothing: pick a taxon, or skip. Add the missing taxon in the [taxonomy admin](#how-do-i-create-or-edit-taxonomy) first if needed, then re-resolve the package. |
-| **Undescribed-Gall candidate** | A statement may be about an undescribed Gall: pick one, make it new, or skip. |
-| **Dispute** | A statement contradicts what Gallformers holds: keep or drop the statement. |
-| **Same-date conflict**, **Taxonomy disagreement**, **Generation outside its group** | Acknowledge, with a note. |
-| **Gall rename proposal** | A taxonomy change would rename a Gall (from → to, with any name collision shown): accept or reject. These come from taxonomy edits, not from a package. |
+### A Source's page
 
-Any decision can carry a note. Items that hold up a package's approval can be decided here or on the package's page.
+`/admin/review/sources/:id` (or `/admin/review/packages/:id` for one package) shows:
 
-### Packages
+- what the Source states: its Galls, statements about them, taxonomic acts, and the terms and statements the reader set aside;
+- progress: how many questions are decided, how many are left, and how many of those have a proposed answer;
+- **Approve**, with what holds it if anything does, and **Deny…** with a reason;
+- the questions, in sections by kind (Host names Gallformers doesn't hold, names held by several species, Galls whose generation isn't named, disputed statements, Trait terms to settle, statements set aside, and so on). Each section says what it is about and whether it holds approval.
 
-The delivered import packages, newest first, filtered by status. Open one (`/admin/queue/packages/:id`) to see:
+Each question is one compact row: the Source's words, the proposed answer and **Accept**. Click anywhere on the row to open it: the question in plain words, the Source's quotes, the evidence (candidates side by side, both readers' cases, the definitions of the Trait values in play), every choice with what it does, a name search where a choice needs one (taxa with their synonyms, plants in Gallformers and WCVP, Galls), what leaving it open means, an optional note, and the technical details. **Reject** a proposal you disagree with: the row stays open for another answer (**Undo** gives the proposal back). **Accept all N proposed…** in a section's header accepts the rest at once, after a confirmation; rejected rows, suggestions to check and rows with no proposal stay open. After each decision the page updates: questions it settles go and any it calls for appear. **Show decided** lists the decided ones too.
 
-- the package — its status, who submitted it, its Source, any validation problems;
-- its open queue items, with their decision controls;
-- its batches — type, mode and status — with each statement and how it resolved (to what, among which candidates, and once applied what it changed), and the entries that mapped to nothing.
+### Trait terms to settle
 
-Then:
+A Source describes its Galls in its own words: the term ("ovoid", "pale tan", "swelling"). Gallformers keeps the term and files it under a Trait's category (globular, tan, …), the values the ID tool filters on. A term already placed, or placed alike by the producer and the checker each on their own, goes in with no question. The rest are in **Trait terms to settle**, one row per term: the term, its Trait, how many Galls use it, and the category proposed if the readers agree. The row says whether the term is a **New term** or **Used in more than one sense** (a term like "swelling" that means different categories in different Galls, so each Gall is decided on its own).
 
-- **Approve** applies the package. If something still holds it (open items, a blocked batch), the page says what.
-- **Deny** the package, or a single batch, with a reason.
-- **Resolve again** after you've fixed what held it, e.g. added a missing name to the taxonomy.
+Open a row to see each Gall it covers: the Gall's name, the quote, what the producer suggested and what the checker placed (with its reason), and a category for that Gall, chosen already where the readers agree. The candidate categories' definitions are side by side. The choices:
+
+- **Place "term" under a category for every Source**: every Source's use of the term gets that category, now and from now on, and the Galls waiting on it get their Facts. Only for a new term.
+- **Use these categories for these Galls only (the term depends on the gall)**: each Gall gets the category chosen for it, or keeps the term as text. The term is then decided Gall by Gall in every Source.
+- **Fits no category (to superadmins)**: the term stays as text; superadmins see the terms that fit no category and may add one.
+- **Keep as text**: these Galls show the term without a category.
+
+Trait terms and statements set aside never hold approval. Left alone, a Gall shows the term without a category (not used by the ID tool), and set-aside statements stay out.
+
+### The Gallformers notes
+
+The Gallformers Source's page lists its notes, grouped by what each holds, in three tabs: **Ready, nothing to decide** (one line each, with what the note adds, ticked by default; **Approve N ticked notes** approves them, each on its own), **Needs you** (notes held by an open question, decided in place) and **Approved**.
+
+### Gall rename proposals
+
+A taxonomy change that would rename a Gall makes a rename proposal (`/admin/review/renames`). They come from taxonomy edits, not from a Source, and hold nothing. **Accept** renames the Gall, keeping the old name as a former name; **Keep the name** fixes it, so later changes to the tree propose nothing for it. A new name another Gall already has is flagged, and accepting it is refused until that Gall's name changes.
+
+### The vocabulary (superadmins)
+
+**Vocabulary** (`/admin/vocabulary`) holds the Trait categories and the Sources' terms under them. Terms are added by the import; categories change rarely, and only here.
+
+- **Placements to spot-check**: terms placed for every Source because the producer and the checker agreed, most Galls first, and placed terms the producer suggested another category for. **Looks right** records the check; **Move…** moves the term.
+- **Terms that fit no category**, most used first. Place one under a category (an existing one, or one you add) and every Gall that kept it as text gets its Fact.
+- **Add a category**: a new Trait value, with its definition (required).
+- **Terms**, filtered by Trait, status or a search: each term's status, category, how it was placed and how many Galls use it. **Change…** moves a placed term to another category (the Facts of every Gall using it move too; this should be rare), marks it as used in more than one sense, or places an ambiguous term under one category.
 
 ---
 
@@ -104,7 +120,7 @@ A Gall's range is computed from its Hosts' ranges: its **potential range**. When
 3. Write a short **statement** saying why, in plain words (required).
 4. Click **Save exclusions**.
 
-The change is saved as a Gallformers statement and goes through the import path like any other, so it is audited and attributed to Gallformers. The page shows the outcome: applied, or waiting in the review queue (with a link to its package).
+The change is saved as a Gallformers statement and goes through the import path like any other, so it is audited and attributed to Gallformers. The page shows the outcome: applied, or waiting for review (with a link to its review page).
 
 ---
 
@@ -167,7 +183,7 @@ While browsing a taxon's children, select several with the checkboxes and click 
 
 Each taxon's page (`/admin/taxonomy/:id`) has sections for:
 
-- **Name** — rename it. The old accepted name stays a synonym. Galls whose names derive from it and would change get **rename proposals** in the review queue, which you accept or reject there.
+- **Name** — rename it. The old accepted name stays a synonym. Galls whose names derive from it and would change get **rename proposals** (`/admin/review/renames`), which you accept or reject there.
 - **Placement** — move it under a new parent.
 - **Plants in this section** (sections) — the section's member plants, all in the section's genus.
 - **Synonyms** and **Common names** — add and remove.
@@ -320,5 +336,5 @@ These are only available to users with the superadmin role.
 
 - **Search everywhere.** Before adding a taxon, search first — it might already exist under a synonym or common name; the new-taxon form warns you too.
 - **Fix the tree, then resolve again.** When a package is held by an unresolved name, add the missing taxon in the taxonomy admin, then **Resolve again** on the package.
-- **Renames ripple.** Renaming or moving a genus can propose new names for the Galls under it; look in the review queue for the rename proposals.
+- **Renames ripple.** Renaming or moving a genus can propose new names for the Galls under it; look in **Review** for the rename proposals.
 - **Discord is your friend.** If something seems wrong or confusing, ask in the Discord channel. The link is on the dashboard.

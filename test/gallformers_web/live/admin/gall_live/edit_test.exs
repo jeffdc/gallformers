@@ -404,7 +404,7 @@ defmodule GallformersWeb.Admin.GallLive.EditTest do
 
       assert has_element?(
                view,
-               "#exclusions-outcome a[href='/admin/queue/packages/#{package.id}']"
+               "#exclusions-outcome a[href='/admin/review/packages/#{package.id}']"
              )
 
       assert Catalog.list_range_adjustments(gall.id) == []

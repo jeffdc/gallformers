@@ -68,7 +68,7 @@ Traits describe a Gall. Traits of the abstract Gall are Facts; the Traits of an 
 |---|---|---|
 | **Generation** | which generation of the Inducer's life cycle the Gall belongs to | terms vary by group. Provisional list: agamic, sexual, spring, summer, autumn (aphid host-alternation phases still open) |
 | **Detachable** | whether the Gall separates from the plant | integral, detachable, both, unknown |
-| **Plant part** | where on the Host the Gall forms | at leaf vein angles, between leaf veins, bud, flower, fruit, leaf edge, leaf midrib, lower leaf, on leaf veins, petiole, stem, underground (roots+), upper leaf |
+| **Plant part** | where on the Host the Gall forms | at leaf vein angles, between leaf veins, bud, flower, fruit, leaf, leaf edge, leaf midrib, lower leaf, on leaf veins, petiole, stem, underground (roots+), upper leaf (`leaf` contains the leaf values: on the leaf, no more precise place stated) |
 | **Form** | the Gall's overall type | abrupt swelling, bullet, hat, hidden cell, jacket, leaf blister, leaf curl, leaf edge fold, leaf edge roll, leaf snap, leaf spot, modified capitulum, oak apple, pip, plum, pocket, rust, scale, stem club, tapered swelling, wig, witches broom |
 | **Shape** | its geometry | cluster, conical, cup, cylindrical, globular, hemispherical, linear, numerous, rosette, spangle/button, sphere, spindle, tuft |
 | **Color** | its colors | black, brown, gray, green, orange, pink, purple, red, tan, UV, white, yellow |

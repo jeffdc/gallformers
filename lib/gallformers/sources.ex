@@ -78,6 +78,57 @@ defmodule Gallformers.Sources do
   end
 
   @doc """
+  What the review pages call a Source: its authors' surnames and its year,
+  "Ashmead 1897", "Nastasi & Davis 2022", "Osten Sacken et al. 1862"
+  (matter `d213`). Without a year, the surnames alone; nil when it names no
+  author. `authors` is read before the old single `author` field.
+  """
+  @spec short_name(Source.t()) :: String.t() | nil
+  def short_name(%Source{} = source) do
+    authors = if source.authors in [nil, []], do: List.wrap(source.author), else: source.authors
+    short_name(authors, source_year(source))
+  end
+
+  @doc "As `short_name/1`, from a list of authors (\"Ashmead, W. H.\") and a year, or nil."
+  @spec short_name([String.t()], integer() | nil) :: String.t() | nil
+  def short_name(authors, year) when is_list(authors) do
+    surnames =
+      for author <- authors, is_binary(author), String.trim(author) != "", do: surname(author)
+
+    who =
+      case surnames do
+        [] -> nil
+        [one] -> one
+        [a, b] -> "#{a} & #{b}"
+        [a | _] -> "#{a} et al."
+      end
+
+    cond do
+      who == nil -> nil
+      is_integer(year) -> "#{who} #{year}"
+      true -> who
+    end
+  end
+
+  defp surname(author) do
+    case String.split(author, ",", parts: 2) do
+      [surname, _rest] -> String.trim(surname)
+      [name] -> name |> String.split() |> List.last()
+    end
+  end
+
+  defp source_year(%Source{authored_date: %Date{year: year}}), do: year
+
+  defp source_year(%Source{pubyear: pubyear}) when is_binary(pubyear) do
+    case Regex.run(~r/\d{4}/, pubyear) do
+      [year] -> String.to_integer(year)
+      _ -> nil
+    end
+  end
+
+  defp source_year(_source), do: nil
+
+  @doc """
   Gets a source by ID, raising if not found.
   """
   @spec get_source!(integer()) :: Source.t()

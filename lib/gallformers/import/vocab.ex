@@ -4,11 +4,15 @@ defmodule Gallformers.Import.Vocab do
   the database and code (`294c` step 3; `mix gallformers.import.vocab`):
 
     * `traits.json` and `traits.schema.json` — the Trait values with their
-      definitions (`trait_values`), the term mappings
-      (`trait_term_mappings`), and the generation groups
+      definitions (`trait_values`), the terms (`trait_term_mappings`, one
+      per row: `mappings`, each with its `term`, `trait`, `status` —
+      `placed`, `ambiguous` or `no_fit` — and its `categories` (one, or
+      each value its words name: "green-yellow" → green and yellow),
+      `candidates` or `rule` where it has them),
+      and the generation groups
       (`generation_groups`, `generation_values`, `generation_group_taxa`):
-      each value with its definition and other names (the term mappings of
-      trait `"generation"`), each group with its values and its taxa
+      each value with its definition and other names (the terms of trait
+      `"generation"` placed under it), each group with its values and its taxa
       (accepted name and rank, through `Gallformers.Taxa`);
     * `places.json` and `place-codes.schema.json` — every place
       (`Gallformers.Places.list_all_places/0`);
@@ -21,7 +25,7 @@ defmodule Gallformers.Import.Vocab do
   it, so it says what a field is and what to put in it.
 
   The output is deterministic. Traits come in `TraitValue.traits/0`'s order,
-  generation first; Trait values and term mappings in the order they were
+  generation first; Trait values and terms in the order they were
   added (by ID), which is the contract's order; generation groups in the
   order defined, their values by position and their taxa by name; places by
   code. Each file keeps its formatting: `traits.json` is indented two
@@ -36,10 +40,17 @@ defmodule Gallformers.Import.Vocab do
   content stays the same, and dates them today (`today/0`) when it changes (or as the
   `:version` option says). `check/1` compares with that date.
 
-  Until cutover `Gallformers.Catalog.Vocab.Loader` loads the Trait values
-  and term mappings from `traits.json`, and the generation groups and values
-  from its own list, so the database and the shipped file must agree:
-  loading the file and generating it again reproduces it (tested).
+  ## The source of truth
+
+  The database owns the Trait values and terms (`6611`, `d213`): they are
+  added through `Gallformers.Import.record_trait_value_added/2` and
+  `record_term_edit/3`, and this generator publishes them, so
+  `traits.json` and `traits.schema.json` are generated output, regenerated
+  and committed after a change, never edited by hand. The committed
+  `traits.json` seeds a fresh database (`Gallformers.Catalog.Vocab.Loader`
+  inserts only what the database lacks), and the generation groups and
+  values come from the loader's own list, so loading the file and
+  generating it again reproduces it (tested).
   """
 
   alias Gallformers.Catalog
@@ -252,13 +263,9 @@ defmodule Gallformers.Import.Vocab do
     end
   end
 
-  # A generation value's other names: the terms mapped onto it, each a
-  # comma-separated list of names.
-  defp other_names_of(value, mappings) do
-    for mapping <- mappings,
-        value in mapping.maps_to,
-        name <- String.split(mapping.term, ", "),
-        do: name
+  # A generation value's other names: the terms placed under it.
+  defp other_names_of(value, terms) do
+    for term <- terms, term.status == :placed, value in term.categories, do: term.term
   end
 
   defp taxon(id) do
@@ -325,14 +332,15 @@ defmodule Gallformers.Import.Vocab do
     ])
   end
 
-  # A mapping's fields, leaving out those it has no value for.
-  defp mapping(mapping) do
+  # A term's fields, leaving out those it has no value for.
+  defp mapping(term) do
     [
-      {"term", mapping.term},
-      {"trait", mapping.trait},
-      {"maps_to", mapping.maps_to},
-      {"candidates", mapping.candidates},
-      {"rule", mapping.rule}
+      {"term", term.term},
+      {"trait", term.trait},
+      {"status", Atom.to_string(term.status)},
+      {"categories", term.categories},
+      {"candidates", term.candidates},
+      {"rule", term.rule}
     ]
     |> Enum.reject(fn {_key, value} -> value in [nil, "", []] end)
     |> object()

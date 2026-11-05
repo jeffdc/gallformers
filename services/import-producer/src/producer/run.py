@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from string import Template
 
-from producer import paths
+from producer import note, paths
 
 MODEL = "claude-opus-5-5"
 PROMPT = paths.PROJECT / "prompts" / "producer.md"
@@ -37,7 +37,9 @@ PHASE_RULES = {
 Follow PRODUCER_GUIDE.md, "Phase 2 — Taxonomy batch". Write taxonomy.json even when the Source states no acts (empty `taxa` and `acts`), and say why in `notes-phase2.md`.""",
     3: """## Phase 3
 
-Follow PRODUCER_GUIDE.md, "Phase 3 — Gall batch", using taxon names as they stand after phase 2. $taxonomy_note""",
+Follow PRODUCER_GUIDE.md, "Phase 3 — Gall batch", using taxon names as they stand after phase 2. $taxonomy_note
+
+Under "Judgement calls" in `notes-phase3.md`, list the trait terms you gave no category or marked `depends_on_gall`, with the categories you weighed.""",
 }
 
 # Contract files, in the order the prompt presents them. places.json is left out
@@ -58,6 +60,12 @@ CONTRACT_FILES = (
     "examples/retraction/gall.json",
 )
 
+# Added for a Gall's Gallformers note (producer.note).
+NOTE_CONTRACT_FILES = (
+    "GALLFORMERS_STATEMENTS.md",
+    "examples/gallformers-note/gall.json",
+)
+
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -68,9 +76,9 @@ def instructions_version() -> str:
     return f"producer.md@{sha256(PROMPT)[:12]}"
 
 
-def contract_text() -> str:
+def contract_text(extra: tuple[str, ...] = ()) -> str:
     parts = []
-    for name in CONTRACT_FILES:
+    for name in (*CONTRACT_FILES, *extra):
         text = (paths.CONTRACT / name).read_text(encoding="utf-8")
         fence = "markdown" if name.endswith(".md") else "json"
         parts.append(f"## priv/import/{name}\n\n```{fence}\n{text.rstrip()}\n```")
@@ -93,14 +101,19 @@ def commands(package: Path) -> dict[str, str]:
     }
 
 
-def build_prompt(package: Path, phase: int) -> str:
-    batch_file = BATCH_FILE[phase]
-    envelope = {
+def envelope(package: Path, phase: int) -> dict:
+    """The values the run fixes. A Gall's note (producer.note) has its whole Source block."""
+    source = (
+        note.source_block(package)
+        if note.is_note(package)
+        else {"document": {"file": "document.json", "sha256": sha256(package / "document.json")}}
+    )
+    return {
         "format": "gallformers-import",
-        "format_version": 3,
+        "format_version": 4,
         "vocabulary_version": vocabulary_version(),
         "batch_type": "taxonomy" if phase == 2 else "gall",
-        "mode": "replace",
+        "mode": "add" if note.is_note(package) else "replace",
         "batch_id": str(uuid.uuid4()),
         "produced_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "producer": {
@@ -109,10 +122,23 @@ def build_prompt(package: Path, phase: int) -> str:
             "model": MODEL,
             "instructions_version": instructions_version(),
         },
-        "source": {
-            "document": {"file": "document.json", "sha256": sha256(package / "document.json")}
-        },
+        "source": source,
     }
+
+
+SOURCE_INSTRUCTIONS = (
+    "Fill in the rest of `source` (kind, title, authors, authored, citation, identifiers, "
+    "license) from the document itself."
+)
+
+NOTE_INSTRUCTIONS = """This Source is Gallformers itself, and the document is one Gall's Gallformers note. The `source` above is complete: copy it as it is. Follow GALLFORMERS_STATEMENTS.md, "Reading a Gall's note", as well as the producer guide. The note's Gall, as Gallformers holds it:
+
+$gall"""
+
+
+def build_prompt(package: Path, phase: int) -> str:
+    batch_file = BATCH_FILE[phase]
+    is_note = note.is_note(package)
 
     taxonomy = package / "taxonomy.json"
     source_hint = ""
@@ -123,15 +149,20 @@ def build_prompt(package: Path, phase: int) -> str:
         if not json.loads(taxonomy.read_text(encoding="utf-8")).get("acts"):
             taxonomy_note += " Its `acts` are empty: the Source states no taxonomic acts."
 
+    source_instructions = (
+        Template(NOTE_INSTRUCTIONS).substitute(gall=note.gall_text(package))
+        if is_note
+        else f"{SOURCE_INSTRUCTIONS} {source_hint}".rstrip()
+    )
     rules = Template(PHASE_RULES[phase]).safe_substitute(taxonomy_note=taxonomy_note)
     return Template(PROMPT.read_text(encoding="utf-8")).substitute(
         phase=phase,
         batch_file=batch_file,
         phase_task=PHASE_TASK[phase],
-        envelope=json.dumps(envelope, indent=2),
-        source_hint=source_hint,
+        envelope=json.dumps(envelope(package, phase), indent=2),
+        source_instructions=source_instructions,
         phase_rules=rules,
-        contract=contract_text(),
+        contract=contract_text(NOTE_CONTRACT_FILES if is_note else ()),
         document=(package / "document.txt").read_text(encoding="utf-8"),
         **commands(package),
     )
@@ -187,6 +218,8 @@ def run_tool(args: list[str], cwd: Path) -> dict:
 
 def run_phase(package: Path, phase: int, effort: str = "high", dry_run: bool = False) -> dict:
     package = package.resolve()
+    if phase == 2 and note.is_note(package):
+        return {"phase": 2, "blocked": "a note's taxonomy batch is empty; `produce note` writes it"}
     prompt = build_prompt(package, phase)
     (package / f"phase{phase}.prompt.md").write_text(prompt, encoding="utf-8")
     command = claude_command(package, effort)

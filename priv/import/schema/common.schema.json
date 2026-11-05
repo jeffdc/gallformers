@@ -11,7 +11,7 @@
       "required": ["format", "format_version", "vocabulary_version", "batch_type", "mode", "batch_id", "produced_at", "producer", "source"],
       "properties": {
         "format": { "const": "gallformers-import", "description": "Identifies the file as a Gallformers import batch." },
-        "format_version": { "const": 3, "description": "The version of the import format this batch follows." },
+        "format_version": { "enum": [3, 4], "description": "The version of the import format this batch follows. 4 is current; 3 (Trait values with as_written, before Source terms and categories) is still read." },
         "vocabulary_version": { "$ref": "#/$defs/date_full", "description": "The vocabulary_version the vocab/ files carry (one date, shared by all of them): the lists this batch's controlled values come from." },
         "batch_type": { "enum": ["taxonomy", "gall"], "description": "taxonomy for taxonomy.json; gall for gall.json." },
         "mode": {
@@ -47,11 +47,34 @@
     },
 
     "gallformers_source": {
-      "description": "Gallformers' own statements (author: Gallformers Contributors). The gallformers key is the whole block; each statement carries its own date and text in its evidence. Batches with this Source use mode add.",
+      "description": "Gallformers' own statements (author: Gallformers Contributors). Batches with this Source use mode add. Without a note, each statement carries its own date and text in its evidence. With a note, the batch's statements come from one Gall's Gallformers note (document.json) and quote it, all dated as the note says.",
       "type": "object",
       "required": ["gallformers"],
       "properties": {
-        "gallformers": { "const": true }
+        "gallformers": { "const": true },
+        "note": {
+          "description": "The Gall whose Gallformers note document.json holds, and the date the statements take: the note version's date (for a legacy note, which has none, the date of the run).",
+          "type": "object",
+          "required": ["gallformers_gall_id", "stated_on"],
+          "properties": {
+            "gallformers_gall_id": { "type": "integer", "minimum": 1 },
+            "stated_on": { "$ref": "#/$defs/date_full" }
+          },
+          "additionalProperties": false
+        },
+        "document": { "$ref": "#/$defs/document_file" }
+      },
+      "dependentRequired": { "note": ["document"], "document": ["note"] },
+      "additionalProperties": false
+    },
+
+    "document_file": {
+      "description": "The phase 1 document (a DoclingDocument, document.json) beside this batch, and its sha256.",
+      "type": "object",
+      "required": ["file", "sha256"],
+      "properties": {
+        "file": { "const": "document.json" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       },
       "additionalProperties": false
     },
@@ -99,16 +122,7 @@
           },
           "additionalProperties": false
         },
-        "document": {
-          "description": "The phase 1 document (a DoclingDocument, document.json) beside this batch, and its sha256.",
-          "type": "object",
-          "required": ["file", "sha256"],
-          "properties": {
-            "file": { "const": "document.json" },
-            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
-          },
-          "additionalProperties": false
-        },
+        "document": { "$ref": "#/$defs/document_file" },
         "retracts": {
           "description": "On a retraction notice only: the Source the notice retracts.",
           "type": "object",
@@ -124,14 +138,18 @@
     },
 
     "taxon_ref": {
-      "description": "A taxon the Source names, declared once and referred to by ref. It is identified by its name, exactly as the Source writes it, and its rank.",
+      "description": "A taxon the Source names, declared once and referred to by ref. It is identified by its name, exactly as the Source writes it, and its rank. A Host the Source names only by a common name is declared by that name, with common_name: true; its rank is optional.",
       "type": "object",
-      "required": ["ref", "name_as_written", "rank"],
+      "required": ["ref", "name_as_written"],
+      "if": { "properties": { "common_name": { "const": true } }, "required": ["common_name"] },
+      "then": { "properties": { "new": false, "sensu": false, "gallformers_taxon_id": false } },
+      "else": { "required": ["rank"] },
       "properties": {
         "ref": { "$ref": "#/$defs/taxon_ref_id" },
         "name_as_written": { "type": "string", "minLength": 1, "description": "The name verbatim from the document, OCR damage included, so it matches the quotes." },
         "name_reading": { "type": "string", "minLength": 1, "description": "Optional. The evident printed name when the document's text of it is damaged by OCR or extraction (\"Cynips Jlocossa\" → \"Cynips flocossa\"). It repairs damaged letters only; the author's own spelling stays as written." },
         "rank": { "$ref": "../vocab/ranks.schema.json" },
+        "common_name": { "const": true, "description": "Optional. The Source names this Host only by a common name (\"the black oak\", \"live oak\"), never paired with a scientific name: name_as_written is the Source's words. Gallformers asks a curator which plant it is. Only a Host (a host_of subject or identified_by.host) may be declared so; it takes no new, sensu or gallformers_taxon_id." },
         "sensu": { "type": "string", "minLength": 1, "description": "Optional. For a misapplied name (one used for the wrong species): the usage the Source means, as written (\"O. S. non Harris\")." },
         "new": {
           "description": "Novelty the Source itself claims: sp. nov., gen. nov., subgen. nov., comb. nov., comb. rev., stat. nov., stat. rev., nom. nov.",
@@ -215,7 +233,7 @@
     },
 
     "unmapped": {
-      "description": "Source terms that fit no vocabulary value, each recorded here with its evidence in place of a Fact. A value is used only when its definition fits; a near miss belongs here.",
+      "description": "Source terms that fit no vocabulary value, and statements that can't be Facts (hedges, PRODUCER_GUIDE.md rule 7), each recorded here with its evidence in place of a Fact. A value is used only when its definition fits; a near miss belongs here. In a format 4 gall batch a Trait term is always a trait Fact, with category null when no value fits, so the Trait slots are not used there.",
       "type": "array",
       "items": {
         "type": "object",
@@ -225,6 +243,10 @@
           "slot": {
             "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season", "generation", "relationship_type", "lethality", "parasitism_mode", "place", "rank", "taxonomic_act", "other"],
             "description": "Which vocabulary it would have belonged to."
+          },
+          "topic": {
+            "enum": ["names", "inducer", "host", "range", "gall", "other"],
+            "description": "What the statement is about, for grouping at review. names: synonymies, splits, new genera, species groups. inducer: who induces the Gall, and other organisms associated with it. host: which plants. range: where it occurs. gall: the Gall itself (where on the plant, shape, form, season…). other: none of these. Expected on every entry; an entry without it is reviewed under other."
           },
           "gall": { "$ref": "#/$defs/gall_ref_id", "description": "The Gall it describes, if any (gall batches)." },
           "evidence": { "$ref": "#/$defs/evidence" },

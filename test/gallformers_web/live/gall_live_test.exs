@@ -106,6 +106,102 @@ defmodule GallformersWeb.GallLiveTest do
     end
   end
 
+  describe "the Sources' terms for its Traits (d213)" do
+    import Gallformers.CatalogFixtures
+
+    setup do
+      load_vocab!()
+      %{gall: gall_fixture()}
+    end
+
+    defp trait!(gall, {trait, value}, attribution) do
+      {:ok, _} =
+        Catalog.assert_trait(
+          DataCase.test_actor(),
+          %{gall_id: gall.id, trait: trait, value: value},
+          attribution
+        )
+    end
+
+    # A waiting term needs the package and batch it came from.
+    defp waiting!(gall, source, trait, term) do
+      n = System.unique_integer([:positive])
+      now = ~U[2026-11-01 00:00:00Z]
+
+      {1, [%{id: package_id}]} =
+        Gallformers.Repo.insert_all(
+          "import_packages",
+          [
+            %{
+              key: "pkg-#{n}",
+              s3_prefix: "import/pkg-#{n}/",
+              submitter_name: "test",
+              inserted_at: now,
+              updated_at: now
+            }
+          ],
+          returning: [:id]
+        )
+
+      {1, [%{id: batch_id}]} =
+        Gallformers.Repo.insert_all(
+          "import_batches",
+          [
+            %{
+              package_id: package_id,
+              file: "gall.json",
+              batch_type: "gall",
+              mode: "add",
+              producer_batch_id: "batch-#{n}",
+              sha256: "0",
+              content: %{},
+              inserted_at: now,
+              updated_at: now
+            }
+          ],
+          returning: [:id]
+        )
+
+      {:ok, _} =
+        Catalog.put_pending_term(DataCase.test_actor(), %{
+          gall_id: gall.id,
+          source_id: source.id,
+          package_id: package_id,
+          batch_id: batch_id,
+          trait: trait,
+          term: term
+        })
+    end
+
+    test "each category shows its Sources' terms; a waiting term shows as text", %{
+      conn: conn,
+      gall: gall
+    } do
+      kinsey = source_fixture("Kinsey", "1959")
+      weld = source_fixture("Weld", "1959")
+
+      trait!(gall, {"shape", "globular"}, confirm(kinsey, %{term: "ovoid"}))
+      trait!(gall, {"shape", "globular"}, confirm(weld, %{term: "oval"}))
+      trait!(gall, {"color", "red"}, confirm(kinsey))
+      trait!(gall, {"texture", "hairless"}, confirm(kinsey, %{term: "hairless"}))
+      waiting!(gall, kinsey, "texture", "reticulate")
+      waiting!(gall, kinsey, "walls", "papery")
+
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+
+      assert has_element?(view, "div", ~r/^\s*Shape:\s*globular \(oval, ovoid\)\s*$/)
+      assert has_element?(view, "div", ~r/^\s*Color:\s*red\s*$/)
+
+      assert has_element?(
+               view,
+               "div",
+               ~r/^\s*Texture:\s*hairless; also described as “reticulate”\s*$/
+             )
+
+      assert has_element?(view, "div", ~r/^\s*Walls:\s*described as “papery”\s*$/)
+    end
+  end
+
   describe "the admin link" do
     test "an admin gets a link to the Gall page in admin; a visitor does not", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")

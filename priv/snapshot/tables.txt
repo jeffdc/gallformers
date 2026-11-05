@@ -39,12 +39,16 @@ private           content_images
 private           source_documents
 private           document_items
 
-# Import: packages, batches, the admin queue, disputes, the replay log.
+# Import: packages, batches, the admin queue and its notes, edits on Facts before approval, disputes, vocabulary requests, the replay log.
 private           import_packages
 private           import_batches
 private           batch_statements
 private           batch_unmapped
 private           queue_items
+private           queue_item_notes
+private           package_statement_edits
+private           vocab_requests
+private           trait_term_candidates
 private           replay_log
 
 # Places and vocabularies.
@@ -125,6 +129,8 @@ public            range_facts
 public            occurrence_facts
 public            alias_facts
 public            description_facts
+# Sources' Trait terms waiting on a question, shown on the Gall page (d213).
+public            pending_trait_terms
 # Old gall IDs excluded as non-galls, for their URLs' redirect.
 public            non_gall_redirects
 # The ID tool's per-Gall lookup table (a read model of the public tables).

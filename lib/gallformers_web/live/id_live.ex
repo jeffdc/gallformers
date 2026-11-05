@@ -24,6 +24,8 @@ defmodule GallformersWeb.IDLive do
     * `h` matches a plant's accepted name or a synonym, so a renamed plant's
       old name still selects it;
     * `ng` (show non-galls) is ignored: non-galls are not in the catalog;
+    * `lo=leaf_anywhere`, the old "leaf (anywhere)" option, is the plant
+      part `leaf`, which matches every leaf value (`d213`);
     * V1 parameter names (`hostOrTaxon`, `color`, ...) are mapped as before.
 
   An unknown Trait value or ID is dropped.
@@ -74,9 +76,6 @@ defmodule GallformersWeb.IDLive do
   # Host genus / section ranks, in the order a name without a rank is tried
   @group_ranks [:genus, :subgenus, :section]
 
-  # Special marker for "leaf (anywhere)" virtual location option
-  @leaf_anywhere_id "leaf_anywhere"
-
   # V1 URL param names -> V2 param names (for backwards compatibility with old bookmarks)
   @v1_param_mapping %{
     "hostOrTaxon" => "h",
@@ -112,7 +111,7 @@ defmodule GallformersWeb.IDLive do
        page_json_ld: nil,
        page_noindex: true,
        trait_values: trait_values,
-       plant_part_options: plant_part_options(trait_values),
+       plant_part_options: value_options(Map.get(trait_values, "plant_part", [])),
        texture_options: value_options(Map.get(trait_values, "texture", [])),
        families: [],
        # Current filter selections
@@ -270,7 +269,9 @@ defmodule GallformersWeb.IDLive do
     end
   end
 
-  defp list_item(@leaf_anywhere_id, "plant_part", _trait_values, _legacy), do: @leaf_anywhere_id
+  # The old "leaf (anywhere)" option is the plant part `leaf` (d213).
+  defp list_item("leaf_anywhere", "plant_part", trait_values, legacy),
+    do: trait_value("leaf", "plant_part", trait_values, legacy)
 
   defp list_item(token, trait, trait_values, legacy),
     do: trait_value(token, trait, trait_values, legacy)
@@ -785,14 +786,7 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("filter_by_name", %{"value" => value}, socket) do
-    filtered =
-      if value == "" do
-        socket.assigns.results
-      else
-        term = String.downcase(value)
-        Enum.filter(socket.assigns.results, &String.contains?(String.downcase(&1.name), term))
-      end
-
+    filtered = Catalog.filter_identified(socket.assigns.results, value)
     {:noreply, assign(socket, name_filter: value, filtered_results: filtered)}
   end
 
@@ -913,7 +907,7 @@ defmodule GallformersWeb.IDLive do
       end
 
     name_filter = socket.assigns.name_filter
-    filtered_results = apply_name_filter(results, name_filter)
+    filtered_results = Catalog.filter_identified(results, name_filter)
 
     socket =
       assign(socket,
@@ -927,13 +921,6 @@ defmodule GallformersWeb.IDLive do
     if socket.assigns.filters == default_filters(),
       do: assign(socket, total_count: length(results)),
       else: socket
-  end
-
-  defp apply_name_filter(results, ""), do: results
-
-  defp apply_name_filter(results, filter) do
-    term = String.downcase(filter)
-    Enum.filter(results, &String.contains?(String.downcase(&1.name), term))
   end
 
   # The page's selections as `Gallformers.Catalog.identify/1` filters.
@@ -956,7 +943,7 @@ defmodule GallformersWeb.IDLive do
 
     traits =
       Map.merge(single, %{
-        "plant_part" => expand_plant_parts(filters.plant_parts, socket.assigns.trait_values),
+        "plant_part" => filters.plant_parts,
         "texture" => filters.textures
       })
 
@@ -972,27 +959,7 @@ defmodule GallformersWeb.IDLive do
     }
   end
 
-  # The plant part options: each value, and "leaf (anywhere)", by label.
-  defp plant_part_options(trait_values) do
-    virtual_option = %{id: @leaf_anywhere_id, label: "leaf (anywhere)"}
-
-    [virtual_option | value_options(Map.get(trait_values, "plant_part", []))]
-    |> Enum.sort_by(& &1.label)
-  end
-
   defp value_options(values), do: Enum.map(values, &%{id: &1, label: &1})
-
-  # Expand "leaf (anywhere)" to every plant part value naming a leaf
-  defp expand_plant_parts(plant_parts, trait_values) do
-    if @leaf_anywhere_id in plant_parts do
-      leaf_values =
-        trait_values |> Map.get("plant_part", []) |> Enum.filter(&String.contains?(&1, "leaf"))
-
-      Enum.uniq(leaf_values ++ List.delete(plant_parts, @leaf_anywhere_id))
-    else
-      plant_parts
-    end
-  end
 
   # Helper for formatting host display with aliases
   defp format_host_display(%{name: name, aliases: aliases}) when is_list(aliases) do
@@ -1398,7 +1365,7 @@ defmodule GallformersWeb.IDLive do
             <input
               type="text"
               value={@name_filter}
-              placeholder="Filter by name..."
+              placeholder="Filter by name or trait..."
               phx-keyup="filter_by_name"
               phx-debounce="200"
               class="text-sm border border-gray-300 rounded-md pl-7 pr-7 py-1 w-48 focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"

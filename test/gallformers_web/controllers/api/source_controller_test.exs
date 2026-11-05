@@ -70,10 +70,17 @@ defmodule GallformersWeb.API.SourceControllerTest do
 
     test "the Gallformers Source's Galls carry their newest note's text", %{conn: conn} do
       response = conn |> get(~p"/api/v2/sources/58") |> valid!(@show)
+      by_id = Map.new(response["species"], &{&1["id"], &1})
 
-      assert [%{"id" => 300} = agamic, %{"id" => 301} = sexgen] = response["species"]
-      assert agamic["description"] =~ "seed note"
-      assert sexgen["description"] =~ "sexgen seed note"
+      assert by_id[300]["description"] =~ "seed note"
+      assert by_id[301]["description"] =~ "sexgen seed note"
+    end
+
+    test "the Gallformers Source lists the undescribed Galls whose Facts it holds", %{conn: conn} do
+      # Seed Galls 102 and 304 are undescribed: their legacy Facts are Gallformers' (`20e5`).
+      response = conn |> get(~p"/api/v2/sources/58") |> valid!(@show)
+
+      assert response["species"] |> Enum.map(& &1["id"]) |> Enum.sort() == [102, 300, 301, 304]
     end
 
     test "a Source attributing Facts lists their Galls, with no citation text", %{conn: conn} do

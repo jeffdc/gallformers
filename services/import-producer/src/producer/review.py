@@ -6,6 +6,11 @@ notes or prompts. It can read and write there, with no shell. The driver
 fixes `reviewed` (the batch hashes) and `reviewers`. Several models review in
 turn (they catch different errors); their findings are merged into one
 review.json, each naming its reviewer. Phase 6 answers the findings.
+
+In a format 4 gall batch the reviewer places every trait term blind: its copy
+of gall.json has each trait Fact's `category` and `depends_on_gall` removed,
+and it writes its own in `placements`. The placements are merged like the
+findings, each naming its reviewer.
 """
 
 import json
@@ -17,9 +22,10 @@ import time
 from pathlib import Path
 from string import Template
 
-from producer import paths
+from producer import note, paths
 from producer.run import (
     MODEL,
+    NOTE_CONTRACT_FILES,
     TIMEOUT_S,
     child_env,
     claude_base,
@@ -31,6 +37,7 @@ from producer.run import (
 PROMPT = paths.PROJECT / "prompts" / "verifier.md"
 REVIEWERS = ("claude-opus-5-5", "claude-sonnet-5-5")
 STAGED = ("document.json", "document.txt", "taxonomy.json", "gall.json")
+BLINDED = ("category", "depends_on_gall")
 
 CONTRACT_FILES = (
     "VERIFY_GUIDE.md",
@@ -50,14 +57,39 @@ def instructions_version() -> str:
     return f"verifier.md@{sha256(PROMPT)[:12]}"
 
 
+def blind(gall: dict) -> dict:
+    """The gall batch as the reviewer sees it: each trait Fact without the producer's category."""
+    facts = [
+        {k: v for k, v in f.items() if k not in BLINDED} if f.get("kind") == "trait" else f
+        for f in gall.get("facts", [])
+    ]
+    return {**gall, "facts": facts}
+
+
+def is_v4(gall: dict) -> bool:
+    return gall.get("format_version") == 4
+
+
+def gall_text(package: Path) -> str:
+    """gall.json for the reviewer: blind when it is format 4, otherwise as it is."""
+    text = (package / "gall.json").read_text(encoding="utf-8")
+    gall = json.loads(text)
+    if not is_v4(gall):
+        return text
+    return json.dumps(blind(gall), indent=2, ensure_ascii=False) + "\n"
+
+
 def stage(package: Path, work: Path) -> None:
     for name in STAGED:
-        shutil.copy2(package / name, work / name)
+        if name == "gall.json":
+            (work / name).write_text(gall_text(package), encoding="utf-8")
+        else:
+            shutil.copy2(package / name, work / name)
 
 
-def contract_text() -> str:
+def contract_text(extra: tuple[str, ...] = ()) -> str:
     parts = []
-    for name in CONTRACT_FILES:
+    for name in (*CONTRACT_FILES, *extra):
         text = (paths.CONTRACT / name).read_text(encoding="utf-8")
         fence = "markdown" if name.endswith(".md") else "json"
         parts.append(f"## priv/import/{name}\n\n```{fence}\n{text.rstrip()}\n```")
@@ -71,9 +103,9 @@ def build_review_prompt(package: Path, model: str = MODEL) -> str:
     }
     return Template(PROMPT.read_text(encoding="utf-8")).substitute(
         fixed=json.dumps(fixed, indent=2),
-        contract=contract_text(),
+        contract=contract_text(NOTE_CONTRACT_FILES if note.is_note(package) else ()),
         taxonomy=(package / "taxonomy.json").read_text(encoding="utf-8").rstrip(),
-        gall=(package / "gall.json").read_text(encoding="utf-8").rstrip(),
+        gall=gall_text(package).rstrip(),
         document=(package / "document.txt").read_text(encoding="utf-8"),
     )
 
@@ -94,13 +126,36 @@ def merge_reviews(reviews: list[dict]) -> dict:
     if any(r["reviewed"] != reviewed for r in reviews):
         raise ValueError("the reviews cover different batches")
     merged = {"format": "gallformers-review", "reviewed": reviewed, "reviewers": [], "findings": []}
+    placements = []
     for review in reviews:
         reviewers = review.get("reviewers", [])
         merged["reviewers"].extend(reviewers)
         model = reviewers[0].get("model") if reviewers else None
         for finding in review["findings"]:
             merged["findings"].append({**finding, "reviewer": finding.get("reviewer", model)})
+        for placement in review.get("placements", []):
+            placements.append({**placement, "reviewer": placement.get("reviewer", model)})
+    if placements:
+        merged["placements"] = placements
     return merged
+
+
+def missing_placements(gall: dict, review: dict) -> dict[str, list[str]]:
+    """Format 4: the trait Facts each reviewer left unplaced, by reviewer (empty when none). A
+    placement naming no reviewer counts for every reviewer."""
+    if not is_v4(gall):
+        return {}
+    traits = [f["id"] for f in gall.get("facts", []) if f.get("kind") == "trait"]
+    reviewers = [r.get("model") for r in review.get("reviewers", [])] or [None]
+    out = {}
+    for reviewer in reviewers:
+        placed = {
+            p["id"] for p in review.get("placements", []) if p.get("reviewer") in (None, reviewer)
+        }
+        missing = [ident for ident in traits if ident not in placed]
+        if missing:
+            out[reviewer or "reviewer"] = missing
+    return out
 
 
 def review_once(package: Path, model: str, effort: str, dry_run: bool) -> tuple[dict, dict | None]:
@@ -181,5 +236,11 @@ def run_review(
         json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     record["findings"] = len(merged["findings"])
+    record["placements"] = len(merged.get("placements", []))
+    gall = json.loads((package / "gall.json").read_text(encoding="utf-8"))
+    missing = missing_placements(gall, merged)
+    if missing:
+        record["missing_placements"] = missing
+        record["error"] = "a reviewer left trait terms unplaced: re-run phase 5"
     record["ready"] = validate(package, review=True)
     return record

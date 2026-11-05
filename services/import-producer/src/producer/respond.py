@@ -5,7 +5,9 @@ did, fixes the statements it agrees with and writes responses.json (one
 answer per numbered finding). The driver records the answers on their
 findings in review.json and adds `responded` (the batch hashes it leaves), so
 the agent never edits review.json itself. Disputed findings go to a human at
-intake; nothing is reviewed again.
+intake; nothing is reviewed again. Phase 6 runs only once every trait term of a
+format 4 batch is placed: the responder knows its own categories, so it can't
+place a term blind.
 """
 
 import json
@@ -15,11 +17,12 @@ import time
 from pathlib import Path
 from string import Template
 
-from producer import paths
-from producer.review import validate
+from producer import note, paths
+from producer.review import missing_placements, validate
 from producer.run import (
     CONTRACT_FILES,
     MODEL,
+    NOTE_CONTRACT_FILES,
     TIMEOUT_S,
     child_env,
     claude_base,
@@ -37,9 +40,9 @@ def instructions_version() -> str:
     return f"responder.md@{sha256(PROMPT)[:12]}"
 
 
-def contract_text() -> str:
+def contract_text(extra: tuple[str, ...] = ()) -> str:
     parts = []
-    for name in (*CONTRACT_FILES, "VERIFY_GUIDE.md", "schema/review.schema.json"):
+    for name in (*CONTRACT_FILES, *extra, "VERIFY_GUIDE.md", "schema/review.schema.json"):
         text = (paths.CONTRACT / name).read_text(encoding="utf-8")
         fence = "markdown" if name.endswith(".md") else "json"
         parts.append(f"## priv/import/{name}\n\n```{fence}\n{text.rstrip()}\n```")
@@ -55,7 +58,7 @@ def build_respond_prompt(package: Path) -> str:
     return Template(PROMPT.read_text(encoding="utf-8")).substitute(
         findings=json.dumps(numbered(review), indent=2, ensure_ascii=False),
         validate_cmd=commands(package)["validate_cmd"],
-        contract=contract_text(),
+        contract=contract_text(NOTE_CONTRACT_FILES if note.is_note(package) else ()),
         taxonomy=(package / "taxonomy.json").read_text(encoding="utf-8").rstrip(),
         gall=(package / "gall.json").read_text(encoding="utf-8").rstrip(),
         document=(package / "document.txt").read_text(encoding="utf-8"),
@@ -67,6 +70,13 @@ def respond_command(package: Path, effort: str) -> list[str]:
     base = claude_base(effort, tools="Read,Write,Edit,Grep,Bash")
     at = base.index("--permission-mode")
     return [*base[:at], "--allowedTools", *allowed, *base[at:]]
+
+
+def response(answer: dict) -> dict:
+    """A finding's response from its answer; the one-sentence summary only when given."""
+    out = {"decision": answer["decision"], "reason": answer["reason"].strip()}
+    summary = str(answer.get("summary") or "").strip()
+    return {**out, "summary": summary} if summary else out
 
 
 def apply_responses(review: dict, answers: list[dict], result: dict, responder: dict) -> dict:
@@ -92,10 +102,7 @@ def apply_responses(review: dict, answers: list[dict], result: dict, responder: 
         raise ValueError("; ".join(problems))
 
     findings = [
-        {
-            **finding,
-            "response": {"decision": by_n[n]["decision"], "reason": by_n[n]["reason"].strip()},
-        }
+        {**finding, "response": response(by_n[n])}
         for n, finding in enumerate(review["findings"], start=1)
     ]
     return {**review, "findings": findings, "responded": {"responder": responder, "result": result}}
@@ -112,6 +119,15 @@ def run_respond(package: Path, effort: str = "high", dry_run: bool = False) -> d
         return {"phase": 6, "blocked": "the review has no findings: nothing to answer"}
     if review.get("responded"):
         return {"phase": 6, "blocked": "already answered: re-run phase 5 for a new review"}
+    missing = missing_placements(
+        json.loads((package / "gall.json").read_text(encoding="utf-8")), review
+    )
+    if missing:
+        unplaced = "; ".join(f"{who}: {', '.join(ids)}" for who, ids in missing.items())
+        return {
+            "phase": 6,
+            "blocked": f"trait terms not placed in phase 5 ({unplaced}): re-run phase 5",
+        }
     if not dry_run:
         phase4 = validate(package)
         if phase4["exit"] != 0:

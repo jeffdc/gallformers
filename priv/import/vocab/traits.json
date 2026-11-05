@@ -1,6 +1,6 @@
 {
   "vocabulary": "traits",
-  "vocabulary_version": "2026-10-27",
+  "vocabulary_version": "2026-11-03",
   "description": "What each Trait value means, how common Source terms map onto values, and the generation groups. A value's definition decides whether it fits; the value is shorthand for its definition. traits.schema.json lists the allowed values.",
   "traits": {
     "generation": {
@@ -220,6 +220,10 @@
         {
           "value": "upper leaf",
           "definition": "Galls are located on the upper (adaxial) side of the leaf."
+        },
+        {
+          "value": "leaf",
+          "definition": "Galls are located on the leaf, with no more precise location stated, or in no consistent location on it."
         }
       ]
     },
@@ -624,82 +628,204 @@
     {
       "term": "swelling",
       "trait": "form",
+      "status": "ambiguous",
       "candidates": [
         "tapered swelling",
         "abrupt swelling",
         "stem club"
       ],
-      "rule": "Choose the candidate whose definition the Source's description fits. When nothing distinguishes them, record the term in unmapped and name the candidates."
+      "rule": "The category depends on the gall: suggest the candidate whose definition this gall's description fits, and set depends_on_gall; when nothing distinguishes them, give category null with depends_on_gall."
     },
     {
-      "term": "inflorescence, raceme, catkin, ament",
+      "term": "inflorescence",
       "trait": "plant_part",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "flower"
       ]
     },
     {
-      "term": "woody, hard",
+      "term": "raceme",
+      "trait": "plant_part",
+      "status": "placed",
+      "categories": [
+        "flower"
+      ]
+    },
+    {
+      "term": "catkin",
+      "trait": "plant_part",
+      "status": "placed",
+      "categories": [
+        "flower"
+      ]
+    },
+    {
+      "term": "ament",
+      "trait": "plant_part",
+      "status": "placed",
+      "categories": [
+        "flower"
+      ]
+    },
+    {
+      "term": "woody",
       "trait": "texture",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
+        "stiff"
+      ]
+    },
+    {
+      "term": "hard",
+      "trait": "texture",
+      "status": "placed",
+      "categories": [
         "stiff"
       ]
     },
     {
       "term": "perpendicular",
       "trait": "alignment",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "erect"
       ]
     },
     {
-      "term": "smooth, glossy, polished, glabrous",
+      "term": "smooth",
       "trait": "texture",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
+        "hairless"
+      ]
+    },
+    {
+      "term": "glossy",
+      "trait": "texture",
+      "status": "placed",
+      "categories": [
+        "hairless"
+      ]
+    },
+    {
+      "term": "polished",
+      "trait": "texture",
+      "status": "placed",
+      "categories": [
+        "hairless"
+      ]
+    },
+    {
+      "term": "glabrous",
+      "trait": "texture",
+      "status": "placed",
+      "categories": [
         "hairless"
       ]
     },
     {
       "term": "rough",
       "trait": "texture",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "mealy"
       ]
     },
     {
       "term": "fleshy",
       "trait": "texture",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "succulent"
       ]
     },
     {
-      "term": "pithy, pith-filled",
+      "term": "pithy",
       "trait": "walls",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "spongy"
       ]
     },
     {
-      "term": "a single central larval cell, one chamber",
+      "term": "pith-filled",
+      "trait": "walls",
+      "status": "placed",
+      "categories": [
+        "spongy"
+      ]
+    },
+    {
+      "term": "a single central larval cell",
       "trait": "cells",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "monothalamous"
       ]
     },
     {
-      "term": "on the leaf, with no side, vein or midrib stated",
-      "trait": "plant_part",
-      "maps_to": [
-        "upper leaf",
-        "lower leaf"
+      "term": "one chamber",
+      "trait": "cells",
+      "status": "placed",
+      "categories": [
+        "monothalamous"
       ]
     },
     {
-      "term": "oval, ovate, ovoid, ellipsoid, egg-shaped",
+      "term": "on the leaf",
+      "trait": "plant_part",
+      "status": "placed",
+      "categories": [
+        "leaf"
+      ]
+    },
+    {
+      "term": "oval",
       "trait": "shape",
-      "maps_to": [
+      "status": "placed",
+      "categories": [
         "globular"
+      ]
+    },
+    {
+      "term": "ovate",
+      "trait": "shape",
+      "status": "placed",
+      "categories": [
+        "globular"
+      ]
+    },
+    {
+      "term": "ovoid",
+      "trait": "shape",
+      "status": "placed",
+      "categories": [
+        "globular"
+      ]
+    },
+    {
+      "term": "ellipsoid",
+      "trait": "shape",
+      "status": "placed",
+      "categories": [
+        "globular"
+      ]
+    },
+    {
+      "term": "egg-shaped",
+      "trait": "shape",
+      "status": "placed",
+      "categories": [
+        "globular"
+      ]
+    },
+    {
+      "term": "crinkled leaf",
+      "trait": "form",
+      "status": "placed",
+      "categories": [
+        "leaf curl"
       ]
     }
   ]

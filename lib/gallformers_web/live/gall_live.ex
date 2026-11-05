@@ -210,14 +210,38 @@ defmodule GallformersWeb.GallLive do
     end)
   end
 
-  defp detachable_display(traits) do
-    case Map.get(traits, "detachable", []) do
-      [value | _] -> Map.get(@detachable_values, value, "")
-      [] -> ""
+  # A Trait's line: its values, each with the Sources' terms under it
+  # ("globular (oval, ovoid)"), then the terms it has no category for, as
+  # text ("; also described as “reticulate”"). Detachable shows its one
+  # value's label.
+  defp trait_display(gall, "detachable") do
+    case Map.get(gall.traits, "detachable", []) do
+      [value | _] -> trait_line(gall, "detachable", [value], &Map.get(@detachable_values, &1, ""))
+      [] -> trait_line(gall, "detachable", [], & &1)
     end
   end
 
-  defp trait_display(traits, trait), do: traits |> Map.get(trait, []) |> Enum.join(", ")
+  defp trait_display(gall, trait),
+    do: trait_line(gall, trait, Map.get(gall.traits, trait, []), & &1)
+
+  defp trait_line(gall, trait, values, label) do
+    terms = Map.get(gall.trait_terms, trait, %{})
+
+    values
+    |> Enum.map(&with_terms(label.(&1), Map.get(terms, &1, [])))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(", ")
+    |> with_text_terms(Map.get(gall.text_terms, trait, []))
+  end
+
+  defp with_terms(shown, terms) when shown == "" or terms == [], do: shown
+  defp with_terms(shown, terms), do: "#{shown} (#{Enum.join(terms, ", ")})"
+
+  defp with_text_terms(shown, []), do: shown
+  defp with_text_terms("", terms), do: "described as " <> quoted(terms)
+  defp with_text_terms(shown, terms), do: shown <> "; also described as " <> quoted(terms)
+
+  defp quoted(terms), do: Enum.map_join(terms, ", ", &"“#{&1}”")
 
   # Splits the generation qualifier (e.g. "agamic", "sexgen") off the Gall's
   # name and gives its definition: the vocabulary's, else the glossary entry
@@ -467,26 +491,26 @@ defmodule GallformersWeb.GallLive do
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4">
                   <div class="space-y-1">
                     <div>
-                      <strong>Detachable:</strong> {detachable_display(@gall.traits)}
+                      <strong>Detachable:</strong> {trait_display(@gall, "detachable")}
                     </div>
-                    <div><strong>Color:</strong> {trait_display(@gall.traits, "color")}</div>
-                    <div><strong>Texture:</strong> {trait_display(@gall.traits, "texture")}</div>
+                    <div><strong>Color:</strong> {trait_display(@gall, "color")}</div>
+                    <div><strong>Texture:</strong> {trait_display(@gall, "texture")}</div>
                     <div><strong>Abundance:</strong> {@gall.abundance || ""}</div>
                   </div>
                   <div class="space-y-1">
-                    <div><strong>Shape:</strong> {trait_display(@gall.traits, "shape")}</div>
-                    <div><strong>Season:</strong> {trait_display(@gall.traits, "season")}</div>
+                    <div><strong>Shape:</strong> {trait_display(@gall, "shape")}</div>
+                    <div><strong>Season:</strong> {trait_display(@gall, "season")}</div>
                     <div>
-                      <strong>Alignment:</strong> {trait_display(@gall.traits, "alignment")}
+                      <strong>Alignment:</strong> {trait_display(@gall, "alignment")}
                     </div>
-                    <div><strong>Walls:</strong> {trait_display(@gall.traits, "walls")}</div>
+                    <div><strong>Walls:</strong> {trait_display(@gall, "walls")}</div>
                   </div>
                   <div class="space-y-1">
                     <div>
-                      <strong>Location:</strong> {trait_display(@gall.traits, "plant_part")}
+                      <strong>Location:</strong> {trait_display(@gall, "plant_part")}
                     </div>
-                    <div><strong>Form:</strong> {trait_display(@gall.traits, "form")}</div>
-                    <div><strong>Cells:</strong> {trait_display(@gall.traits, "cells")}</div>
+                    <div><strong>Form:</strong> {trait_display(@gall, "form")}</div>
+                    <div><strong>Cells:</strong> {trait_display(@gall, "cells")}</div>
                   </div>
                 </div>
               </div>

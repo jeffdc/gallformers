@@ -294,11 +294,28 @@ defmodule GallformersWeb.IDLiveTest do
       assert gall_links(view) == [gall.id]
     end
 
-    test "leaf (anywhere) matches any leaf plant part", %{conn: conn, gall: gall} do
+    test "leaf is a plant part like the others, matching every leaf value",
+         %{conn: conn, gall: gall} do
+      {:ok, view, _html} = live(conn, @host_path)
+
+      options = render_click(view, "plant_part_focus", %{})
+      assert length(Regex.scan(~r/phx-value-id="leaf"/, options)) == 1
+      refute options =~ "leaf (anywhere)"
+      refute options =~ "leaf_anywhere"
+
+      # The fixture Gall is on upper leaf and lower leaf.
+      {:ok, view, _html} = live(conn, @host_path <> "&lo=leaf")
+      assert gall_links(view) == [gall.id]
+    end
+
+    test "an old leaf (anywhere) bookmark selects leaf", %{conn: conn, gall: gall} do
       {:ok, view, html} = live(conn, @host_path <> "&lo=leaf_anywhere")
 
-      assert html =~ "leaf (anywhere)"
+      refute html =~ "leaf (anywhere)"
       assert gall_links(view) == [gall.id]
+
+      render_click(view, "plant_part_select", %{"id" => "stem"})
+      assert %{"lo" => "stem,leaf"} = patched_query(view)
     end
 
     test "textures, season and detachable", %{conn: conn, gall: gall} do
@@ -564,6 +581,24 @@ defmodule GallformersWeb.IDLiveTest do
       assert html =~ "Amphibolips"
 
       html = render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
+
+      assert html =~ "Andricus"
+      refute html =~ "Amphibolips"
+    end
+
+    test "the filter also finds a Gall by the terms of its Traits (d213)", %{conn: conn} do
+      source = source_fixture("Kinsey", "1959")
+
+      {:ok, _} =
+        Catalog.assert_trait(
+          test_actor(),
+          %{gall_id: 100, trait: "shape", value: "globular"},
+          confirm(source, %{term: "fixtovoid"})
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      html = render_keyup(view, "filter_by_name", %{"value" => "Fixtovoid"})
 
       assert html =~ "Andricus"
       refute html =~ "Amphibolips"

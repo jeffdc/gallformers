@@ -1,6 +1,6 @@
 {
   "format": "gallformers-import",
-  "format_version": 3,
+  "format_version": 4,
   "vocabulary_version": "2026-10-11",
   "batch_type": "gall",
   "mode": "replace",
@@ -61,12 +61,12 @@
     },
     {
       "id": "f6", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "plant_part",
-      "value": { "value": "bud", "as_written": "buds" },
+      "term": "buds", "category": { "value": "bud" },
       "evidence": [{ "item": "#/texts/125", "quote": "galls in buds of Quercus garryana", "page": "13" }]
     },
     {
       "id": "f7", "stance": "confirm", "kind": "trait", "gall": "g2", "trait": "plant_part",
-      "value": { "value": "lower leaf", "as_written": "underside of leaves" },
+      "term": "underside of leaves", "category": { "value": "lower leaf" },
       "evidence": [{ "item": "#/texts/130", "quote": "galls on the underside of leaves", "page": "14" }]
     }
   ]

@@ -4,11 +4,17 @@ defmodule Gallformers.Import.ApplyGall do
   transaction:
 
     1. Taxa and Galls come from the batch's resolved statements, decisions
-       already honoured (`Gallformers.Import.Queue`). A taxon the Source
-       presents as new that no taxonomy batch created is created, unplaced.
+       already honoured (`Gallformers.Import.Queue`); a skipped taxon or
+       Gall (decided skip, or its dispute decided skip) is neither found nor
+       created. A taxon the Source
+       presents as new that no taxonomy batch created is created, under the
+       parent a curator chose deciding it new, else unplaced.
        A Gall resolved `:new` (or decided new) is created with its name
        parts and the name they derive (`Gallformers.Catalog.GallName`,
-       `86e7` §5): its generation, and
+       `86e7` §5): its generation (the one a curator chose deciding it
+       new, else the Source's), its Host (the plant a curator chose for it,
+       `Gallformers.Import.GallDecisions`, else the one the batch identifies
+       it by), and
          * a described Gall (Inducer at species rank or below): a Host
            qualifier when the batch identifies it by its Host (a plant) —
            "Andricus novus (sexgen) (on Quercus lobata)". A name already
@@ -25,7 +31,27 @@ defmodule Gallformers.Import.ApplyGall do
        `Gallformers.Catalog`: Relationships and the other kinds first, then
        qualifiers (they point at a Relationship Fact of the batch). A Fact
        whose taxon or Gall did not resolve, or that a curator dropped (a
-       disputed statement decided `skip`), is not written.
+       disputed statement decided `skip`), is not written. A Host Fact
+       whose dispute was kept on a plant chosen for it, or whose Gall a
+       curator chose a plant for (`ctx.hosts`,
+       `Gallformers.Import.Disputes.chosen_hosts/1`,
+       `Gallformers.Import.GallDecisions.chosen_hosts/2`; the dispute's
+       wins), is written on that plant, its statement's detail noting
+       `"chosen_host_taxon_id"`.
+       Trait Facts go on the categories their terms are placed under
+       (`Gallformers.Import.TraitTerms.apply_plan/3`): a term placed by the
+       readers' agreement is placed first, for every Source; a use that is
+       a question, or kept as text, is stored on its Gall as a waiting
+       term instead, and its Facts are not written; so is a use whose Facts
+       wait on an open dispute (`ctx.trait_disputes`), linked to it. Each Trait
+       attribution carries the Source's term. A Trait Fact a curator gave
+       other values (`ctx.trait_values`, `Gallformers.Import.FactEdits`)
+       goes on those, whatever its term's standing.
+       Then what curators stated for the statements the producer set aside
+       (`Gallformers.Import.SetAside.facts/1`): one Fact per covered Gall,
+       written the same way, the entries' evidence as its evidence. Decided
+       after the batch is applied, these are written then (`run_set_aside/2`),
+       as are the Trait Facts a question's decision writes (`run_facts/3`).
     3. `mode: replace` removes the Source's gall attributions the batch no
        longer states.
     4. Same-date conflicts the standings report, and the batch's Galls whose
@@ -41,6 +67,8 @@ defmodule Gallformers.Import.ApplyGall do
   alias Gallformers.Import.ApplyTaxonomy
   alias Gallformers.Import.Attributions
   alias Gallformers.Import.Diff
+  alias Gallformers.Import.SetAside
+  alias Gallformers.Import.TraitTerms
   alias Gallformers.Places
   alias Gallformers.Taxa
 
@@ -56,16 +84,31 @@ defmodule Gallformers.Import.ApplyGall do
     content = ctx.batch.content
     declared = Map.new(List.wrap(content["taxa"]), &{&1["ref"], &1})
 
-    with {:ok, taxa, taxon_updates} <- taxa(ctx, declared),
-         {:ok, galls, gall_updates} <- galls(ctx, taxa) do
-      diff = diff_context(ctx)
-      facts = List.wrap(content["facts"])
-      {qualifiers, others} = Enum.split_with(facts, &(&1["kind"] == "qualifier"))
-      refs = %{taxa: taxa, galls: galls, declared: declared, facts: %{}}
+    terms = trait_plan(ctx)
 
-      with {:ok, outcomes, refs} <- write_all(ctx, diff, others, refs),
+    with {:ok, taxa, taxon_updates} <- taxa(ctx, declared),
+         {:ok, galls, gall_updates} <- galls(ctx, taxa),
+         :ok <- TraitTerms.record_edits(ctx.actor, terms.edits) do
+      diff = diff_context(ctx)
+      facts = Enum.reject(List.wrap(content["facts"]), &(&1["kind"] == "trait"))
+      {qualifiers, others} = Enum.split_with(facts, &(&1["kind"] == "qualifier"))
+      set_aside = SetAside.facts(Map.get(ctx, :set_aside, []))
+
+      refs = %{
+        taxa: Map.merge(taxa, set_aside.taxa),
+        galls: galls,
+        declared: Map.merge(declared, set_aside.declared),
+        hosts: Map.get(ctx, :hosts, %{}),
+        facts: %{}
+      }
+
+      with {:ok, outcomes, refs} <-
+             write_all(ctx, diff, others ++ terms.facts ++ set_aside.facts, refs),
            {:ok, q_outcomes, _refs} <- write_all(ctx, diff, qualifiers, refs),
-           outcomes = outcomes ++ q_outcomes,
+           :ok <- TraitTerms.store_waiting(ctx, terms.waiting, galls),
+           :ok <- TraitTerms.store_disputed(ctx, Map.get(ctx, :trait_disputes, []), galls),
+           unwritten = for({ref, reason} <- terms.unwritten, do: {ref, Diff.unresolved(reason)}),
+           outcomes = outcomes ++ q_outcomes ++ unwritten,
            stated = for({_ref, %{fact_id: id}} <- outcomes, is_integer(id), do: id),
            {:ok, removal_conflicts} <- Diff.remove_unstated(diff, ctx.batch.mode, stated) do
         {:ok,
@@ -76,6 +119,64 @@ defmodule Gallformers.Import.ApplyGall do
              conflict_items(outcomes, removal_conflicts) ++ generation_items(galls, ctx.galls)
          }}
       end
+    end
+  end
+
+  @doc """
+  What `run/1` writes for the batch's Trait terms
+  (`Gallformers.Import.TraitTerms.apply_plan/3`): its dropped Facts left
+  out, its decided term questions honoured, and the values a curator's
+  edit gives a Trait Fact (`ctx.trait_values`, ref to values) in place of
+  its term's.
+  """
+  @spec trait_plan(map()) :: map()
+  def trait_plan(ctx) do
+    TraitTerms.apply_plan(ctx.batch.content, Map.get(ctx, :review),
+      file: ctx.batch.file,
+      drop: Map.keys(ctx.drop),
+      items: Map.get(ctx, :term_items, []),
+      values: Map.get(ctx, :trait_values, %{})
+    )
+  end
+
+  @doc """
+  Writes what the decided set-aside items `decided` state, for a gall batch
+  applied already (`ctx` as for `run/1`, with `:gall_ids`, the batch's
+  Galls by ref, in place of its statements). Returns the rows to record, as
+  `run/1` does; it removes nothing the Source states.
+  """
+  @spec run_set_aside(map(), [map()]) :: {:ok, map()} | {:error, term()}
+  def run_set_aside(ctx, decided) do
+    set_aside = SetAside.facts(decided)
+    run_facts(ctx, set_aside.facts, Map.take(set_aside, [:taxa, :declared]))
+  end
+
+  @doc """
+  Writes `facts` (the contract's shape: a decided question's Trait Facts,
+  `Gallformers.Import.TraitTerms.facts_for/3`, or what set-aside items
+  state) for a gall batch applied already, as `run_set_aside/2` does;
+  `refs` may give the `:taxa` and `:declared` they name besides the
+  batch's.
+  """
+  @spec run_facts(map(), [map()], map()) :: {:ok, map()} | {:error, term()}
+  def run_facts(ctx, facts, refs \\ %{}) do
+    ctx = Map.merge(%{drop: %{}}, ctx)
+
+    refs = %{
+      taxa: Map.get(refs, :taxa, %{}),
+      galls: ctx.gall_ids,
+      declared: Map.get(refs, :declared, %{}),
+      hosts: Map.get(ctx, :hosts, %{}),
+      facts: %{}
+    }
+
+    with {:ok, outcomes, _refs} <- write_all(ctx, diff_context(ctx), facts, refs) do
+      {:ok,
+       %{
+         statements: Enum.map(outcomes, &statement_row/1),
+         updates: [],
+         queue: conflict_items(outcomes, [])
+       }}
     end
   end
 
@@ -95,6 +196,7 @@ defmodule Gallformers.Import.ApplyGall do
   defp taxa(ctx, declared) do
     collect(ctx.taxa, fn ref, s ->
       cond do
+        "skipped" in s.flags -> :none
         is_integer(s.taxon_id) and s.resolution in [:resolved, :new] -> {:found, s.taxon_id}
         s.resolution == :new and "skipped" not in s.flags -> create_taxon(ctx, s, declared[ref])
         true -> :none
@@ -103,7 +205,9 @@ defmodule Gallformers.Import.ApplyGall do
   end
 
   defp create_taxon(ctx, s, declared) do
-    with {:ok, taxon, flags} <- ApplyTaxonomy.create_new_taxon(ctx.actor, declared, nil) do
+    parent_id = ApplyTaxonomy.chosen_parent(s)
+
+    with {:ok, taxon, flags} <- ApplyTaxonomy.create_new_taxon(ctx.actor, declared, parent_id) do
       {:created, taxon.id,
        %{id: s.id, taxon_id: taxon.id, method: "created", flags: s.flags ++ flags}}
     end
@@ -115,11 +219,14 @@ defmodule Gallformers.Import.ApplyGall do
 
     collect(ctx.galls, fn ref, s ->
       cond do
+        "skipped" in s.flags ->
+          :none
+
         s.resolution == :resolved and is_integer(s.gall_id) ->
           {:found, s.gall_id}
 
         s.resolution == :new and "skipped" not in s.flags ->
-          with {:ok, gall} <- create_gall(ctx, content_galls[ref], taxa) do
+          with {:ok, gall} <- create_gall(ctx, content_galls[ref], s, taxa) do
             {:created, gall.id, %{id: s.id, gall_id: gall.id, method: "created"}}
           end
 
@@ -144,12 +251,11 @@ defmodule Gallformers.Import.ApplyGall do
   end
 
   # A new Gall: its name parts from the batch and the name they derive.
-  defp create_gall(ctx, g, taxa) do
+  defp create_gall(ctx, g, s, taxa) do
     ident = g["identified_by"] || %{}
-    generation = get_in(ident, ["generation", "value"])
-    generation_value = generation && Catalog.get_generation_value(generation)
+    generation_value = generation_value(s, ident)
     inducer = get_taxon(taxa, ident["inducer"])
-    host = get_taxon(taxa, ident["host"])
+    host = chosen_host(s) || get_taxon(taxa, ident["host"])
 
     parts = %{
       inducer_taxon_id: inducer && inducer.id,
@@ -168,7 +274,19 @@ defmodule Gallformers.Import.ApplyGall do
     Catalog.create_gall(ctx.actor, Map.delete(attrs, :inducer_taxon_id))
   end
 
+  # The generation a curator chose for a new Gall, else the Source's.
+  defp generation_value(s, ident) do
+    generation = (s.detail || %{})["chosen_generation"] || get_in(ident, ["generation", "value"])
+    generation && Catalog.get_generation_value(generation)
+  end
+
   defp get_taxon(taxa, ref), do: taxa[ref] && Taxa.get_taxon!(taxa[ref])
+
+  # The plant a curator chose for a new Gall's Host (`Gallformers.Import.GallDecisions`).
+  defp chosen_host(%{detail: %{"chosen_host_taxon_id" => id}}) when is_integer(id),
+    do: Taxa.get_taxon!(id)
+
+  defp chosen_host(_s), do: nil
 
   defp plant_id(%{kingdom: "Plantae", id: id}), do: id
   defp plant_id(_host), do: nil
@@ -272,6 +390,7 @@ defmodule Gallformers.Import.ApplyGall do
     Enum.reduce_while(facts, {:ok, [], refs}, fn fact, {:ok, outcomes, refs} ->
       case write_fact(ctx, diff, fact, refs) do
         {:ok, outcome} ->
+          outcome = spot_check(outcome, fact)
           refs = put_in(refs, [:facts, fact["id"]], outcome.fact_id)
           {:cont, {:ok, outcomes ++ [{fact["id"], outcome}], refs}}
 
@@ -281,6 +400,18 @@ defmodule Gallformers.Import.ApplyGall do
     end)
   end
 
+  # A placed term the producer suggested another category for, noted on
+  # its statement for a spot check (`Gallformers.Import.TraitTerms`).
+  defp spot_check(outcome, %{"spot_check" => detail}) when is_integer(outcome.fact_id) do
+    %{
+      outcome
+      | flags: Enum.uniq(outcome.flags ++ ["suggested_other_category"]),
+        detail: Map.put(outcome.detail || %{}, "spot_check", detail)
+    }
+  end
+
+  defp spot_check(outcome, _fact), do: outcome
+
   defp write_fact(ctx, diff, fact, refs) do
     if Map.has_key?(ctx.drop, fact["id"]) do
       {:ok, Diff.unresolved("dropped by a curator: #{ctx.drop[fact["id"]]}")}
@@ -288,15 +419,29 @@ defmodule Gallformers.Import.ApplyGall do
       case key_and_extra(fact, refs) do
         {:ok, kind, key, extra} ->
           attribution =
-            Attributions.build(fact, ctx.source.kind, ctx.batch.id, ctx.items, extra)
+            fact
+            |> Attributions.build(ctx.source.kind, ctx.batch.id, ctx.items, extra)
+            |> Attributions.with_note(ctx.note)
 
-          Diff.write(diff, %{kind: kind, key: key, attribution: attribution})
+          diff
+          |> Diff.write(%{kind: kind, key: key, attribution: attribution})
+          |> chosen_host(fact, refs)
 
         {:skip, reason} ->
           {:ok, Diff.unresolved(reason)}
       end
     end
   end
+
+  # A Host Fact written on the plant a curator chose for it (a Host dispute
+  # kept so, `Gallformers.Import.Disputes`), noted on its statement.
+  defp chosen_host({:ok, outcome}, %{"id" => ref}, %{hosts: %{} = hosts})
+       when is_map_key(hosts, ref),
+       do:
+         {:ok,
+          %{outcome | detail: Map.put(outcome.detail || %{}, "chosen_host_taxon_id", hosts[ref])}}
+
+  defp chosen_host(result, _fact, _refs), do: result
 
   defp key_and_extra(%{"kind" => "relationship"} = f, refs) do
     case RelationshipTypes.get(f["type"]) do
@@ -316,7 +461,7 @@ defmodule Gallformers.Import.ApplyGall do
   defp key_and_extra(%{"kind" => "trait"} = f, refs) do
     with {:ok, gall_id} <- gall(refs, f["gall"]) do
       {:ok, :trait, %{gall_id: gall_id, trait: f["trait"], value: f["value"]["value"]},
-       %{value_as_written: f["value"]["as_written"]}}
+       %{value_as_written: f["value"]["as_written"], term: f["term"]}}
     end
   end
 
@@ -358,7 +503,7 @@ defmodule Gallformers.Import.ApplyGall do
   defp key_and_extra(f, _refs), do: {:skip, "unknown Fact kind #{f["kind"]}"}
 
   defp relationship(:taxon_to_gall, f, refs) do
-    with {:ok, subject} <- taxon(refs, f["subject"]),
+    with {:ok, subject} <- host_or_taxon(refs, f),
          {:ok, object} <- gall(refs, f["object"]) do
       {:ok, :relationship, %{type: f["type"], subject_taxon_id: subject, object_gall_id: object},
        %{
@@ -398,6 +543,13 @@ defmodule Gallformers.Import.ApplyGall do
        }}
     end
   end
+
+  # A Host Fact's subject: the plant chosen for the statement, else its taxon.
+  defp host_or_taxon(%{hosts: %{} = hosts}, %{"type" => "host_of", "id" => ref})
+       when is_map_key(hosts, ref),
+       do: {:ok, hosts[ref]}
+
+  defp host_or_taxon(refs, f), do: taxon(refs, f["subject"])
 
   defp taxon(refs, ref), do: fetch(refs.taxa, ref, "taxon #{ref}")
   defp gall(refs, ref), do: fetch(refs.galls, ref, "Gall #{ref}")

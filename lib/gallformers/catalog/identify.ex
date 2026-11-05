@@ -18,8 +18,11 @@ defmodule Gallformers.Catalog.Identify do
     * `:traits` — `%{trait => [value]}` by name (`"color" => ["red"]`): a
       Gall matches a Trait when it has any of the values, or all of them
       when `:trait_logic` says `%{trait => :and}` (the tool offers that for
-      plant parts and textures). A value the vocabulary lacks matches
-      nothing.
+      plant parts and textures). A Gall has a value when it has one of its
+      `Gallformers.Catalog.Vocab.TraitValue.matching_values/2`: `leaf`
+      finds the Galls on any leaf value, and a leaf value (`lower leaf`)
+      the Galls on it or only on `leaf`, never on another leaf value alone
+      (`d213`). A value the vocabulary lacks matches nothing.
     * `:detachable` — `"integral"` or `"detachable"` (each also matching
       `"both"`), or `"both"`; `"unknown"` filters nothing.
     * `:undescribed` — `true` for undescribed Galls only.
@@ -35,19 +38,38 @@ defmodule Gallformers.Catalog.Identify do
   ## Results
 
   Each matching Gall, by name: `%{id, name, undescribed, detachable,
-  image_url, traits}` — `image_url` the default image's small size (or
-  nil), `traits` its current Trait values by Trait (as
+  image_url, traits, terms}` — `image_url` the default image's small size
+  (or nil), `traits` its current Trait values by Trait (as
   `Gallformers.Catalog.ReadModels.GallSummary` gives them, for
-  `Gallformers.Galls.Summary.from_traits/1`). Two queries, whatever the
-  number of results.
+  `Gallformers.Galls.Summary.from_traits/1`), `terms` what the results'
+  text search (`filter_by_text/2`) reads of its Traits. Four queries,
+  whatever the number of results.
+
+  ## Text search
+
+  `filter_by_text/2` narrows the results by what the user types (`d213`):
+  a Gall is kept when every word is in its name, or is a whole word of its
+  `terms` (other than a word such as "on" or "the"): its current Trait
+  values; the terms placed under them for every Source
+  (`Gallformers.Catalog.Vocab.TraitTermMapping`, so "oval" finds a
+  globular Gall); and the terms its Sources used for them (the current
+  Trait Facts' confirming attributions, a retracted Source's left out).
+  Terms waiting on a question are not searched, and the filters take
+  Trait values only. Terms are read at
+  query time, not stored in `gall_index`: a term placed, or a Source's
+  attribution added to a Fact already current, changes no row there.
   """
   import Ecto.Query
 
+  alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.ReadModels.GallIndex
+  alias Gallformers.Catalog.Vocab.TraitTermMapping
   alias Gallformers.Catalog.Vocab.TraitValue
+  alias Gallformers.Facts.Attribution
   alias Gallformers.Images.Image
   alias Gallformers.Places
   alias Gallformers.Repo
+  alias Gallformers.Sources.Source
   alias Gallformers.Taxa
 
   @type filters :: %{
@@ -67,7 +89,8 @@ defmodule Gallformers.Catalog.Identify do
           undescribed: boolean(),
           detachable: String.t() | nil,
           image_url: String.t() | nil,
-          traits: %{String.t() => [String.t()]}
+          traits: %{String.t() => [String.t()]},
+          terms: [String.t()]
         }
 
   @type family :: %{id: integer(), name: String.t()}
@@ -92,6 +115,8 @@ defmodule Gallformers.Catalog.Identify do
       |> Repo.all()
 
     values = Map.new(Repo.all(TraitValue), &{&1.id, &1})
+    placed = placed_terms()
+    used = used_terms(Enum.map(rows, & &1.id))
 
     Enum.map(rows, fn row ->
       %{
@@ -100,9 +125,41 @@ defmodule Gallformers.Catalog.Identify do
         undescribed: row.undescribed,
         detachable: row.detachable,
         image_url: row.image_path && Image.sized_url(row.image_path, :small),
-        traits: traits(row.trait_value_ids, values)
+        traits: traits(row.trait_value_ids, values),
+        terms: terms(row.trait_value_ids, values, placed, Map.get(used, row.id, []))
       }
     end)
+  end
+
+  @doc """
+  The `results` (of `identify/1`) that `text` finds (see *Text search*),
+  in order; all of them for a blank `text`.
+  """
+  @spec filter_by_text([result()], String.t()) :: [result()]
+  def filter_by_text(results, text) when is_list(results) and is_binary(text) do
+    case words(text) do
+      [] -> results
+      words -> Enum.filter(results, &found_by?(&1, words))
+    end
+  end
+
+  # Words of a term that find nothing on their own: "on" of "on the leaf".
+  @stopwords ~w(a an and as at by for from in into is near of on or the to with)
+
+  defp found_by?(result, words) do
+    name = TraitTermMapping.normalize(result.name)
+
+    term_words =
+      result.terms |> Enum.flat_map(&words/1) |> Enum.reject(&(&1 in @stopwords)) |> MapSet.new()
+
+    Enum.all?(words, &(String.contains?(name, &1) or MapSet.member?(term_words, &1)))
+  end
+
+  # A text's words, compared normalized; punctuation separates them.
+  defp words(text) do
+    text
+    |> TraitTermMapping.normalize()
+    |> String.split(~r/[^\p{L}\p{N}]+/u, trim: true)
   end
 
   @doc "How many Galls match `filters`."
@@ -180,9 +237,17 @@ defmodule Gallformers.Catalog.Identify do
     ids = trait_value_ids(Enum.map(wanted, &elem(&1, 0)))
 
     Enum.reduce(wanted, query, fn {trait, values}, query ->
-      found = for value <- values, id = ids[{trait, value}], do: id
-      trait_filter(query, Map.get(logic, trait, :or), found, length(values))
+      matches = for value <- values, do: matching_ids(trait, value, ids)
+      trait_filter(query, Map.get(logic, trait, :or), matches)
     end)
+  end
+
+  # The IDs of the values a Gall may have to match `value`
+  # (`TraitValue.matching_values/2`); none for a value the vocabulary lacks.
+  defp matching_ids(trait, value, ids) do
+    if Map.has_key?(ids, {trait, value}),
+      do: for(v <- TraitValue.matching_values(trait, value), id = ids[{trait, v}], do: id),
+      else: []
   end
 
   # The IDs of the values of `traits`, by {trait, value}.
@@ -194,17 +259,21 @@ defmodule Gallformers.Catalog.Identify do
     |> Map.new()
   end
 
-  # `found` are the known values' IDs of the `wanted` asked for.
-  defp trait_filter(query, _logic, [], _wanted), do: where(query, [_g], false)
+  # `matches` holds, for each value asked for, the IDs a Gall may have to
+  # match it: all of them must match, or any.
+  defp trait_filter(query, :and, matches) do
+    Enum.reduce(matches, query, fn
+      [], query -> where(query, [_g], false)
+      ids, query -> where(query, [g], fragment("? && ?::bigint[]", g.trait_value_ids, ^ids))
+    end)
+  end
 
-  defp trait_filter(query, :and, found, wanted) when length(found) < wanted,
-    do: where(query, [_g], false)
-
-  defp trait_filter(query, :and, found, _wanted),
-    do: where(query, [g], fragment("? @> ?::bigint[]", g.trait_value_ids, ^found))
-
-  defp trait_filter(query, _or, found, _wanted),
-    do: where(query, [g], fragment("? && ?::bigint[]", g.trait_value_ids, ^found))
+  defp trait_filter(query, _or, matches) do
+    case Enum.concat(matches) do
+      [] -> where(query, [_g], false)
+      ids -> where(query, [g], fragment("? && ?::bigint[]", g.trait_value_ids, ^ids))
+    end
+  end
 
   defp detachable(query, value) when value in [nil, "", "unknown"], do: query
   defp detachable(query, "both"), do: where(query, [g], g.detachable == "both")
@@ -226,6 +295,52 @@ defmodule Gallformers.Catalog.Identify do
       |> Places.batch_leaf_descendant_ids()
 
     where(query, [g], g.everywhere or fragment("? && ?::bigint[]", g.place_ids, ^leaves))
+  end
+
+  # -- terms (`d213`) -------------------------------------------------------------
+
+  # The placed terms under each Trait value, by {trait, value}, normalized.
+  defp placed_terms do
+    from(m in TraitTermMapping,
+      where: m.status == :placed and m.trait in ^TraitValue.traits(),
+      select: {m.trait, m.categories, m.normalized_term}
+    )
+    |> Repo.all()
+    |> Enum.flat_map(fn {trait, categories, term} ->
+      for category <- categories, do: {{trait, category}, term}
+    end)
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  end
+
+  # The terms the Galls' Sources used for their current Trait values, by Gall.
+  defp used_terms([]), do: %{}
+
+  defp used_terms(gall_ids) do
+    from(t in Current.traits(gall_ids),
+      join: a in Attribution,
+      on: a.fact_id == t.fact_id,
+      join: s in Source,
+      on: s.id == a.source_id,
+      where: a.stance == :confirm and not is_nil(a.term) and is_nil(s.retracted_by_id),
+      distinct: true,
+      select: {t.gall_id, a.term}
+    )
+    |> Repo.all()
+    |> Enum.group_by(&elem(&1, 0), &TraitTermMapping.normalize(elem(&1, 1)))
+  end
+
+  defp terms(value_ids, values, placed, used) do
+    value_terms =
+      Enum.flat_map(value_ids, fn id ->
+        value = Map.fetch!(values, id)
+
+        [
+          TraitTermMapping.normalize(value.value)
+          | Map.get(placed, {value.trait, value.value}, [])
+        ]
+      end)
+
+    (value_terms ++ used) |> Enum.uniq() |> Enum.sort()
   end
 
   defp traits(value_ids, values) do

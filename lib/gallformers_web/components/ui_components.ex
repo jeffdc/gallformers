@@ -712,6 +712,57 @@ defmodule GallformersWeb.UIComponents do
     Calendar.strftime(datetime, "%b %d, %Y")
   end
 
+  @legacy_source_text "From the original Gallformers data"
+
+  @doc """
+  A Source's line of when it came to Gallformers
+  (`Gallformers.Import.source_dates/1`, matter `f14c`): "Added to
+  Gallformers <date> · updated <date>", the update left out when it was on
+  the day the Source was added; for a Source from the old data, "From the
+  original Gallformers data", with any later update. Nothing when there is
+  no date to give (a Source whose first package is not applied yet).
+
+  ## Examples
+
+      <.source_dates id="source-dates" dates={@dates} />
+      <.source_dates dates={@dates} format={:short} />
+  """
+  attr :dates, :map, required: true, doc: "`%{ingested, updated, legacy?}`"
+  attr :format, :atom, default: :long, values: [:long, :short], doc: "as `format_date/2`'s"
+  attr :class, :any, default: nil
+  attr :rest, :global
+
+  def source_dates(assigns) do
+    assigns = assign(assigns, :text, source_dates_text(assigns.dates, assigns.format))
+
+    ~H"""
+    <p :if={@text} class={@class} {@rest}>{@text}</p>
+    """
+  end
+
+  @doc "The text `source_dates/1` shows, or nil when it shows nothing."
+  @spec source_dates_text(map(), :long | :short) :: String.t() | nil
+  def source_dates_text(dates, format \\ :long)
+
+  def source_dates_text(%{legacy?: true, updated: nil}, _format), do: @legacy_source_text
+
+  def source_dates_text(%{legacy?: true, updated: updated}, format),
+    do: "#{@legacy_source_text} · updated #{format_date(updated, format)}"
+
+  def source_dates_text(%{ingested: nil}, _format), do: nil
+
+  def source_dates_text(%{ingested: ingested, updated: updated}, format) do
+    added = "Added to Gallformers #{format_date(ingested, format)}"
+
+    if is_nil(updated) or DateTime.to_date(updated) == DateTime.to_date(ingested),
+      do: added,
+      else: "#{added} · updated #{format_date(updated, format)}"
+  end
+
+  @doc "What a Source from the old data shows instead of a date."
+  @spec legacy_source_text() :: String.t()
+  def legacy_source_text, do: @legacy_source_text
+
   @doc """
   Renders a glossary term with hover tooltip showing its definition.
 

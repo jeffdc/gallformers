@@ -496,3 +496,56 @@ def test_each_checked_package_scores_all_present_against_its_golden_file(spec, t
     doc = json.loads(golden_file.read_text(encoding="utf-8"))
     report = golden.score(doc, TRIAL / spec.package)
     assert [r for r in report["items"] if r["status"] != "present"] == []
+
+
+# ---------------------------------------------------------------- format v4 (d213)
+# A v4 trait Fact carries the Source's term and a suggested category in place of
+# value.as_written and value.value. Golden items are v3; runs may be either.
+
+
+def as_v4(pkg):
+    """The package with its gall batch in format 4."""
+    pkg = copy.deepcopy(pkg)
+    pkg["gall"]["format_version"] = 4
+    for f in pkg["gall"]["facts"]:
+        if f["kind"] == "trait":
+            value = f.pop("value")
+            f["term"], f["category"] = value["as_written"], {"value": value["value"]}
+    return pkg
+
+
+def test_a_v4_run_scores_against_v3_golden_items(exported, tmp_path):
+    report = score(exported, tmp_path, as_v4(base_package()))
+    assert {r["status"] for r in report["items"]} == {"present"}
+    assert status(report, "gall-f3")["label"] == "color = red | the agamic stem gall of A. foo"
+
+
+def test_a_v4_term_in_another_category_is_changed(exported, tmp_path):
+    pkg = as_v4(base_package())
+    facts = facts_of(pkg)
+    facts["f5"]["category"] = {"value": "detachable"}
+    facts["f3"]["category"] = {"value": "orange"}  # the same term, "reddish", now orange
+    report = score(exported, tmp_path, pkg)
+    f5 = status(report, "gall-f5")
+    assert (f5["status"], f5["golden"], f5["run"]) == ("changed", "integral", "detachable")
+    f3 = status(report, "gall-f3")
+    assert (f3["status"], f3["golden"], f3["run"]) == ("changed", "red", "orange")
+
+
+def test_a_v4_term_with_no_category_is_changed(exported, tmp_path):
+    pkg = as_v4(base_package())
+    facts_of(pkg)["f3"]["category"] = None
+    f3 = status(score(exported, tmp_path, pkg), "gall-f3")
+    assert (f3["status"], f3["golden"], f3["run"]) == ("changed", "red", "no category (reddish)")
+
+
+def test_export_from_a_v4_package(tmp_path):
+    trial = tmp_path / "trial"
+    write_package(trial / SPEC.package, as_v4(base_package()))
+    verdicts = write_checks(tmp_path / "verdicts", VERDICTS)
+    doc = golden.export_source(SPEC, trial / SPEC.package, verdicts / SPEC.checks / "checks")
+    f3 = next(i for i in doc["items"] if i["id"] == "gall-f3")
+    assert f3["statement"]["term"] == "reddish" and f3["statement"]["category"] == {"value": "red"}
+    assert f3["context"]["slot_values"] == ["brown", "red"]
+    report = golden.score(doc, write_package(tmp_path / "run", base_package()))
+    assert {r["status"] for r in report["items"]} == {"present"}

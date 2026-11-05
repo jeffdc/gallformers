@@ -136,6 +136,41 @@ def batch():
     }
 
 
+def trait_fact(ident="f5", term="pale tan", category="tan", trait="color", **fields):
+    """A format v4 trait Fact on g1: the Source's term and a suggested category (None: none fits)."""
+    return {
+        "id": ident, "stance": "confirm", "kind": "trait", "gall": "g1", "trait": trait, "term": term,
+        "category": None if category is None else {"value": category},
+        "evidence": [{"item": "#/texts/1", "quote": "pale tan when mature"}], **fields,
+    }  # fmt: skip
+
+
+@pytest.fixture
+def batch_v4(batch):
+    """`batch` in format v4, with one trait Fact (f5)."""
+    b = copy.deepcopy(batch)
+    b["format_version"] = 4
+    b["facts"].append(trait_fact())
+    return b
+
+
+def as_v3(batch: dict) -> dict:
+    """A format v4 gall batch as format v3: each trait Fact's term and category as value.as_written
+    and value.value. Trait Facts with no category have no v3 form and are dropped."""
+    b = copy.deepcopy(batch)
+    b["format_version"] = 3
+    facts = []
+    for f in b["facts"]:
+        if f["kind"] == "trait":
+            if f.get("category") is None:
+                continue
+            v3 = {k: v for k, v in f.items() if k not in ("term", "category", "depends_on_gall")}
+            f = v3 | {"value": {"value": f["category"]["value"], "as_written": f["term"]}}
+        facts.append(f)
+    b["facts"] = facts
+    return b
+
+
 @pytest.fixture
 def taxonomy(batch):
     """A taxonomy batch (same Source as `batch`) whose evidence points into the `document` fixture."""

@@ -1,6 +1,6 @@
 # Gallformers import — producer guide
 
-How to turn one Source into a Gallformers import package. Follow these rules exactly. The schemas in `schema/` define the shape of every file; this guide says what goes in them.
+How to turn one Source into a Gallformers import package. Follow these rules exactly. The schemas in `schema/` define the shape of every file; this guide says what goes in them. It describes format 4 (`format_version`: 4); Gallformers still reads format 3 packages, whose Traits carry `value` and `as_written`.
 
 **Terms.** A *Source* is a publication, website or dataset. A *Gall* is a kind of gall (two generations of one species are two Galls). The *Inducer* makes the Gall; a *Host* is a plant it grows on. A *Fact* is one statement about a Gall; an *act* is one taxonomic statement.
 
@@ -30,12 +30,15 @@ Convert the Source into a DoclingDocument, `document.json`. Every later phase re
 2. **`mode`:** `replace` for a full run over a Source; `add` for statements that supplement an earlier run.
 3. **Names exactly as the Source writes them** (`name_as_written`), abbreviations included ("Q. lobata"), with the rank the Source implies. Identify every taxon by its name and rank, and every Gall by `identified_by` (Phase 3, "Galls").
    - When the document's text of a name is damaged by OCR or extraction ("Cynips Jlocossa" where the page evidently prints *flocossa*), keep `name_as_written` verbatim and give the evident printed name as `name_reading`. `name_reading` repairs damaged letters only: the author's own spelling stays as written, and capitals from small caps ("ANDRICUS RILEYI") stay too, since Gallformers normalises case.
-   - When a passage names an organism by a common name only and the Source pairs that common name with a scientific name anywhere ("the red oak, Quercus rubrum"), declare the taxon by the scientific name and cite both passages. A common name the Source never pairs with a scientific name ("rose", with *Rosa* never printed) goes to `unmapped`.
+   - When a passage names an organism by a common name only and the Source pairs that same common name with a scientific name anywhere ("the red oak, Quercus rubrum"), declare the taxon by the scientific name and cite both passages. A pairing covers only the name it pairs: "the red oak, Quercus rubrum" says nothing about a bare "oak" or "the black oak".
+   - **A Host the Source names only by a common name,** never paired with a scientific name ("the black oak", "live oak", "scrub oak"), or by a bare common name ("an unknown oak", "an oak in Arizona", "a wild rose"), is declared by that name: a `taxa` entry with `common_name: true` and `name_as_written` the Source's words exactly as printed, article included ("the black oak"). Give no rank (a bare "oak" is not the genus: a curator usually places it in a section), and no `new`, `sensu` or `gallformers_taxon_id`. Use it as the Host (the `host_of` subject or `identified_by.host`) and as nothing else. Don't guess the species, don't state the genus in its place, and don't put it in `unmapped`: Gallformers asks a curator which plant the Source means.
+   - Any other organism the Source names only by a common name ("a small red mite") goes to `unmapped`.
    - A named hybrid ("Populus deltoides × P. angustifolia") is a taxon at rank species; an unnamed one ("hybrid intermediates") goes to `unmapped`.
-4. **`new`** marks novelty the Source itself claims: *sp. nov.*, *gen. nov.*, *comb. nov.*, *comb. rev.*, *stat. nov.*, *stat. rev.*, *nom. nov.* for taxa; for Galls, see Phase 3, "Galls". A formal description of a taxon the Source names as its own counts, with or without those words, and so does a provisional name ("I call it provisionally…"); `new.status` holds the Source's words, or "described here".
-5. **Controlled values** carry `as_written`: the vocabulary value plus the Source's own words, e.g. `{ "value": "tan", "as_written": "pale tan" }`. Choose values by their definitions (Phase 3, "Traits"). When no value's definition fits, record the term in `unmapped` with `term`, `slot`, the Gall if any, evidence, and an optional note. Every `as_written` field (authorship and status words included) is verbatim, OCR errors and all.
-6. **Deny** where the Source corrects a published statement: another Source's Fact or act, or earlier records it calls wrong ("earlier records from Q. douglasii are misidentifications", "erroneously synonymized"). Any Fact or act can be denied this way, Trait values included. Leave other negatives out of the batch, `unmapped` included: contrasts within a description ("not woody"), absences ("no inquilines were reared"), rejected unpublished reports. State only what the Source says: a list of three Hosts says nothing about a fourth. A record the Source reassigns to another Gall ("the latter reference concerns N. quercusminutissimus") is a `confirm` on that Gall.
-7. **Assertions only.** Hedged or doubted statements ("putative", "probably", "may", "must be confirmed", "not clear if", "is said to") go to `unmapped` (slot `other`) with their quote, in place of a Fact, act, or flag.
+4. **`new`** marks novelty the Source itself claims: *sp. nov.*, *gen. nov.*, *comb. nov.*, *comb. rev.*, *stat. nov.*, *stat. rev.*, *nom. nov.* for taxa; for Galls, see Phase 3, "Galls". The words may be in English or abbreviated: "new species" (Ashmead 1897's heading "41. DIASTROPHUS SMILACIS, new species."), "n. sp.", "sp. n.", "new genus". Mark every taxon the Source calls new, whatever later work has made of the name. A formal description of a taxon the Source names as its own counts, with or without those words, and so does a provisional name ("I call it provisionally…"); `new.status` holds the Source's words, or "described here".
+5. **Controlled values** carry `as_written`: the vocabulary value plus the Source's own words, e.g. `{ "value": "US-CA", "as_written": "Mt. Diablo" }`. Choose values by their definitions. When no value's definition fits, record the term in `unmapped` with `term`, `slot`, `topic`, the Gall if any, evidence, and an optional note. **Traits are the exception:** a trait Fact carries the Source's term and the category you suggest for it, `null` when none fits, and never goes to `unmapped` (Phase 3, "Traits"). Every `as_written` field (authorship and status words included) and every `term` is verbatim, OCR errors and all.
+   - **`topic`** on every `unmapped` entry says what it is about, so that a curator reviews related entries together: `names` (synonymies, splits, new genera, species groups), `inducer` (who induces the Gall, and other organisms associated with it), `host` (which plants), `range` (where it occurs), `gall` (the Gall itself: where on the plant, shape, form, season…), `other` (none of these). In Nastasi & Davis (2022): "Presumed Diastrophus sp." is `inducer`; "Aulacidea annulata, is almost certainly a synonym of A. tumida" is `names`; "possibly prairie lettuce (L. ludoviciana)" is `host`; "may be found as far south as Arkansas" is `range`; "galls seem to only be induced in the basal leaves" is `gall`.
+6. **Deny** where the Source corrects a published statement: another Source's Fact or act, or earlier records it calls wrong ("earlier records from Q. douglasii are misidentifications", "erroneously synonymized"). Any Fact or act can be denied this way, Traits included. Leave other negatives out of the batch, `unmapped` included: contrasts within a description ("not woody"), absences ("no inquilines were reared"), rejected unpublished reports. State only what the Source says: a list of three Hosts says nothing about a fourth. A record the Source reassigns to another Gall ("the latter reference concerns N. quercusminutissimus") is a `confirm` on that Gall.
+7. **Assertions only.** Hedged or doubted statements ("putative", "probably", "may", "must be confirmed", "not clear if", "is said to") go to `unmapped` (slot `other`, with the `topic` of what they are about) with their quote, in place of a Fact, act, or flag.
    - A hedged correction ("this report has been questioned") is a hedge: `unmapped`, not a `deny`.
    - A statement made outright stays a statement when the Source adds that later work may revise it ("further research may call this into question").
    - A named person's record the Source reports ("Professor Riley says: …") is stated, with `cites`.
@@ -168,7 +171,7 @@ A generation is a stage of the Inducer's life cycle that induces a clearly diffe
 | `predator_of` | taxon → taxon, in a Gall | one organism eats another, within `gall_context` |
 
 - **Use the most specific type the Source supports.** "Reared from the gall" with no stated role is `emerged_from`; a role the Source states elsewhere counts ("stem galls of cecidomyiid flies … all of the individuals I have reared from these galls were Lasioptera solani" is `inducer_of`). A Source can support a neutral and a specific type together: a caterpillar eating gall tissue and the larva inside is `herbivore_of` plus `predator_of` (in the Gall).
-- **Hosts:** when the Source lists a Gall's Host species, state those; a genus `host_of` only when it names no species. Galls found under or near a plant ("on the ground, under an oak") don't make it a Host, and plants the Inducer lives on without a Gall (an aphid's secondary hosts) aren't Hosts: both go to `unmapped`.
+- **Hosts:** when the Source lists a Gall's Host species, state those; a genus `host_of` only when it names no species, never in place of a Host it names by a common name (rule 3). Galls found under or near a plant ("on the ground, under an oak") don't make it a Host, and plants the Inducer lives on without a Gall (an aphid's secondary hosts) aren't Hosts: both go to `unmapped`.
 - **One Inducer per Gall.**
 - **Hyperparasitism** is stated as `parasitoid_of` between the organisms involved.
 
@@ -184,17 +187,34 @@ A qualifier is its own Fact, pointing at a Relationship Fact in the same batch (
 
 ### Traits
 
-- Traits: `detachable`, `plant_part`, `form`, `shape`, `color`, `texture`, `alignment`, `walls`, `cells`, `season`. Values come from `vocab/traits.schema.json`.
-- **A value's definition in `vocab/traits.json` decides whether it fits;** the value's name is shorthand for its definition. `traits.json` also maps common Source terms onto values.
-- A Gall can have several values of each Trait, one Fact per value; `detachable` has one value.
+- Traits: `detachable`, `plant_part`, `form`, `shape`, `color`, `texture`, `alignment`, `walls`, `cells`, `season`. Their values, in `vocab/traits.schema.json`, are the categories Gallformers' ID tool filters on.
+- **A trait Fact holds the Source's term and the category you suggest for it:**
+  - `term`: the Source's own word or short phrase for one value of this Trait, verbatim: the shortest phrase that is the term ("ovoid", "pale tan", "covered in short hairs"), not the sentence and not a clause. The sentence stays in the quote, and the term must be found in it.
+  - `category`: `{ "value": … }`, the value of the Trait whose definition in `vocab/traits.json` the term fits, judged from the whole description; the value's name is shorthand for its definition. `null` when no value's definition fits. **Never force a fit:** a near miss is `null` ("rough" is not `mealy` unless the description shows a coarse, floury surface).
+  - `depends_on_gall: true` when the term means different values for different Galls and this Gall's description decides it ("swelling": `abrupt swelling`, `tapered swelling` or `stem club`). Its `category` is the one this Gall's description supports, or `null` when nothing in it tells them apart.
+- **Gallformers decides the category.** A term it has placed before takes that category for every Source. A new term is placed once, for every Source, when the reviewers' own placements agree with your suggestion, or, where you suggested nothing (`null`), with each other, and no one says it depends on the Gall. Anything else goes to a curator, and the Gall shows the term without a category until it is settled. So suggest what the definitions support, and leave `null` where no value fits clearly: if two reviewers then agree on a value, it is placed.
+- **Terms in `traits.json`.** Its term mappings (`mappings`) list terms Gallformers has already decided. A `placed` term takes its category. An `ambiguous` term, listed with its `candidates`, is never mapped as listed: choose among the candidates from this Gall's description (or `null` when nothing in it tells them apart) and mark it `depends_on_gall: true`.
+- **Words for something else are not a term of this Trait.** "Sometimes three or four together, pressing each other into irregular shapes" says how the Galls grow together, not the shape of one: no shape term. "Each with a single insect" says what is in each chamber, not how many chambers the Gall has: it is a `cells` term only where the Source's words say whether the Gall has one chamber or several. A comparison the Source makes for a Trait is the term, as written ("the color of a large dried pea" for color); suggest a category only when the comparison plainly means one value, else `null`.
+- **One Fact per value a term names.** Most terms name one value: one Fact. A term that names several values takes one Fact for each, all with the same term: "green-yellow" is color `green` and color `yellow`; "protruding from both sides" of a leaf is plant_part `upper leaf` and `lower leaf`. A Gall can also have several terms for a Trait ("pale tan, spotted with red": color `pale tan` and color `red`); `detachable` has one Fact.
+- **Never guess between values.** A term that offers a choice or leaves it open names none of them: "on either side of the leaf" and "on the upper or lower surface" are `leaf`; any other such term is one Fact with category `null`, and `depends_on_gall: true` when its value varies from Gall to Gall.
+
+```json
+{ "id": "f6", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "shape",
+  "term": "ovoid", "category": { "value": "globular" },
+  "evidence": [{ "item": "#/texts/44", "quote": "The galls are ovoid, 4 mm long", "page": "58" }] }
+{ "id": "f7", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "form",
+  "term": "swelling", "category": { "value": "abrupt swelling" }, "depends_on_gall": true,
+  "evidence": [{ "item": "#/texts/44", "quote": "a swelling rising sharply from the stem", "page": "58" }] }
+```
+
 - `season` is when the Gall forms and grows: not when it is seen or found, and not when the Inducer emerges (rearing and emergence dates don't count). `Winter` applies only where the Host grows in winter.
 - `detachable` is whether the Gall can be removed from the Host without cutting it out or destroying the surrounding tissue. `both` means it is ambiguous: the Gall bursts and drops later, part of it stays behind, or it rarely comes off without major agitation.
 - `texture` describes the surface.
 - `color` is what you see on the Gall, its covering (hairs, wool) included; a Gall can have several colours.
-- `plant_part`: the most precise location the Source supports. A usual location ("usually along the midrib") counts as the location. A leaf Gall with no side, vein or midrib stated is both `upper leaf` and `lower leaf`.
-- Map by definition, not by word: a described single central cell is `monothalamous` though the Source never says "monothalamous". A value a definition merely implies (cells `not applicable` for an aphid gall) is left out unless the Source says it.
+- `plant_part`: the most precise location the Source supports; `leaf` when it supports no more precise place on the leaf (no side, edge, vein or midrib stated, or no consistent one). A usual location ("usually along the midrib") counts as the location. Never both `leaf` and a leaf value from the same words: "on the under side of the leaves" is `lower leaf` alone, since every leaf value is on the leaf.
+- The category comes from the definitions, the term from the Source: "a single central larval cell" is the term, with category `monothalamous`, though the Source never says "monothalamous". A value a definition merely implies (cells `not applicable` for an aphid gall) is left out unless the Source says it.
 - Generation identifies the Gall (`identified_by`), not a Trait.
-- A Trait the Source states for one Host only ("smooth and large when on Q. alba") goes to `unmapped`.
+- A Trait the Source states for one Host only ("smooth and large when on Q. alba") goes to `unmapped`, slot `other`, with the note "for one Host only".
 
 ### Range adjustments
 
@@ -234,11 +254,11 @@ uv run priv/import/validate.py <package-dir>
 python3 priv/import/validate.py <package-dir>     # needs jsonschema >= 4.18, rfc3339-validator, rfc3987
 ```
 
-It checks each batch against its schema, that `source.document.sha256` matches `document.json`, that every quote is found in its item, and that references, qualifiers, Inducers, descriptions and `new` Galls are consistent.
+It checks each batch against its schema, that `source.document.sha256` matches `document.json`, that every quote is found in its item and every trait term in its quote, and that references, qualifiers, Inducers, descriptions and `new` Galls are consistent.
 
 ## Phase 5 — Review
 
-A fresh reviewer, following `VERIFY_GUIDE.md`, checks every act and Fact against the document and writes `review.json` with its findings. The reviewer works from this guide, the vocabularies, `document.json` and the two batches only, and changes nothing. Several reviewers (for example, different models) may review the same batches; their findings are combined in one `review.json`, each naming its `reviewer`.
+A fresh reviewer, following `VERIFY_GUIDE.md`, checks every act and Fact against the document and writes `review.json` with its findings, each with its position in one plain sentence (`summary`). It also places every trait term itself (`placements`), from a copy of `gall.json` with your categories removed, so that Gallformers can tell whether two readers place a new term alike. The reviewer works from this guide, the vocabularies, `document.json` and the two batches only, and changes nothing. Several reviewers (for example, different models) may review the same batches; their findings are combined in one `review.json`, each naming its `reviewer`.
 
 When there are no findings, the package is ready. Otherwise, run phase 6.
 
@@ -248,6 +268,9 @@ The producer answers every finding once, in its `response`:
 
 - **Agree** when the finding is right by this guide and the document. Fix the statement (as suggested, or better), and say what changed in `reason`.
 - **Disagree** when the statement already follows this guide and the document. Leave it as it is, and say why in `reason`, citing the document or the rule. A disputed finding goes to a human reviewer at intake.
+- **`summary`:** with either answer, your position in one plain sentence, for the curator who weighs it against the reviewer's: no rule numbers and no `#/texts` references ("Ashmead gives the colour by comparison, so the comparison is the term, with no category"). The full argument stays in `reason`.
+
+Placements are not findings: don't answer them, and don't read them. A trait Fact keeps the category you gave it unless a finding makes you change its term or Trait; a trait Fact you add or rewrite in phase 6 has no placement, so a curator places its term at intake.
 
 Then run phase 4 again, and record `responded`: the sha256 of each batch as you leave it (`result`). The package is ready when this passes:
 
@@ -255,4 +278,4 @@ Then run phase 4 again, and record `responded`: the sha256 of each batch as you 
 uv run priv/import/validate.py --review <package-dir>
 ```
 
-`--review` adds to the phase 4 checks: `review.json` is well-formed; with no findings, it covers the current batches; otherwise every finding has a response and the batches are the ones `responded` names. Disputed findings are listed for intake.
+`--review` adds to the phase 4 checks: `review.json` is well-formed; with no findings, it covers the current batches; otherwise every finding has a response and the batches are the ones `responded` names; every trait Fact has a placement, in a value of its Trait or none. Disputed findings, and trait Facts phase 6 left without a placement, are listed for intake.

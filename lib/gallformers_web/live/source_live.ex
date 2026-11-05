@@ -2,12 +2,18 @@ defmodule GallformersWeb.SourceLive do
   @moduledoc """
   LiveView for the source/reference detail page.
 
-  Displays a scientific source's metadata, its images and the Galls it
-  speaks of (`Gallformers.Catalog.list_galls_for_source/1`).
+  Displays a scientific source's metadata, when it came to Gallformers
+  (`Gallformers.Import.source_dates/1`), its images, the Galls it speaks
+  of (`Gallformers.Catalog.list_galls_for_source/1`) and what it says of
+  them: its Facts, grouped by Gall then category
+  (`Gallformers.Import.facts_for_source/1`, read-only; matter `f14c`),
+  read on the connected mount only.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Accounts, Catalog, Images, Sources}
+  import GallformersWeb.FactsComponents, only: [facts_view: 1]
+
+  alias Gallformers.{Accounts, Catalog, Images, Import, Sources}
   alias Gallformers.Images.Image
 
   @page_size 20
@@ -69,13 +75,24 @@ defmodule GallformersWeb.SourceLive do
            page_json_ld: nil,
            page_noindex: false,
            source: source,
+           dates: Map.fetch!(Import.source_dates([source_id]), source_id),
            galls: galls,
            images: images,
            current_page: 1,
            page_size: @page_size,
+           facts: nil,
            error: nil
-         )}
+         )
+         |> load_facts(source_id)}
     end
+  end
+
+  # Read once, on the connected mount: the first render (what search
+  # engines read) has the Source and its Galls without waiting for them.
+  defp load_facts(socket, source_id) do
+    if connected?(socket),
+      do: assign(socket, facts: Import.facts_for_source(source_id)),
+      else: socket
   end
 
   @impl true
@@ -154,6 +171,8 @@ defmodule GallformersWeb.SourceLive do
                   incomplete_tooltip="We are still working on this source so information from the source is potentially still missing."
                 />
               </div>
+
+              <.source_dates id="source-dates" dates={@dates} class="text-sm text-gray-500 mb-1" />
 
               <%= if valid_url?(@source.link) do %>
                 <.link
@@ -252,6 +271,25 @@ defmodule GallformersWeb.SourceLive do
                 <p class="text-gray-500 italic">No galls connected to this source.</p>
               <% end %>
             </div>
+
+            <%!-- What the Source says: its Facts (matter f14c) --%>
+            <section id="source-facts" class="mt-8">
+              <h2 class="text-lg font-semibold text-gray-800">What this Source says</h2>
+              <p class="mb-3 text-sm text-gray-500">
+                The Facts Gallformers holds from this Source, by Gall, each with the Source's own
+                words.
+              </p>
+              <%= cond do %>
+                <% @facts == nil -> %>
+                  <p class="flex items-center gap-2 text-sm text-gray-500">
+                    <.loading_spinner size="sm" /> Loading…
+                  </p>
+                <% @facts == [] -> %>
+                  <p class="text-gray-500 italic">No Facts from this Source yet.</p>
+                <% true -> %>
+                  <.facts_view id="source-facts-galls" galls={@facts} mode={:public} />
+              <% end %>
+            </section>
 
             <.record_metadata inserted_at={@source.inserted_at} updated_at={@source.updated_at} />
           <% else %>

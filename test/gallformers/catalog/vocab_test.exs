@@ -1,8 +1,9 @@
 defmodule Gallformers.Catalog.VocabTest do
   @moduledoc """
   Catalog vocabularies (`9449` §4, Task 8): Trait values and term mappings
-  loaded from the contract (`priv/import/vocab/traits.json`), the provisional
-  generation groups, and the fixed list of Relationship types.
+  seeded from the contract (`priv/import/vocab/traits.json`) and added by
+  curators (`6611` Task 1), the provisional generation groups, and the fixed
+  list of Relationship types.
 
   Not async: the vocabulary tables are unique on their values, so concurrent
   sandbox transactions loading them wait on each other.
@@ -14,6 +15,7 @@ defmodule Gallformers.Catalog.VocabTest do
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationGroupTaxon
   alias Gallformers.Catalog.Vocab.GenerationValue
+  alias Gallformers.Catalog.Vocab.Loader
   alias Gallformers.Catalog.Vocab.TraitTermMapping
   alias Gallformers.Catalog.Vocab.TraitValue
 
@@ -92,6 +94,9 @@ defmodule Gallformers.Catalog.VocabTest do
 
       assert %TraitValue{definition: "The Gall forms and grows in spring."} =
                Catalog.get_trait_value("season", "Spring")
+
+      assert %TraitValue{definition: "Galls are located on the leaf" <> _} =
+               Catalog.get_trait_value("plant_part", "leaf")
     end
 
     test "loads every generation value in the contract into a generation group" do
@@ -135,29 +140,67 @@ defmodule Gallformers.Catalog.VocabTest do
       assert Repo.aggregate(GenerationGroupTaxon, :count) == mapped
     end
 
-    test "loads the term mappings" do
+    test "loads the terms, one per row, as seeded placements" do
       {:ok, _counts} = Catalog.load_vocab(test_actor())
 
-      assert %TraitTermMapping{maps_to: ["flower"], candidates: []} =
-               Repo.get_by(TraitTermMapping,
-                 trait: "plant_part",
-                 term: "inflorescence, raceme, catkin, ament"
-               )
+      for term <- ~w(inflorescence raceme catkin ament) do
+        assert %TraitTermMapping{
+                 status: :placed,
+                 categories: ["flower"],
+                 candidates: [],
+                 placed_by: :seed,
+                 placed_at: %DateTime{}
+               } = Catalog.get_term("plant_part", term)
+      end
+
+      assert %TraitTermMapping{status: :placed, categories: ["globular"]} =
+               Catalog.get_term("shape", "ovoid")
 
       assert %TraitTermMapping{
-               maps_to: [],
+               status: :ambiguous,
+               categories: [],
                candidates: ["tapered swelling", "abrupt swelling", "stem club"],
-               rule: "Choose the candidate" <> _
-             } = Repo.get_by(TraitTermMapping, trait: "form", term: "swelling")
+               rule: "The category depends on the gall" <> _
+             } = Catalog.get_term("form", "swelling")
+
+      # On the leaf, with no more precise place: `leaf` alone (d213).
+      assert %TraitTermMapping{status: :placed, categories: ["leaf"], rule: nil} =
+               Catalog.get_term("plant_part", "on the leaf")
 
       mappings = contract("traits.json")["mappings"]
 
       assert Repo.aggregate(from(m in TraitTermMapping, where: m.trait != "generation"), :count) ==
                length(mappings)
 
-      # The aphid values' other names (`8567`) map onto them.
-      assert %TraitTermMapping{maps_to: ["fundatrix"]} =
-               Repo.get_by(TraitTermMapping, trait: "generation", term: "stem mother")
+      # The aphid values' other names (`8567`), one per row, map onto them.
+      assert %TraitTermMapping{categories: ["fundatrix"]} =
+               Catalog.get_term("generation", "stem mother")
+
+      assert %TraitTermMapping{categories: ["exules"]} =
+               Catalog.get_term("generation", "alienicolae")
+
+      assert %TraitTermMapping{categories: ["exules"]} =
+               Catalog.get_term("generation", "virginoparae")
+    end
+
+    test "a fresh database loads the terms the migrated one holds, in the same order" do
+      {:ok, _counts} = Catalog.load_vocab(test_actor())
+
+      fields = [:trait, :term, :normalized_term, :status, :categories, :candidates, :rule]
+      terms = fn -> Enum.map(Catalog.list_trait_term_mappings(), &Map.take(&1, fields)) end
+      migrated = terms.()
+
+      Repo.delete_all(TraitTermMapping)
+      assert {:ok, %{trait_term_mappings: count}} = Catalog.load_vocab(test_actor())
+      assert count == length(migrated)
+      assert terms.() == migrated
+    end
+
+    test "the contract lists one term per row" do
+      for mapping <- contract("traits.json")["mappings"] do
+        assert mapping["status"] in ~w(placed ambiguous no_fit)
+        refute mapping["term"] =~ ", ", "#{mapping["term"]} lists several terms"
+      end
     end
 
     test "is idempotent: loading again writes nothing" do
@@ -190,25 +233,168 @@ defmodule Gallformers.Catalog.VocabTest do
                )
     end
 
-    test "updates a definition that changed and is audited" do
+    test "never overwrites a definition or term mapping edited in the database" do
       {:ok, _} = Catalog.load_vocab(test_actor())
 
       Repo.update_all(from(t in TraitValue, where: t.trait == "season" and t.value == "Spring"),
-        set: [definition: "stale"]
+        set: [definition: "Edited by a curator."]
       )
 
-      assert {:ok, %{trait_values: 1}} = Catalog.load_vocab(test_actor())
+      Repo.update_all(
+        from(m in TraitTermMapping, where: m.trait == "form" and m.term == "swelling"),
+        set: [rule: "Edited rule."]
+      )
 
+      assert {:ok, %{trait_values: 0, trait_term_mappings: 0}} = Catalog.load_vocab(test_actor())
+
+      assert Catalog.get_trait_value("season", "Spring").definition == "Edited by a curator."
+      assert Catalog.get_term("form", "swelling").rule == "Edited rule."
+    end
+
+    test "never overwrites a term placed in the database" do
+      {:ok, _} = Catalog.load_vocab(test_actor())
+
+      Repo.update_all(
+        from(m in TraitTermMapping, where: m.trait == "texture" and m.term == "rough"),
+        set: [status: :no_fit, categories: [], placed_by: :superadmin]
+      )
+
+      assert {:ok, %{trait_term_mappings: 0}} = Catalog.load_vocab(test_actor())
+
+      assert %TraitTermMapping{status: :no_fit, categories: [], placed_by: :superadmin} =
+               Catalog.get_term("texture", "rough")
+    end
+
+    test "seeds the values and term mappings a file holds that the database lacks" do
+      {:ok, _} = Catalog.load_vocab(test_actor())
+
+      contract = contract("traits.json")
+
+      contract =
+        contract
+        |> update_in(["traits", "shape", "values"], fn values ->
+          values ++ [%{"value" => "seeded shape", "definition" => "A shape from the file."}]
+        end)
+        |> update_in(["traits", "season", "values"], fn values ->
+          for v <- values,
+              do: if(v["value"] == "Spring", do: %{v | "definition" => "From the file."}, else: v)
+        end)
+        |> Map.update!("mappings", fn mappings ->
+          mappings ++
+            [
+              %{
+                "term" => "Seeded  Term",
+                "trait" => "shape",
+                "status" => "placed",
+                "categories" => ["sphere"]
+              },
+              # The same term in other words: the database holds it already.
+              %{
+                "term" => "OVOID",
+                "trait" => "shape",
+                "status" => "placed",
+                "categories" => ["sphere"]
+              }
+            ]
+        end)
+
+      path = Path.join(System.tmp_dir!(), "traits_#{System.unique_integer([:positive])}.json")
+      File.write!(path, Jason.encode!(contract))
+      on_exit(fn -> File.rm(path) end)
+
+      assert {:ok, %{trait_values: 1, trait_term_mappings: 1}} = Loader.load(test_actor(), path)
+
+      assert %TraitValue{definition: "A shape from the file."} =
+               Catalog.get_trait_value("shape", "seeded shape")
+
+      assert %TraitTermMapping{
+               term: "Seeded  Term",
+               normalized_term: "seeded term",
+               status: :placed,
+               categories: ["sphere"],
+               placed_by: :seed
+             } = Catalog.get_term("shape", "seeded term")
+
+      assert Catalog.get_term("shape", "ovoid").categories == ["globular"]
+
+      # The database's definition stays.
       assert Catalog.get_trait_value("season", "Spring").definition ==
                "The Gall forms and grows in spring."
+    end
+  end
 
-      assert [%{changed_from: %{"definition" => "stale"}}] =
-               Repo.all(
-                 from c in Carbonite.Change,
-                   where: c.table_name == "trait_values" and c.op == :update,
-                   order_by: c.id
-               )
-               |> Enum.drop(1)
+  describe "the leaf values (d213)" do
+    test "are the contract's plant parts on the leaf; the petiole is not one" do
+      parts = contract("traits.schema.json")["$defs"]["plant_part"]["enum"]
+
+      assert "leaf" in parts
+
+      assert Enum.sort(TraitValue.leaf_values()) ==
+               parts |> Enum.filter(&(&1 =~ "leaf")) |> List.delete("leaf") |> Enum.sort()
+
+      refute "petiole" in TraitValue.leaf_values()
+    end
+  end
+
+  describe "add_trait_value/2" do
+    setup do
+      {:ok, _} = Catalog.load_vocab(test_actor())
+      :ok
+    end
+
+    test "adds a value with its definition, audited" do
+      changes = audit_change_count()
+
+      assert {:ok, %TraitValue{trait: "shape", value: "lenticular"}} =
+               Catalog.add_trait_value(test_actor(), %{
+                 trait: "shape",
+                 value: "lenticular",
+                 definition: "Shaped like a lens: round and flattened, convex on both faces."
+               })
+
+      assert %TraitValue{definition: "Shaped like a lens" <> _} =
+               Catalog.get_trait_value("shape", "lenticular")
+
+      assert audit_change_count() == changes + 1
+    end
+
+    test "refuses a value without a definition" do
+      for definition <- [nil, "", "  "] do
+        assert {:error, changeset} =
+                 Catalog.add_trait_value(test_actor(), %{
+                   trait: "shape",
+                   value: "lenticular",
+                   definition: definition
+                 })
+
+        assert %{definition: ["can't be blank"]} = errors_on(changeset)
+      end
+
+      refute Catalog.get_trait_value("shape", "lenticular")
+    end
+
+    test "refuses an unknown trait, and generation" do
+      for trait <- ["size", "generation", nil] do
+        assert {:error, changeset} =
+                 Catalog.add_trait_value(test_actor(), %{
+                   trait: trait,
+                   value: "big",
+                   definition: "Large."
+                 })
+
+        assert %{trait: [_]} = errors_on(changeset)
+      end
+    end
+
+    test "refuses a value the Trait already has" do
+      assert {:error, changeset} =
+               Catalog.add_trait_value(test_actor(), %{
+                 trait: "season",
+                 value: "Spring",
+                 definition: "Again."
+               })
+
+      assert %{value: ["has already been taken"]} = errors_on(changeset)
     end
   end
 end

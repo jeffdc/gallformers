@@ -6,7 +6,7 @@ defmodule Mix.Tasks.Gallformers.Import.Submit do
   (`Gallformers.Import.submit_package/3`): its `document.json`,
   `taxonomy.json`, `gall.json` and `review.json` go to the private bucket,
   and the package is registered, validated and resolved, ready for review
-  in the admin queue (`/admin/queue`). The directory's other files (prompts,
+  on its Source's page (`/admin/review`). The directory's other files (prompts,
   notes, transcripts) stay behind.
 
       MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.import.submit \\

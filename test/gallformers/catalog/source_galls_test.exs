@@ -5,7 +5,8 @@ defmodule Gallformers.Catalog.SourceGallsTest do
   Facts, and for the Gallformers Source its notes.
 
   The converted seeds (`priv/repo/test_seeds.sql`) have Source 59 cited on
-  Gall 300 and Gallformers notes (Source 58) on Galls 300 and 301.
+  Gall 300 and Gallformers notes (Source 58) on Galls 300 and 301; Galls 102
+  and 304 are undescribed, so their legacy Facts are Gallformers' too.
 
   Not async: some tests use the Gallformers Source (see
   `Gallformers.CatalogFixtures`).
@@ -40,8 +41,9 @@ defmodule Gallformers.Catalog.SourceGallsTest do
            ]
   end
 
-  test "the Gallformers Source lists the Galls with its notes" do
-    assert ids(Catalog.list_galls_for_source(58)) == [300, 301]
+  test "the Gallformers Source lists the Galls with its notes, and the undescribed Galls it holds Facts for" do
+    # Seed Galls 102 and 304 are undescribed: their legacy Facts are Gallformers' (`20e5`).
+    assert ids(Catalog.list_galls_for_source(58)) |> Enum.sort() == [102, 300, 301, 304]
   end
 
   test "a Source attributing Facts only, each Gall once, by the name shown" do

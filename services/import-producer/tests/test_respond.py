@@ -42,6 +42,21 @@ def test_responses_are_recorded_on_their_findings():
     assert "response" not in REVIEW["findings"][0]  # the input is left alone
 
 
+def test_an_answers_summary_is_kept_on_its_response():
+    answers = [
+        {
+            "n": 1,
+            "decision": "agree",
+            "reason": "f1 removed.",
+            "summary": " The quote isn't there. ",
+        },
+        {"n": 2, "decision": "disagree", "reason": "#/texts/4 says it induces the gall."},
+    ]
+    review = apply_responses(REVIEW, answers, RESULT, RESPONDER)
+    assert review["findings"][0]["response"]["summary"] == "The quote isn't there."
+    assert "summary" not in review["findings"][1]["response"]
+
+
 def test_every_finding_needs_exactly_one_answer():
     with pytest.raises(ValueError, match="finding 2 has no answer"):
         apply_responses(REVIEW, [{"n": 1, "decision": "agree", "reason": "x"}], RESULT, RESPONDER)
@@ -75,3 +90,16 @@ def test_responder_may_only_run_the_validator(package):
     assert cmd[cmd.index("--tools") + 1] == "Read,Write,Edit,Grep,Bash"
     allowed = cmd[cmd.index("--allowedTools") + 1 : cmd.index("--permission-mode")]
     assert len(allowed) == 1 and "validate.py" in allowed[0]
+
+
+def test_phase6_waits_for_every_trait_term_to_be_placed(package, monkeypatch):
+    """A reviewer that left a trait term unplaced must review again: phase 6 can't place blind."""
+    import producer.respond as respond
+
+    gall = {"format_version": 4, "facts": [{"id": "f1", "kind": "trait", "trait": "shape", "term": "ovoid",
+                                            "category": {"value": "globular"}}]}  # fmt: skip
+    (package / "gall.json").write_text(json.dumps(gall), encoding="utf-8")
+    monkeypatch.setattr(respond, "validate", lambda pkg, review=False: {"exit": 0, "output": ""})
+    monkeypatch.setattr(respond.subprocess, "run", lambda *a, **k: pytest.fail("phase 6 ran"))
+    record = respond.run_respond(package)
+    assert "placed" in record["blocked"] and "opus" in record["blocked"]

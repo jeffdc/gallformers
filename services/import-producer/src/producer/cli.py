@@ -58,6 +58,21 @@ def render(package):
 
 
 @cli.command()
+@click.argument("packages", nargs=-1, type=click.Path(exists=True, file_okay=False, path_type=Path))
+def note(packages):
+    """Ready Gall notes for phase 3 (free): document.txt and the empty taxonomy batch.
+
+    Each PACKAGE is a directory `mix gallformers.import.notes` wrote (document.json, note.json).
+    """
+    from producer.note import is_note, prepare
+
+    for package in packages:
+        if not is_note(package):
+            raise click.ClickException(f"{package} has no note.json")
+        click.echo(json.dumps(prepare(package)))
+
+
+@cli.command()
 @click.argument("package", type=click.Path(exists=True, file_okay=False, path_type=Path))
 @click.option(
     "--phase",

@@ -110,6 +110,11 @@ defmodule GallformersWeb.Router do
     get "/species-sources/*path", AdminRedirectController, :sources
     get "/gallhost", AdminRedirectController, :gall_host
     get "/images", AdminRedirectController, :images
+    # The item-first review queue, replaced by the Source-down review (6611)
+    get "/queue", AdminRedirectController, :queue
+    get "/queue/packages/:id", AdminRedirectController, :queue_package
+    # The vocabulary requests, replaced by the vocabulary page (d213)
+    get "/vocab-requests", AdminRedirectController, :vocab_requests
   end
 
   # The admin screens on the new back-end (matter a856). Their own live
@@ -119,9 +124,17 @@ defmodule GallformersWeb.Router do
     pipe_through [:browser, :admin]
 
     live_session :admin, on_mount: {GallformersWeb.Live.UserAuth, :require_admin_actor} do
-      # Review queue and import packages
-      live "/queue", Admin.QueueLive.Index, :index
-      live "/queue/packages/:id", Admin.QueueLive.Package, :show
+      # Source-down review of import packages, and Gall rename proposals (6611)
+      live "/review", Admin.ReviewLive.Sources, :index
+      live "/review/renames", Admin.ReviewLive.Renames, :index
+      live "/review/sources/:id", Admin.ReviewLive.Source, :source
+      live "/review/packages/:package_id", Admin.ReviewLive.Source, :package
+      # A Source's Facts: what approving writes, with edits (f14c, item 4)
+      live "/review/sources/:id/facts", Admin.ReviewLive.Facts, :source
+      live "/review/packages/:package_id/facts", Admin.ReviewLive.Facts, :package
+      # A Source's review steps: names, galls, disputes, traits, hedges (d213)
+      live "/review/sources/:id/:step", Admin.ReviewLive.Step, :source
+      live "/review/packages/:package_id/:step", Admin.ReviewLive.Step, :package
 
       # Source editor
       live "/sources", Admin.SourceLive.Index, :index
@@ -153,6 +166,8 @@ defmodule GallformersWeb.Router do
     live_session :superadmin, on_mount: {GallformersWeb.Live.UserAuth, :require_superadmin} do
       # User management (superadmin only)
       live "/users", Admin.UsersLive, :index
+      # The Trait vocabulary: Source terms and categories (d213)
+      live "/vocabulary", Admin.VocabularyLive, :index
     end
   end
 

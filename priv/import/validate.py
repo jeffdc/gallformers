@@ -11,18 +11,22 @@ Usage:
 PATH is a batch file (taxonomy.json / gall.json) or a package directory, in
 which case every taxonomy.json and gall.json in it is validated.
 
-Phase 4 checks:
+Phase 4 checks, for format 4 batches and the format 3 batches already delivered:
 - the schemas (shape and controlled values);
 - the package: document.json present and matching its sha256, every quote
   found in its document item, references declared, ids unique, qualifier
   targets, one Inducer per Gall, new Galls have Facts, at most one description
-  per Gall, no synonymy or split above family.
+  per Gall, no synonymy or split above family; a batch quoting a Gall's
+  Gallformers note has the note as one text item and quotes it; a format 4
+  trait Fact's term is found in its evidence.
 
 --review adds the readiness gate, for package directories: review.json exists
 and is well-formed; with no findings, it covers the current batches; with
 findings, every one has a phase 6 response and the batches are the ones phase 6
-left. Disputed findings (the producer disagrees) are reported, for human review
-at intake, without failing.
+left. For a format 4 gall batch, review.json places every trait Fact's term
+(`placements`), once per reviewer, in a value of its Trait or none. Disputed
+findings (the producer disagrees), and trait Facts phase 6 left without a
+placement, are reported for human review at intake, without failing.
 
 Exit status: 0 if everything checked is free of errors (warnings allowed), 1 otherwise.
 
@@ -164,6 +168,8 @@ class PackageChecks:
         self.batch = batch
         self.doc = doc
         self.document_sha256 = document_sha256
+        source = batch.get("source")
+        self.note = isinstance(source, dict) and source.get("gallformers") is True and "note" in source
         self.problems = []
         self.used_taxa = set()
         self.used_galls = set()
@@ -203,6 +209,8 @@ class PackageChecks:
     def evidence(self, evidence, where):
         for i, ev in enumerate(evidence):
             path = f"{where}/evidence/{i}"
+            if "statement" in ev and self.note:
+                self.error(f"{path}: a note batch quotes its note; give a quote, not a statement")
             if "statement" in ev or self.doc is None:
                 continue
             ref = ev.get("item")
@@ -220,6 +228,24 @@ class PackageChecks:
                 elsewhere = [o["self_ref"] for o in items(self.doc) if quote_in(quote, item_text(o))]
                 hint = f"; found in {', '.join(elsewhere[:3])}" if elsewhere else "; not found anywhere in the document"
                 self.error(f"{path}: quote not found in {ref}{hint}: {quote[:80]!r}")
+
+    def term(self, fact, where):
+        """A format 4 trait Fact's term is the Source's own words: found, ignoring case, in one of
+        its quotes or whole items. Statements (no document) aren't checked."""
+        if self.doc is None:
+            return
+        texts = []
+        for ev in fact.get("evidence", []):
+            if "statement" in ev:
+                continue
+            if ev.get("whole_item"):
+                item = resolve(self.doc, ev.get("item") or "")
+                texts.append(item_text(item) if item else "")
+            else:
+                texts.append(ev.get("quote", ""))
+        term = fact["term"]
+        if texts and not any(quote_in(term.lower(), text.lower()) for text in texts):
+            self.error(f"{where}: term {term!r} is not in its evidence: give the Source's own words")
 
     def above_family(self, ref):
         rank = self.ranks.get(ref)
@@ -289,6 +315,8 @@ class PackageChecks:
                 about.add(fact.get("gall"))
                 if kind == "description":
                     descriptions[fact.get("gall")] += 1
+                if kind == "trait" and isinstance(fact.get("term"), str):
+                    self.term(fact, where)
             self.evidence(fact.get("evidence", []), where)
 
         for gall, count in inducers.items():
@@ -310,6 +338,34 @@ class PackageChecks:
                     f"inducer_of Fact from {inducer}"
                 )
 
+    def common_name_uses(self):
+        """Every use of a taxon ref other than as a Host, as (ref, where)."""
+        if self.batch.get("batch_type") == "taxonomy":
+            for i, act in enumerate(self.batch.get("acts", [])):
+                for key in ("taxon", "parent", "name", "accepted"):
+                    yield act.get(key), f"acts/{i}"
+                for ref in act.get("into", []):
+                    yield ref, f"acts/{i}"
+            return
+        for i, g in enumerate(self.batch.get("galls", [])):
+            yield g.get("identified_by", {}).get("inducer"), f"galls/{i}/identified_by"
+        for i, fact in enumerate(self.batch.get("facts", [])):
+            if fact.get("kind") != "relationship":
+                continue
+            if fact.get("type") != "host_of":
+                yield fact.get("subject"), f"facts/{i}"
+            yield fact.get("object"), f"facts/{i}"
+
+    def common_names(self):
+        """A taxon declared by a common name is only ever a Host: a host_of subject or identified_by.host."""
+        common = {t.get("ref") for t in self.batch.get("taxa", []) if t.get("common_name") is True}
+        for ref, where in self.common_name_uses():
+            if ref in common:
+                self.error(
+                    f"{where}: taxon {ref} is declared by a common name, so it may only be a Host "
+                    "(a host_of subject or identified_by.host)"
+                )
+
     def run(self):
         self.taxa = self.declared("taxa")
         self.galls = self.declared("galls")
@@ -317,11 +373,14 @@ class PackageChecks:
         expected = self.batch.get("source", {}).get("document", {}).get("sha256")
         if self.document_sha256 and expected and expected != self.document_sha256:
             self.error(f"source.document.sha256 is {expected}, but document.json hashes to {self.document_sha256}")
+        if self.note and self.doc is not None and [o["self_ref"] for o in items(self.doc)] != ["#/texts/0"]:
+            self.error("a note's document.json holds one text item, #/texts/0: the whole note")
 
         if self.batch.get("batch_type") == "taxonomy":
             self.taxonomy_batch()
         else:
             self.gall_batch()
+        self.common_names()
 
         for i, entry in enumerate(self.batch.get("unmapped", [])):
             self.gall(entry.get("gall"), f"unmapped/{i}")
@@ -395,13 +454,14 @@ def review_problems(package, registry, schemas):
         return [("error", e) for e in errors]
 
     problems = []
-    statements, current = {}, {}
+    statements, current, batches = {}, {}, {}
     for name in BATCH_FILES:
         batch_path = package / name
         if not batch_path.exists():
             continue
         current[name] = hashlib.sha256(batch_path.read_bytes()).hexdigest()
         batch = json.loads(batch_path.read_text(encoding="utf-8"))
+        batches[name] = batch
         statements[name] = {x.get("id") for key in ("acts", "facts") for x in batch.get(key, [])} | {
             x.get("ref") for key in ("taxa", "galls") for x in batch.get(key, [])
         }
@@ -431,6 +491,43 @@ def review_problems(package, registry, schemas):
             problems.append(("error", f"finding {label} has no phase 6 response"))
         else:
             problems.append(("error", f"phase 5 finding awaits phase 6: {label}: {finding['reason']}"))
+    gall = batches.get("gall.json")
+    if isinstance(gall, dict) and gall.get("format_version") == 4:
+        problems += placement_problems(gall, review, bool(responded), schemas)
+    return problems
+
+
+def placement_problems(gall, review, responded, schemas):
+    """Format 4: the reviewer placed every trait Fact's term (review.json `placements`), each in a
+    value of the Fact's Trait or none, once per reviewer. After phase 6 a trait Fact may have no
+    placement (phase 6 added or rewrote it) and a placement may outlive its Fact: the first goes
+    to a curator at intake."""
+    traits = {f.get("id"): f for f in gall.get("facts", []) if isinstance(f, dict) and f.get("kind") == "trait"}
+    values = schemas["traits.schema.json"]["$defs"]
+    problems, placed, seen = [], set(), Counter()
+    for p in review.get("placements", []):
+        ident, category = p["id"], p["category"]
+        seen[(ident, p.get("reviewer"))] += 1
+        fact = traits.get(ident)
+        if fact is None:
+            if not responded:
+                problems.append(("error", f"placement {ident} is not a trait Fact in gall.json"))
+            continue
+        placed.add(ident)
+        trait = fact.get("trait")
+        if category is not None and category["value"] not in values.get(trait, {}).get("enum", []):
+            problems.append(("error", f"placement {ident}: {category['value']!r} is not a {trait} value"))
+    for (ident, reviewer), count in seen.items():
+        if count > 1:
+            who = f" by {reviewer}" if reviewer else ""
+            problems.append(("error", f"trait Fact {ident} is placed more than once{who}"))
+    for ident in traits:
+        if ident in placed:
+            continue
+        if responded:
+            problems.append(("warning", f"trait Fact {ident} has no reviewer placement (added or changed in phase 6): a curator places its term at intake"))
+        else:
+            problems.append(("error", f"trait Fact {ident} has no placement: phase 5 places every trait term"))
     return problems
 
 

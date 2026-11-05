@@ -18,36 +18,78 @@ defmodule Gallformers.Import.GallMatcher do
       batch's `host_of` Facts for the Gall) and the plant part break the tie
       (a filter that would leave none is skipped).
 
+  Each candidate is compared with what the batch says of the Gall
+  (`Gallformers.Import.GallComparison`: Host, where on the plant,
+  detachable, generation and season, form); candidates are ranked by how
+  many fields agree, each with its comparison (`detail["comparisons"]`). A
+  lone candidate that conflicts with the Source (a different coarse plant
+  part or form) is not resolved or proposed: it is `:ambiguous`, only the
+  best match (`detail["best"]`), with the fields it conflicts on
+  (`detail["conflicts"]`), for an admin to check.
+
   One left is `:resolved` (method `"identified_by"`), unless another of the
   batch's Galls resolves to it too (their identifying fields are equal):
   then both are `:ambiguous`, offered that entry for an admin to decide.
+  Two Galls of different generations (a fundatrix and its apterae) matching
+  one entry that names no generation are a pair: one of them is the entry,
+  the other is new. Both are `:ambiguous`, each with `detail["pair"]` (the
+  other's ref, name and generation); the second is flagged
+  `"paired_with_gall"` and has no queue item, the first's item decides both
+  (`settle_pairs/1`). A lone Gall of a generation the Source never names,
+  when the Inducer alternates generations (generation group `heterogony`),
+  is only proposed: the Source may describe the other generation.
+
   Several are `:ambiguous` with a reason (e.g. a generation the Source never
-  names);
-  none is `:new` when the Source presents the Gall as new, otherwise
+  names); none is `:new` when the Source presents the Gall as new, otherwise
   `:unresolved` — unless the Gall is `formerly_undescribed`, which is
   matched as undescribed.
+
+  ## Galls waiting on their Inducer
+
+  A Gall whose Inducer is unresolved, ambiguous or a held-valid synonym is
+  not matched: it is `:unresolved`, flagged `"waits_on_inducer"` with the
+  Inducer's ref as `detail["waits_on"]`, and has no queue item of its own —
+  the Inducer's item decides it. Once the Inducer is decided (taxon
+  decisions are overlaid before matching) the Gall is matched as any other;
+  once it is skipped the Gall is queued on its own.
 
   ## Undescribed Galls
 
   A Gall whose Inducer is only a genus or family, or which has only a Host
   (or is `formerly_undescribed`), is matched against undescribed entries:
   Galls on one of its Hosts (or their genus) whose current Inducer is above
-  species rank or unknown and related to the Gall's genus. Candidates are
-  ranked by the descriptive words of the entry's name ("Andricus
+  species rank or unknown and within the rank the Source states — that
+  taxon (a species' genus), its descendants, or its ancestors up to its
+  family ("Unknown (Cynipidae)"), never a taxon that only shares an
+  ancestor. An entry whose plant parts are recorded must share the Gall's
+  (the leaf's parts count as one, as do bud and stem). Candidates are ranked
+  by the descriptive words of the entry's name ("Andricus
   q-lobata-spindle-gall" → *spindle*) shared with the Gall's
-  `name_as_written` and its Traits in the batch. One candidate is
-  proposed, several are offered — both `:ambiguous` (method
-  `"undescribed"`), for an admin; none is `:new` when the Source presents
-  the Gall as new, else `:unresolved`. Two of the batch's Galls cannot be
-  one entry: a candidate proposed for both is offered to both instead.
+  `name_as_written` and its Traits in the batch, then by agreeing fields.
+  An undescribed match is never firm: one candidate is only the best match
+  (`detail["best"]`), several are offered — both `:ambiguous` (method
+  `"undescribed"`), for an admin. Two of the batch's Galls cannot be one
+  entry: a candidate picked (proposed or best) for both is offered to both
+  instead, and a candidate picked for one is dropped from the others'
+  candidates.
+
+  With no candidate, the Galls whose current Inducer is a taxon the batch
+  says `emerged_from` the Gall are offered (method `"emerged_from"`; one is
+  only the best match); with
+  none of those either the Gall is `:new` when the Source presents it as
+  new, else `:unresolved` with new proposed (`detail["proposed"]` `"new"`).
 
   A supplied `gallformers_gall_id` that is not the match or among the
-  candidates is flagged `"supplied_id_disagrees"`.
+  candidates is flagged `"supplied_id_disagrees"` — except in a batch
+  reading a Gall's note (`source.note`), whose Gall with the note's ID is
+  that Gall (method `"note"`), with no matching.
   """
 
   alias Gallformers.Catalog
+  alias Gallformers.Import.GallComparison
   alias Gallformers.Import.Resolver
   alias Gallformers.Taxa
+  alias Gallformers.Taxa.Rank
 
   @typedoc "A Gall statement's resolution, as `Gallformers.Import.BatchStatement` takes it."
   @type statement :: %{
@@ -64,22 +106,54 @@ defmodule Gallformers.Import.GallMatcher do
   @species_or_below ["species", "subspecies", "variety", "form"]
   @species_ranks [:species, :subspecies, :variety, :form]
   @stop_words ~w(gall galls the and of on in a an sp spp wasp unknown from with its this)
+  @open [:unresolved, :ambiguous]
+  @not_queued ["waits_on_inducer", "paired_with_gall"]
 
   @doc """
   Matches every Gall of `batch` (a decoded gall batch), given the batch's
-  taxon statements (`Gallformers.Import.Resolver.resolve_taxa/2`).
+  taxon statements (`Gallformers.Import.Resolver.resolve_taxa/2`) with the
+  admin's decisions on them overlaid.
   """
   @spec match_galls(map(), [Resolver.statement()]) :: [statement()]
   def match_galls(batch, taxon_statements) do
     taxa = Map.new(taxon_statements, &{&1.ref, &1})
     facts = List.wrap(batch["facts"])
+    noted = noted_gall_id(batch["source"])
 
     batch
     |> Map.get("galls", [])
     |> List.wrap()
-    |> Enum.map(&match_gall(&1, taxa, facts))
+    |> Enum.map(fn g ->
+      if noted && g["gallformers_gall_id"] == noted,
+        do: note_gall(g, noted),
+        else: match_gall(g, taxa, facts)
+    end)
     |> unshare_resolutions()
     |> unshare_proposals()
+    |> drop_sibling_proposals()
+    |> unshare_proposals()
+  end
+
+  # A batch reading a Gall's note (`source.note`) is about that Gall by
+  # construction: the Gall it names with the note's ID is that Gall, when
+  # Gallformers holds it (a missing one is the Source step's queue item).
+  defp noted_gall_id(%{"gallformers" => true, "note" => %{"gallformers_gall_id" => id}})
+       when is_integer(id),
+       do: if(Catalog.get_gall(id), do: id)
+
+  defp noted_gall_id(_source), do: nil
+
+  defp note_gall(g, gall_id) do
+    %{
+      kind: :gall,
+      ref: g["ref"],
+      resolution: :resolved,
+      method: "note",
+      gall_id: gall_id,
+      candidate_ids: [],
+      flags: [],
+      detail: %{"name_as_written" => g["name_as_written"], "new" => false}
+    }
   end
 
   defp match_gall(g, taxa, facts) do
@@ -106,11 +180,22 @@ defmodule Gallformers.Import.GallMatcher do
 
     hosts = host_ids(g, ident, taxa, facts)
 
+    m = %{
+      g: g,
+      ident: ident,
+      inducer: inducer,
+      hosts: hosts,
+      facts: facts,
+      emerged: emerged_from(g, taxa, facts),
+      source: GallComparison.source_side(g, facts, hosts)
+    }
+
     statement =
-      if described?(inducer) do
-        described(base, g, ident, inducer, hosts)
-      else
-        undescribed(base, g, inducer, hosts, facts)
+      cond do
+        described?(inducer) -> described(base, m)
+        open?(inducer) and "skipped" in inducer.flags -> skipped_inducer(base)
+        open?(inducer) -> waits_on_inducer(base, ident["inducer"])
+        true -> undescribed(base, m)
       end
 
     check_supplied_id(statement, g["gallformers_gall_id"])
@@ -121,9 +206,29 @@ defmodule Gallformers.Import.GallMatcher do
 
   defp described?(_inducer), do: false
 
+  defp open?(%{resolution: resolution}), do: resolution in @open
+  defp open?(_inducer), do: false
+
+  # -- waiting on the Inducer --------------------------------------------------
+
+  defp waits_on_inducer(base, ref) do
+    %{
+      base
+      | flags: ["waits_on_inducer"],
+        detail:
+          Map.merge(base.detail, %{
+            "waits_on" => ref,
+            "reason" => "waits on its Inducer (#{ref})"
+          })
+    }
+  end
+
+  defp skipped_inducer(base),
+    do: unresolved(base, "its Inducer was skipped: the Gall is new, or skipped too")
+
   # -- described Galls ---------------------------------------------------------
 
-  defp described(base, g, ident, inducer, hosts) do
+  defp described(base, %{g: g, ident: ident, inducer: inducer, hosts: hosts} = m) do
     generation = get_in(ident, ["generation", "value"])
     plant_part = get_in(ident, ["plant_part", "value"])
 
@@ -136,7 +241,7 @@ defmodule Gallformers.Import.GallMatcher do
 
     case candidates do
       [one] ->
-        %{base | resolution: :resolved, method: "identified_by", gall_id: one.gall_id}
+        lone_candidate(base, one, generation, inducer, m.source)
 
       [_ | _] = several ->
         reason =
@@ -145,16 +250,52 @@ defmodule Gallformers.Import.GallMatcher do
             else:
               "#{length(several)} Galls of this Inducer match and the Source names no generation"
 
-        ambiguous(base, "identified_by", several, reason)
+        ranked(base, "identified_by", several, m.source, reason)
 
       [] ->
         cond do
-          g["formerly_undescribed"] == true -> undescribed(base, g, inducer, hosts, [])
+          g["formerly_undescribed"] == true -> undescribed(base, m)
           g["new"] == true -> %{base | resolution: :new}
           true -> unresolved(base, "no Gall of this Inducer matches")
         end
     end
   end
+
+  # One Gall left resolves it, unless what the Source says conflicts with
+  # it (a different plant part or form: only the best match, for an admin
+  # to check), or the Source names no generation, the Gall has one and the
+  # Inducer alternates generations: the Source may describe the other
+  # generation, so it is only proposed.
+  defp lone_candidate(base, one, generation, inducer, source) do
+    comparison = GallComparison.compare(source, one)
+
+    cond do
+      comparison.conflicts != [] ->
+        reason =
+          "one Gall of this Inducer, which conflicts with the Source on " <>
+            "#{conflict_labels(comparison.conflicts)} (admin checks)"
+
+        base
+        |> ambiguous("identified_by", [one], reason)
+        |> with_comparisons([{one, comparison}])
+        |> pick("best", one.gall_id)
+
+      generation == nil and one.generation != nil and heterogony?(inducer.taxon_id) ->
+        reason =
+          "one Gall of this Inducer, of the #{one.generation} generation, which the Source " <>
+            "does not name (admin confirms)"
+
+        base
+        |> ambiguous("identified_by", [one], reason)
+        |> with_comparisons([{one, comparison}])
+        |> pick("proposed", one.gall_id)
+
+      true ->
+        %{base | resolution: :resolved, method: "identified_by", gall_id: one.gall_id}
+    end
+  end
+
+  defp conflict_labels(fields), do: Enum.map_join(fields, " and ", &GallComparison.label/1)
 
   defp by_generation(candidates, nil), do: candidates
 
@@ -178,9 +319,24 @@ defmodule Gallformers.Import.GallMatcher do
   defp shares_host?(summary, lineage),
     do: Enum.any?(summary.hosts, &MapSet.member?(lineage, &1.taxon_id))
 
+  # Whether the generation groups that apply to the taxon (those of its
+  # nearest mapped ancestor, itself included) include heterogony.
+  defp heterogony?(taxon_id) do
+    mapped =
+      for group <- Catalog.list_generation_groups(), t <- group.taxa, reduce: %{} do
+        acc -> Map.update(acc, t.taxon_id, [group.name], &[group.name | &1])
+      end
+
+    groups =
+      [taxon_id | Enum.map(Taxa.ancestors(taxon_id), & &1.id)]
+      |> Enum.find_value([], &Map.get(mapped, &1))
+
+    "heterogony" in groups
+  end
+
   # -- undescribed Galls -------------------------------------------------------
 
-  defp undescribed(base, g, inducer, hosts, facts) do
+  defp undescribed(base, %{g: g, inducer: inducer, hosts: hosts, facts: facts} = m) do
     case genus_scope(inducer) do
       :unresolved ->
         unresolved(base, "its Inducer is not resolved")
@@ -193,34 +349,69 @@ defmodule Gallformers.Import.GallMatcher do
           |> MapSet.to_list()
           |> Catalog.list_gall_summaries_by_host()
           |> Enum.filter(&undescribed_entry?(&1, scope))
+          |> by_organ(organs(g, facts))
           |> by_description(gall_words(g, facts))
 
-        undescribed_outcome(base, g, candidates)
+        undescribed_outcome(base, m, candidates)
     end
   end
 
-  defp undescribed_outcome(base, g, {[], _agree?}) do
-    if g["new"] == true,
-      do: %{base | resolution: :new},
-      else: unresolved(base, "no undescribed Gall on its Host matches")
+  defp undescribed_outcome(base, m, {[], _agree?}) do
+    case emerged_candidates(m) do
+      [] ->
+        if m.g["new"] == true,
+          do: %{base | resolution: :new},
+          else:
+            base
+            |> unresolved("no undescribed Gall on its Host matches: new proposed")
+            |> put_in([:detail, "proposed"], "new")
+
+      candidates ->
+        refs = Enum.map_join(m.emerged, ", ", &elem(&1, 0))
+
+        reason =
+          "no undescribed Gall on its Host matches; the Galls of #{refs}, which emerged from it"
+
+        statement = ranked(base, "emerged_from", candidates, m.source, reason)
+
+        case candidates do
+          [one] -> pick(statement, "best", one.gall_id)
+          _several -> statement
+        end
+    end
   end
 
-  defp undescribed_outcome(base, _g, {[one], agree?}) do
+  # An undescribed match is never firm: one candidate is only the best
+  # match, for an admin to confirm.
+  defp undescribed_outcome(base, m, {[one], agree?}) do
     reason =
       if agree?,
         do: "one undescribed candidate (admin confirms)",
         else: "one undescribed candidate, its description differs (admin checks)"
 
     base
-    |> ambiguous("undescribed", [one], reason)
-    |> put_in([:detail, "proposed"], one.gall_id)
+    |> ranked("undescribed", [one], m.source, reason)
+    |> pick("best", one.gall_id)
   end
 
-  defp undescribed_outcome(base, _g, {several, _agree?}),
-    do: ambiguous(base, "undescribed", several, "several undescribed candidates (admin picks)")
+  defp undescribed_outcome(base, m, {several, _agree?}),
+    do:
+      ranked(
+        base,
+        "undescribed",
+        several,
+        m.source,
+        "several undescribed candidates (admin picks)"
+      )
 
-  # The taxa an undescribed entry's Inducer may be: the Gall's genus (or
-  # family) with its ancestors; nil when the Gall has no Inducer.
+  defp best_undescribed(base, gall_id, reason) do
+    base
+    |> ambiguous("undescribed", [%{gall_id: gall_id}], reason)
+    |> pick("best", gall_id)
+  end
+
+  # The taxa an undescribed entry's Inducer may be, around the rank the
+  # Source states (a species' genus): nil when the Gall has no Inducer.
   defp genus_scope(nil), do: nil
 
   defp genus_scope(%{resolution: :resolved, taxon_id: id, detail: %{"rank" => rank}}) do
@@ -231,33 +422,80 @@ defmodule Gallformers.Import.GallMatcher do
         id
       end
 
-    genus_id && lineage([genus_id])
+    genus_id && scope(genus_id)
   end
 
   defp genus_scope(%{resolution: :new, detail: %{"name_as_written" => name} = detail}) do
     genus = (detail["name_reading"] || name) |> String.split() |> List.first()
 
     case genus && Taxa.resolve_name(genus, rank: :genus) do
-      {:ok, taxon} -> lineage([taxon.id])
+      {:ok, taxon} -> scope(taxon.id)
       _ -> nil
     end
   end
 
   defp genus_scope(_inducer), do: :unresolved
 
+  # The stated taxon, and it with its ancestors up to its family (an entry
+  # known only to the family may be this Gall; one of a sibling tribe not).
+  defp scope(id) do
+    up =
+      id
+      |> Taxa.ancestors()
+      |> Enum.take_while(&(&1.rank == :family or Rank.below?(&1.rank, :family)))
+
+    %{id: id, up: MapSet.new([id | Enum.map(up, & &1.id)])}
+  end
+
   # An undescribed entry: no Inducer, or only Inducers above species rank
-  # that are related to the scope (the same taxon, an ancestor of it, or a
-  # descendant).
+  # that are within the scope.
   defp undescribed_entry?(summary, scope) do
     Enum.all?(summary.inducers, &(&1.rank not in @species_ranks)) and
       (scope == nil or summary.inducers == [] or
          Enum.any?(summary.inducers, &related?(&1.taxon_id, scope)))
   end
 
+  # The stated taxon, one of its ancestors up to the family, or a descendant.
   defp related?(taxon_id, scope) do
-    MapSet.member?(scope, taxon_id) or
-      taxon_id |> Taxa.ancestors() |> Enum.any?(&MapSet.member?(scope, &1.id))
+    MapSet.member?(scope.up, taxon_id) or
+      taxon_id |> Taxa.ancestors() |> Enum.any?(&(&1.id == scope.id))
   end
+
+  # The organs of the Gall's plant parts (`identified_by` and its Traits in
+  # the batch).
+  defp organs(g, facts) do
+    from_traits =
+      for %{"kind" => "trait", "trait" => "plant_part", "gall" => ref} = f <- facts,
+          ref == g["ref"],
+          value = trait_value(f),
+          is_binary(value),
+          do: value
+
+    [get_in(g, ["identified_by", "plant_part", "value"]) | from_traits]
+    |> Enum.filter(&is_binary/1)
+    |> MapSet.new(&organ/1)
+  end
+
+  # Plant parts a Source and an entry may record differently for one Gall.
+  defp organ(part) do
+    cond do
+      part == "petiole" or String.contains?(part, "leaf") -> "leaf"
+      part in ["bud", "stem"] -> "stem"
+      true -> part
+    end
+  end
+
+  # Keeps the entries on one of the organs, or with no plant part recorded.
+  defp by_organ(candidates, organs) do
+    if MapSet.size(organs) == 0,
+      do: candidates,
+      else: Enum.filter(candidates, &(plant_parts(&1) == [] or on_organ?(&1, organs)))
+  end
+
+  defp plant_parts(summary), do: Map.get(summary.traits, "plant_part", [])
+
+  defp on_organ?(summary, organs),
+    do: Enum.any?(plant_parts(summary), &MapSet.member?(organs, organ(&1)))
 
   # Keeps the candidates sharing the most descriptive words with the Gall;
   # says whether the best shares any.
@@ -280,12 +518,17 @@ defmodule Gallformers.Import.GallMatcher do
 
   defp gall_words(g, facts) do
     traits =
-      for %{"kind" => "trait", "gall" => ref, "value" => %{"value" => value}} <- facts,
+      for %{"kind" => "trait", "gall" => ref} = f <- facts,
           ref == g["ref"],
-          do: value
+          word <- [trait_value(f), f["term"]],
+          is_binary(word),
+          do: word
 
     words(Enum.join([g["name_as_written"] || "" | traits], " "))
   end
+
+  # A trait Fact's category: format 4's suggestion, format 3's value.
+  defp trait_value(f), do: get_in(f, ["category", "value"]) || get_in(f, ["value", "value"])
 
   defp words(text) do
     ~r/[a-z]{3,}/
@@ -293,6 +536,40 @@ defmodule Gallformers.Import.GallMatcher do
     |> List.flatten()
     |> MapSet.new()
     |> MapSet.difference(MapSet.new(@stop_words))
+  end
+
+  # -- emerged from ------------------------------------------------------------
+
+  # The taxa the batch says emerged from the Gall, as {ref, taxon_id}: the
+  # resolved ones, and a held-valid synonym's taxon (only offered).
+  defp emerged_from(g, taxa, facts) do
+    refs =
+      for %{"kind" => "relationship", "type" => "emerged_from", "stance" => "confirm"} = f <-
+            facts,
+          f["object"] == g["ref"],
+          uniq: true,
+          do: f["subject"]
+
+    for ref <- refs, id = emerged_taxon(taxa[ref]), is_integer(id), do: {ref, id}
+  end
+
+  defp emerged_taxon(%{resolution: :resolved, taxon_id: id}), do: id
+
+  defp emerged_taxon(%{flags: flags, candidate_ids: [id]}),
+    do: if("synonym_held_valid" in flags, do: id)
+
+  defp emerged_taxon(_statement), do: nil
+
+  defp emerged_candidates(%{emerged: []}), do: []
+
+  defp emerged_candidates(%{emerged: emerged, hosts: hosts, g: g, facts: facts}) do
+    organs = organs(g, facts)
+
+    emerged
+    |> Enum.map(&elem(&1, 1))
+    |> Catalog.list_gall_summaries_by_inducer()
+    |> tie_break(&shares_host?(&1, host_lineage(hosts)))
+    |> tie_break(&on_organ?(&1, organs))
   end
 
   # -- Hosts -------------------------------------------------------------------
@@ -320,6 +597,49 @@ defmodule Gallformers.Import.GallMatcher do
 
   # -- outcomes ----------------------------------------------------------------
 
+  # Ambiguous between `candidates`, ranked by how many fields agree with
+  # what the Source says, each with its comparison (`detail["comparisons"]`).
+  defp ranked(base, method, candidates, source, reason) do
+    ranked = GallComparison.rank(candidates, source)
+
+    base
+    |> ambiguous(method, Enum.map(ranked, &elem(&1, 0)), reason)
+    |> with_comparisons(ranked)
+  end
+
+  defp with_comparisons(statement, ranked),
+    do:
+      put_in(
+        statement,
+        [:detail, "comparisons"],
+        Enum.map(ranked, &GallComparison.to_proposal(elem(&1, 1)))
+      )
+
+  # Picks `gall_id` as the `"proposed"` (firm) or `"best"` (only a
+  # suggestion) candidate, with its conflicts, if any.
+  defp pick(statement, key, gall_id) do
+    conflicts =
+      statement.detail
+      |> Map.get("comparisons", [])
+      |> Enum.find_value([], &(&1["gall_id"] == gall_id && &1["conflicts"]))
+
+    detail =
+      statement.detail
+      |> Map.drop(["proposed", "best", "conflicts"])
+      |> Map.put(key, gall_id)
+
+    detail = if conflicts == [], do: detail, else: Map.put(detail, "conflicts", conflicts)
+    %{statement | detail: detail}
+  end
+
+  # The candidate an item picks, firm or not.
+  defp picked(%{detail: detail}) do
+    case detail["proposed"] || detail["best"] do
+      id when is_integer(id) -> id
+      _ -> nil
+    end
+  end
+
   defp ambiguous(base, method, candidates, reason) do
     %{
       base
@@ -341,25 +661,57 @@ defmodule Gallformers.Import.GallMatcher do
       else: %{statement | flags: statement.flags ++ ["supplied_id_disagrees"]}
   end
 
+  # -- the batch's Galls together ----------------------------------------------
+
   # Two of the batch's Galls cannot be one entry: an entry resolved for
   # several (their identifying fields are equal) is offered to each of them,
-  # for an admin to decide (no silent merges).
+  # for an admin to decide (no silent merges); two of different generations
+  # resolved to an entry with none are a pair.
   defp unshare_resolutions(statements) do
-    shared =
+    replacements =
       statements
       |> Enum.filter(&(&1.resolution == :resolved))
-      |> Enum.frequencies_by(& &1.gall_id)
-      |> Enum.filter(fn {_id, n} -> n > 1 end)
-      |> MapSet.new(&elem(&1, 0))
+      |> Enum.group_by(& &1.gall_id)
+      |> Enum.flat_map(fn
+        {_id, [_one]} -> []
+        {id, [a, b]} -> if pair?(a, b), do: pair(a, b, id), else: unshare([a, b], id)
+        {id, several} -> unshare(several, id)
+      end)
+      |> Map.new(&{&1.ref, &1})
 
-    Enum.map(statements, fn s ->
-      if s.resolution == :resolved and MapSet.member?(shared, s.gall_id) do
-        reason = "the entry matches another of this batch's Galls too"
-        ambiguous(%{s | gall_id: nil}, s.method, [%{gall_id: s.gall_id}], reason)
-      else
-        s
-      end
-    end)
+    Enum.map(statements, &Map.get(replacements, &1.ref, &1))
+  end
+
+  defp unshare(statements, gall_id) do
+    reason = "the entry matches another of this batch's Galls too"
+
+    for s <- statements,
+        do: ambiguous(%{s | gall_id: nil}, s.method, [%{gall_id: gall_id}], reason)
+  end
+
+  # Two Galls of different generations: the entry they share names none
+  # (`by_generation/2` fell back to the Galls without one for both).
+  defp pair?(a, b) do
+    a.method == "identified_by" and b.method == "identified_by" and
+      is_binary(a.detail["generation"]) and is_binary(b.detail["generation"]) and
+      a.detail["generation"] != b.detail["generation"]
+  end
+
+  defp pair(a, b, gall_id) do
+    reason =
+      "#{a.ref} (#{a.detail["generation"]}) and #{b.ref} (#{b.detail["generation"]}) both " <>
+        "match this entry, which names no generation: one of them is it, the other is new"
+
+    [
+      a |> paired(b, gall_id, reason),
+      b |> paired(a, gall_id, reason) |> Map.update!(:flags, &(&1 ++ ["paired_with_gall"]))
+    ]
+  end
+
+  defp paired(s, mate, gall_id, reason) do
+    s = ambiguous(%{s | gall_id: nil}, s.method, [%{gall_id: gall_id}], reason)
+    pair = Map.take(mate.detail, ["name_as_written", "generation"]) |> Map.put("ref", mate.ref)
+    put_in(s, [:detail, "pair"], pair)
   end
 
   # Two of the batch's Galls cannot be one entry: offer a shared proposal to
@@ -367,17 +719,17 @@ defmodule Gallformers.Import.GallMatcher do
   defp unshare_proposals(statements) do
     shared =
       statements
-      |> Enum.map(& &1.detail["proposed"])
-      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&picked/1)
+      |> Enum.filter(&is_integer/1)
       |> Enum.frequencies()
       |> Enum.filter(fn {_id, n} -> n > 1 end)
       |> MapSet.new(&elem(&1, 0))
 
     Enum.map(statements, fn s ->
-      if MapSet.member?(shared, s.detail["proposed"]) do
+      if MapSet.member?(shared, picked(s)) do
         detail =
           s.detail
-          |> Map.delete("proposed")
+          |> Map.drop(["proposed", "best", "conflicts"])
           |> Map.put("reason", "the candidate is proposed for another of this batch's Galls too")
 
         %{s | detail: detail}
@@ -387,25 +739,135 @@ defmodule Gallformers.Import.GallMatcher do
     end)
   end
 
+  # Two of the batch's Galls cannot be one entry: a candidate proposed for
+  # one is not a candidate of the others' undescribed matches.
+  defp drop_sibling_proposals(statements) do
+    proposed =
+      for s <- statements,
+          id = picked(s),
+          is_integer(id),
+          into: %{},
+          do: {id, s.ref}
+
+    Enum.map(statements, &drop_proposed(&1, proposed))
+  end
+
+  defp drop_proposed(
+         %{method: "undescribed", resolution: :ambiguous, detail: detail} = s,
+         proposed
+       )
+       when not is_map_key(detail, "proposed") and not is_map_key(detail, "best") do
+    {taken, left} = Enum.split_with(s.candidate_ids, &Map.has_key?(proposed, &1))
+    elsewhere = Enum.map_join(taken, ", ", &"#{&1} is proposed for #{proposed[&1]}")
+
+    case left do
+      _ when taken == [] ->
+        s
+
+      [] ->
+        %{s | candidate_ids: []}
+        |> keep_comparisons([])
+        |> unresolved("#{elsewhere}: new proposed")
+        |> put_in([:detail, "proposed"], "new")
+
+      [one] ->
+        s
+        |> keep_comparisons([one])
+        |> best_undescribed(one, "#{elsewhere}; one undescribed candidate left (admin confirms)")
+
+      several ->
+        keep_comparisons(
+          %{
+            s
+            | candidate_ids: several,
+              detail:
+                Map.put(detail, "reason", "#{elsewhere}; several undescribed candidates left")
+          },
+          several
+        )
+    end
+  end
+
+  defp drop_proposed(statement, _proposed), do: statement
+
+  defp keep_comparisons(%{detail: %{"comparisons" => comparisons}} = s, ids),
+    do: put_in(s, [:detail, "comparisons"], Enum.filter(comparisons, &(&1["gall_id"] in ids)))
+
+  defp keep_comparisons(statement, _ids), do: statement
+
+  @doc """
+  Settles the pairs of `statements` (Gall statements with the admin's
+  decisions overlaid, `Gallformers.Import.Queue.overlay/2`): one of a pair
+  decided as the entry makes the other new; decided new, the other is the
+  entry (method `"pair"`). Decided otherwise or skipped, the other is no
+  longer paired and is queued on its own.
+  """
+  @spec settle_pairs([statement()]) :: [statement()]
+  def settle_pairs(statements) do
+    by_ref = Map.new(statements, &{&1.ref, &1})
+    Enum.map(statements, &settle_pair(&1, by_ref[get_in(&1.detail, ["pair", "ref"])]))
+  end
+
+  defp settle_pair(%{resolution: :ambiguous, candidate_ids: [id]} = s, %{} = mate) do
+    settled = %{s | flags: s.flags -- ["paired_with_gall"], method: "pair"}
+
+    cond do
+      mate.resolution == :resolved and mate.gall_id == id ->
+        %{settled | resolution: :new}
+
+      mate.resolution == :new ->
+        %{settled | resolution: :resolved, gall_id: id}
+
+      mate.resolution == :resolved or "skipped" in mate.flags ->
+        reason = "#{mate.ref}, its pair, was decided otherwise: the entry matches this Gall"
+
+        %{
+          s
+          | flags: s.flags -- ["paired_with_gall"],
+            detail: s.detail |> Map.delete("pair") |> Map.put("reason", reason)
+        }
+
+      true ->
+        s
+    end
+  end
+
+  defp settle_pair(statement, _mate), do: statement
+
   # -- the admin queue ---------------------------------------------------------
 
   @doc """
   The queue items the Gall statements call for, as
-  `%{kind, statement_ref, subject, proposal, reason}`: undescribed
-  candidates are `:undescribed_gall` (with the proposed one, if any), other
-  ambiguous matches `:ambiguous_match`, unresolved Galls
-  `:unresolved_name`.
+  `%{kind, statement_ref, subject, proposal, reason}`. The proposal holds
+  `"candidate_ids"` (ranked), `"proposed"` (a firm match, or `"new"`),
+  `"best"` (a match only to check), `"conflicts"` (the fields the proposed
+  or best match conflicts on), `"comparisons"` (each candidate's
+  `Gallformers.Import.GallComparison.to_proposal/1`, in rank order) and
+  `"pair"`, each when present. Undescribed
+  candidates are `:undescribed_gall` (with the best one, if any), other
+  ambiguous matches `:ambiguous_match` (a pair's with the other Gall as
+  `"pair"`), unresolved Galls `:unresolved_name` (`"proposed"` `"new"` when
+  new is proposed). A Gall waiting on its Inducer, and the second of a
+  pair, have none.
   """
   @spec queue_items([statement()]) :: [map()]
   def queue_items(statements) do
     for %{kind: :gall, resolution: resolution} = s <- statements,
-        resolution in [:ambiguous, :unresolved] do
+        resolution in @open,
+        not Enum.any?(@not_queued, &(&1 in s.flags)) do
       %{
         kind: queue_kind(s),
         statement_ref: s.ref,
         subject: Map.take(s.detail, ["name_as_written", "generation", "plant_part", "new"]),
         proposal:
-          %{"candidate_ids" => s.candidate_ids, "proposed" => s.detail["proposed"]}
+          %{
+            "candidate_ids" => s.candidate_ids,
+            "proposed" => s.detail["proposed"],
+            "best" => s.detail["best"],
+            "conflicts" => s.detail["conflicts"],
+            "comparisons" => s.detail["comparisons"],
+            "pair" => s.detail["pair"]
+          }
           |> Map.reject(fn {_k, v} -> is_nil(v) end),
         reason: s.detail["reason"]
       }

@@ -22,11 +22,26 @@ defmodule Gallformers.Import.QueueItem do
       `proposal` `%{"gall_id", "from", "to", "collision"}`. It comes from no
       package (`package_id` is nil for this kind only), and a Gall has at
       most one open.
+    * `:set_aside_statement` — a statement the producer set aside
+      (`unmapped`) as hedged or not a Fact. One per term within a package,
+      covering every Gall it was set aside for
+      (`Gallformers.Import.SetAside`). Never blocking.
+    * `:trait_term` — a Source's Trait term the import could not place on
+      its own (matter `d213`): an ambiguous term's use, a new term the
+      readers placed differently, a format 3 term
+      (`Gallformers.Import.TraitTerms`). One per term within a package,
+      covering its Galls. Never blocking.
+    * `:set_aside_term` — before `:trait_term`, a Trait term the producer
+      set aside. No longer made; kept so that older rows load.
 
-  `statement_ref` is the batch statement it is about (`t1`, `g1`, `f3`);
+  `statement_ref` is the batch statement it is about (`t1`, `g1`, `f3`;
+  `u:<slot>:<term>` for what was set aside and for a Trait term);
   `subject` what it is about, `proposal` the proposed answer and
   candidates, `decision` the admin's answer with `decided_by_*` and
-  `decided_at`.
+  `decided_at`. An open item's proposal can be rejected
+  (`proposal_rejected_at`, `proposal_rejected_by_name`): the item stays
+  open, and accepting proposals in bulk leaves it out
+  (`Gallformers.Import.Proposals`).
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -43,7 +58,10 @@ defmodule Gallformers.Import.QueueItem do
     :same_date_conflict,
     :taxonomy_disagreement,
     :generation_outside_group,
-    :gall_rename
+    :gall_rename,
+    :set_aside_term,
+    :set_aside_statement,
+    :trait_term
   ]
 
   @type kind ::
@@ -56,6 +74,9 @@ defmodule Gallformers.Import.QueueItem do
           | :taxonomy_disagreement
           | :generation_outside_group
           | :gall_rename
+          | :set_aside_term
+          | :set_aside_statement
+          | :trait_term
 
   @type t :: %__MODULE__{
           id: integer() | nil,
@@ -71,6 +92,8 @@ defmodule Gallformers.Import.QueueItem do
           decided_by_user_id: integer() | nil,
           decided_by_name: String.t() | nil,
           decided_at: DateTime.t() | nil,
+          proposal_rejected_at: DateTime.t() | nil,
+          proposal_rejected_by_name: String.t() | nil,
           package: Package.t() | Ecto.Association.NotLoaded.t() | nil,
           batch: Batch.t() | Ecto.Association.NotLoaded.t() | nil,
           inserted_at: DateTime.t() | nil,
@@ -88,6 +111,8 @@ defmodule Gallformers.Import.QueueItem do
     field :decided_by_user_id, :integer
     field :decided_by_name, :string
     field :decided_at, :utc_datetime
+    field :proposal_rejected_at, :utc_datetime
+    field :proposal_rejected_by_name, :string
 
     belongs_to :package, Package
     belongs_to :batch, Batch
@@ -115,6 +140,21 @@ defmodule Gallformers.Import.QueueItem do
     )
     |> check_constraint(:decision, name: :queue_items_decided_check)
   end
+
+  @doc """
+  A changeset marking an open item's proposal rejected by `actor` (nil:
+  restoring it).
+  """
+  @spec reject_changeset(t(), Gallformers.Audit.Actor.t() | nil) :: Ecto.Changeset.t()
+  def reject_changeset(item, nil),
+    do: change(item, proposal_rejected_at: nil, proposal_rejected_by_name: nil)
+
+  def reject_changeset(item, actor),
+    do:
+      change(item,
+        proposal_rejected_at: DateTime.utc_now(:second),
+        proposal_rejected_by_name: actor.name
+      )
 
   @doc """
   A changeset for a new (open) queue item. Every kind but `:gall_rename`

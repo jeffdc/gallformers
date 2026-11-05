@@ -421,6 +421,50 @@ defmodule Gallformers.Catalog.AssertTest do
       assert standing(other.fact.id) == :current
     end
 
+    test "the attribution carries the Source's term, verbatim", ctx do
+      key = %{gall_id: ctx.gall.id, trait: "shape", value: "globular"}
+
+      {:ok, ovoid} =
+        Catalog.assert_trait(
+          test_actor(),
+          key,
+          confirm(ctx.source, %{term: "Ovoid", value_as_written: "ovoid, somewhat flattened"})
+        )
+
+      {:ok, oval} =
+        Catalog.assert_trait(
+          test_actor(),
+          key,
+          confirm(source_fixture("B", "1970"), %{term: "oval"})
+        )
+
+      assert ovoid.fact.id == oval.fact.id
+      assert ovoid.attribution.term == "Ovoid"
+      assert oval.attribution.term == "oval"
+      assert Repo.get!(Gallformers.Facts.Attribution, oval.attribution.id).term == "oval"
+    end
+
+    test "with no term given, the attribution's term is the value as written", ctx do
+      {:ok, %{attribution: attribution}} =
+        Catalog.assert_trait(
+          test_actor(),
+          %{gall_id: ctx.gall.id, trait: "color", value: "red"},
+          confirm(ctx.source, %{value_as_written: "crimson"})
+        )
+
+      assert attribution.term == "crimson"
+
+      {:ok, %{attribution: attribution}} =
+        Catalog.assert_fact(
+          :trait,
+          test_actor(),
+          %{gall_id: ctx.gall.id, trait: "color", value: "green"},
+          confirm(ctx.source, %{value_as_written: "olive"})
+        )
+
+      assert attribution.term == "olive"
+    end
+
     test "detachable has one value: the newest Source's value supersedes", ctx do
       {:ok, older} =
         Catalog.assert_trait(

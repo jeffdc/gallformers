@@ -10,6 +10,8 @@ defmodule Gallformers.Facts.Attribution do
       authored date, or for Gallformers the statement's own date. Both are
       nil for an undated (legacy) statement.
     * `value_as_written` — a controlled value as the Source wrote it.
+    * `term` — for a Trait, the Source's term, verbatim ("ovoid", "oval"),
+      placed under the Fact's category (globular; matter `d213`).
     * `batch_id` — the import batch that last wrote it.
     * `statement_text` — Gallformers' statement; required for the Gallformers
       Source.
@@ -41,6 +43,7 @@ defmodule Gallformers.Facts.Attribution do
           stated_on: Date.t() | nil,
           stated_precision: PartialDate.precision() | nil,
           value_as_written: String.t() | nil,
+          term: String.t() | nil,
           batch_id: integer() | nil,
           statement_text: String.t() | nil,
           when_as_written: String.t() | nil,
@@ -58,6 +61,7 @@ defmodule Gallformers.Facts.Attribution do
     :fact_id,
     :stance,
     :value_as_written,
+    :term,
     :batch_id,
     :statement_text,
     :when_as_written,
@@ -71,6 +75,7 @@ defmodule Gallformers.Facts.Attribution do
     field :stated_on, :date
     field :stated_precision, Ecto.Enum, values: [:year, :month, :day]
     field :value_as_written, :string
+    field :term, :string
     field :batch_id, :integer
     field :statement_text, :string
     field :when_as_written, :string
@@ -91,7 +96,7 @@ defmodule Gallformers.Facts.Attribution do
   @doc """
   Creates a changeset for `source`'s attribution of a Fact.
 
-  `attrs` takes `fact_id`, `stance`, `value_as_written`, `batch_id`,
+  `attrs` takes `fact_id`, `stance`, `value_as_written`, `term`, `batch_id`,
   `statement_text`, `when_as_written`, `stage_as_written`,
   `status_as_written`, `authorship_as_written` and `stated`. The
   Source comes from `source`, never from `attrs`.

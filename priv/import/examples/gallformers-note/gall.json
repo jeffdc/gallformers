@@ -1,0 +1,51 @@
+{
+  "format": "gallformers-import",
+  "format_version": 4,
+  "vocabulary_version": "2026-10-11",
+  "batch_type": "gall",
+  "mode": "add",
+  "batch_id": "6a1d2f3e-8b7c-4e5d-9f01-2a3b4c5d6e07",
+  "produced_at": "2026-10-30T14:00:00Z",
+  "producer": { "name": "gallformers-import-producer-poc", "version": "0.1.0", "model": "example-model", "instructions_version": "2026-10-30" },
+
+  "source": {
+    "gallformers": true,
+    "note": { "gallformers_gall_id": 587, "stated_on": "2026-10-30" },
+    "document": { "file": "document.json", "sha256": "08150e6ece762caade780faeb0ffaf77ca64072f15c89d63ae4f5aca02bd9326" }
+  },
+
+  "taxa": [
+    { "ref": "t1", "name_as_written": "Andricus quercuscalifornicus", "rank": "species" },
+    { "ref": "t2", "name_as_written": "Quercus douglasii", "rank": "species" }
+  ],
+
+  "galls": [
+    {
+      "ref": "g1",
+      "name_as_written": "Andricus quercuscalifornicus agamic gall",
+      "identified_by": { "inducer": "t1", "generation": { "value": "agamic", "as_written": "agamic" } },
+      "gallformers_gall_id": 587
+    }
+  ],
+
+  "facts": [
+    {
+      "id": "f1", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g1",
+      "evidence": [{
+        "item": "#/texts/0",
+        "quote": "Quercus douglasii is added as a host based on this observation in California",
+        "observations": [{ "provider": "inaturalist", "id": "123456789" }]
+      }]
+    },
+    {
+      "id": "f2", "stance": "confirm", "kind": "occurrence", "gall": "g1",
+      "place": { "value": "US-CA", "as_written": "Contra Costa County, California" },
+      "when_as_written": "July",
+      "evidence": [{
+        "item": "#/texts/0",
+        "quote": "Observed in Contra Costa County, California in [July]",
+        "observations": [{ "provider": "inaturalist", "id": "123456791" }]
+      }]
+    }
+  ]
+}

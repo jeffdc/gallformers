@@ -1,6 +1,6 @@
 {
   "format": "gallformers-import",
-  "format_version": 3,
+  "format_version": 4,
   "vocabulary_version": "2026-10-11",
   "batch_type": "taxonomy",
   "mode": "replace",

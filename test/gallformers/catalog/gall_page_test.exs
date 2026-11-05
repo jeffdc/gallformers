@@ -20,6 +20,7 @@ defmodule Gallformers.Catalog.GallPageTest do
 
   alias Gallformers.Catalog
   alias Gallformers.Catalog.ReadModels.GallPage
+  alias Gallformers.Facts
   alias Gallformers.Facts.Attribution
   alias Gallformers.Ranges.DisplayRange
   alias Gallformers.Sources
@@ -266,6 +267,156 @@ defmodule Gallformers.Catalog.GallPageTest do
   test "the name shown is the override where set" do
     gall = gall_fixture(name: "Derived name", name_override: "Shown name")
     assert page!(gall.id).name == "Shown name"
+  end
+
+  describe "the Sources' terms for its Traits (d213)" do
+    setup do
+      load_vocab!()
+      %{gall: gall_fixture()}
+    end
+
+    defp trait!(gall, {trait, value}, attribution) do
+      {:ok, _} =
+        Catalog.assert_trait(
+          test_actor(),
+          %{gall_id: gall.id, trait: trait, value: value},
+          attribution
+        )
+    end
+
+    defp origin! do
+      n = System.unique_integer([:positive])
+      now = ~U[2026-11-01 00:00:00Z]
+
+      {1, [%{id: package_id}]} =
+        Repo.insert_all(
+          "import_packages",
+          [
+            %{
+              key: "pkg-#{n}",
+              s3_prefix: "import/pkg-#{n}/",
+              submitter_name: "test",
+              inserted_at: now,
+              updated_at: now
+            }
+          ],
+          returning: [:id]
+        )
+
+      {1, [%{id: batch_id}]} =
+        Repo.insert_all(
+          "import_batches",
+          [
+            %{
+              package_id: package_id,
+              file: "gall.json",
+              batch_type: "gall",
+              mode: "add",
+              producer_batch_id: "batch-#{n}",
+              sha256: "0",
+              content: %{},
+              inserted_at: now,
+              updated_at: now
+            }
+          ],
+          returning: [:id]
+        )
+
+      %{package_id: package_id, batch_id: batch_id}
+    end
+
+    defp waiting!(gall, source, origin, trait, term) do
+      {:ok, _} =
+        Catalog.put_pending_term(
+          test_actor(),
+          Map.merge(origin, %{gall_id: gall.id, source_id: source.id, trait: trait, term: term})
+        )
+    end
+
+    test "each category carries its Sources' distinct terms, by term, not its own name",
+         %{gall: gall} do
+      [kinsey, weld, felt, beutenmuller] =
+        for title <- ~w(Kinsey Weld Felt Beutenmuller), do: source_fixture(title, "1959")
+
+      older = source_fixture("Older", "1900")
+
+      trait!(gall, {"shape", "globular"}, confirm(kinsey, %{term: "ovoid"}))
+      trait!(gall, {"shape", "globular"}, confirm(weld, %{term: "oval"}))
+      trait!(gall, {"shape", "globular"}, confirm(felt, %{term: " Oval "}))
+      trait!(gall, {"shape", "globular"}, confirm(beutenmuller, %{term: "Globular"}))
+      # A Source denying the value: its term is not one the Gall is described by.
+      trait!(gall, {"shape", "globular"}, deny(older, %{term: "spherical"}))
+      trait!(gall, {"texture", "hairy"}, confirm(kinsey, %{term: "pubescent"}))
+      # No term, or only the value as written (older attributions).
+      trait!(gall, {"color", "red"}, confirm(kinsey))
+      trait!(gall, {"color", "brown"}, confirm(weld, %{value_as_written: "brown"}))
+
+      page = page!(gall.id)
+
+      assert page.traits["shape"] == ["globular"]
+
+      assert page.trait_terms == %{
+               "shape" => %{"globular" => ["oval", "ovoid"]},
+               "texture" => %{"hairy" => ["pubescent"]}
+             }
+    end
+
+    test "terms waiting on a question or kept as text are text under their Trait",
+         %{gall: gall} do
+      kinsey = source_fixture("Kinsey", "1959")
+      weld = source_fixture("Weld", "1959")
+      origin = origin!()
+
+      trait!(gall, {"texture", "hairless"}, confirm(kinsey, %{term: "glabrous"}))
+      waiting!(gall, kinsey, origin, "texture", "reticulate")
+      waiting!(gall, weld, origin, "texture", "Reticulate")
+      waiting!(gall, kinsey, origin, "texture", "rugose")
+      waiting!(gall, kinsey, origin, "shape", "lens-like")
+      # Already a term under a category of the Trait: shown there only.
+      waiting!(gall, weld, origin, "texture", "glabrous")
+
+      # Kept as text, and settled under a category (its Fact is shown instead).
+      {:ok, [_]} =
+        Catalog.settle_pending_terms(test_actor(), "texture", "rugose", nil, gall_ids: [gall.id])
+
+      {:ok, [_]} =
+        Catalog.settle_pending_terms(test_actor(), "shape", "lens-like", "globular",
+          gall_ids: [gall.id]
+        )
+
+      page = page!(gall.id)
+
+      assert page.text_terms == %{"texture" => ["reticulate", "rugose"]}
+      assert page.trait_terms == %{"texture" => %{"hairless" => ["glabrous"]}}
+    end
+
+    test "a retracted Source's terms are not shown, under a category or as text",
+         %{gall: gall} do
+      kinsey = source_fixture("Kinsey", "1959")
+      retracted = source_fixture("Retracted", "1960")
+      notice = source_fixture("Retraction notice", "1961")
+      origin = origin!()
+
+      trait!(gall, {"shape", "globular"}, confirm(kinsey, %{term: "ovoid"}))
+      trait!(gall, {"shape", "globular"}, confirm(retracted, %{term: "oval"}))
+      waiting!(gall, kinsey, origin, "texture", "reticulate")
+      waiting!(gall, retracted, origin, "texture", "rugose")
+
+      {:ok, _} = Sources.retract_source(test_actor(), retracted, notice, ~D[1961-06-01])
+      {:ok, _} = Facts.recompute_for_source(test_actor(), retracted.id)
+
+      page = page!(gall.id)
+
+      assert page.trait_terms == %{"shape" => %{"globular" => ["ovoid"]}}
+      assert page.text_terms == %{"texture" => ["reticulate"]}
+    end
+
+    test "a Gall with no terms has none" do
+      page = page!(300)
+
+      assert page.trait_terms == %{}
+      assert page.text_terms == %{}
+    end
   end
 
   test ":not_found for a missing ID and for an ID that is not a Gall" do

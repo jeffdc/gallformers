@@ -39,6 +39,19 @@ For a web page: `uv run produce convert-url <url or saved .html> -o output/<name
 
 **Cost and time** (API-equivalent, billed to the subscription), from the trial: phase 2 about $0.50–1.20; phase 3 $1–5 (scales with the Source: a 53-page field guide was $4.73); phase 5 about $0.75–2.60 for both reviewers; phase 6 about $0.50–1.70. A web page cost $2.72 in total; papers and guides $7.70–10.
 
+## Running Gallformers notes
+
+A Gall's Gallformers note is a Source of its own (`priv/import/GALLFORMERS_STATEMENTS.md`, "Reading a Gall's note"). Gallformers writes each note as a package directory (`note-<gall id>`: `document.json`, the note as one text item, and `note.json`, its Gall and the date its statements take); `produce note` adds `document.txt` and the taxonomy batch, which is always empty. There is no phase 2. From the repository root, then this directory:
+
+```
+MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.import.notes \
+  --dir services/import-producer/output/notes-2026-10-30 --undescribed --limit 20   # free
+uv run produce note output/notes-2026-10-30/note-*                                  # free
+uv run produce phase --phase 3 output/notes-2026-10-30/note-2309                    # then 4, 5, 6 as above
+```
+
+`mix gallformers.import.notes` also takes `--described`, `--stated-on YYYY-MM-DD` (default today) and Gall IDs. The prompt is mostly the contract (about 118,000 characters for a 400-character note), so a note costs nearly as much per phase as a short paper.
+
 ## What's in a package directory
 
 | File | From |
@@ -63,7 +76,7 @@ For a web page: `uv run produce convert-url <url or saved .html> -o output/<name
 
 - Prompts: `prompts/producer.md` (phases 2–3), `prompts/verifier.md` (phase 5), `prompts/responder.md` (phase 6). The contract files are inlined into each prompt from `priv/import/`.
 - Model: Opus 5.5 produces and responds; Opus and Sonnet review.
-- Tools: phases 2, 3 and 6 work in the package directory with Read, Write, Edit, Grep and two allowed commands (the validator and `lookup-place`); the reviewer works in a scratch copy holding only the document and the batches, with no shell. Claude Code's `--safe-mode` keeps user settings, hooks, skills and memory out of the runs. Read-only shell commands can still slip through Claude Code's auto-approval; full lockdown would mean replacing Bash with an MCP tool.
+- Tools: phases 2, 3 and 6 work in the package directory with Read, Write, Edit, Grep and two allowed commands (the validator and `lookup-place`); the reviewer works in a scratch copy holding only the document and the batches, with no shell. In a format 4 batch that copy of `gall.json` has every trait Fact's `category` and `depends_on_gall` removed, so the reviewer places each trait term blind (`placements` in its review); the driver merges the placements with the findings, and phase 6 refuses to run while a reviewer has left a trait term unplaced. Claude Code's `--safe-mode` keeps user settings, hooks, skills and memory out of the runs. Read-only shell commands can still slip through Claude Code's auto-approval; full lockdown would mean replacing Bash with an MCP tool.
 
 ## Scripts
 

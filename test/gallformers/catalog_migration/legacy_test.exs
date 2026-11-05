@@ -113,6 +113,35 @@ defmodule Gallformers.CatalogMigration.LegacyTest do
     assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
   end
 
+  test "an undescribed Gall's legacy Facts are Gallformers' statements too, dated the run's day",
+       ctx do
+    gallformers = gallformers_source()
+    trait!(ctx.old.undescribed, "color", "red")
+
+    assert {:ok, report} =
+             CatalogMigration.run(actor: test_actor(), pending: :skip, stated_on: ~D[2026-10-30])
+
+    assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
+
+    legacy = legacy_source()
+    facts = gall_facts(ctx.old.undescribed)
+    assert [_ | _] = facts
+
+    for fact <- facts do
+      by_source = Map.new(Facts.list_attributions(fact), &{&1.source_id, &1})
+      assert %{stance: :confirm, stated_on: nil} = by_source[legacy.id]
+
+      assert %{stance: :confirm, stated_on: ~D[2026-10-30], statement_text: text} =
+               by_source[gallformers.id]
+
+      assert text =~ "undescribed"
+    end
+
+    # A described Gall's stay the legacy Source's alone.
+    for fact <- gall_facts(ctx.old.agamic),
+        do: assert(Enum.map(Facts.list_attributions(fact), & &1.source_id) == [legacy.id])
+  end
+
   test "the ID tool's lookup table is rebuilt at the end, one row per Gall, no job enqueued",
        ctx do
     Oban.Testing.with_testing_mode(:manual, fn ->

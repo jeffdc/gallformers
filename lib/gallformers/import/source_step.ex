@@ -28,6 +28,13 @@ defmodule Gallformers.Import.SourceStep do
   counter, appended. The package's `document.json` is stored for it
   (`Gallformers.Sources.store_document/3`).
 
+  A batch of Gallformers statements reading a Gall's note (`source.note`,
+  `20e5`) quotes that note: its text, the document's one item, is stored as
+  the Gall's note version unless Gallformers holds it already
+  (`Gallformers.Sources.store_note/5`), and the quotes point at that. A note
+  of a Gall Gallformers doesn't hold is an `:unresolved_name` queue item
+  (`statement_ref` `"note"`).
+
   A retraction notice (`source.retracts`) marks the retracted Source —
   matched by `gallformers_source_id` or citation, or an admin's decision
   (`statement_ref` `"retracts"`) — as retracted by the notice on the
@@ -35,6 +42,8 @@ defmodule Gallformers.Import.SourceStep do
   are cancelled.
   """
 
+  alias Gallformers.Catalog
+  alias Gallformers.Catalog.Gall
   alias Gallformers.Facts
   alias Gallformers.Import.Package
   alias Gallformers.Licenses
@@ -61,8 +70,21 @@ defmodule Gallformers.Import.SourceStep do
         {:error, reason} -> {nil, [unresolved_item("source", block, reason)]}
       end
 
-    %{source_id: source_id, queue: queue ++ retracts_items(block["retracts"])}
+    %{
+      source_id: source_id,
+      queue: queue ++ retracts_items(block["retracts"]) ++ note_items(block["note"])
+    }
   end
+
+  # A Gall's note must belong to a Gall Gallformers holds.
+  defp note_items(%{"gallformers_gall_id" => id} = note) when is_integer(id) do
+    case Catalog.get_gall(id) do
+      %Gall{} -> []
+      nil -> [unresolved_item("note", note, "no Gall has gallformers_gall_id #{id}")]
+    end
+  end
+
+  defp note_items(_note), do: []
 
   defp match(%{"gallformers" => true}) do
     case Sources.get_gallformers_source() do
@@ -129,7 +151,14 @@ defmodule Gallformers.Import.SourceStep do
 
   defp subject(block),
     do:
-      Map.take(block, ["title", "citation", "citation_as_written", "identifiers", "gallformers"])
+      Map.take(block, [
+        "title",
+        "citation",
+        "citation_as_written",
+        "identifiers",
+        "gallformers",
+        "gallformers_gall_id"
+      ])
 
   # -- applying ----------------------------------------------------------------
 
@@ -143,7 +172,7 @@ defmodule Gallformers.Import.SourceStep do
           {:ok, Source.t(), %{String.t() => integer()}} | {:error, term()}
   def ensure(actor, %Package{} = package, block, files, decisions) do
     with {:ok, source} <- source(package, block, decisions),
-         {:ok, items} <- store_document(actor, source, files["document.json"]),
+         {:ok, items} <- store_document(actor, source, block["note"], files["document.json"]),
          :ok <- retract(actor, source, block["retracts"], decisions["retracts"]) do
       {:ok, source, items}
     end
@@ -197,10 +226,50 @@ defmodule Gallformers.Import.SourceStep do
     |> Enum.find(&(not Sources.title_taken?(&1)))
   end
 
-  defp store_document(_actor, _source, nil), do: {:ok, %{}}
-  defp store_document(_actor, %Source{kind: :gallformers}, _bytes), do: {:ok, %{}}
+  @doc """
+  The note a batch of Gallformers statements quotes (`source.note`), or nil:
+  its Gall, the date its statements take, and its text (the package
+  document's one item).
+  """
+  @spec note(map() | nil, map()) ::
+          %{gall_id: integer(), stated_on: String.t(), text: String.t()} | nil
+  def note(%{"gallformers" => true, "note" => %{} = note}, files) do
+    %{
+      gall_id: note["gallformers_gall_id"],
+      stated_on: note["stated_on"],
+      text: note_text(files["document.json"])
+    }
+  end
 
-  defp store_document(actor, source, bytes) do
+  def note(_block, _files), do: nil
+
+  defp note_text(bytes) when is_binary(bytes) do
+    case Jason.decode(bytes) do
+      {:ok, %{"texts" => [%{"text" => text} | _]}} when is_binary(text) -> text
+      _ -> nil
+    end
+  end
+
+  defp note_text(_bytes), do: nil
+
+  defp store_document(_actor, _source, _note, nil), do: {:ok, %{}}
+
+  # The note is stored as that Gall's note version unless Gallformers holds it
+  # already (a legacy note, or one stored when a curator edited it).
+  defp store_document(actor, %Source{kind: :gallformers} = source, %{} = note, bytes) do
+    %{gall_id: gall_id, stated_on: stated_on, text: text} =
+      note(%{"gallformers" => true, "note" => note}, %{"document.json" => bytes})
+
+    with true <- is_binary(text) || {:error, :note_document_has_no_text},
+         {:ok, document} <-
+           Sources.store_note(actor, source, gall_id, text, Date.from_iso8601!(stated_on)) do
+      {:ok, Map.new(Sources.list_document_items(document), &{&1.ref, &1.id})}
+    end
+  end
+
+  defp store_document(_actor, %Source{kind: :gallformers}, _note, _bytes), do: {:ok, %{}}
+
+  defp store_document(actor, source, _note, bytes) do
     with {:ok, document} <- Sources.store_document(actor, source, bytes) do
       {:ok, Map.new(Sources.list_document_items(document), &{&1.ref, &1.id})}
     end

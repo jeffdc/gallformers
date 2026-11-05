@@ -10,14 +10,16 @@ Judge each finding on its merits. Two findings may be about the same statement, 
 ## What to do
 
 1. Read the findings below, and the statements and document passages they cite (`taxonomy.json`, `gall.json` and `document.txt` are in your working directory).
-2. Make the fixes you agree with, in `taxonomy.json` and `gall.json`. Change nothing else. Leave `review.json` as it is.
+2. Make the fixes you agree with, in `taxonomy.json` and `gall.json`. Change nothing else. Leave `review.json` as it is, and don't read it: the reviewers' own placements of the trait terms are in it, and the categories you suggest must stay your own. A trait Fact keeps the `category` and `depends_on_gall` you gave it unless a finding about that Fact makes you change its term or Trait; then suggest the category for the new term by the definitions.
 3. Validate with `$validate_cmd` and fix every error until it is clean.
-4. Write `responses.json` in your working directory: one answer per finding, by its number:
+4. Write `responses.json` in your working directory: one answer per finding, by its number, each with a `summary`: your position in one plain sentence, with no rule numbers and no `#/texts` references, for the curator who reads it beside the reviewer's. The full argument goes in `reason`.
 
 ```json
 [
-  { "n": 1, "decision": "agree", "reason": "f12 color changed from brown to tan: the quote says 'pale tan'." },
-  { "n": 2, "decision": "disagree", "reason": "#/texts/43 says 'earlier records from Q. douglasii are misidentifications': a correction of published records, so f3 stays a deny (rule 6)." }
+  { "n": 1, "decision": "agree", "reason": "f12 term changed from 'mature' to 'pale tan': the quote says 'pale tan when mature'.",
+    "summary": "The reviewer is right: the colour is pale tan." },
+  { "n": 2, "decision": "disagree", "reason": "#/texts/43 says 'earlier records from Q. douglasii are misidentifications': a correction of published records, so f3 stays a deny (rule 6).",
+    "summary": "The Source calls the earlier Q. douglasii records misidentifications, so it denies them." }
 ]
 ```
 

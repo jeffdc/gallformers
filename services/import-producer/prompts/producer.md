@@ -22,7 +22,7 @@ These are fixed by the run, not by you:
 $envelope
 ```
 
-Fill in the rest of `source` (kind, title, authors, authored, citation, identifiers, license) from the document itself. $source_hint
+$source_instructions
 
 ## How to read the document
 

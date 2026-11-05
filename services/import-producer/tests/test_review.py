@@ -4,7 +4,14 @@ import re
 
 import pytest
 
-from producer.review import build_review_prompt, merge_reviews, review_command, stage
+from producer.review import (
+    blind,
+    build_review_prompt,
+    merge_reviews,
+    missing_placements,
+    review_command,
+    stage,
+)
 
 
 @pytest.fixture
@@ -102,3 +109,82 @@ def test_merge_reviews_keeps_every_finding_and_names_its_reviewer():
 def test_merge_reviews_needs_the_same_batches():
     with pytest.raises(ValueError, match="different batches"):
         merge_reviews([one_review("opus"), one_review("sonnet", reviewed={"gall.json": "b" * 64})])
+
+
+# -- format v4: the reviewer places every trait term blind (d213) ---------------------------
+
+TRAIT = {"id": "f2", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "shape",
+         "term": "swelling", "category": {"value": "abrupt swelling"}, "depends_on_gall": True,
+         "evidence": [{"item": "#/texts/1", "quote": "swelling"}]}  # fmt: skip
+HOST = {"id": "f1", "kind": "relationship", "type": "host_of", "subject": "t1", "object": "g1"}
+
+
+def v4_gall(*facts):
+    return {"format_version": 4, "facts": list(facts or (HOST, TRAIT))}
+
+
+@pytest.fixture
+def v4_package(package):
+    (package / "gall.json").write_text(json.dumps(v4_gall()), encoding="utf-8")
+    return package
+
+
+def test_blind_drops_the_producers_categories_only():
+    blinded = blind(v4_gall())
+    assert blinded["facts"][0] == HOST
+    assert blinded["facts"][1] == {
+        k: v for k, v in TRAIT.items() if k not in ("category", "depends_on_gall")
+    }
+    assert TRAIT["category"] == {"value": "abrupt swelling"}  # the batch itself is untouched
+
+
+def test_stage_gives_the_reviewer_a_blind_gall_batch(v4_package, tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    stage(v4_package, work)
+    staged = json.loads((work / "gall.json").read_text(encoding="utf-8"))
+    assert "category" not in staged["facts"][1] and "depends_on_gall" not in staged["facts"][1]
+    assert json.loads((v4_package / "gall.json").read_text(encoding="utf-8")) == v4_gall()
+
+
+def test_the_prompt_shows_the_blind_batch_but_fixes_the_real_hash(v4_package):
+    prompt = build_review_prompt(v4_package)
+    batches = prompt.split("# The batches")[1].split("# The document")[0]
+    assert '"term": "swelling"' in batches
+    assert "abrupt swelling" not in batches and "depends_on_gall" not in batches
+    fixed = json.loads(re.search(r"```json\n(\{.*?\})\n```", prompt, re.S).group(1))
+    assert (
+        fixed["reviewed"]["gall.json"]
+        == hashlib.sha256((v4_package / "gall.json").read_bytes()).hexdigest()
+    )
+
+
+def test_a_v3_batch_is_staged_as_it_is(package, tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    stage(package, work)
+    assert (work / "gall.json").read_bytes() == (package / "gall.json").read_bytes()
+
+
+def test_merge_reviews_keeps_each_reviewers_placements():
+    opus = one_review("opus") | {
+        "placements": [{"id": "f2", "category": {"value": "abrupt swelling"}}]
+    }
+    sonnet = one_review("sonnet") | {
+        "placements": [{"id": "f2", "category": None, "depends_on_gall": True}]
+    }
+    merged = merge_reviews([opus, sonnet])
+    assert merged["placements"] == [
+        {"id": "f2", "category": {"value": "abrupt swelling"}, "reviewer": "opus"},
+        {"id": "f2", "category": None, "depends_on_gall": True, "reviewer": "sonnet"},
+    ]
+    assert "placements" not in merge_reviews([one_review("opus")])
+
+
+def test_missing_placements_are_listed_per_reviewer():
+    review = merge_reviews([
+        one_review("opus") | {"placements": [{"id": "f2", "category": None}]},
+        one_review("sonnet") | {"placements": []},
+    ])  # fmt: skip
+    assert missing_placements(v4_gall(), review) == {"sonnet": ["f2"]}
+    assert missing_placements({"format_version": 3, "facts": [TRAIT]}, review) == {}

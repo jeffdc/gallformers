@@ -6,8 +6,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
   use GallformersWeb, :live_view
 
   alias Gallformers.{Catalog, Images, Import, Sources, Taxa}
-  alias Gallformers.Import.QueueItem
-  alias GallformersWeb.Admin.QueueLive.ItemDecision
 
   @impl true
   def mount(_params, session, socket) do
@@ -50,8 +48,8 @@ defmodule GallformersWeb.Admin.DashboardLive do
         </h2>
         <div id="admin-quick-actions" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <.action_card
-            label="Review the Queue"
-            href="/admin/queue"
+            label="Review Sources"
+            href="/admin/review"
             icon="ph-check-circle"
           />
           <.action_card
@@ -75,24 +73,24 @@ defmodule GallformersWeb.Admin.DashboardLive do
         </div>
       </div>
 
-      <%!-- Review queue: the open items, by kind --%>
+      <%!-- Review: the open questions of the imports, and the rename proposals --%>
       <div class="mt-8">
         <h2 class="text-sm font-medium text-gray-500 mb-3">
-          Review Queue
+          Review
         </h2>
         <div id="admin-queue" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <.stat_card
-            title="Open items"
-            value={@queue_total}
+            title="Questions to decide"
+            value={@questions}
             icon="ph-check-circle"
-            href="/admin/queue"
+            href="/admin/review"
           />
           <.stat_card
-            :for={{kind, count} <- @queue_counts}
-            title={ItemDecision.kind_label(kind)}
-            value={count}
+            :if={@renames > 0}
+            title="Gall rename proposals"
+            value={@renames}
             icon="ph-warning-circle"
-            href={"/admin/queue?kind=#{kind}"}
+            href="/admin/review/renames"
           />
         </div>
       </div>
@@ -163,6 +161,13 @@ defmodule GallformersWeb.Admin.DashboardLive do
               label="Manage Users"
               href="/admin/users"
               icon="ph-users-three"
+              accent="slate"
+              small
+            />
+            <.action_card
+              label="Vocabulary"
+              href="/admin/vocabulary"
+              icon="ph-book-open"
               accent="slate"
               small
             />
@@ -357,15 +362,11 @@ defmodule GallformersWeb.Admin.DashboardLive do
     """
   end
 
-  # The open queue items' total and their counts by kind, in the kinds' order.
+  # The open questions of the imports (every open queue item but the rename
+  # proposals, which belong to no package) and the open rename proposals.
   defp assign_queue(socket) do
-    counts = Import.count_open_queue_items()
-
-    assign(socket,
-      queue_total: counts |> Map.values() |> Enum.sum(),
-      queue_counts:
-        for(kind <- QueueItem.kinds(), Map.has_key?(counts, kind), do: {kind, counts[kind]})
-    )
+    {renames, questions} = Map.pop(Import.count_open_queue_items(), :gall_rename, 0)
+    assign(socket, questions: questions |> Map.values() |> Enum.sum(), renames: renames)
   end
 
   defp assign_stats(socket) do

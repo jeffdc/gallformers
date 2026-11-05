@@ -17,15 +17,21 @@ defmodule Gallformers.Import.Validator do
       quote found in its document item (`Gallformers.Sources.QuoteLocator`,
       which matches quotes as the validator does), references declared, ids
       unique, qualifier targets, one Inducer per Gall, new Galls have Facts,
-      at most one description per Gall, no synonymy or split above family. A
-      taxon or Gall declared but never used is a warning.
+      at most one description per Gall, no synonymy or split above family, a
+      format 4 trait Fact's `term` found in its evidence. A taxon or Gall
+      declared but never used is a warning.
+
+  Format 3 and 4 batches both validate: format 4 trait Facts carry `term`,
+  `category` and `depends_on_gall`; format 3 ones `value` and `as_written`.
 
   ## The readiness gate
 
   `review.json` exists and is well formed; with no findings it covers the
   batches as they stand; with findings, each has a phase 6 response and the
   batches are the ones phase 6 left. Disputed findings are warnings, for
-  human review at intake.
+  human review at intake. For a format 4 gall batch, `placements` place
+  every trait Fact once per reviewer, in a value of its Trait or none; after
+  phase 6 an unplaced trait Fact is a warning (a curator places it).
 
   ## Differences from `validate.py`
 
@@ -52,6 +58,16 @@ defmodule Gallformers.Import.Validator do
   @type package :: %{optional(String.t()) => binary()}
 
   @batch_files ["taxonomy.json", "gall.json"]
+
+  # Each Trait's values (vocab/traits.schema.json), for the readiness gate's
+  # placements.
+  @traits_schema Path.expand("../../../priv/import/vocab/traits.schema.json", __DIR__)
+  @external_resource @traits_schema
+  @trait_values @traits_schema
+                |> File.read!()
+                |> Jason.decode!()
+                |> Map.fetch!("$defs")
+                |> Map.new(fn {trait, schema} -> {trait, Map.get(schema, "enum", [])} end)
 
   @doc "The batch files a package may hold, in the order they are applied."
   @spec batch_files() :: [String.t()]
@@ -263,8 +279,77 @@ defmodule Gallformers.Import.Validator do
             do: {:error, "review is stale for #{name}: re-run phase 4, then phase 5"}
       end
 
-    stale ++ Enum.flat_map(review["findings"], &finding_problems(&1, statements, responded))
+    findings = Enum.flat_map(review["findings"], &finding_problems(&1, statements, responded))
+    stale ++ findings ++ placement_problems(package["gall.json"], review, responded != nil)
   end
+
+  # Format 4: the reviewer placed every trait Fact's term (`placements`),
+  # each in a value of the Fact's Trait or none, once per reviewer. After
+  # phase 6 a trait Fact may have no placement (phase 6 added or rewrote it)
+  # and a placement may outlive its Fact: the first goes to a curator at
+  # intake.
+  defp placement_problems(gall_bytes, review, responded?) when is_binary(gall_bytes) do
+    case Jason.decode(gall_bytes) do
+      {:ok, %{"format_version" => 4} = gall} -> placements(gall, review, responded?)
+      _ -> []
+    end
+  end
+
+  defp placement_problems(_gall_bytes, _review, _responded?), do: []
+
+  defp placements(gall, review, responded?) do
+    facts = List.wrap(gall["facts"])
+    traits = for %{"kind" => "trait"} = f <- facts, into: %{}, do: {f["id"], f}
+    list = List.wrap(review["placements"])
+    placed = for %{"id" => id} <- list, Map.has_key?(traits, id), into: MapSet.new(), do: id
+
+    Enum.flat_map(list, &placement_value(&1, traits[&1["id"]], responded?)) ++
+      placed_twice(list) ++
+      for(
+        %{"kind" => "trait", "id" => id} <- facts,
+        not MapSet.member?(placed, id),
+        do: unplaced(id, responded?)
+      )
+  end
+
+  defp placement_value(%{"id" => id}, nil, false),
+    do: [{:error, "placement #{id} is not a trait Fact in gall.json"}]
+
+  defp placement_value(_placement, nil, true), do: []
+  defp placement_value(%{"category" => nil}, _fact, _responded?), do: []
+
+  defp placement_value(%{"id" => id, "category" => %{"value" => value}}, fact, _responded?) do
+    trait = fact["trait"]
+
+    if value in Map.get(@trait_values, trait, []),
+      do: [],
+      else: [{:error, "placement #{id}: #{py_repr(value)} is not a #{trait} value"}]
+  end
+
+  defp placed_twice(placements) do
+    for {{id, reviewer}, n} <- ordered_counts(Enum.map(placements, &{&1["id"], &1["reviewer"]})),
+        n > 1 do
+      by = if reviewer, do: " by #{reviewer}", else: ""
+      {:error, "trait Fact #{id} is placed more than once#{by}"}
+    end
+  end
+
+  defp unplaced(id, true),
+    do:
+      {:warning,
+       "trait Fact #{id} has no reviewer placement (added or changed in phase 6): " <>
+         "a curator places its term at intake"}
+
+  defp unplaced(id, false),
+    do: {:error, "trait Fact #{id} has no placement: phase 5 places every trait term"}
+
+  defp ordered_counts(values) do
+    counts = Enum.frequencies(values)
+    values |> Enum.uniq() |> Enum.map(&{&1, counts[&1]})
+  end
+
+  # Python's repr of a string, as validate.py prints it.
+  defp py_repr(value), do: "'#{value}'"
 
   defp finding_problems(finding, statements, responded) do
     %{"batch" => name, "id" => id} = finding

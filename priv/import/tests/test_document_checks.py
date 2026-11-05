@@ -1,6 +1,7 @@
 """Layer 1, the document checks: what validate.py can verify from the package alone, no Gallformers data."""
 
 import copy
+import json
 
 from conftest import validate
 
@@ -49,6 +50,54 @@ def test_whole_item_needs_text(package, batch):
     b = copy.deepcopy(batch)
     b["facts"][3]["evidence"][0]["item"] = "#/pictures/0"
     assert any("has no text" in p for p in problems(package(gall=b)))
+
+
+def note_batch(batch):
+    """`batch` as Gallformers statements quoting a Gall's note: the `document` fixture's #/texts/2."""
+    b = copy.deepcopy(batch)
+    b["mode"] = "add"
+    b["source"] = {
+        "gallformers": True,
+        "note": {"gallformers_gall_id": 587, "stated_on": "2026-10-30"},
+        "document": {"file": "document.json", "sha256": "0" * 64},
+    }
+    b["facts"] = [b["facts"][1]]
+    b["facts"][0]["evidence"][0]["item"] = "#/texts/0"
+    del b["taxa"][2]
+    return b
+
+
+def note_document(document, text="Common on Q. lobata throughout the hills; earlier records from Q. douglasii are misidentifications."):
+    doc = copy.deepcopy(document)
+    doc["texts"] = [{**doc["texts"][2], "self_ref": "#/texts/0", "text": text}]
+    doc["body"]["children"] = [{"$ref": "#/texts/0"}]
+    doc["tables"], doc["pictures"] = [], []
+    return doc
+
+
+def test_a_note_batch_quotes_its_note(package, batch, document):
+    assert problems(package(doc=note_document(document), gall=note_batch(batch))) == []
+
+
+def test_a_note_batch_takes_no_statement_evidence(package, batch, document):
+    b = note_batch(batch)
+    b["facts"][0]["evidence"] = [{"statement": {"text": "Seen on Q. lobata.", "stated_on": "2026-10-30"}}]
+    assert any("quotes its note" in p for p in problems(package(doc=note_document(document), gall=b)))
+
+
+def test_a_note_document_is_one_text_item(package, batch, document):
+    assert any(
+        "one text item" in p for p in problems(package(doc=document, gall=note_batch(batch)))
+    )
+
+
+def test_statements_without_a_note_are_unchanged(package, batch):
+    b = note_batch(batch)
+    b["source"] = {"gallformers": True}
+    b["facts"][0]["evidence"] = [{"statement": {"text": "Seen on Q. lobata.", "stated_on": "2026-10-30"}}]
+    pkg = package(gall=None)
+    (pkg / "gall.json").write_text(json.dumps(b), encoding="utf-8")
+    assert problems(pkg) == []
 
 
 def test_document_hash_mismatch(package, batch, tmp_path):
@@ -205,3 +254,74 @@ def test_inducer_fact_must_name_the_identified_inducer(package, batch):
     b["facts"][0]["subject"] = "t3"
     b["galls"][0]["new"] = True
     assert named_inducer(problems(package(gall=b)))
+
+
+# -- 2026-11-02: format v4, a trait Fact's term is the Source's own words (d213) --------------
+
+
+def test_a_v4_package_is_clean(package, batch_v4):
+    assert problems(package(gall=batch_v4)) == []
+
+
+def test_the_term_is_in_its_evidence(package, batch_v4):
+    b = copy.deepcopy(batch_v4)
+    b["facts"][4]["term"] = "light brown"
+    [error] = problems(package(gall=b))
+    assert "facts/4" in error and "term" in error and "light brown" in error
+
+
+def test_the_term_is_matched_as_quotes_are_and_ignoring_case(package, batch_v4):
+    b = copy.deepcopy(batch_v4)
+    b["facts"][4].update(trait="shape", term="Globular", category={"value": "globular"})
+    b["facts"][4]["evidence"] = [{"item": "#/texts/1", "quote": "are globular  and pale tan"}]
+    assert problems(package(gall=b)) == []
+    b["facts"][4]["term"] = "glob- ular"
+    assert problems(package(gall=b)) == []
+
+
+def test_the_term_may_come_from_a_whole_item(package, batch_v4):
+    b = copy.deepcopy(batch_v4)
+    b["facts"][4]["term"] = "large stem galls"
+    b["facts"][4]["evidence"] = [{"item": "#/texts/1", "whole_item": True}]
+    assert problems(package(gall=b)) == []
+
+
+def test_a_statement_term_is_not_checked(package, batch_v4):
+    """Without a document there is nothing to find the term in."""
+    b = copy.deepcopy(batch_v4)
+    b["source"] = {"gallformers": True}
+    b["mode"] = "add"
+    for f in b["facts"]:
+        f["evidence"] = [{"statement": {"text": "Seen on Q. lobata.", "stated_on": "2026-10-30"}}]
+    pkg = package(gall=None)
+    (pkg / "gall.json").write_text(json.dumps(b), encoding="utf-8")
+    assert problems(pkg) == []
+
+
+# -- 2026-11-03: a Host declared by its common name (d213 Task 6) ---------------
+
+
+def common_name_host(b, ref="t2"):
+    for t in b["taxa"]:
+        if t["ref"] == ref:
+            t.clear()
+            t.update(ref=ref, name_as_written="the black oak", common_name=True)
+    return b
+
+
+def test_a_common_name_may_be_a_host(package, batch):
+    b = common_name_host(copy.deepcopy(batch))
+    b["galls"][0]["identified_by"]["host"] = "t2"
+    assert problems(package(gall=b)) == []
+
+
+def test_a_common_name_is_only_ever_a_host(package, batch):
+    b = common_name_host(copy.deepcopy(batch), "t1")
+    errors = problems(package(gall=b))
+    assert any("t1" in p and "common name" in p and "Host" in p for p in errors), errors
+
+
+def test_a_common_name_takes_no_taxonomic_act(package, taxonomy):
+    taxonomy["taxa"][0] = {"ref": "t1", "name_as_written": "the black oak", "common_name": True}
+    errors = problems(package(gall=None, taxonomy=taxonomy))
+    assert any("t1" in p and "common name" in p for p in errors), errors

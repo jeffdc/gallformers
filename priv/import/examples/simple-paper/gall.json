@@ -1,6 +1,6 @@
 {
   "format": "gallformers-import",
-  "format_version": 3,
+  "format_version": 4,
   "vocabulary_version": "2026-10-11",
   "batch_type": "gall",
   "mode": "replace",
@@ -65,17 +65,17 @@
     },
     {
       "id": "f6", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "color",
-      "value": { "value": "tan", "as_written": "pale tan" },
+      "term": "pale tan", "category": { "value": "tan" },
       "evidence": [{ "item": "#/texts/44", "quote": "pale tan when mature", "page": "58" }]
     },
     {
       "id": "f7", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "plant_part",
-      "value": { "value": "stem", "as_written": "twigs" },
+      "term": "stem", "category": { "value": "stem" },
       "evidence": [{ "item": "#/texts/41", "quote": "the large stem galls", "page": "58" }]
     },
     {
       "id": "f8", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "detachable",
-      "value": { "value": "integral", "as_written": "not falling from the twig" },
+      "term": "never falling", "category": { "value": "integral" },
       "evidence": [{ "item": "#/texts/44", "quote": "remaining on the twig for years, never falling", "page": "58" }]
     },
     {
@@ -100,7 +100,7 @@
     },
     {
       "id": "f13", "stance": "confirm", "kind": "trait", "gall": "g2", "trait": "shape",
-      "value": { "value": "spindle", "as_written": "spindle" },
+      "term": "spindle", "category": { "value": "spindle" },
       "evidence": [{ "item": "#/texts/61", "quote": "a small spindle gall on the midrib", "page": "64" }]
     },
     {
@@ -109,18 +109,13 @@
     },
     {
       "id": "f14", "stance": "confirm", "kind": "trait", "gall": "g2", "trait": "plant_part",
-      "value": { "value": "leaf midrib", "as_written": "midrib" },
+      "term": "midrib", "category": { "value": "leaf midrib" },
       "evidence": [{ "item": "#/texts/61", "quote": "a small spindle gall on the midrib", "page": "64" }]
-    }
-  ],
-
-  "unmapped": [
+    },
     {
-      "term": "lignified",
-      "slot": "texture",
-      "gall": "g1",
-      "evidence": [{ "item": "#/texts/44", "quote": "becoming lignified in the second year", "page": "58" }],
-      "note": "No texture value for woody/lignified; consider adding one."
+      "id": "f16", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "texture",
+      "term": "lignified", "category": { "value": "stiff" },
+      "evidence": [{ "item": "#/texts/44", "quote": "becoming lignified in the second year", "page": "58" }]
     }
   ]
 }

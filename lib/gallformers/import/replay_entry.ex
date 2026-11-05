@@ -7,7 +7,12 @@ defmodule Gallformers.Import.ReplayEntry do
 
   Kinds: `:batch_applied`, `:queue_decision`, `:synonym_added`,
   `:plant_added`, `:taxonomy_edit`, `:package_denied`, `:batch_denied`,
-  `:source_edit`. The log is ordered by `id`.
+  `:source_edit`, `:trait_value_added`, `:term_mapping_added` (6611's,
+  replayed only), `:trait_term_edit`, `:vocab_requests_decided` (6611's
+  vocabulary backlog, replaced by the vocabulary page of `d213`: no longer
+  written, kept so earlier entries load), `:fact_edit` and
+  `:fact_edit_removed` (a curator's edits on a package's Facts,
+  `Gallformers.Import.FactEdits`). The log is ordered by `id`.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -20,7 +25,13 @@ defmodule Gallformers.Import.ReplayEntry do
     :taxonomy_edit,
     :package_denied,
     :batch_denied,
-    :source_edit
+    :source_edit,
+    :trait_value_added,
+    :term_mapping_added,
+    :trait_term_edit,
+    :vocab_requests_decided,
+    :fact_edit,
+    :fact_edit_removed
   ]
 
   @type kind ::
@@ -32,6 +43,12 @@ defmodule Gallformers.Import.ReplayEntry do
           | :package_denied
           | :batch_denied
           | :source_edit
+          | :trait_value_added
+          | :term_mapping_added
+          | :trait_term_edit
+          | :vocab_requests_decided
+          | :fact_edit
+          | :fact_edit_removed
 
   @type t :: %__MODULE__{
           id: integer() | nil,

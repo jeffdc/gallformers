@@ -22,13 +22,28 @@ defmodule Gallformers.Import do
        `Gallformers.Import.Resolver` and `Gallformers.Import.GallMatcher`):
        every taxon and Gall of a batch resolves, is new, or goes to the
        admin queue (`Gallformers.Import.Queue`; decided items are kept and
-       honoured). Unresolved Host names hold the gall batch (`d585`). The
+       honoured). A name both batches declare is queued and decided once.
+       Unresolved Host names hold the gall batch (`d585`). The
        package's Source is matched (`Gallformers.Import.SourceStep`) and
-       phase 6 disputes from `review.json` are queued.
+       phase 6 disputes from `review.json` are queued
+       (`Gallformers.Import.Disputes`). What the producer
+       set aside as hedged or not a Fact (`unmapped`) is queued one item per
+       term, never holding approval (`Gallformers.Import.SetAside`). The
+       Source's Trait terms are placed (`Gallformers.Import.TraitTerms`):
+       a term the import can't place on its own is a question, one per term,
+       never holding approval.
     4. **Decide** (`decide_queue_item/3`): an admin answers each open item,
-       recorded with who and when. The same queue holds rename proposals,
-       which come from taxonomy changes rather than packages
-       (`Gallformers.Import.GallRenames`, `list_gall_renames/1`).
+       recorded with who and when; or accepts the proposals of many at once
+       (`accept_proposals/2`, `Gallformers.Import.Proposals`), having
+       rejected those they disagree with (`reject_proposal/2`). Host
+       decisions may add a synonym or a plant from WCVP
+       (`Gallformers.Import.HostDecisions`); `candidate_comparison/1` sets a
+       name's candidates side by side. The same queue holds rename
+       proposals, which come from taxonomy changes rather than packages
+       (`Gallformers.Import.GallRenames`, `list_gall_renames/1`). A Trait
+       term's question is settled by placing it for every Source, a
+       category for its Galls only, fitting no category, or keeping it as
+       text (`Gallformers.Import.TraitTerms`).
     5. **Approve** (`approve_package/2`): with nothing open that a batch
        needs, the package is approved and the import worker
        (`Gallformers.Import.Worker`) applies it.
@@ -41,6 +56,12 @@ defmodule Gallformers.Import do
        (new open items) sends the package back to `:awaiting_review`.
 
   Until a package is approved nothing here changes Facts, taxa or Galls.
+  The Facts preview (`preview_package/2`, `Gallformers.Import.Preview`)
+  shows what approving would write, given the answers so far, by running
+  the apply in a transaction that is rolled back; before approval a
+  curator may edit a Fact (drop it, change its Host or its Trait values,
+  note it: `edit_fact/5`, `Gallformers.Import.FactEdits`), which applying
+  honours. `facts_for_source/1` shows a Source's applied Facts the same way.
   Instead of approving, an admin can deny a package or one of its batches
   (`deny_package/3`, `deny_batch/3`) until it is applied.
 
@@ -54,7 +75,8 @@ defmodule Gallformers.Import do
 
   Every data-changing step appends to `replay_log` by stable keys
   (`Gallformers.Import.StableRef`): batches applied, queue decisions,
-  denials, and the Host-name step's and taxonomy admin's edits
+  denials, edits on Facts before approval, and the Host-name step's and
+  taxonomy admin's edits
   (`record_synonym_added/4`, `record_plant_added/2`,
   `record_taxonomy_edit/2`, `record_wcvp_edit/2`).
   `Gallformers.Import.Replay` replays it after the cutover data migration:
@@ -84,16 +106,24 @@ defmodule Gallformers.Import do
       Gallformers.Repo,
       Gallformers.Sources,
       Gallformers.Storage,
-      Gallformers.Taxa
+      Gallformers.Taxa,
+      # Host-name suggestions call the configured WCVP lookup at runtime.
+      Gallformers.Wcvp
     ],
     exports: [
       Batch,
       BatchStatement,
       BatchUnmapped,
+      GallComparison,
       Package,
+      Passages,
       QueueItem,
+      QueueItemNote,
+      ReviewContext,
       Replay,
       ReplayEntry,
+      StatementEdit,
+      TermCandidate,
       Validator,
       Validator.Problem,
       Vocab,
@@ -105,28 +135,45 @@ defmodule Gallformers.Import do
   alias Ecto.Changeset
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
+  alias Gallformers.Catalog
+  alias Gallformers.Facts
   alias Gallformers.Import.ApplyGall
   alias Gallformers.Import.ApplyTaxonomy
   alias Gallformers.Import.Batch
   alias Gallformers.Import.BatchStatement
   alias Gallformers.Import.BatchUnmapped
+  alias Gallformers.Import.Disputes
+  alias Gallformers.Import.FactEdits
+  alias Gallformers.Import.FactsView
+  alias Gallformers.Import.GallDecisions
   alias Gallformers.Import.GallMatcher
   alias Gallformers.Import.GallRenames
+  alias Gallformers.Import.HostDecisions
   alias Gallformers.Import.Package
+  alias Gallformers.Import.Preview
+  alias Gallformers.Import.Proposals
   alias Gallformers.Import.Queue
   alias Gallformers.Import.QueueItem
+  alias Gallformers.Import.QueueItemNote
   alias Gallformers.Import.Replay
   alias Gallformers.Import.ReplayEntry
   alias Gallformers.Import.ReplayExport
   alias Gallformers.Import.ReplayLog
   alias Gallformers.Import.Resolver
+  alias Gallformers.Import.SetAside
   alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.SourceStep
   alias Gallformers.Import.StableRef
+  alias Gallformers.Import.StatementEdit
+  alias Gallformers.Import.SynonymDecisions
   alias Gallformers.Import.TaxonomyAdmin
   alias Gallformers.Import.TaxonomyEdits
+  alias Gallformers.Import.TermCandidate
+  alias Gallformers.Import.TermCandidates
+  alias Gallformers.Import.TraitTerms
   alias Gallformers.Import.Validator
   alias Gallformers.Import.Validator.Problem
+  alias Gallformers.Import.VocabEdits
   alias Gallformers.Import.Worker
   alias Gallformers.Repo
   alias Gallformers.Sources.Docling
@@ -451,8 +498,42 @@ defmodule Gallformers.Import do
 
     store_package_items(package, source_items)
 
-    for batch <- batches do
-      store_resolution(package, resolve_batch(batch, taxonomy, texts, review))
+    # A denied batch decides nothing for the others.
+    decided =
+      for batch <- all,
+          batch.status != :denied,
+          into: %{},
+          do: {batch.id, Queue.decided(batch.id)}
+
+    names =
+      name_decisions(
+        all,
+        Map.new(decided, fn {id, items} -> {id, Queue.statement_decisions(items)} end)
+      )
+
+    # A Host read in the Source's sense holds for every batch of the package.
+    readings = decided |> Map.values() |> List.flatten() |> GallDecisions.readings()
+
+    common = %{
+      taxonomy: taxonomy,
+      texts: texts,
+      review: review,
+      names: names,
+      readings: readings
+    }
+
+    resolutions =
+      for batch <- batches, do: resolve_batch(batch, Map.put(common, :decided, decided[batch.id]))
+
+    queues =
+      resolutions
+      |> Enum.map(fn %{batch: batch} = r ->
+        %{file: batch.file, batch_type: batch.batch_type, name_keys: r.name_keys, queue: r.queue}
+      end)
+      |> Queue.share_names()
+
+    for {resolution, queue} <- Enum.zip(resolutions, queues) do
+      store_resolution(package, %{resolution | queue: queue})
     end
 
     if source_id && package.source_id == nil do
@@ -474,12 +555,6 @@ defmodule Gallformers.Import do
   # The package-level items (its Source, the Source a notice retracts):
   # open ones replaced, decided ones kept.
   defp store_package_items(package, items) do
-    Repo.delete_all(
-      from(q in QueueItem,
-        where: q.package_id == ^package.id and is_nil(q.batch_id) and q.status == :open
-      )
-    )
-
     decided =
       from(q in QueueItem,
         where: q.package_id == ^package.id and is_nil(q.batch_id) and q.status == :decided,
@@ -487,9 +562,19 @@ defmodule Gallformers.Import do
       )
       |> Repo.all()
 
-    items
-    |> Enum.reject(&(&1.statement_ref in decided))
-    |> insert_queue_items(package, nil)
+    replace_open_items(package, nil, Enum.reject(items, &(&1.statement_ref in decided)))
+  end
+
+  # The decisions on names, by name key (`Queue.name_keys/1`): what was
+  # decided for a name in one batch holds for it in every batch of the
+  # package; the first batch's (the taxonomy batch's) wins.
+  defp name_decisions(batches, decisions) do
+    for batch <- batches,
+        by_ref = Map.get(decisions, batch.id, %{}),
+        {ref, key} <- Queue.name_keys(batch.content),
+        Map.has_key?(by_ref, ref),
+        reduce: %{},
+        do: (acc -> Map.put_new(acc, key, by_ref[ref]))
   end
 
   defp document_texts(nil), do: []
@@ -501,13 +586,31 @@ defmodule Gallformers.Import do
     end
   end
 
-  # Resolves one batch, honouring its decided queue items: the statements,
-  # the queue items they call for (less those already decided, and less
-  # unresolved names no act or Fact needs), and its status.
-  defp resolve_batch(%Batch{content: content} = batch, taxonomy, texts, review) do
-    decided = Queue.decided(batch.id)
-    context = Resolver.context(content, taxonomy: taxonomy, document_texts: texts)
-    taxa = content |> Resolver.resolve_taxa(context) |> Queue.overlay(decided)
+  # Resolves one batch, honouring the decided queue items: its own, and the
+  # package's decisions on the names it declares (`ctx.names`). The taxa
+  # are decided before the Galls are matched, so a Gall waiting on its
+  # Inducer is matched against the decided Inducer. Returns the
+  # statements, the queue items they call for (less those decided, and
+  # less unresolved names no act or Fact needs), and its status.
+  defp resolve_batch(%Batch{content: content} = batch, ctx) do
+    name_keys = Queue.name_keys(content)
+
+    decisions =
+      for(
+        {ref, key} <- name_keys,
+        Map.has_key?(ctx.names, key),
+        into: %{},
+        do: {ref, ctx.names[key]}
+      )
+      |> Map.merge(Queue.statement_decisions(ctx.decided))
+
+    context = Resolver.context(content, taxonomy: ctx.taxonomy, document_texts: ctx.texts)
+
+    taxa =
+      content
+      |> Resolver.resolve_taxa(context)
+      |> GallDecisions.read(ctx.readings)
+      |> Queue.overlay(decisions)
 
     {statements, queue, status} =
       case batch.batch_type do
@@ -515,40 +618,62 @@ defmodule Gallformers.Import do
           {taxa, Resolver.queue_items(taxa), :ready}
 
         :gall ->
-          galls = content |> GallMatcher.match_galls(taxa) |> Queue.overlay(decided)
+          galls =
+            content
+            |> GallMatcher.match_galls(taxa)
+            |> Queue.overlay(decisions)
+            |> GallMatcher.settle_pairs()
 
           {taxa ++ galls, Resolver.queue_items(taxa) ++ GallMatcher.queue_items(galls),
            if(Queue.holds_gall_batch?(taxa), do: :blocked, else: :ready)}
       end
 
-    needed = needed_taxon_refs(batch.batch_type, content)
-    decided_refs = for(%{kind: kind} = q <- decided, kind != :dispute, do: q.statement_ref)
-    decided_disputes = for(%{kind: :dispute} = q <- decided, do: q.statement_ref)
+    needed = needed_taxon_refs(batch.batch_type, content, taxa)
 
     queue =
       Enum.filter(queue, fn item ->
-        item.statement_ref not in decided_refs and
+        not Map.has_key?(decisions, item.statement_ref) and
           (not String.starts_with?(item.statement_ref, "t") or item.statement_ref in needed)
-      end) ++
-        Enum.reject(
-          Queue.dispute_items(review, batch.file),
-          &(&1.statement_ref in decided_disputes)
-        )
+      end) ++ statement_items(batch, ctx)
 
-    %{batch: batch, statements: statements, queue: queue, status: status}
+    %{batch: batch, statements: statements, queue: queue, status: status, name_keys: name_keys}
+  end
+
+  # The items about the batch's statements rather than its names and Galls,
+  # less those decided: disputes, what was set aside, Trait terms.
+  defp statement_items(%Batch{content: content, file: file}, ctx) do
+    decided_disputes = for(%{kind: :dispute} = q <- ctx.decided, ref <- Disputes.refs(q), do: ref)
+    decided_set_aside = for(q <- ctx.decided, SetAside.set_aside?(q), do: q.statement_ref)
+    decided_terms = for(%{kind: :trait_term} = q <- ctx.decided, do: q.statement_ref)
+
+    dropped = Map.keys(Queue.drops(ctx.decided))
+    terms = TraitTerms.queue_items(content, ctx.review, file: file, drop: dropped)
+
+    # A statement a Gall decision left out is disputed no longer.
+    Enum.reject(
+      Disputes.items(ctx.review, file, content),
+      &(&1.statement_ref in decided_disputes or &1.statement_ref in dropped)
+    ) ++
+      Enum.reject(SetAside.queue_items(content), &(&1.statement_ref in decided_set_aside)) ++
+      Enum.reject(terms, &(&1.statement_ref in decided_terms))
   end
 
   # The taxon refs a batch's acts or Galls and Facts need resolved. A
-  # synonymy act's `name` is a name, not a taxon: it need not resolve.
-  defp needed_taxon_refs(:taxonomy, content) do
+  # synonymy act's `name` is a name, not a taxon: it need not resolve. Nor
+  # does the parent of an original combination's placement, which is
+  # recorded as history (`Gallformers.Import.ApplyTaxonomy`).
+  defp needed_taxon_refs(:taxonomy, content, taxa) do
+    original = for %{flags: flags} = s <- taxa, "original_combination" in flags, do: s.ref
+
     for act <- List.wrap(content["acts"]),
         role <- ["taxon", "parent", "accepted", "into"],
+        not (role == "parent" and act["kind"] == "placement" and act["taxon"] in original),
         ref <- List.wrap(act[role]),
         uniq: true,
         do: ref
   end
 
-  defp needed_taxon_refs(:gall, content) do
+  defp needed_taxon_refs(:gall, content, _taxa) do
     from_galls =
       for g <- List.wrap(content["galls"]),
           role <- ["inducer", "host"],
@@ -575,14 +700,62 @@ defmodule Gallformers.Import do
       end
 
     Repo.insert_all(BatchStatement, rows)
-
-    Repo.delete_all(from(q in QueueItem, where: q.batch_id == ^batch.id and q.status == :open))
-    insert_queue_items(resolution.queue, package, batch.id)
+    replace_open_items(package, batch.id, resolution.queue)
 
     batch
     |> Batch.status_changeset(resolution.status)
     |> Repo.update()
     |> unwrap_or_rollback()
+  end
+
+  # Replaces the open items of `batch_id` (nil: the package's own) with
+  # `items`. An open item still called for (the same kind and statement)
+  # keeps its row and ID, its subject, proposal and reason brought up to
+  # date, so a resolution after a decision leaves the others in place. A
+  # rejection lasts while the proposal it rejected does. An item no longer
+  # called for is deleted; its notes pass to the item now queued about the
+  # same statement, if any, else go with it.
+  defp replace_open_items(package, batch_id, items) do
+    open =
+      from(q in QueueItem, where: q.package_id == ^package.id and q.status == :open)
+      |> then(fn query ->
+        if batch_id,
+          do: where(query, [q], q.batch_id == ^batch_id),
+          else: where(query, [q], is_nil(q.batch_id))
+      end)
+      |> Repo.all()
+      |> Map.new(&{{&1.kind, &1.statement_ref}, &1})
+
+    items = Enum.uniq_by(items, &{&1.kind, &1.statement_ref})
+    wanted = MapSet.new(items, &{&1.kind, &1.statement_ref})
+    stale = for {key, q} <- open, not MapSet.member?(wanted, key), do: q
+
+    {kept, new} = Enum.split_with(items, &Map.has_key?(open, {&1.kind, &1.statement_ref}))
+
+    for item <- kept,
+        q = open[{item.kind, item.statement_ref}],
+        {q.subject, q.proposal, q.reason} != {item.subject, item.proposal, item.reason} do
+      rejection =
+        if q.proposal != item.proposal,
+          do: [proposal_rejected_at: nil, proposal_rejected_by_name: nil],
+          else: []
+
+      from(i in QueueItem, where: i.id == ^q.id)
+      |> Repo.update_all(
+        set:
+          [
+            subject: item.subject,
+            proposal: item.proposal,
+            reason: item.reason,
+            updated_at: DateTime.utc_now(:second)
+          ] ++ rejection
+      )
+    end
+
+    insert_queue_items(new, package, batch_id)
+    # A stale item's notes pass to its replacement before it is deleted.
+    pass_on_notes(package, batch_id, stale)
+    Repo.delete_all(from(q in QueueItem, where: q.id in ^Enum.map(stale, & &1.id)))
   end
 
   defp insert_queue_items(items, package, batch_id) do
@@ -606,6 +779,26 @@ defmodule Gallformers.Import do
   @spec list_statements(Batch.t()) :: [BatchStatement.t()]
   def list_statements(%Batch{id: batch_id}) do
     Repo.all(from(s in BatchStatement, where: s.batch_id == ^batch_id, order_by: s.id))
+  end
+
+  @doc """
+  The taxon and Gall statements of `batch_ids` with these refs, in one
+  query, by `{batch_id, ref}`: what the queue items of several packages
+  speak of (`pairs` is `[{batch_id, ref}]`).
+  """
+  @spec statements_for([{integer(), String.t()}]) :: %{
+          {integer(), String.t()} => BatchStatement.t()
+        }
+  def statements_for([]), do: %{}
+
+  def statements_for(pairs) do
+    batch_ids = pairs |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
+    wanted = MapSet.new(pairs)
+
+    from(s in BatchStatement, where: s.batch_id in ^batch_ids and s.kind in [:taxon, :gall])
+    |> Repo.all()
+    |> Enum.filter(&MapSet.member?(wanted, {&1.batch_id, &1.ref}))
+    |> Map.new(&{{&1.batch_id, &1.ref}, &1})
   end
 
   @doc """
@@ -666,6 +859,45 @@ defmodule Gallformers.Import do
   @spec applicable?(Batch.t()) :: boolean()
   def applicable?(%Batch{status: status}), do: status == :ready
 
+  @typedoc "A Trait Fact written on a placed term the producer suggested another category for."
+  @type term_spot_check :: %{
+          trait: String.t(),
+          term: String.t(),
+          category: String.t(),
+          suggested: [String.t()],
+          fact_id: integer(),
+          batch_id: integer(),
+          ref: String.t()
+        }
+
+  @doc """
+  The Trait Facts written on a placed term whose producer suggested
+  another category (flagged `"suggested_other_category"` when applied,
+  `Gallformers.Import.TraitTerms`), newest first: for spot checks of the
+  term's placement.
+  """
+  @spec list_term_spot_checks() :: [term_spot_check()]
+  def list_term_spot_checks do
+    from(s in BatchStatement,
+      where: s.kind == :fact and "suggested_other_category" in s.flags,
+      order_by: [desc: s.id]
+    )
+    |> Repo.all()
+    |> Enum.map(fn s ->
+      spot = s.detail["spot_check"] || %{}
+
+      %{
+        trait: spot["trait"],
+        term: spot["term"],
+        category: spot["category"],
+        suggested: List.wrap(spot["suggested"]),
+        fact_id: s.fact_id,
+        batch_id: s.batch_id,
+        ref: s.ref
+      }
+    end)
+  end
+
   @doc "A batch's `unmapped` entries, in the batch's order."
   @spec list_unmapped(Batch.t()) :: [BatchUnmapped.t()]
   def list_unmapped(%Batch{id: batch_id}) do
@@ -684,6 +916,59 @@ defmodule Gallformers.Import do
   @spec list_gall_renames(keyword()) :: [QueueItem.t()]
   def list_gall_renames(opts \\ []), do: GallRenames.list(opts)
 
+  @typedoc "A candidate of a name several taxa hold, for comparison (`candidate_comparison/1`)."
+  @type candidate :: %{
+          taxon_id: integer(),
+          name: String.t(),
+          rank: Taxa.Rank.t(),
+          authorship: String.t() | nil,
+          names: [
+            %{
+              name: String.t(),
+              status: :accepted | :synonym,
+              authorship: String.t() | nil,
+              sensu: String.t() | nil
+            }
+          ],
+          galls: [
+            %{
+              gall_id: integer(),
+              name: String.t(),
+              generation: String.t() | nil,
+              hosts: [%{taxon_id: integer(), name: String.t(), rank: Taxa.Rank.t()}]
+            }
+          ]
+        }
+
+  @doc """
+  The candidates of a taxon item (`t1`; a name several species hold, as a
+  misapplied or invalid name is), in the proposal's order, to compare with
+  what the Source says: each one's accepted name and rank, the names it
+  holds (accepted first, then its synonyms, with authorship and sensu), and
+  the Galls it induces with their current Hosts. Empty for any other item.
+  """
+  @spec candidate_comparison(QueueItem.t()) :: [candidate()]
+  def candidate_comparison(%QueueItem{statement_ref: "t" <> _, proposal: proposal}) do
+    for id <- List.wrap(proposal["candidate_ids"]),
+        taxon = Taxa.get_taxon(id) do
+      accepted = Enum.find(taxon.names, &(&1.status == :accepted))
+
+      %{
+        taxon_id: id,
+        name: accepted.name,
+        rank: taxon.rank,
+        authorship: accepted.authorship,
+        names: Enum.map(taxon.names, &Map.take(&1, [:name, :status, :authorship, :sensu])),
+        galls:
+          for s <- Catalog.list_gall_summaries_by_inducer([id]) do
+            %{gall_id: s.gall_id, name: s.name, generation: s.generation, hosts: s.hosts}
+          end
+      }
+    end
+  end
+
+  def candidate_comparison(_item), do: []
+
   # -- decisions ---------------------------------------------------------------
 
   @doc """
@@ -691,40 +976,605 @@ defmodule Gallformers.Import do
   and when (`Gallformers.Import.Queue` lists what each kind takes). The
   decision is honoured at once — a decided taxon or Gall statement follows
   it, and a gall batch held only by a decided Host name is freed — and
-  every later resolution keeps it. The replay log records it.
+  every later resolution keeps it. A decision on a batch's item resolves
+  the package again (when it can be resolved): a name's decision then
+  holds in every batch that declares it, and the Galls are matched again,
+  so a Gall that waited on its Inducer is queued now if it still needs
+  someone. Open items still called for keep their IDs. The replay log
+  records it.
 
-  `{:error, :already_decided}` for a decided item; `{:error, changeset}`
-  (errors on `:decision`) for a decision that does not fit the item.
+  A Host decision that adds a synonym or a plant adds it first
+  (`Gallformers.Import.HostDecisions`). A Gall decision may leave out
+  statements the Source gets wrong and read a Host name in the Source's
+  sense, recording that sense on the plant first
+  (`Gallformers.Import.GallDecisions`). A synonym question may be decided by
+  changing the tree: the name split off as a species of its own, or moved
+  to another species (`Gallformers.Import.SynonymDecisions`), the edits
+  made first. A dispute dropping a Trait Fact
+  keeps its words as text on the Gall (`Gallformers.Import.Disputes`); one
+  about a Trait term kept after its batch was applied writes its Facts. A
+  decision on what was set aside, made after its gall batch was applied,
+  writes its Facts at once (`apply_set_aside_decision/2`). A decision on a
+  Trait term (`Gallformers.Import.TraitTerms`) changes the term first;
+  then its waiting uses are settled and get their Facts at once where
+  their batch is applied (else when it is): this question's, or, placing
+  the term for every Source or marking it as fitting none, every
+  Source's, the other packages' questions about the term being decided
+  with it.
+
+  `{:error, :already_decided}` for a decided item; `{:error, :gone}` for
+  one a later resolution removed (its statement no longer needs anyone);
+  `{:error, changeset}` (errors on `:decision`) for a decision that does
+  not fit the item.
   """
   @spec decide_queue_item(Actor.t(), QueueItem.t(), map()) ::
-          {:ok, QueueItem.t()} | {:error, :already_decided | Changeset.t()}
+          {:ok, QueueItem.t()} | {:error, :already_decided | :gone | Changeset.t()}
   def decide_queue_item(%Actor{} = actor, %QueueItem{} = item, decision) do
+    files = decision_files(item.package_id, [item])
+
     Audit.transaction(actor, "import.decide_queue_item", fn ->
-      item = Repo.one!(from(q in QueueItem, where: q.id == ^item.id, lock: "FOR UPDATE"))
+      # The package first, as resolving locks it before its items.
+      package = item.package_id && lock_package(item.package_id)
+      item = Repo.one(from(q in QueueItem, where: q.id == ^item.id, lock: "FOR UPDATE"))
+      if item == nil, do: Repo.rollback(:gone)
       if item.status == :decided, do: Repo.rollback(:already_decided)
 
+      item = actor |> decide(item, package, decision, files) |> unwrap_or_rollback()
+      settle(package, [item], files)
+      item
+    end)
+  end
+
+  @doc """
+  Accepts the proposals of `items` (`Gallformers.Import.Proposals`: what
+  accepting decides, per kind), in one transaction: each is decided as
+  `decide_queue_item/3` decides it, and logged for replay the same way;
+  each package is then resolved again once.
+
+  Skipped, and left open: an item whose proposal was rejected
+  (`:rejected`), one with only a suggestion to check (`:weak`), one with no
+  proposal (`:no_proposal`), one decided (`:already_decided`) or removed
+  (`:gone`) since it was listed, and one whose proposal no longer fits it
+  (`{:invalid, changeset}`). Returns what was decided and what was
+  skipped, with why, in the order given.
+  """
+  @spec accept_proposals(Actor.t(), [QueueItem.t()]) ::
+          {:ok, %{decided: [QueueItem.t()], skipped: [{QueueItem.t(), term()}]}}
+          | {:error, term()}
+  def accept_proposals(%Actor{} = actor, items) when is_list(items) do
+    items = Enum.uniq_by(items, & &1.id)
+    by_package = Enum.group_by(items, & &1.package_id)
+    files = Map.new(by_package, fn {id, listed} -> {id, decision_files(id, listed)} end)
+    ids = Enum.map(items, & &1.id)
+
+    Audit.transaction(actor, "import.accept_proposals", fn ->
+      packages =
+        for id <- by_package |> Map.keys() |> Enum.reject(&is_nil/1) |> Enum.sort(),
+            into: %{},
+            do: {id, lock_package(id)}
+
+      current =
+        from(q in QueueItem, where: q.id in ^ids, order_by: q.id, lock: "FOR UPDATE")
+        |> Repo.all()
+        |> Map.new(&{&1.id, &1})
+
+      {decided, skipped} =
+        Enum.reduce(items, {[], []}, fn listed, acc ->
+          item = current[listed.id]
+          collect(acc, accept(actor, item, packages, files), item || listed)
+        end)
+
+      for {id, package} <- packages,
+          do: settle(package, Enum.filter(decided, &(&1.package_id == id)), files[id])
+
+      %{decided: Enum.reverse(decided), skipped: Enum.reverse(skipped)}
+    end)
+  end
+
+  @doc """
+  The decision accepting `item`'s proposal makes, or why it has none to
+  accept (`:rejected`, `:weak`, `:no_proposal`;
+  `Gallformers.Import.Proposals`).
+  """
+  @spec proposed_decision(QueueItem.t()) :: {:ok, map()} | {:none, Proposals.reason()}
+  defdelegate proposed_decision(item), to: Proposals, as: :proposed
+
+  @doc """
+  Decides a group of identical disputes (`Gallformers.Import.Disputes`:
+  the same statement, `subject["group"]`) as one question, in one
+  transaction: `%{"keep" => true}` or `%{"skip" => true}` for every item,
+  but those whose IDs are in `"except"`, which get the other. A group of
+  Host disputes may be kept with the Host read as another plant (`%{"keep"
+  => true, "host_reading" => reading}`), or on the plant chosen for their
+  statements (`%{"keep" => true, "host_taxon_id" => id}`): each kept is
+  decided so, each excepted `skip`. Each item is
+  decided as `decide_queue_item/3` decides it, and logged for replay the
+  same way; the package is then resolved again once. Returns the decided
+  items.
+
+  `{:error, :not_one_group}` unless `items` are disputes of one package
+  sharing a group, every exception among them; `{:error, :invalid_decision}`
+  for another decision; `{:error, :already_decided}` or `{:error, :gone}`
+  when one of them is decided or removed since it was listed.
+  """
+  @spec decide_group(Actor.t(), [QueueItem.t()], map()) ::
+          {:ok, [QueueItem.t()]}
+          | {:error, :not_one_group | :invalid_decision | :already_decided | :gone | term()}
+  def decide_group(%Actor{} = actor, items, decision) when is_list(items) and is_map(decision) do
+    items = Enum.uniq_by(items, & &1.id)
+
+    with {:ok, chosen, except} <- group_decision(decision),
+         :ok <- one_group(items, except) do
+      package_id = hd(items).package_id
+      files = decision_files(package_id, items)
+      ids = Enum.map(items, & &1.id)
+
+      Audit.transaction(actor, "import.decide_group", fn ->
+        package = package_id && lock_package(package_id)
+
+        current =
+          Repo.all(from(q in QueueItem, where: q.id in ^ids, order_by: q.id, lock: "FOR UPDATE"))
+
+        cond do
+          length(current) < length(ids) -> Repo.rollback(:gone)
+          Enum.any?(current, &(&1.status == :decided)) -> Repo.rollback(:already_decided)
+          one_group(current, except) != :ok -> Repo.rollback(:not_one_group)
+          true -> :ok
+        end
+
+        decided =
+          for item <- current do
+            this = if item.id in except, do: other_choice(chosen), else: chosen
+            actor |> decide(item, package, this, files) |> unwrap_or_rollback()
+          end
+
+        settle(package, decided, files)
+        decided
+      end)
+    end
+  end
+
+  defp group_decision(decision) do
+    {except, choice} = Map.pop(decision, "except", [])
+
+    cond do
+      not (is_list(except) and Enum.all?(except, &is_integer/1)) ->
+        {:error, :invalid_decision}
+
+      choice in [%{"keep" => true}, %{"skip" => true}] ->
+        {:ok, choice, except}
+
+      match?(%{"keep" => true, "host_reading" => %{}}, choice) and map_size(choice) == 2 ->
+        {:ok, choice, except}
+
+      match?(%{"keep" => true, "host_taxon_id" => id} when is_integer(id), choice) and
+          map_size(choice) == 2 ->
+        {:ok, choice, except}
+
+      true ->
+        {:error, :invalid_decision}
+    end
+  end
+
+  defp other_choice(%{"keep" => true}), do: %{"skip" => true}
+  defp other_choice(%{"skip" => true}), do: %{"keep" => true}
+
+  defp one_group([], _except), do: {:error, :not_one_group}
+
+  defp one_group([first | _] = items, except) do
+    group = first.subject["group"]
+    ids = Enum.map(items, & &1.id)
+
+    if is_binary(group) and Enum.all?(except, &(&1 in ids)) and
+         Enum.all?(items, fn item ->
+           item.kind == :dispute and item.package_id == first.package_id and
+             item.subject["group"] == group
+         end),
+       do: :ok,
+       else: {:error, :not_one_group}
+  end
+
+  defp collect({decided, skipped}, {:ok, item}, _item), do: {[item | decided], skipped}
+
+  defp collect({decided, skipped}, {:skip, reason}, item),
+    do: {decided, [{item, reason} | skipped]}
+
+  defp accept(_actor, nil, _packages, _files), do: {:skip, :gone}
+
+  defp accept(_actor, %QueueItem{status: :decided}, _packages, _files),
+    do: {:skip, :already_decided}
+
+  defp accept(actor, item, packages, files) do
+    case Proposals.proposed(item) do
+      {:none, reason} ->
+        {:skip, reason}
+
+      {:ok, decision} ->
+        case decide(actor, item, packages[item.package_id], decision, files[item.package_id]) do
+          {:ok, item} -> {:ok, item}
+          {:error, changeset} -> {:skip, {:invalid, changeset}}
+        end
+    end
+  end
+
+  @doc """
+  Rejects an open item's proposal (or suggestion): the item stays open,
+  marked with who rejected it and when, and accepting proposals in bulk
+  leaves it out. The mark lasts until the proposal is restored
+  (`restore_proposal/2`) or a resolution proposes something else.
+
+  Not in the replay log: it changes no data, and the decision made
+  afterwards is logged on its own. (After the cutover replay an item still
+  open shows its proposal again.)
+
+  `{:error, :no_proposal}` for an item with neither; `{:error,
+  :already_decided}`, `{:error, :gone}` as for `decide_queue_item/3`.
+  """
+  @spec reject_proposal(Actor.t(), QueueItem.t()) ::
+          {:ok, QueueItem.t()} | {:error, :no_proposal | :already_decided | :gone}
+  def reject_proposal(%Actor{} = actor, %QueueItem{} = item),
+    do: mark_proposal(actor, item, actor)
+
+  @doc "Restores an open item's rejected proposal (`reject_proposal/2`)."
+  @spec restore_proposal(Actor.t(), QueueItem.t()) ::
+          {:ok, QueueItem.t()} | {:error, :already_decided | :gone}
+  def restore_proposal(%Actor{} = actor, %QueueItem{} = item), do: mark_proposal(actor, item, nil)
+
+  defp mark_proposal(actor, %QueueItem{id: id}, rejecting) do
+    operation = if rejecting, do: "import.reject_proposal", else: "import.restore_proposal"
+
+    Audit.transaction(actor, operation, fn ->
+      item = Repo.one(from(q in QueueItem, where: q.id == ^id, lock: "FOR UPDATE"))
+
+      cond do
+        item == nil ->
+          Repo.rollback(:gone)
+
+        item.status == :decided ->
+          Repo.rollback(:already_decided)
+
+        rejecting && not Proposals.rejectable?(item) ->
+          Repo.rollback(:no_proposal)
+
+        true ->
+          item |> QueueItem.reject_changeset(rejecting) |> Repo.update() |> unwrap_or_rollback()
+      end
+    end)
+  end
+
+  # -- notes -------------------------------------------------------------------
+
+  @doc """
+  Saves `actor`'s note on `item`, open or decided, for the next curator
+  (`Gallformers.Import.QueueItemNote`; matter `d213`). A note is not part
+  of the decision and is not replayed; it stays with the item. The text is
+  trimmed; a blank one is refused (`{:error, changeset}`, on `:text`), as
+  is a note on an item that is gone (on `:queue_item_id`).
+  """
+  @spec add_note(Actor.t(), QueueItem.t(), String.t()) ::
+          {:ok, QueueItemNote.t()} | {:error, Changeset.t()}
+  def add_note(%Actor{} = actor, %QueueItem{} = item, text) do
+    changeset = QueueItemNote.create_changeset(item, actor, text)
+
+    if changeset.valid? do
+      Audit.transaction(actor, "import.add_note", fn ->
+        changeset |> Repo.insert() |> unwrap_or_rollback()
+      end)
+    else
+      {:error, changeset}
+    end
+  end
+
+  @doc "`item`'s saved notes, oldest first."
+  @spec list_notes(QueueItem.t()) :: [QueueItemNote.t()]
+  def list_notes(%QueueItem{id: id}) do
+    Repo.all(
+      from(n in QueueItemNote, where: n.queue_item_id == ^id, order_by: [n.inserted_at, n.id])
+    )
+  end
+
+  @doc """
+  `item`'s notes to show, oldest first: its saved notes and, for an older
+  decision that carries a `"note"`, that note (unsaved: `id` nil, by who
+  decided, when).
+  """
+  @spec notes_for(QueueItem.t()) :: [QueueItemNote.t()]
+  def notes_for(%QueueItem{} = item), do: with_decision_note(list_notes(item), item)
+
+  @doc "`notes_for/1` of each of `items`, by item ID, in one query."
+  @spec notes_by_item([QueueItem.t()]) :: %{integer() => [QueueItemNote.t()]}
+  def notes_by_item(items) when is_list(items) do
+    ids = Enum.map(items, & &1.id)
+
+    saved =
+      from(n in QueueItemNote,
+        where: n.queue_item_id in ^ids,
+        order_by: [n.inserted_at, n.id]
+      )
+      |> Repo.all()
+      |> Enum.group_by(& &1.queue_item_id)
+
+    Map.new(items, &{&1.id, with_decision_note(Map.get(saved, &1.id, []), &1)})
+  end
+
+  defp with_decision_note(notes, %QueueItem{decision: %{"note" => text}} = item)
+       when is_binary(text) and text != "" do
+    legacy = %QueueItemNote{
+      queue_item_id: item.id,
+      text: text,
+      author_user_id: item.decided_by_user_id,
+      author_name: item.decided_by_name,
+      inserted_at: item.decided_at
+    }
+
+    Enum.sort_by(notes ++ [legacy], & &1.inserted_at, DateTime)
+  end
+
+  defp with_decision_note(notes, _item), do: notes
+
+  # Passes the notes of `stale` open items (about to be deleted) to the open
+  # item now queued about the same statement, if there is one; the rest go
+  # with their items.
+  defp pass_on_notes(_package, _batch_id, []), do: :ok
+
+  defp pass_on_notes(package, batch_id, stale) do
+    noted =
+      from(n in QueueItemNote,
+        where: n.queue_item_id in ^Enum.map(stale, & &1.id),
+        distinct: true,
+        select: n.queue_item_id
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    stale_ids = Enum.map(stale, & &1.id)
+
+    for q <- stale,
+        MapSet.member?(noted, q.id),
+        to = replacing_item(package, batch_id, q.statement_ref, stale_ids) do
+      from(n in QueueItemNote, where: n.queue_item_id == ^q.id)
+      |> Repo.update_all(set: [queue_item_id: to])
+    end
+
+    :ok
+  end
+
+  defp replacing_item(_package, _batch_id, nil, _stale_ids), do: nil
+
+  defp replacing_item(package, batch_id, ref, stale_ids) do
+    from(q in QueueItem,
+      where:
+        q.package_id == ^package.id and q.status == :open and q.statement_ref == ^ref and
+          q.id not in ^stale_ids,
+      order_by: [desc: q.id],
+      limit: 1,
+      select: q.id
+    )
+    |> in_batch(batch_id)
+    |> Repo.one()
+  end
+
+  defp in_batch(query, nil), do: where(query, [q], is_nil(q.batch_id))
+  defp in_batch(query, batch_id), do: where(query, [q], q.batch_id == ^batch_id)
+
+  # Records and honours `decision` on the open, locked `item` (its package
+  # locked, or nil), inside the caller's transaction, and logs it. The
+  # package is not resolved again (`settle/3`). {:ok, item}, or {:error,
+  # changeset} for a decision that does not fit.
+  defp decide(actor, item, package, decision, files) do
+    changeset =
+      item
+      |> QueueItem.decide_changeset(decision, actor)
+      |> Queue.validate_decision(item, decision)
+
+    if changeset.valid? do
+      decision = actor |> carry_out(item, decision) |> unwrap_or_rollback()
+
       item =
-        item
-        |> QueueItem.decide_changeset(decision, actor)
-        |> Queue.validate_decision(item, decision)
+        changeset
+        |> Changeset.put_change(:decision, decision)
         |> Repo.update()
         |> unwrap_or_rollback()
 
       item =
         case item.kind do
           :gall_rename -> GallRenames.honour(actor, item)
-          _kind -> tap(item, &honour/1)
+          _kind -> tap(item, &honour(actor, &1, package, files))
         end
 
       log_decision(item)
+      {:ok, item}
+    else
+      {:error, changeset}
+    end
+  end
+
+  defp carry_out(actor, item, decision) do
+    cond do
+      HostDecisions.host?(item) -> HostDecisions.carry_out(actor, item, decision)
+      GallDecisions.gall?(item) -> GallDecisions.carry_out(actor, item, decision)
+      Disputes.host?(item) -> GallDecisions.carry_out(actor, item, decision)
+      SynonymDecisions.synonym?(item) -> SynonymDecisions.carry_out(actor, item, decision)
+      true -> {:ok, decision}
+    end
+  end
+
+  # The package's files when a decision on `items` will resolve it again (a
+  # batch's item, the package resolvable) or write a set-aside item's Facts
+  # (its batch applied); nil otherwise, or when the bucket cannot be read
+  # (a decision is then honoured on its statement alone, and the next
+  # resolution does the rest; set-aside Facts read the files again).
+  defp decision_files(nil, _items), do: nil
+
+  defp decision_files(package_id, items) do
+    package = get_package!(package_id)
+
+    needed? =
+      Enum.any?(items, fn item ->
+        cond do
+          not is_integer(item.batch_id) -> false
+          written_later?(item) -> get_batch!(item.batch_id).status == :applied
+          true -> package.status in @resolvable
+        end
+      end)
+
+    with true <- needed?, {:ok, files} <- read_package_files(package) do
+      files
+    else
+      _ -> nil
+    end
+  end
+
+  # Applies a decision to its stored statement, inside the caller's
+  # transaction; the package is resolved again afterwards (`settle/3`).
+  defp honour(_actor, %QueueItem{batch_id: nil}, _package, _files), do: :ok
+
+  # What was set aside bears on no statement; its Facts are written when
+  # the gall batch is applied, or now if it is
+  # (`Gallformers.Import.SetAside`).
+  defp honour(actor, %QueueItem{kind: :set_aside_statement} = item, package, files) do
+    batch = get_batch!(item.batch_id)
+
+    if batch.status == :applied and batch.batch_type == :gall do
+      files = files || package |> read_package_files() |> unwrap_or_rollback()
+      write_set_aside(actor, package, batch, [item], files)
+    end
+
+    :ok
+  end
+
+  # A Trait term's question: the term changes, then its waiting uses are
+  # settled, getting their Facts where their batch is applied
+  # (`Gallformers.Import.TraitTerms`).
+  defp honour(actor, %QueueItem{kind: :trait_term} = item, package, files) do
+    actor |> TraitTerms.change_term(item) |> unwrap_or_rollback()
+    %{"trait" => trait, "term" => term} = item.subject
+
+    if TraitTerms.every_source?(item.decision) do
+      decide_with(actor, item)
+      categories = TraitTerms.settled_categories(item.decision)
+      # Placed under its categories, or (no_fit) kept as text because it fits none.
+      settled = Catalog.settle_pending_terms(actor, trait, term, categories, as: :no_fit)
+      settled |> unwrap_or_rollback() |> write_settled(actor, package, files)
+    else
       item
+      |> TraitTerms.settlements()
+      |> Enum.flat_map(&settle_uses(actor, item, &1))
+      |> write_settled(actor, package, files)
+    end
+  end
+
+  # A dispute dropped: a dropped Trait Fact's words stay as text, and the
+  # term waiting on the dispute (its batch applied) is settled as text.
+  defp honour(
+         actor,
+         %QueueItem{kind: :dispute, decision: %{"skip" => true}} = item,
+         _package,
+         _files
+       ) do
+    batch = get_batch!(item.batch_id)
+    insert_texts(batch, Disputes.texts(item, batch.content))
+
+    if Disputes.trait?(item) do
+      %{"trait" => trait, "term" => term} = item.subject
+
+      actor
+      |> Catalog.settle_pending_terms(trait, term, nil, queue_item_id: item.id, as: :kept)
+      |> unwrap_or_rollback()
+    end
+
+    honour_statement(item)
+  end
+
+  # A Trait dispute kept after its batch was applied: its Facts, which
+  # waited, are written now (`Gallformers.Import.Disputes`).
+  defp honour(
+         actor,
+         %QueueItem{kind: :dispute, decision: %{"keep" => true}} = item,
+         package,
+         files
+       ) do
+    batch = get_batch!(item.batch_id)
+
+    if batch.status == :applied and Disputes.trait?(item) do
+      files = files || package |> read_package_files() |> unwrap_or_rollback()
+      write_kept_traits(actor, package, batch, item, files)
+    end
+
+    honour_statement(item)
+  end
+
+  defp honour(_actor, item, _package, _files), do: honour_statement(item)
+
+  # Inside the caller's transaction, the package locked: the Trait Facts of
+  # a kept dispute (its refs) for an applied gall batch, as applying the
+  # batch would have written them (the term's standing or question), or
+  # stored as waiting terms (on the term's question). The term waiting on
+  # the dispute is settled under the categories its Facts were written on.
+  defp write_kept_traits(actor, package, batch, item, files) do
+    refs = Disputes.refs(item)
+    others = for f <- List.wrap(batch.content["facts"]), f["id"] not in refs, do: f["id"]
+    ours? = fn id -> id |> String.split("+") |> hd() |> then(&(&1 in refs)) end
+
+    term_items =
+      package
+      |> list_queue_items(kind: :trait_term, status: :all)
+      |> Enum.filter(&(&1.batch_id == batch.id))
+
+    plan =
+      TraitTerms.apply_plan(batch.content, decode(files["review.json"]),
+        file: batch.file,
+        drop: others,
+        items: term_items
+      )
+
+    facts = Enum.filter(plan.facts, &ours?.(&1["id"]))
+
+    write_later(actor, package, batch, files, fn ctx ->
+      waiting =
+        Enum.filter(plan.waiting, fn %{use: use} -> Enum.any?(use.facts, &(&1.ref in refs)) end)
+
+      with :ok <- TraitTerms.record_edits(actor, plan.edits),
+           {:ok, result} <- ApplyGall.run_facts(ctx, facts),
+           :ok <-
+             TraitTerms.store_waiting(
+               Map.put(ctx, :term_items, term_items),
+               waiting,
+               ctx.gall_ids
+             ),
+           :ok <- settle_disputed(actor, item, facts) do
+        {:ok, result}
+      end
     end)
   end
 
-  # Applies a decision to its stored statement and the batch's status.
-  defp honour(%QueueItem{batch_id: nil}), do: :ok
+  # The terms waiting on dispute `item`, settled under the categories
+  # its kept Facts (`facts`, the contract's shape) were written on.
+  defp settle_disputed(actor, item, facts) do
+    facts
+    |> Enum.group_by(&{&1["trait"], &1["term"]}, &get_in(&1, ["value", "value"]))
+    |> Enum.reduce_while(:ok, fn {{trait, term}, categories}, :ok ->
+      opts = [queue_item_id: item.id]
 
-  defp honour(%QueueItem{batch_id: batch_id, statement_ref: ref, decision: decision}) do
+      case Catalog.settle_pending_terms(actor, trait, term, Enum.uniq(categories), opts) do
+        {:ok, _settled} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  # The question's waiting uses settled under `categories` (all of them, or
+  # those of the Facts `refs`).
+  defp settle_uses(actor, %QueueItem{subject: subject} = item, {categories, refs}) do
+    narrowed = if refs == :all, do: [], else: [statement_refs: refs]
+    opts = [queue_item_id: item.id] ++ narrowed
+
+    actor
+    |> Catalog.settle_pending_terms(subject["trait"], subject["term"], categories, opts)
+    |> unwrap_or_rollback()
+  end
+
+  defp honour_statement(%QueueItem{batch_id: batch_id, statement_ref: ref} = item) do
     statement =
       Repo.one(
         from(s in BatchStatement,
@@ -733,19 +1583,122 @@ defmodule Gallformers.Import do
       )
 
     if statement do
-      decided = Queue.apply_decision(statement, decision)
+      decided = Queue.apply_decision(statement, Queue.statement_decision(item))
 
       if decided != statement do
         statement
         |> Changeset.change(
-          Map.take(decided, [:resolution, :taxon_id, :gall_id, :method, :flags])
+          Map.take(decided, [:resolution, :taxon_id, :gall_id, :method, :flags, :detail])
         )
         |> Repo.update!()
       end
     end
 
-    refresh_batch_status(get_batch!(batch_id))
+    :ok
   end
+
+  # A dropped Trait Fact's words, kept as text on its Gall: `unmapped`
+  # entries after the batch's own.
+  defp insert_texts(_batch, []), do: :ok
+
+  defp insert_texts(batch, texts) do
+    last =
+      Repo.one(from(u in BatchUnmapped, where: u.batch_id == ^batch.id, select: max(u.position)))
+
+    rows =
+      texts
+      |> Enum.with_index((last || -1) + 1)
+      |> Enum.map(fn {text, position} ->
+        Map.merge(text, %{batch_id: batch.id, position: position})
+      end)
+
+    Repo.insert_all(BatchUnmapped, rows)
+    :ok
+  end
+
+  # After decisions on `items` of `package` (locked, or nil): resolves the
+  # package again when one of them is about a batch's statement and it can
+  # be (the decisions then hold for each name in every batch, and the
+  # Galls are matched again: a Gall waiting on its Inducer is matched once
+  # the Inducer is decided), else brings those batches' status up to date.
+  defp settle(nil, _items, _files), do: :ok
+
+  defp settle(package, items, files) do
+    batch_ids =
+      for item <- items,
+          is_integer(item.batch_id),
+          not written_later?(item),
+          uniq: true,
+          do: item.batch_id
+
+    cond do
+      batch_ids == [] -> :ok
+      files && package.status in @resolvable -> resolve(package, files)
+      true -> Enum.each(batch_ids, &refresh_batch_status(get_batch!(&1)))
+    end
+
+    :ok
+  end
+
+  # Items bearing on no statement, whose Facts are written when their batch
+  # is applied, or at once once it is: what was set aside, a Trait term.
+  defp written_later?(%QueueItem{kind: :trait_term}), do: true
+
+  # A Trait dispute decided after its batch was applied.
+  defp written_later?(%QueueItem{kind: :dispute, batch_id: id} = item) when is_integer(id),
+    do: Disputes.trait?(item) and get_batch!(id).status == :applied
+
+  defp written_later?(item), do: SetAside.set_aside?(item)
+
+  # Decides the other open questions about `item`'s term, in every
+  # package, as `item` is: placing the term, or fitting none, holds for
+  # every Source. Not logged: replaying `item`'s decision decides them again.
+  defp decide_with(actor, %QueueItem{} = item) do
+    decision =
+      item.decision
+      |> Map.take(["place", "no_fit"])
+      |> Map.put("note", "settled for every Source by another package's question")
+
+    from(q in QueueItem,
+      where:
+        q.kind == :trait_term and q.status == :open and q.statement_ref == ^item.statement_ref and
+          q.id != ^item.id,
+      lock: "FOR UPDATE"
+    )
+    |> Repo.all()
+    |> Enum.each(fn q ->
+      q |> QueueItem.decide_changeset(decision, actor) |> Repo.update() |> unwrap_or_rollback()
+    end)
+  end
+
+  # Inside the caller's transaction (`package` locked, `files` its files or
+  # nil): writes the Trait Facts of `settled` waiting terms under their
+  # categories (one Fact each), each in its batch (applied: a waiting term
+  # is stored when its batch is applied), attributed to that batch's Source.
+  defp write_settled(settled, actor, package, files) do
+    settled
+    |> Enum.filter(&(&1.settled_categories != []))
+    |> Enum.group_by(& &1.batch_id)
+    |> Enum.sort()
+    |> Enum.each(fn {batch_id, terms} ->
+      batch = get_batch!(batch_id)
+
+      {pkg, files} =
+        if package && batch.package_id == package.id,
+          do: {package, files || package |> read_package_files() |> unwrap_or_rollback()},
+          else: batch.package_id |> lock_package() |> with_files()
+
+      facts =
+        Enum.flat_map(
+          terms,
+          &TraitTerms.facts_for(batch.content, &1.statement_ref, &1.settled_categories)
+        )
+
+      write_later(actor, pkg, batch, files, &ApplyGall.run_facts(&1, facts))
+    end)
+  end
+
+  defp with_files(package), do: {package, package |> read_package_files() |> unwrap_or_rollback()}
 
   defp refresh_batch_status(%Batch{batch_type: :gall, status: status} = batch)
        when status in [:ready, :blocked] do
@@ -784,7 +1737,77 @@ defmodule Gallformers.Import do
     )
   end
 
+  @doc """
+  Writes the Facts a decided set-aside item (`Gallformers.Import.SetAside`;
+  its `decision` as given) states, when its gall batch is applied already:
+  one per covered Gall, attributed to the batch's Source with the entries'
+  evidence, as applying the batch writes them. Writing again changes
+  nothing. `{:ok, :not_applied}` while the batch is not applied (applying
+  it writes them). `decide_queue_item/3` calls it for a decision made after
+  the batch was applied.
+  """
+  @spec apply_set_aside_decision(Actor.t(), QueueItem.t()) ::
+          {:ok, :written | :not_applied} | {:error, term()}
+  def apply_set_aside_decision(%Actor{} = actor, %QueueItem{batch_id: batch_id} = item)
+      when is_integer(batch_id) do
+    package = get_package!(item.package_id)
+
+    with {:ok, files} <- read_package_files(package) do
+      Audit.transaction(actor, "import.apply_set_aside_decision", fn ->
+        package = lock_package(package.id)
+        batch = get_batch!(batch_id)
+
+        if batch.status == :applied and batch.batch_type == :gall do
+          write_set_aside(actor, package, batch, [item], files)
+          :written
+        else
+          :not_applied
+        end
+      end)
+    end
+  end
+
+  # Inside the caller's transaction, the package locked: the set-aside
+  # items' Facts for an applied gall batch, its Galls as applied.
+  defp write_set_aside(actor, package, batch, items, files),
+    do: write_later(actor, package, batch, files, &ApplyGall.run_set_aside(&1, items))
+
+  # Inside the caller's transaction, the package locked: what `run` (given
+  # the batch's context, with its Galls as applied) writes for an applied
+  # gall batch, recorded as its statements.
+  defp write_later(actor, package, batch, files, run) do
+    galls =
+      for %{kind: :gall, gall_id: id} = s <- list_statements(batch),
+          is_integer(id) and "skipped" not in s.flags,
+          into: %{},
+          do: {s.ref, id}
+
+    result =
+      actor
+      |> batch_context(package, batch, files)
+      |> Map.put(:gall_ids, galls)
+      |> run.()
+      |> unwrap_or_rollback()
+
+    refs = Enum.map(result.statements, & &1.ref)
+
+    Repo.delete_all(
+      from(s in BatchStatement,
+        where: s.batch_id == ^batch.id and s.kind == :fact and s.ref in ^refs
+      )
+    )
+
+    record_applied(package, batch, result)
+  end
+
   # -- approval ----------------------------------------------------------------
+
+  @doc """
+  Whether an open `item` of a batch of `batch_type` (nil for the package)
+  holds the package's approval (`Gallformers.Import.Queue.blocking?/2`).
+  """
+  @spec blocking?(QueueItem.t(), :taxonomy | :gall | nil) :: boolean()
+  defdelegate blocking?(item, batch_type), to: Queue
 
   @doc """
   Approves a package awaiting review and has the import worker apply it
@@ -822,6 +1845,25 @@ defmodule Gallformers.Import do
     end
   end
 
+  @doc """
+  Approves each of `packages` in turn (`approve_package/2`), as the
+  Gallformers notes' bulk approve does (`6611` Task 7): those nothing holds
+  are approved; the others are refused, each with `approve_package/2`'s
+  reason. Both lists keep the order given.
+  """
+  @spec approve_packages(Actor.t(), [Package.t()]) :: %{
+          approved: [Package.t()],
+          refused: [{Package.t(), term()}]
+        }
+  def approve_packages(%Actor{} = actor, packages) when is_list(packages) do
+    results = Enum.map(packages, &{&1, approve_package(actor, &1)})
+
+    %{
+      approved: for({_package, {:ok, approved}} <- results, do: approved),
+      refused: for({package, {:error, reason}} <- results, do: {package, reason})
+    }
+  end
+
   defp approvable(%Package{status: :awaiting_review}), do: :ok
   defp approvable(_package), do: {:error, :not_approvable}
 
@@ -842,6 +1884,242 @@ defmodule Gallformers.Import do
 
   defp pending_batches(package),
     do: package |> list_batches() |> Enum.reject(&(&1.status in [:applied, :denied]))
+
+  # -- the Facts preview and edits -------------------------------------------------
+
+  @doc """
+  What approving `package` would write, given the answers so far (matter
+  `f14c`, item 4; `Gallformers.Import.Preview`): the apply the approval
+  runs, run as `actor` (default the system actor `"preview"`) in one
+  transaction that is always rolled back. Every batch not applied or
+  denied is applied, the taxonomy batch first and the package resolved
+  again before the next, whatever its status: a batch held by a question
+  writes what resolves, and what waits on a question says which. A
+  package question not decided yet (its Source, the Source a notice
+  retracts) is taken as a new Source and no retraction, for the preview
+  only. The curator's edits on Facts (`edit_fact/5`) are honoured, as
+  approval honours them.
+
+  Returns:
+
+      %{
+        package_id: id,
+        ready?: whether `approve_package/2` would approve it now,
+        blocking: %{count, by_kind: %{kind => n}, items: [%{id, kind,
+                    statement_ref, batch_id}], blocked_batches: [file]},
+        galls: [Gall header with its `facts` by category],
+        taxonomy: %{new_taxa: [...], acts: [entries]},
+        counts: %{new, held, conflict, waiting, dropped},
+        errors: [%{file, reason}],  # a batch the preview could not apply
+        applied: [file]              # batches applied already
+      }
+
+  The shape of a Gall header and a Fact entry is
+  `Gallformers.Import.FactsView`'s. `{:error, reason}` when the package's
+  files cannot be read.
+  """
+  @spec preview_package(Package.t(), Actor.t()) :: {:ok, map()} | {:error, term()}
+  def preview_package(%Package{} = package, %Actor{} = actor \\ Actor.system("preview")) do
+    package = get_package!(package.id)
+    batches = list_batches(package)
+    pending = pending_batches(package)
+
+    with {:ok, collected} <- preview_batches(actor, package, pending) do
+      items = list_queue_items(package)
+
+      {:ok,
+       collected
+       |> Enum.filter(&Map.has_key?(&1, :entries))
+       |> Preview.finish(items)
+       |> Map.merge(%{
+         package_id: package.id,
+         ready?: ready?(package, items, pending),
+         blocking: blocking(package, items, pending),
+         errors:
+           for(%{error: reason, batch: b} <- collected, do: %{file: b.file, reason: reason}),
+         applied: for(%{status: :applied, file: file} <- batches, do: file)
+       })}
+    end
+  end
+
+  defp preview_batches(_actor, _package, []), do: {:ok, []}
+
+  defp preview_batches(actor, package, pending) do
+    with {:ok, files} <- read_package_files(package) do
+      # Nothing of it is kept: no Gall index refresh, no object stored (a
+      # new Source's document), and the transaction rolled back.
+      Catalog.without_gall_index_refresh(fn ->
+        Private.without_writes(fn -> rolled_back(actor, package, pending, files) end)
+      end)
+    end
+  end
+
+  defp rolled_back(actor, package, pending, files) do
+    actor
+    |> Audit.transaction("import.preview_package", fn ->
+      Repo.rollback({:preview, preview_in_transaction(actor, package, pending, files)})
+    end)
+    |> case do
+      {:error, {:preview, collected}} -> {:ok, collected}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # As applying does, the package is resolved again before a batch after
+  # the first, against the taxa the batch before created. The stored
+  # statements are current otherwise: each decision resolves the package
+  # again, and applying a taxonomy batch changes the tree only by creating
+  # its new taxa. A package question not decided yet is taken as a new
+  # Source and no retraction.
+  defp preview_in_transaction(actor, package, pending, files) do
+    defaults = %{"source" => %{"new" => true}, "retracts" => %{"skip" => true}}
+
+    {collected, _created?} =
+      Enum.map_reduce(pending, false, fn batch, created? ->
+        if created?, do: package.id |> get_package!() |> resolve(files)
+        package = get_package!(package.id)
+        collected = preview_batch(actor, package, get_batch!(batch.id), files, defaults)
+        {collected, created_taxa?(collected)}
+      end)
+
+    collected
+  end
+
+  # Applies one batch inside the preview's transaction and collects what it wrote.
+  defp preview_batch(actor, package, batch, files, defaults) do
+    ctx = apply_context(actor, package, batch, files, defaults)
+    plan = Preview.plan(ctx)
+
+    case runner(batch).run(ctx) do
+      {:ok, result} ->
+        collected =
+          Preview.collect(ctx, result,
+            plan: plan,
+            items: list_queue_items(package),
+            batches: list_batches(package),
+            edits: FactEdits.for_batch(batch.id)
+          )
+
+        # The next batch resolves against this one, applied.
+        batch |> Batch.status_changeset(:applied) |> Repo.update!()
+        collected
+
+      {:error, reason} ->
+        %{batch: batch, error: reason}
+    end
+  end
+
+  # A statement ref in batch order: "f2" before "f10"; none last.
+  defp ref_order(nil), do: {1, 0, ""}
+
+  defp ref_order(ref) do
+    case Regex.run(~r/\A\D*(\d+)/, ref) do
+      [_, n] -> {0, String.to_integer(n), ref}
+      nil -> {0, 0, ref}
+    end
+  end
+
+  defp created_taxa?(%{created: %{taxa: taxa}}), do: MapSet.size(taxa) > 0
+  defp created_taxa?(_failed), do: false
+
+  defp ready?(package, items, pending) do
+    types = package |> list_batches() |> Map.new(&{&1.id, &1.batch_type})
+
+    package.status == :awaiting_review and
+      not Enum.any?(items, &Queue.blocking?(&1, types[&1.batch_id])) and
+      not Enum.any?(pending, &(&1.status == :blocked))
+  end
+
+  defp blocking(package, items, pending) do
+    types = package |> list_batches() |> Map.new(&{&1.id, &1.batch_type})
+    open = Enum.filter(items, &Queue.blocking?(&1, types[&1.batch_id]))
+
+    %{
+      count: length(open),
+      by_kind: Enum.frequencies_by(open, & &1.kind),
+      items:
+        for(
+          q <- open,
+          do: %{id: q.id, kind: q.kind, statement_ref: q.statement_ref, batch_id: q.batch_id}
+        ),
+      blocked_batches: for(%{status: :blocked, file: file} <- pending, do: file)
+    }
+  end
+
+  @doc """
+  Edits Fact (or act) `ref` of `batch` before approval
+  (`Gallformers.Import.FactEdits`): `%{"drop" => true}`,
+  `%{"host_taxon_id" => plant}` (a Host statement), `%{"values" => [v]}`
+  (a Trait statement) or `%{"note" => text}`, any with a `"note"`.
+  Applying the batch, and so the preview, honours it; the replay log
+  records it. Only a package awaiting review, and a batch not applied or
+  denied (`{:error, :not_editable}`).
+  """
+  @spec edit_fact(Actor.t(), Package.t(), Batch.t(), String.t(), map()) ::
+          {:ok, StatementEdit.t()} | {:error, term()}
+  defdelegate edit_fact(actor, package, batch, ref, edit), to: FactEdits, as: :edit
+
+  @doc "Removes an edit on a Fact, undoing it (`edit_fact/5`); the replay log records it."
+  @spec remove_fact_edit(Actor.t(), StatementEdit.t()) ::
+          {:ok, StatementEdit.t()} | {:error, :not_editable | :not_found}
+  defdelegate remove_fact_edit(actor, edit), to: FactEdits, as: :remove
+
+  @doc "A package's edits on its Facts, by batch, statement ref and kind."
+  @spec list_fact_edits(Package.t()) :: [StatementEdit.t()]
+  defdelegate list_fact_edits(package), to: FactEdits, as: :list
+
+  @doc """
+  The gall Facts Source `source_id` states (its attributions), grouped by
+  Gall and category as the preview shows them
+  (`Gallformers.Import.FactsView`): each entry with the Fact's `standing`
+  and its statement ref where an import batch wrote it.
+  """
+  @spec facts_for_source(integer()) :: [map()]
+  def facts_for_source(source_id) when is_integer(source_id) do
+    attributions = Facts.list_source_attributions(source_id, "gall_")
+    fact_ids = attributions |> Map.keys() |> Enum.sort()
+
+    refs =
+      from(s in BatchStatement,
+        where: s.kind == :fact and s.fact_id in ^fact_ids,
+        select: {s.fact_id, {s.batch_id, s.ref}}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    entries =
+      for e <- FactsView.entries(source_id, fact_ids) do
+        {batch_id, ref} = Map.get(refs, e.fact_id, {e.batch_id, nil})
+
+        value =
+          case e.value do
+            %{of_fact_id: of} = v -> %{v | of_ref: refs[of] && elem(refs[of], 1)}
+            v -> v
+          end
+
+        %{e | ref: ref, batch_id: batch_id, value: value} |> Map.drop([:slot])
+      end
+      |> Enum.sort_by(&{&1.batch_id || 0, ref_order(&1.ref), &1.fact_id})
+
+    names = entries |> Enum.map(& &1.gall) |> Enum.filter(&is_integer/1) |> FactsView.gall_names()
+
+    headers =
+      for {id, %{name: name}} <- Enum.sort_by(names, fn {_id, n} -> n.name end) do
+        %{
+          key: id,
+          ref: nil,
+          gall_id: id,
+          new: false,
+          name_as_written: nil,
+          name: name,
+          status: :resolved,
+          question: nil,
+          why: nil
+        }
+      end
+
+    FactsView.group(headers, entries)
+  end
 
   # -- denial ------------------------------------------------------------------
 
@@ -1152,29 +2430,8 @@ defmodule Gallformers.Import do
 
   # Inside the batch's transaction, the batch row locked.
   defp apply_locked_batch(actor, package, batch, files) do
-    {:ok, source, items} =
-      actor
-      |> SourceStep.ensure(package, batch.content["source"], files, package_decisions(package))
-      |> ok_or_rollback()
-
-    if package.source_id == nil do
-      package |> Changeset.change(source_id: source.id) |> Repo.update() |> unwrap_or_rollback()
-    end
-
-    statements = list_statements(batch)
-
-    ctx = %{
-      actor: actor,
-      source: source,
-      batch: batch,
-      items: items,
-      taxa: for(%{kind: :taxon} = s <- statements, into: %{}, do: {s.ref, s}),
-      galls: for(%{kind: :gall} = s <- statements, into: %{}, do: {s.ref, s}),
-      drop: batch.id |> Queue.decided() |> Queue.drops()
-    }
-
-    runner = if batch.batch_type == :taxonomy, do: ApplyTaxonomy, else: ApplyGall
-    result = ctx |> runner.run() |> unwrap_or_rollback()
+    ctx = apply_context(actor, package, batch, files)
+    result = ctx |> runner(batch).run() |> unwrap_or_rollback()
 
     record_applied(package, batch, result)
 
@@ -1185,6 +2442,84 @@ defmodule Gallformers.Import do
     )
 
     batch |> Batch.status_changeset(:applied) |> Repo.update() |> unwrap_or_rollback()
+  end
+
+  defp runner(%Batch{batch_type: :taxonomy}), do: ApplyTaxonomy
+  defp runner(%Batch{batch_type: :gall}), do: ApplyGall
+
+  # What applying `batch` takes (`Gallformers.Import.ApplyTaxonomy`), inside
+  # its transaction: its statements, decisions honoured, and the curator's
+  # edits on its Facts (`Gallformers.Import.FactEdits`, which win).
+  # `defaults` are package decisions to take where none is made (the
+  # preview's).
+  defp apply_context(actor, package, batch, files, defaults \\ %{}) do
+    statements = list_statements(batch)
+    decided = Queue.decided(batch.id)
+    trait_disputes = open_trait_disputes(package, batch)
+    edits = batch.id |> FactEdits.for_batch() |> FactEdits.overlay()
+
+    actor
+    |> batch_context(package, batch, files, defaults)
+    |> Map.merge(%{
+      taxa: for(%{kind: :taxon} = s <- statements, into: %{}, do: {s.ref, s}),
+      galls: for(%{kind: :gall} = s <- statements, into: %{}, do: {s.ref, s}),
+      drop:
+        waiting_on(trait_disputes) |> Map.merge(Queue.drops(decided)) |> Map.merge(edits.drop),
+      hosts:
+        GallDecisions.chosen_hosts(decided, batch.content || %{})
+        |> Map.merge(Disputes.chosen_hosts(decided))
+        |> Map.merge(edits.hosts),
+      trait_values: edits.trait_values,
+      trait_disputes: trait_disputes,
+      set_aside: Enum.filter(decided, &SetAside.set_aside?/1),
+      review: decode(files["review.json"]),
+      term_items:
+        package
+        |> list_queue_items(kind: :trait_term, status: :all)
+        |> Enum.filter(&(&1.batch_id == batch.id))
+    })
+  end
+
+  # The batch's open Trait disputes (`Gallformers.Import.Disputes`).
+  defp open_trait_disputes(package, batch) do
+    for q <- list_queue_items(package, kind: :dispute),
+        q.batch_id == batch.id,
+        Disputes.trait?(q),
+        do: q
+  end
+
+  # The Trait Facts whose disputes are open: they wait, unwritten, until
+  # decided, stored as waiting terms; ref to why.
+  defp waiting_on(trait_disputes) do
+    for q <- trait_disputes,
+        ref <- Disputes.refs(q),
+        into: %{},
+        do: {ref, "waiting on its dispute (#{q.statement_ref})"}
+  end
+
+  # What writing a batch's Facts needs, inside its transaction (the package
+  # locked): its Source (matched, decided or created, with its document
+  # stored; the package records it), the document's items by ref, and the
+  # note a Gallformers statement quotes.
+  defp batch_context(actor, package, batch, files, defaults \\ %{}) do
+    decisions = Map.merge(defaults, package_decisions(package))
+
+    {:ok, source, items} =
+      actor
+      |> SourceStep.ensure(package, batch.content["source"], files, decisions)
+      |> ok_or_rollback()
+
+    if package.source_id == nil do
+      package |> Changeset.change(source_id: source.id) |> Repo.update() |> unwrap_or_rollback()
+    end
+
+    %{
+      actor: actor,
+      source: source,
+      batch: batch,
+      items: items,
+      note: SourceStep.note(batch.content["source"], files)
+    }
   end
 
   defp ok_or_rollback({:ok, _source, _items} = ok), do: ok
@@ -1455,6 +2790,13 @@ defmodule Gallformers.Import do
     to: TaxonomyAdmin,
     as: :add_plant_from_wcvp
 
+  @doc """
+  The rank a plant's name is at, read from its infraspecific marker
+  (`%{taxon_name: name}`; `Gallformers.Import.TaxonomyAdmin.wcvp_rank/1`).
+  """
+  @spec wcvp_rank(map()) :: Taxa.Rank.t()
+  defdelegate wcvp_rank(record), to: TaxonomyAdmin
+
   @doc "Moves each of `taxon_ids` under `parent_id` (`Gallformers.Import.TaxonomyAdmin.move_all/3`)."
   @spec record_taxa_moved(Actor.t(), [integer()], integer()) ::
           {:ok, non_neg_integer()} | {:error, term()}
@@ -1477,6 +2819,134 @@ defmodule Gallformers.Import do
   @spec record_source_edit(Actor.t(), SourceEdits.edit()) ::
           {:ok, Gallformers.Sources.Source.t()} | {:error, Changeset.t() | term()}
   defdelegate record_source_edit(actor, edit), to: SourceEdits, as: :record
+
+  @doc """
+  Each of `source_ids`' two dates, by Source ID: `%{ingested, updated,
+  legacy?}` — when its first package's batch was applied, when its data
+  was last edited, and whether it is from the old data (with no Ingested
+  date) (`Gallformers.Import.SourceDates`, matter `f14c`).
+  """
+  @spec source_dates([integer()]) :: %{integer() => Gallformers.Import.SourceDates.dates()}
+  defdelegate source_dates(source_ids), to: Gallformers.Import.SourceDates, as: :for_sources
+
+  # -- the Trait vocabulary ----------------------------------------------------
+
+  @doc """
+  Adds a Trait value (`Gallformers.Catalog.add_trait_value/2`: `:trait`,
+  `:value`, `:definition`, all required) and records it in the replay log,
+  in one transaction (`Gallformers.Import.VocabEdits`).
+  """
+  @spec record_trait_value_added(Actor.t(), map()) ::
+          {:ok, Gallformers.Catalog.Vocab.TraitValue.t()} | {:error, Changeset.t()}
+  defdelegate record_trait_value_added(actor, attrs), to: VocabEdits
+
+  @doc """
+  Changes a term (`d213`: place it, mark it ambiguous or unambiguous, mark
+  it as fitting no category, move it, record a spot check — through
+  `Gallformers.Catalog.place_term/6` and its siblings) and records the
+  change in the replay log, in one transaction
+  (`Gallformers.Import.VocabEdits.record_term_edit/3`).
+  """
+  @spec record_term_edit(Actor.t(), VocabEdits.term_edit(), keyword()) ::
+          {:ok, Gallformers.Catalog.Vocab.TraitTermMapping.t()} | {:error, term()}
+  defdelegate record_term_edit(actor, edit, opts \\ []), to: VocabEdits
+
+  @doc """
+  Places `term` for every Source under `categories` (one value, or a list:
+  each value the term's words name, `d213`), as a superadmin does from the
+  vocabulary page (recorded for replay as a `:trait_term_edit` placed by
+  `:superadmin`, with the set): the open questions about the term, in
+  every package, are decided as placing it, and its uses waiting or kept
+  as text, in every Source, get their Facts, one per category
+  (`settle_placed_term/4`).
+  """
+  @spec place_term(Actor.t(), String.t(), String.t(), VocabEdits.categories()) ::
+          {:ok, Gallformers.Catalog.Vocab.TraitTermMapping.t()} | {:error, term()}
+  def place_term(%Actor{} = actor, trait, term, categories)
+      when is_binary(trait) and is_binary(term) and
+             (is_binary(categories) or is_list(categories)) do
+    Audit.transaction(actor, "import.place_term", fn ->
+      placed =
+        actor
+        |> VocabEdits.record_term_edit({:place, trait, term, categories, :superadmin})
+        |> unwrap_or_rollback()
+
+      actor |> settle_placed_term(trait, term, categories) |> unwrap_or_rollback()
+      placed
+    end)
+  end
+
+  @doc """
+  After a superadmin placed `term` under `categories` (`place_term/4`, and
+  its replay): decides the open questions about the term as placing it,
+  and settles its uses waiting or kept as text, in every Source, writing
+  their Facts.
+  """
+  @spec settle_placed_term(Actor.t(), String.t(), String.t(), VocabEdits.categories()) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  def settle_placed_term(%Actor{} = actor, trait, term, categories) do
+    Audit.transaction(actor, "import.settle_placed_term", fn ->
+      decision = %{"place" => categories, "note" => "placed for every Source by a superadmin"}
+
+      from(q in QueueItem,
+        where:
+          q.kind == :trait_term and q.status == :open and
+            q.statement_ref == ^TraitTerms.statement_ref(trait, term),
+        lock: "FOR UPDATE"
+      )
+      |> Repo.all()
+      |> Enum.each(fn q ->
+        q |> QueueItem.decide_changeset(decision, actor) |> Repo.update() |> unwrap_or_rollback()
+      end)
+
+      settled =
+        actor
+        |> Catalog.settle_pending_terms(trait, term, categories, text: true)
+        |> unwrap_or_rollback()
+
+      write_settled(settled, actor, nil, nil)
+      length(settled)
+    end)
+  end
+
+  # -- seeding the term table (`d213`, Task F) -------------------------------------
+
+  @doc """
+  Gathers the Trait terms of the producer packages under `dirs` into seed
+  candidates for a superadmin, skipping the terms the term table holds
+  (`Gallformers.Import.TermCandidates.gather/2`; `mix
+  gallformers.import.term_candidates`).
+  """
+  @spec gather_term_candidates(Actor.t(), [String.t()]) ::
+          {:ok, TermCandidates.summary()} | {:error, term()}
+  defdelegate gather_term_candidates(actor, dirs), to: TermCandidates, as: :gather
+
+  @doc "The open seed candidates, by Trait, most used first; `decided: true` adds the decided."
+  @spec list_term_candidates(keyword()) :: [TermCandidate.t()]
+  defdelegate list_term_candidates(opts \\ []), to: TermCandidates, as: :list
+
+  @doc "A seed candidate by ID, raising if there is none."
+  @spec get_term_candidate!(integer()) :: TermCandidate.t()
+  defdelegate get_term_candidate!(id), to: TermCandidates, as: :get!
+
+  @doc """
+  Rules on a seed candidate — `{:place, category}`, `{:ambiguous,
+  candidates}` or `:no_fit` — as a term edit recorded for replay, and
+  marks it decided (`Gallformers.Import.TermCandidates.decide/3`).
+  """
+  @spec decide_term_candidate(Actor.t(), TermCandidate.t(), TermCandidates.decision()) ::
+          {:ok, TermCandidate.t()} | {:error, term()}
+  defdelegate decide_term_candidate(actor, candidate, decision), to: TermCandidates, as: :decide
+
+  @doc """
+  Places each of `candidates` whose uses all suggest one category under
+  it; skips the others (`Gallformers.Import.TermCandidates.place_by_suggestion/2`).
+  """
+  @spec place_term_candidates(Actor.t(), [TermCandidate.t()]) ::
+          {:ok, %{placed: non_neg_integer(), skipped: non_neg_integer(), failed: list()}}
+  defdelegate place_term_candidates(actor, candidates),
+    to: TermCandidates,
+    as: :place_by_suggestion
 
   # -- helpers -----------------------------------------------------------------
 

@@ -221,7 +221,8 @@ defmodule Gallformers.Wcvp.Lookup do
   @doc """
   Exact lookup by plant_name_id.
 
-  Returns a WcvpName struct with `:native_distribution` and
+  Returns a WcvpName struct, with its `:taxon_status` and
+  `:accepted_plant_name_id`, and with `:native_distribution` and
   `:introduced_distribution` virtual fields populated (each a list of
   area_code_l3 strings). Returns nil if not found or repo unavailable.
   """
@@ -229,7 +230,15 @@ defmodule Gallformers.Wcvp.Lookup do
   @spec get(String.t()) :: WcvpName.t() | nil
   def get(plant_name_id) do
     with_retry("get(#{plant_name_id})", fn ->
-      case Repo.WCVP.one(from(n in name_query(), where: n.plant_name_id == ^plant_name_id)) do
+      case Repo.WCVP.one(
+             from(n in name_query(),
+               where: n.plant_name_id == ^plant_name_id,
+               select_merge: %{
+                 taxon_status: n.taxon_status,
+                 accepted_plant_name_id: n.accepted_plant_name_id
+               }
+             )
+           ) do
         nil ->
           nil
 
@@ -288,7 +297,10 @@ defmodule Gallformers.Wcvp.Lookup do
         Repo.WCVP.one(
           from(n in name_query(),
             where: n.plant_name_id == ^accepted_id,
-            select_merge: %{taxon_status: n.taxon_status}
+            select_merge: %{
+              taxon_status: n.taxon_status,
+              accepted_plant_name_id: n.accepted_plant_name_id
+            }
           )
         )
     end

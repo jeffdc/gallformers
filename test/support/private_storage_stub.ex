@@ -33,5 +33,11 @@ defmodule Gallformers.Storage.PrivateStub do
     end
   end
 
+  @doc "The keys of the objects this test stored, sorted."
+  def keys do
+    owner = owner()
+    @table |> :ets.match({{owner, :_, :"$1"}, :_}) |> List.flatten() |> Enum.sort()
+  end
+
   defp owner, do: List.last(Process.get(:"$callers", [])) || self()
 end

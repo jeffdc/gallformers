@@ -914,6 +914,57 @@ defmodule Gallformers.Taxa do
     end
   end
 
+  @typedoc "A taxon found by one of its common names (`find_by_common_name/2`)."
+  @type common_name_hit :: %{
+          taxon_id: integer(),
+          name: String.t(),
+          rank: Gallformers.Taxa.Rank.t(),
+          common_name: String.t()
+        }
+
+  @doc """
+  The taxa one of whose common names is `name`, read loosely: ignoring case,
+  a leading article ("the black oak"), and spaces, hyphens and other
+  non-letters between words ("Black-jack oak" is "blackjack oak"). Each
+  with its accepted name, rank and the common name that matched, by
+  accepted name. Options: `:kingdom` (e.g. `"Plantae"`). A common name is
+  never a taxon's name: these are only ever suggestions.
+  """
+  @spec find_by_common_name(String.t(), keyword()) :: [common_name_hit()]
+  def find_by_common_name(name, opts \\ []) when is_binary(name) do
+    case common_name_key(name) do
+      "" ->
+        []
+
+      key ->
+        from(c in CommonName,
+          join: t in assoc(c, :taxon),
+          join: n in TaxonName,
+          on: n.taxon_id == t.id and n.status == :accepted,
+          where:
+            fragment(
+              "regexp_replace(regexp_replace(lower(?), '^\\s*(the|an|a)\\s+', ''), '[^a-z]', '', 'g')",
+              c.name
+            ) == ^key,
+          order_by: [n.name, t.id, c.id],
+          select: %{taxon_id: t.id, name: n.name, rank: t.rank, common_name: c.name}
+        )
+        |> common_name_kingdom(opts[:kingdom])
+        |> Repo.all()
+        |> Enum.uniq_by(& &1.taxon_id)
+    end
+  end
+
+  defp common_name_kingdom(query, nil), do: query
+  defp common_name_kingdom(query, kingdom), do: where(query, [_c, t], t.kingdom == ^kingdom)
+
+  defp common_name_key(name) do
+    name
+    |> String.downcase()
+    |> String.replace(~r/\A\s*(the|an|a)\s+/, "")
+    |> String.replace(~r/[^a-z]/, "")
+  end
+
   @doc """
   Resolves a species epithet in any genus: the taxa with a binomial name
   (accepted or synonym) whose second word is `epithet`, compared normalized.
