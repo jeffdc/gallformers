@@ -321,4 +321,52 @@ defmodule Gallformers.TaxonName do
 
     not String.match?(first_word, ~r/(oidea|idae|inae|ini|ina)$/i)
   end
+
+  @rank_words ~w(var. subsp. ssp. f. forma subvar. cv.)
+
+  @doc """
+  Splits a species-level name into the parts to set in italics and the
+  parts to set upright, following the naming codes: the binomial and an
+  infraspecific name are italic; rank words (var., subsp. …), authorities
+  (Michx.) and a parenthetical qualifier such as a Gall's generation
+  ("(agamic)") are upright. An undescribed Gall's placeholder ("Unknown
+  (Cynipidae) q-rubra-spur-gall") is not a scientific name: all upright.
+
+  ## Examples
+
+      iex> segments("Callirhytis quercuscornigera (agamic)")
+      [{"Callirhytis quercuscornigera", :italic}, {" (agamic)", :upright}]
+
+      iex> segments("Quercus chrysolepis var. vaccinifolia")
+      [{"Quercus chrysolepis", :italic}, {" var. ", :upright}, {"vaccinifolia", :italic}]
+
+      iex> segments("Unknown (Cynipidae) q-rubra-spur-gall")
+      [{"Unknown (Cynipidae) q-rubra-spur-gall", :upright}]
+  """
+  @spec segments(String.t()) :: [{String.t(), :italic | :upright}]
+  def segments(name) when is_binary(name) do
+    case parse(name) do
+      %__MODULE__{unknown?: true} ->
+        [{name, :upright}]
+
+      %__MODULE__{epithet: nil} ->
+        [{name, :italic}]
+
+      %__MODULE__{genus: genus, epithet: epithet, qualifier: nil} ->
+        [{"#{genus} #{epithet}", :italic}]
+
+      %__MODULE__{genus: genus, epithet: epithet, qualifier: q} ->
+        [{"#{genus} #{epithet}", :italic} | qualifier_segments(q)]
+    end
+  end
+
+  defp qualifier_segments(q) do
+    case String.split(q, " ", parts: 3) do
+      [rank, infra | rest] when rank in @rank_words ->
+        [{" #{rank} ", :upright}, {infra, :italic}] ++ Enum.map(rest, &{" #{&1}", :upright})
+
+      _ ->
+        [{" #{q}", :upright}]
+    end
+  end
 end

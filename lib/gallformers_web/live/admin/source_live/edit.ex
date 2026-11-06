@@ -1,6 +1,7 @@
 defmodule GallformersWeb.Admin.SourceLive.Edit do
   @moduledoc """
-  The Source editor (matter a856, Task 10): a Source's details — today's
+  The Source editor (matter a856, Task 10; on the design system's admin
+  edit page pattern, matter bc0d): a Source's details — today's
   columns, shown on the public pages, and the new back-end's description —
   with today's validation (`Gallformers.Sources.Source.changeset/2`); its
   retraction by a retraction notice (another Source, picked by search) on a
@@ -240,217 +241,243 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        Editing <em class="font-bold">{@source.title}</em>
-      </:page_title_html>
-      <Layouts.admin_edit_layout
-        back_path={~p"/admin/sources"}
-        back_label="Back to Sources"
-        public_url={~p"/source/#{@source.id}"}
-      >
-        <:intro>
-          Sources arrive with imports. Correct a Source's details here, or record that it was
-          retracted. Saving recomputes the standing of every Fact the Source supports.
-        </:intro>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin/sources"}>Sources</:crumb>
+          <:title>{@source.title}</:title>
+          <:chip :if={@source.retracted_by_id} variant={:warn}>Retracted</:chip>
+          <:chip :if={!@source.retracted_by_id && @source.datacomplete} variant={:ok}>
+            Complete
+          </:chip>
+          <:description>
+            Sources arrive with imports. Correct a Source's details here, or record that it was retracted. Saving recomputes the standing of every Fact the Source supports.
+          </:description>
+          <:action>
+            <.button
+              href={~p"/source/#{@source.id}"}
+              variant="ghost"
+              size="sm"
+              icon="ph-arrow-square-out"
+            >
+              View public page
+            </.button>
+          </:action>
+        </.page_header>
 
-        <div class="mb-6 space-y-1 text-sm">
-          <.source_dates id="source-dates" dates={@dates} format={:short} class="text-gray-600" />
-          <p :if={@review} id="source-review">
-            <.review_in_progress_link review={@review} />
-          </p>
+        <div class="gf-with-rail">
+          <div class="flex max-w-form min-w-0 flex-col gap-section">
+            <.form
+              for={@form}
+              id="source-form"
+              phx-change="validate"
+              phx-submit="save"
+              class="flex flex-col gap-section"
+            >
+              <.section title="Citation">
+                <div class="flex flex-col gap-block">
+                  <p class="text-meta text-muted">As shown on the Source's public page.</p>
+
+                  <.input field={@form[:title]} schema={Source} label="Title" />
+
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-2">
+                    <.input
+                      field={@form[:author]}
+                      schema={Source}
+                      label="Author(s)"
+                      placeholder="e.g., Smith, J. and Jones, M."
+                    />
+                    <.input
+                      field={@form[:pubyear]}
+                      schema={Source}
+                      label="Publication Year"
+                      placeholder="e.g., 2023"
+                    />
+                  </div>
+
+                  <.input
+                    field={@form[:link]}
+                    type="url"
+                    label="Reference Link"
+                    placeholder="https://..."
+                  />
+
+                  <% current_license = Form.input_value(@form, :license) %>
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-2">
+                    <.input
+                      field={@form[:license]}
+                      schema={Source}
+                      type="select"
+                      label="License"
+                      prompt="Select license"
+                      options={license_options(@form)}
+                    />
+                    <div>
+                      <%= if Licenses.url_readonly?(current_license) do %>
+                        <.input
+                          field={@form[:licenselink]}
+                          type="url"
+                          label="License Link"
+                          value={Licenses.url(current_license)}
+                          readonly
+                          class="gf-input cursor-not-allowed text-muted"
+                        />
+                        <p class="gf-hint">Auto-filled from license selection</p>
+                      <% else %>
+                        <.input field={@form[:licenselink]} type="url" label="License Link" />
+                      <% end %>
+                    </div>
+                  </div>
+
+                  <.input
+                    field={@form[:citation]}
+                    schema={Source}
+                    type="textarea"
+                    label="Citation (MLA format)"
+                    rows="4"
+                  />
+
+                  <.input
+                    type="checkbox"
+                    field={@form[:datacomplete]}
+                    label="All information from this source has been entered into the database"
+                  />
+                </div>
+              </.section>
+
+              <.section title="Description">
+                <div class="flex flex-col gap-block">
+                  <p class="text-meta text-muted">The Source as imports describe it.</p>
+
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-2">
+                    <.input
+                      field={@form[:kind]}
+                      type="select"
+                      label="Kind"
+                      prompt="Select kind"
+                      options={kind_options()}
+                    />
+                    <.input
+                      field={@form[:authored]}
+                      label="Authored"
+                      placeholder="YYYY, YYYY-MM or YYYY-MM-DD"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-2">
+                    <.input
+                      field={@form[:authors]}
+                      type="textarea"
+                      label="Authors (one per line)"
+                      value={authors_text(@form)}
+                      rows="3"
+                    />
+                    <.input
+                      field={@form[:authored_as_written]}
+                      label="Date as written"
+                      placeholder="e.g., Spring 1897"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-3">
+                    <.input field={@form[:doi]} label="DOI" placeholder="10.xxxx/..." />
+                    <.input field={@form[:url]} type="url" label="URL" placeholder="https://..." />
+                    <.input field={@form[:isbn]} label="ISBN" />
+                  </div>
+
+                  <.input field={@form[:license_as_written]} label="License as written" />
+                </div>
+              </.section>
+
+              <div class="flex justify-end border-t border-line pt-block">
+                <.form_actions form_dirty={@form_dirty} mode={:edit} />
+              </div>
+            </.form>
+
+            <.section id="retraction" title="Retraction">
+              <%= if @source.retracted_by_id do %>
+                <div class="flex flex-col items-start gap-block">
+                  <.notice kind={:warn} class="self-stretch">
+                    Retracted by
+                    <.link
+                      :if={@retracted_by}
+                      navigate={~p"/admin/sources/#{@source.retracted_by_id}"}
+                      class="font-semibold"
+                    >
+                      {@retracted_by.title}
+                    </.link>
+                    on {@source.retracted_on}. Its stances are cancelled.
+                  </.notice>
+                  <.button
+                    id="unretract-button"
+                    variant="secondary"
+                    phx-click="unretract"
+                    data-confirm="Undo this retraction? The Source's stances count again."
+                  >
+                    Undo retraction
+                  </.button>
+                </div>
+              <% else %>
+                <div class="flex flex-col gap-block">
+                  <p class="text-ui text-ink-2">
+                    A retraction cancels all of this Source's stances. Pick the retraction notice (another Source) and the date of the retraction.
+                  </p>
+                  <.typeahead
+                    id="notice-picker"
+                    label="Retraction notice"
+                    placeholder="Search for the notice..."
+                    query={@notice_query}
+                    results={@notice_results}
+                    selected={@notice}
+                    search_event="search_notice"
+                    select_event="select_notice"
+                    clear_event="clear_notice"
+                    display_fn={& &1.title}
+                  >
+                    <:result :let={notice}>
+                      <div class="flex flex-col">
+                        <span class="text-ink">{notice.title}</span>
+                        <span class="text-caption text-muted">
+                          {notice.author} ({notice.pubyear})
+                        </span>
+                      </div>
+                    </:result>
+                  </.typeahead>
+                  <p :if={@notice_error} class="text-meta text-danger">{@notice_error}</p>
+
+                  <.form
+                    for={@retract_form}
+                    id="retract-form"
+                    phx-submit="retract"
+                    class="flex flex-col items-start gap-block"
+                  >
+                    <.input field={@retract_form[:retracted_on]} type="date" label="Retracted on" />
+                    <.button type="submit" variant="danger">Retract</.button>
+                  </.form>
+                </div>
+              <% end %>
+            </.section>
+
+            <.record_metadata inserted_at={@source.inserted_at} updated_at={@source.updated_at} />
+          </div>
+
+          <.rail :if={source_dates_text(@dates, :short) || @review} width={:narrow}>
+            <.panel id="source-record" title="In Gallformers">
+              <.source_dates
+                id="source-dates"
+                dates={@dates}
+                format={:short}
+                class="text-ui text-ink-2"
+              />
+              <p :if={@review} id="source-review" class="text-ui">
+                <.review_in_progress_link review={@review} />
+              </p>
+            </.panel>
+          </.rail>
         </div>
 
-        <.form for={@form} id="source-form" phx-change="validate" phx-submit="save">
-          <h2 class="text-lg font-semibold text-gray-800 mb-2">Citation</h2>
-          <p class="text-sm text-gray-500 mb-3">As shown on the Source's public page.</p>
-
-          <div class="mb-3">
-            <.input field={@form[:title]} schema={Source} label="Title" />
-          </div>
-
-          <div class="grid grid-cols-2 gap-4 mb-3">
-            <.input
-              field={@form[:author]}
-              schema={Source}
-              label="Author(s)"
-              placeholder="e.g., Smith, J. and Jones, M."
-            />
-            <.input
-              field={@form[:pubyear]}
-              schema={Source}
-              label="Publication Year"
-              placeholder="e.g., 2023"
-            />
-          </div>
-
-          <div class="mb-3">
-            <.input
-              field={@form[:link]}
-              type="url"
-              label="Reference Link"
-              placeholder="https://..."
-            />
-          </div>
-
-          <% current_license = Form.input_value(@form, :license) %>
-          <div class="grid grid-cols-2 gap-4 mb-3">
-            <.input
-              field={@form[:license]}
-              schema={Source}
-              type="select"
-              label="License"
-              prompt="Select license"
-              options={license_options(@form)}
-            />
-            <div>
-              <%= if Licenses.url_readonly?(current_license) do %>
-                <.input
-                  field={@form[:licenselink]}
-                  type="url"
-                  label="License Link"
-                  value={Licenses.url(current_license)}
-                  readonly
-                  class="bg-gray-100 text-gray-500 cursor-not-allowed"
-                />
-                <p class="mt-1 text-xs text-gray-500">Auto-filled from license selection</p>
-              <% else %>
-                <.input field={@form[:licenselink]} type="url" label="License Link" />
-              <% end %>
-            </div>
-          </div>
-
-          <div class="mb-3">
-            <.input
-              field={@form[:citation]}
-              schema={Source}
-              type="textarea"
-              label="Citation (MLA format)"
-              rows="4"
-            />
-          </div>
-
-          <div class="mb-6">
-            <.input
-              type="checkbox"
-              field={@form[:datacomplete]}
-              label="All information from this source has been entered into the database"
-            />
-          </div>
-
-          <h2 class="text-lg font-semibold text-gray-800 mb-2">Description</h2>
-          <p class="text-sm text-gray-500 mb-3">
-            The Source as imports describe it.
-          </p>
-
-          <div class="grid grid-cols-2 gap-4 mb-3">
-            <.input
-              field={@form[:kind]}
-              type="select"
-              label="Kind"
-              prompt="Select kind"
-              options={kind_options()}
-            />
-            <.input
-              field={@form[:authored]}
-              label="Authored"
-              placeholder="YYYY, YYYY-MM or YYYY-MM-DD"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-4 mb-3">
-            <.input
-              field={@form[:authors]}
-              type="textarea"
-              label="Authors (one per line)"
-              value={authors_text(@form)}
-              rows="3"
-            />
-            <.input
-              field={@form[:authored_as_written]}
-              label="Date as written"
-              placeholder="e.g., Spring 1897"
-            />
-          </div>
-
-          <div class="grid grid-cols-3 gap-4 mb-3">
-            <.input field={@form[:doi]} label="DOI" placeholder="10.xxxx/..." />
-            <.input field={@form[:url]} type="url" label="URL" placeholder="https://..." />
-            <.input field={@form[:isbn]} label="ISBN" />
-          </div>
-
-          <div class="mb-3">
-            <.input field={@form[:license_as_written]} label="License as written" />
-          </div>
-
-          <div class="flex justify-end pt-4 border-t border-gray-200">
-            <.form_actions form_dirty={@form_dirty} mode={:edit} />
-          </div>
-        </.form>
-
-        <section id="retraction" class="mt-8 pt-6 border-t border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-800 mb-3">Retraction</h2>
-
-          <%= if @source.retracted_by_id do %>
-            <.alert variant="warning">
-              Retracted by
-              <.link
-                :if={@retracted_by}
-                navigate={~p"/admin/sources/#{@source.retracted_by_id}"}
-                class="font-medium hover:underline"
-              >
-                {@retracted_by.title}
-              </.link>
-              on {@source.retracted_on}. Its stances are cancelled.
-            </.alert>
-            <button
-              id="unretract-button"
-              type="button"
-              phx-click="unretract"
-              data-confirm="Undo this retraction? The Source's stances count again."
-              class="gf-btn gf-btn-soft mt-3"
-            >
-              Undo retraction
-            </button>
-          <% else %>
-            <p class="text-sm text-gray-600 mb-3">
-              A retraction cancels all of this Source's stances. Pick the retraction notice (another
-              Source) and the date of the retraction.
-            </p>
-            <div class="max-w-xl space-y-3">
-              <.typeahead
-                id="notice-picker"
-                label="Retraction notice"
-                placeholder="Search for the notice..."
-                query={@notice_query}
-                results={@notice_results}
-                selected={@notice}
-                search_event="search_notice"
-                select_event="select_notice"
-                clear_event="clear_notice"
-                display_fn={& &1.title}
-              >
-                <:result :let={notice}>
-                  <div class="flex flex-col">
-                    <span class="text-gray-900">{notice.title}</span>
-                    <span class="text-xs text-gray-500">{notice.author} ({notice.pubyear})</span>
-                  </div>
-                </:result>
-              </.typeahead>
-              <p :if={@notice_error} class="text-sm text-red-600">{@notice_error}</p>
-
-              <.form for={@retract_form} id="retract-form" phx-submit="retract">
-                <.input field={@retract_form[:retracted_on]} type="date" label="Retracted on" />
-                <button type="submit" class="gf-btn gf-btn-danger mt-3">Retract</button>
-              </.form>
-            </div>
-          <% end %>
-        </section>
-
-        <.record_metadata inserted_at={@source.inserted_at} updated_at={@source.updated_at} />
-
         <.discard_confirm_modal show={@show_discard_confirm} />
-      </Layouts.admin_edit_layout>
+      </div>
     </Layouts.admin>
     """
   end

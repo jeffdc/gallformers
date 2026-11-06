@@ -48,7 +48,7 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
 
       assert html =~ "Host Range Review"
       assert html =~ "Needs Review"
-      assert html =~ "WCVP data:"
+      assert html =~ "WCVP data"
       assert html =~ "#{ctx.tag} alba"
       assert has_element?(view, "a[href='/admin/taxonomy/#{ctx.alba.id}']")
       assert has_element?(view, "a[href='/admin']")
@@ -95,7 +95,7 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
     test "select all and clear selection", %{conn: conn} = ctx do
       {:ok, view, _html} = live(conn, review(ctx.tag))
 
-      view |> element("th input[type=checkbox]") |> render_click()
+      view |> element("#host-range-select-all") |> render_click()
       assert render(view) =~ "Confirm Selected (2)"
 
       view |> element("button", "Clear selection") |> render_click()

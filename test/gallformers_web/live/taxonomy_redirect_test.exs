@@ -29,10 +29,8 @@ defmodule GallformersWeb.TaxonomyRedirectTest do
       assert html =~ "Cynipidae"
     end
 
-    test "invalid numeric ID shows not found", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/family/99999")
-
-      assert html =~ "not found" or html =~ "Not Found"
+    test "an unknown numeric ID is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/family/99999") end
     end
   end
 
@@ -50,19 +48,15 @@ defmodule GallformersWeb.TaxonomyRedirectTest do
       assert html =~ "Andricus"
     end
 
-    test "invalid numeric ID shows not found", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/genus/99999")
-
-      assert html =~ "not found" or html =~ "Not Found"
+    test "an unknown numeric ID is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/genus/99999") end
     end
   end
 
   describe "section ID redirect" do
     # No section in test seeds with a known ID, so we test the not-found path
-    test "invalid numeric section ID shows not found", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/section/99999")
-
-      assert html =~ "not found" or html =~ "Not Found"
+    test "an unknown numeric section ID is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/section/99999") end
     end
   end
 

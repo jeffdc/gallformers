@@ -44,6 +44,16 @@ defmodule Gallformers.Catalog.ReadModels.Current do
     )
   end
 
+  @doc "Current recorded occurrences of the Galls among a list of IDs."
+  @spec occurrences([integer()]) :: Ecto.Query.t()
+  def occurrences(gall_ids) when is_list(gall_ids) do
+    from(o in OccurrenceFact,
+      join: f in Fact,
+      on: f.id == o.fact_id,
+      where: o.gall_id in ^gall_ids and f.standing == :current
+    )
+  end
+
   @doc "Current alias Facts (common names, former labels, codes) of every Gall."
   @spec aliases() :: Ecto.Query.t()
   def aliases do

@@ -60,6 +60,12 @@ defmodule Gallformers.KeysTest do
       assert key.title == "Test Key"
     end
 
+    test "counts each key's couplets" do
+      {:ok, _key} = Keys.create_key(valid_attrs())
+      key = Enum.find(Keys.list_keys(), &(&1.slug == "test-key"))
+      assert key.couplet_count == 2
+    end
+
     test "excludes couplets from results" do
       {:ok, _key} = Keys.create_key(valid_attrs())
       keys = Keys.list_keys()

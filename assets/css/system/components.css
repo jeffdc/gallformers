@@ -1,0 +1,568 @@
+/* ==========================================================================
+   Gallformers design system — components
+   One block per documented component (docs/design-system/components.md).
+   Components set structure here only where utilities can't (states,
+   descendants, retiring class names still used in templates). Everything
+   reads tokens; no literal colors.
+   ========================================================================== */
+
+@layer components {
+  /* ---------------------------------------------------------------------
+     button (ActionComponents.button)
+     --------------------------------------------------------------------- */
+  .gf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: var(--gf-ctl-h);
+    padding: 0 0.75rem;
+    border: 1px solid var(--gf-line-strong);
+    border-radius: var(--radius-ctl);
+    background: var(--gf-surface);
+    color: var(--gf-ink);
+    font-family: var(--font-sans);
+    font-size: var(--gf-fs-ui);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 120ms ease-out, border-color 120ms ease-out;
+  }
+  .gf-btn:hover { text-decoration: none; color: var(--gf-ink); background: var(--gf-surface-2); }
+  .gf-btn:disabled, .gf-btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+  .gf-btn .icon, .gf-btn [class^="ph-"], .gf-btn [class^="gf-"] { width: 1.1em; height: 1.1em; flex: none; }
+
+  .gf-btn-primary {
+    background: var(--gf-maroon-fill);
+    border-color: var(--gf-maroon-fill);
+    color: var(--gf-on-fill);
+  }
+  .gf-btn-primary:hover:not(:disabled) {
+    background: var(--gf-maroon-hover);
+    border-color: var(--gf-maroon-hover);
+    color: var(--gf-on-fill);
+  }
+
+  /* secondary is the default look; soft and warning are retiring aliases */
+  .gf-btn-secondary, .gf-btn-soft, .gf-btn-warning { /* the base .gf-btn look */ }
+
+  .gf-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--gf-link);
+    padding: 0 0.375rem;
+  }
+  .gf-btn-ghost:hover:not(:disabled) { background: var(--gf-sky-soft); color: var(--gf-link-hover); }
+
+  .gf-btn-danger { color: var(--gf-danger); }
+  .gf-btn-danger:hover:not(:disabled) {
+    background: var(--gf-danger-bg);
+    border-color: var(--gf-danger);
+    color: var(--gf-danger);
+  }
+
+  .gf-btn-sm { height: 1.75rem; padding: 0 0.5rem; font-size: var(--gf-fs-meta); }
+  .gf-btn-icon { width: var(--gf-ctl-h); padding: 0; }
+  .gf-btn-sm.gf-btn-icon { width: 1.75rem; }
+  /* lg and pill are retiring: they render as the default size and shape */
+  .gf-btn-lg, .gf-btn-pill { /* no change */ }
+
+  /* ---------------------------------------------------------------------
+     chip (DataComponents.chip)
+     --------------------------------------------------------------------- */
+  .gf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.0625rem 0.5rem;
+    border: 1px solid var(--gf-line);
+    border-radius: 999px;
+    background: var(--gf-surface-2);
+    color: var(--gf-ink-2);
+    font-size: var(--gf-fs-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .gf-chip-ok { background: var(--gf-ok-bg); color: var(--gf-ok); border-color: transparent; }
+  .gf-chip-warn { background: var(--gf-warn-bg); color: var(--gf-warn); border-color: transparent; }
+  .gf-chip-danger { background: var(--gf-danger-bg); color: var(--gf-danger); border-color: transparent; }
+  .gf-chip-info { background: var(--gf-info-bg); color: var(--gf-info); border-color: transparent; }
+  .gf-chip-rank { background: var(--gf-sky-soft); color: var(--gf-ink-2); border-color: transparent; }
+  .gf-chip-count {
+    background: transparent;
+    border-color: transparent;
+    color: var(--gf-autumn-ink);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    padding: 0 0.25rem;
+  }
+  .gf-chip-sm { font-size: 0.6875rem; padding: 0 0.375rem; }
+  .gf-chip-remove {
+    display: inline-flex;
+    margin-right: -0.25rem;
+    padding: 0.125rem;
+    border-radius: 999px;
+    color: var(--gf-muted);
+    cursor: pointer;
+  }
+  .gf-chip-remove:hover { background: var(--gf-line); color: var(--gf-ink); }
+
+  /* ---------------------------------------------------------------------
+     admin_shell sidebar: the current page (set by the AdminNav hook)
+     --------------------------------------------------------------------- */
+  /* photo_viewer: the current thumbnail */
+  .gf-thumbs [aria-current="true"] { border-color: var(--color-brand); }
+
+  .gf-sidenav a[aria-current="page"] {
+    background: var(--gf-surface);
+    color: var(--gf-ink);
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--gf-maroon);
+  }
+
+  /* ---------------------------------------------------------------------
+     menu (ActionComponents.menu) and the shells' dropdowns
+     --------------------------------------------------------------------- */
+  .gf-menu {
+    position: absolute;
+    z-index: 60;
+    min-width: 12rem;
+    padding: 0.25rem;
+    border: 1px solid var(--gf-line);
+    border-radius: var(--radius-panel);
+    background: var(--gf-surface);
+    box-shadow: var(--gf-shadow-float);
+  }
+  .gf-menu a, .gf-menu button {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: var(--radius-ctl);
+    color: var(--gf-ink);
+    font-size: var(--gf-fs-ui);
+    text-align: left;
+    text-decoration: none;
+  }
+  .gf-menu a:hover, .gf-menu button:hover, .gf-menu a:focus-visible { background: var(--gf-sky-soft); color: var(--gf-ink); }
+
+  /* ---------------------------------------------------------------------
+     rail (PageComponents.rail): the main column plus rail grid.
+     Wrap the main column and the <.rail> in <div class="gf-with-rail">.
+     Narrow screens stack them; a rail with data-stack="first" (public
+     detail pages: the photo first) comes before the main column.
+     --------------------------------------------------------------------- */
+  .gf-with-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gf-gap-section);
+  }
+  .gf-with-rail > aside[data-stack="first"] { order: -1; }
+  @media (min-width: 1024px) {
+    .gf-with-rail:has(> aside[data-width="wide"]) { grid-template-columns: minmax(0, 1fr) 420px; column-gap: 2.5rem; }
+    .gf-with-rail:has(> aside[data-width="narrow"]) { grid-template-columns: minmax(0, 1fr) 300px; column-gap: 2.25rem; }
+    .gf-with-rail > aside[data-stack="first"] { order: 0; }
+  }
+
+  /* ---------------------------------------------------------------------
+     gall_card grids (DomainComponents.gall_card): photos fill the row at a
+     minimum width, so a wider screen shows more photos, never smaller ones.
+     <div class="gf-photo-grid"> for identification (photos at least 280px),
+     data-size="sm" for overview rows (at least 176px; two across on phones).
+     --------------------------------------------------------------------- */
+  .gf-photo-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr));
+  }
+  .gf-photo-grid[data-size="sm"] {
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(45%, 11rem), 1fr));
+  }
+
+  /* ---------------------------------------------------------------------
+     Form controls (CoreComponents.input, the typeahead family, search_input):
+     one height (h-ctl, from the density), one border and radius, one focus.
+     Look only: the components' markup and behavior are unchanged
+     (docs/design-system/inventory/forms.md, typeahead-and-id.md).
+     --------------------------------------------------------------------- */
+  .gf-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--gf-ink);
+    font-size: var(--gf-fs-meta);
+    font-weight: 600;
+  }
+  .gf-label-sm {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--gf-ink-2);
+    font-size: var(--gf-fs-caption);
+    font-weight: 600;
+  }
+
+  .gf-input, .gf-select, .gf-textarea, .gf-search-input, .gf-search-input-sm {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--gf-line-strong);
+    border-radius: var(--radius-ctl);
+    background-color: var(--gf-surface);
+    color: var(--gf-ink);
+    font-size: var(--gf-fs-ui);
+    line-height: 1.4;
+  }
+  .gf-input, .gf-select, .gf-search-input { height: var(--gf-ctl-h); padding: 0 0.75rem; }
+  .gf-select { padding-right: 2rem; }
+  .gf-textarea { min-height: 5rem; padding: 0.5rem 0.75rem; }
+  .gf-search-input { padding-left: 2rem; }
+  .gf-search-input-sm { height: 1.75rem; padding: 0 0.5rem 0 1.75rem; font-size: var(--gf-fs-meta); }
+
+  :is(.gf-input, .gf-select, .gf-textarea, .gf-search-input, .gf-search-input-sm):focus {
+    border-color: var(--gf-focus);
+    outline: 2px solid color-mix(in srgb, var(--gf-focus) 35%, transparent);
+    outline-offset: 0;
+  }
+  :is(.gf-input, .gf-select, .gf-textarea):disabled { background-color: var(--gf-surface-2); color: var(--gf-muted); cursor: not-allowed; }
+  :is(.gf-input, .gf-select, .gf-textarea)[readonly] { background-color: var(--gf-surface-2); }
+  .gf-input-error, .gf-select-error, .gf-textarea-error { border-color: var(--gf-danger); }
+
+  .gf-checkbox {
+    width: 1rem;
+    height: 1rem;
+    border-radius: var(--radius-ctl);
+    accent-color: var(--gf-maroon-fill);
+  }
+
+  /* A switch (`toggle`): the track after its visually hidden checkbox. */
+  .gf-toggle-track {
+    position: relative;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 1.25rem;
+    border-radius: 9999px;
+    background-color: var(--gf-line-strong);
+    transition: background-color 0.15s ease-in-out;
+  }
+  .gf-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background-color: var(--gf-surface);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--gf-ink) 25%, transparent);
+    transition: transform 0.15s ease-in-out;
+  }
+  :checked + .gf-toggle-track { background-color: var(--gf-maroon-fill); }
+  :checked + .gf-toggle-track::after { transform: translateX(1rem); }
+  :focus-visible + .gf-toggle-track { outline: 2px solid var(--gf-focus); outline-offset: 2px; }
+  :disabled + .gf-toggle-track { opacity: 0.5; cursor: not-allowed; }
+  @media (prefers-reduced-motion: reduce) {
+    .gf-toggle-track, .gf-toggle-track::after { transition: none; }
+  }
+
+  /* A file input: its button styled like a secondary button, the chosen
+     file's name beside it. */
+  .gf-file { display: block; color: var(--gf-muted); font-size: var(--gf-fs-meta); }
+  .gf-file::file-selector-button {
+    margin-right: 0.75rem;
+    height: var(--gf-ctl-h);
+    padding: 0 0.75rem;
+    border: 1px solid var(--gf-line-strong);
+    border-radius: var(--radius-ctl);
+    background-color: var(--gf-surface);
+    color: var(--gf-ink);
+    font: inherit;
+    font-size: var(--gf-fs-ui);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .gf-file:hover::file-selector-button { border-color: var(--gf-maroon); }
+
+  .gf-hint { margin-top: 0.25rem; color: var(--gf-muted); font-size: var(--gf-fs-meta); }
+  .gf-error {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+    color: var(--gf-danger);
+    font-size: var(--gf-fs-meta);
+  }
+
+  /* The typeahead's highlighted option (set by the Typeahead hook). */
+  [data-typeahead-option][data-highlighted] {
+    background-color: var(--gf-sky-soft);
+    outline: 2px solid var(--gf-focus);
+    outline-offset: -2px;
+  }
+
+  /* prose: running text (articles, ID Notes, a Source's text). Markdown
+     headings start at the section level whatever their depth, since the
+     page header holds the page's h1. */
+  .gf-prose {
+    --prose-fs: var(--gf-fs-body);
+    font-size: var(--prose-fs);
+    line-height: 1.6;
+    color: var(--gf-ink);
+    overflow-wrap: break-word;
+  }
+  .gf-prose[data-size="sm"] { --prose-fs: var(--gf-fs-meta); }
+  .gf-prose[data-size="lg"] { --prose-fs: 1.125rem; }
+  .gf-prose[data-size="xl"] { --prose-fs: 1.25rem; }
+  .gf-prose[data-font="serif"] { font-family: var(--font-serif); }
+  .gf-prose > * + * { margin-top: 0.85em; }
+  .gf-prose :is(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    color: var(--gf-ink);
+    text-wrap: balance;
+  }
+  .gf-prose :is(h1, h2) { font-size: var(--gf-fs-section); line-height: 1.25; margin-top: 1.6em; }
+  .gf-prose h3 { font-size: var(--gf-fs-subsection); line-height: 1.3; margin-top: 1.4em; }
+  .gf-prose :is(h4, h5, h6) { font-size: 1em; margin-top: 1.25em; }
+  .gf-prose :is(h1, h2, h3, h4, h5, h6) + * { margin-top: 0.5em; }
+  .gf-prose > :first-child { margin-top: 0; }
+  .gf-prose a { color: var(--gf-link); text-decoration: underline; text-underline-offset: 0.15em; }
+  .gf-prose a:hover { color: var(--gf-link-hover); }
+  .gf-prose strong { font-weight: 600; }
+  .gf-prose :is(ul, ol) { padding-left: 1.5em; }
+  .gf-prose ul { list-style: disc; }
+  .gf-prose ol { list-style: decimal; }
+  .gf-prose li + li, .gf-prose li > :is(ul, ol) { margin-top: 0.3em; }
+  .gf-prose li::marker { color: var(--gf-muted); }
+  .gf-prose blockquote {
+    border-left: 3px solid var(--gf-line-strong);
+    padding-left: 1em;
+    font-family: var(--font-serif);
+    color: var(--gf-ink-2);
+  }
+  .gf-prose img { max-width: 100%; height: auto; border-radius: var(--radius-panel); }
+  .gf-prose figcaption { margin-top: 0.4em; font-size: var(--gf-fs-meta); color: var(--gf-muted); }
+  .gf-prose hr { border: 0; border-top: 1px solid var(--gf-line); margin-block: 1.6em; }
+  .gf-prose code {
+    font-size: 0.9em;
+    background: var(--gf-surface-2);
+    border-radius: var(--radius-ctl);
+    padding: 0.1em 0.3em;
+  }
+  .gf-prose pre {
+    overflow-x: auto;
+    background: var(--gf-surface-2);
+    border-radius: var(--radius-panel);
+    padding: 0.75em 1em;
+    font-size: 0.9em;
+  }
+  .gf-prose pre code { background: none; padding: 0; font-size: 1em; }
+  .gf-prose table { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--gf-fs-ui); }
+  .gf-prose :is(th, td) { padding: 0.4em 0.75em; border-bottom: 1px solid var(--gf-line); text-align: left; vertical-align: top; }
+  .gf-prose th { background: var(--gf-surface-2); font-weight: 600; }
+  .gf-prose details {
+    border: 1px solid var(--gf-line);
+    border-radius: var(--radius-panel);
+    background: var(--gf-surface);
+    padding: 0.5em 1em;
+  }
+  .gf-prose details + details { margin-top: 0.5em; }
+  .gf-prose summary { cursor: pointer; font-weight: 600; }
+  .gf-prose details[open] > summary { margin-bottom: 0.5em; }
+  .gf-prose details > :not(summary) + * { margin-top: 0.75em; }
+
+  /* A glossary term linked in rendered text (Gallformers.Markdown): the
+     text's own color, a dotted underline, so it reads as a definition, not
+     a way off the page. */
+  a.glossary-link, .gf-prose a.glossary-link {
+    color: inherit;
+    text-decoration: underline dotted var(--gf-muted);
+    text-underline-offset: 0.2em;
+  }
+  a.glossary-link:hover, .gf-prose a.glossary-link:hover {
+    color: var(--gf-link-hover);
+    text-decoration-color: currentColor;
+  }
+
+  /* The theme switch (Layouts.theme_switch): the button shows the current
+     choice; the menu checks it (aria-checked, set by assets/js/theme.js). */
+  .gf-theme-icon { display: none; }
+  :root:not([data-theme-choice]) .gf-theme-icon[data-for="system"],
+  :root[data-theme-choice="system"] .gf-theme-icon[data-for="system"],
+  :root[data-theme-choice="light"] .gf-theme-icon[data-for="light"],
+  :root[data-theme-choice="dark"] .gf-theme-icon[data-for="dark"] { display: inline-flex; }
+  .gf-theme-check { visibility: hidden; }
+  [aria-checked="true"] > .gf-theme-check { visibility: visible; }
+
+  /* Rendered text inside a tooltip (glossary_tooltip): an inverse bubble, so
+     marks and code take its color, in italics. */
+  [role="tooltip"] :is(mark, code, em) {
+    background: transparent;
+    color: inherit;
+    font-style: italic;
+    padding: 0;
+  }
+
+  /* Light-only and dark-only content (the header's wordmark). */
+  .gf-only-dark { display: none; }
+  [data-theme="dark"] .gf-only-light { display: none; }
+  [data-theme="dark"] .gf-only-dark { display: revert; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .gf-only-light { display: none; }
+    :root:not([data-theme]) .gf-only-dark { display: revert; }
+  }
+
+  /* A range-map legend swatch for an introduced range: the fill, hatched. */
+  .gf-hatch {
+    background-image: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgb(0 0 0 / 0.25) 2px, rgb(0 0 0 / 0.25) 4px);
+  }
+
+  /* The command palette (PaletteLive): a panel near the top of the screen
+     over the overlay; full screen on phones. */
+  .gf-palette-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 12vh 1rem 1rem;
+    background: var(--gf-overlay);
+  }
+  .gf-palette {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 42rem;
+    max-height: min(70vh, 40rem);
+    overflow: hidden;
+    border: 1px solid var(--gf-line);
+    border-radius: var(--radius-panel);
+    background: var(--gf-surface);
+    box-shadow: var(--gf-shadow-float);
+  }
+  @media (max-width: 639px) {
+    .gf-palette-overlay { padding: 0; }
+    .gf-palette { max-width: none; max-height: none; height: 100%; border: 0; border-radius: 0; }
+  }
+
+  /* A key, as in "press /". */
+  .gf-kbd {
+    display: inline-block;
+    min-width: 1.25rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--gf-line-strong);
+    border-radius: var(--radius-ctl);
+    font-family: var(--font-sans);
+    font-size: var(--gf-fs-caption);
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  /* ---- Moved from legacy.css (2026-11-06), on tokens -------------------- */
+
+  /* The flash toasts (`CoreComponents.flash`). */
+  .gf-toast { position: fixed; top: 1rem; right: 1rem; z-index: 50; }
+  .gf-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    max-width: 24rem;
+    padding: 1rem;
+    border: 1px solid var(--gf-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--gf-surface);
+    color: var(--gf-ink);
+    box-shadow: var(--gf-shadow-float);
+    overflow-wrap: break-word;
+  }
+  .gf-alert-info { background-color: var(--gf-info-bg); border-color: var(--gf-info); }
+  .gf-alert-info .gf-alert-icon { color: var(--gf-info); }
+  .gf-alert-error { background-color: var(--gf-danger-bg); border-color: var(--gf-danger); }
+  .gf-alert-error .gf-alert-icon { color: var(--gf-danger); }
+
+  /* A Fact's status on the Facts views (matter f14c): denser than a chip,
+     for one tight row per Fact. */
+  .gf-mark {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.375rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-ctl);
+    font-size: var(--gf-fs-caption);
+    font-weight: 600;
+    line-height: 1.125rem;
+    white-space: nowrap;
+  }
+  .gf-mark-new { background-color: var(--gf-ok-bg); color: var(--gf-ok); }
+  .gf-mark-held { background-color: var(--gf-surface-2); color: var(--gf-ink-2); border-color: var(--gf-line); }
+  .gf-mark-conflict { background-color: var(--gf-danger-bg); color: var(--gf-danger); }
+  .gf-mark-waiting { background-color: var(--gf-warn-bg); color: var(--gf-warn); }
+  .gf-mark-dropped,
+  .gf-mark-standing { background-color: var(--gf-surface); color: var(--gf-muted); border-color: var(--gf-line-strong); }
+
+  /* The Facts views' headings: a Gall's name and its categories. */
+  .gf-facts-title { font-size: var(--gf-fs-body); font-weight: 600; line-height: 1.4; }
+  .gf-facts-category {
+    color: var(--gf-muted);
+    font-size: var(--gf-fs-caption);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    line-height: 1.25rem;
+    text-transform: uppercase;
+  }
+  .gf-card {
+    border: 1px solid var(--gf-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--gf-surface);
+  }
+
+  /* A toggle pill (the Facts views' filters). */
+  .gf-pill {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid;
+    border-radius: 9999px;
+    font-size: var(--gf-fs-meta);
+    cursor: pointer;
+    transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+  }
+  .gf-pill-selected { background-color: var(--gf-maroon-fill); color: var(--gf-on-fill); border-color: var(--gf-maroon-fill); }
+  .gf-pill-unselected { background-color: var(--gf-surface); color: var(--gf-ink-2); border-color: var(--gf-line-strong); }
+  .gf-pill-unselected:hover { border-color: var(--gf-maroon); }
+
+  /* `multi_select_dropdown` (retiring into `typeahead`). */
+  .gf-multi-select-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-height: 2.125rem;
+    padding: 0.375rem;
+    border: 1px solid var(--gf-line-strong);
+    border-radius: var(--radius-ctl);
+    background-color: var(--gf-surface);
+    cursor: text;
+  }
+  .gf-multi-select-container-md { min-height: var(--gf-ctl-h); padding: 0.5rem; }
+  .gf-multi-select-input { flex: 1; min-width: 60px; border: 0; padding: 0; background: transparent; color: var(--gf-ink); font-size: var(--gf-fs-caption); }
+  .gf-multi-select-input:focus { outline: none; box-shadow: none; }
+  .gf-multi-select-input-md { min-width: 80px; font-size: var(--gf-fs-ui); }
+  .gf-multi-select-dropdown {
+    position: absolute;
+    z-index: 20;
+    width: 100%;
+    max-height: 8rem;
+    margin-top: 0.25rem;
+    overflow: auto;
+    border: 1px solid var(--gf-line);
+    border-radius: var(--radius-ctl);
+    background-color: var(--gf-surface);
+    box-shadow: var(--gf-shadow-float);
+  }
+  .gf-multi-select-dropdown-md { max-height: 12rem; }
+  .gf-multi-select-option { width: 100%; padding: 0.25rem 0.5rem; text-align: left; font-size: var(--gf-fs-caption); }
+}

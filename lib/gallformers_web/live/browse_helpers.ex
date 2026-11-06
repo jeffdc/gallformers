@@ -10,15 +10,10 @@ defmodule GallformersWeb.BrowseHelpers do
   @max_families_to_auto_expand 3
   @max_children_per_node 5
 
-  @doc """
-  Filters a tree of nodes by a search query string.
-  Returns only nodes whose labels match or have matching descendants.
-  """
-  @spec filter_tree([map()], String.t()) :: [map()]
-  def filter_tree(nodes, ""), do: nodes
-
-  def filter_tree(nodes, query) do
-    do_filter_tree(nodes, String.downcase(query))
+  @doc "The Browse pages' tabs, as `{label, path}`, for `tab_nav`."
+  @spec browse_tabs() :: [{String.t(), String.t()}]
+  def browse_tabs do
+    [{"By what causes them", "/galls"}, {"By host plant", "/hosts"}, {"By place", "/places"}]
   end
 
   @doc """
@@ -91,31 +86,109 @@ defmodule GallformersWeb.BrowseHelpers do
     end
   end
 
-  # --- Private helpers ---
+  @doc """
+  Filters a browse tree (`/galls`, `/hosts`, `/places`) by a name: it keeps
+  the nodes whose label contains the query (ignoring case) and their
+  ancestors, and a node whose own label matches keeps everything under it,
+  so a matched family's card still shows its genera.
+  """
+  @spec filter_tree([map()], String.t()) :: [map()]
+  def filter_tree(nodes, ""), do: nodes
 
-  defp do_filter_tree(nodes, query_lower) do
+  def filter_tree(nodes, query) do
+    query_lower = String.downcase(query)
+
     nodes
-    |> Enum.map(&filter_node(&1, query_lower))
+    |> Enum.map(&filter_card_node(&1, query_lower))
     |> Enum.reject(&is_nil/1)
   end
 
-  defp filter_node(node, query_lower) do
-    if branch_node?(node) do
-      filter_branch_node(node, query_lower)
-    else
-      if label_matches?(node.label, query_lower), do: node, else: nil
+  defp filter_card_node(node, query_lower) do
+    cond do
+      label_matches?(node.label, query_lower) ->
+        node
+
+      branch_node?(node) ->
+        case filter_tree(node.nodes, query_lower) do
+          [] -> nil
+          children -> %{node | nodes: children}
+        end
+
+      true ->
+        nil
     end
   end
 
-  defp filter_branch_node(node, query_lower) do
-    filtered_children = do_filter_tree(node.nodes, query_lower)
+  @doc """
+  A browse tree (`Gallformers.Taxa.TreeBuilder` shape) as `family_card`s:
+  each family with its count, a photo and its genera (each with its count
+  and leaves), genera most first, then by name.
 
-    if filtered_children != [] or label_matches?(node.label, query_lower) do
-      %{node | nodes: filtered_children}
-    else
-      nil
+  `counting` says what a count is:
+  - `{:leaves, photos}`: the Galls under it (the Galls tree); `photos` maps
+    a Gall ID to its photo URL, and a family's photo is its first Gall with
+    one. Families keep the tree's order.
+  - `{:taxa, counts}`: `counts` maps a genus or family taxon ID to
+    `%{count:, image_url:}` (the Hosts tree: Galls on the taxon); a taxon
+    absent from it counts 0. Families are most galled first, then by name.
+  """
+  @spec family_cards([map()], {:leaves, map()} | {:taxa, map()}) :: [map()]
+  def family_cards(nodes, counting) do
+    cards = Enum.map(nodes, &family_card(&1, counting))
+
+    case counting do
+      {:leaves, _} -> cards
+      {:taxa, _} -> Enum.sort_by(cards, &{-&1.count, &1.name})
     end
   end
+
+  defp family_card(node, counting) do
+    genera =
+      node.nodes
+      |> Enum.map(&genus_card(&1, counting))
+      |> Enum.sort_by(&{-&1.count, &1.name})
+
+    {count, image_url} =
+      case counting do
+        {:leaves, photos} ->
+          leaf_ids = Enum.flat_map(genera, fn g -> Enum.map(g.leaves, & &1.id) end)
+          {length(leaf_ids), Enum.find_value(leaf_ids, &Map.get(photos, &1))}
+
+        {:taxa, counts} ->
+          taxon_count(counts, node.key)
+      end
+
+    node
+    |> Map.take([:key, :name, :url, :description])
+    |> Map.merge(%{count: count, image_url: image_url, genera: genera})
+  end
+
+  defp genus_card(node, counting) do
+    leaves =
+      Enum.map(node.nodes, &Map.put(Map.take(&1, [:key, :label, :url]), :id, key_id(&1.key)))
+
+    count =
+      case counting do
+        {:leaves, _} -> length(leaves)
+        {:taxa, counts} -> counts |> taxon_count(node.key) |> elem(0)
+      end
+
+    node
+    |> Map.take([:key, :name, :url, :description])
+    |> Map.merge(%{count: count, leaves: leaves})
+  end
+
+  defp taxon_count(counts, key) do
+    case Map.get(counts, key_id(key)) do
+      %{count: count, image_url: url} -> {count, url}
+      nil -> {0, nil}
+    end
+  end
+
+  # "f-12" -> 12
+  defp key_id(key), do: key |> String.split("-") |> List.last() |> String.to_integer()
+
+  # --- Private helpers ---
 
   defp branch_node?(node), do: Map.has_key?(node, :nodes) and node.nodes != []
 

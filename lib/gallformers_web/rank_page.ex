@@ -1,7 +1,7 @@
 defmodule GallformersWeb.RankPage do
   @moduledoc """
-  The data the rank pages (`GallformersWeb.FamilyLive`, `IntermediateLive`,
-  `GenusLive`, `SectionLive`) share, from `Gallformers.Taxa` and
+  The data the rank pages (`GallformersWeb.IntermediateLive` for family and
+  the intermediate ranks, `GenusLive`, `SectionLive`) share, from `Gallformers.Taxa` and
   `Gallformers.Catalog`: a taxon found by name and rank (or an old numeric
   URL redirected through the crosswalk), its description, its children
   with gall and host counts, and Galls as table rows.
@@ -46,6 +46,25 @@ defmodule GallformersWeb.RankPage do
     else
       {:ok, Taxa.get_by_name(name, rank)}
     end
+  end
+
+  @doc """
+  A rank page's breadcrumb: the taxon's ancestors that have a page (family,
+  subfamily, tribe, subtribe, genus, section; not itself), from the top,
+  each with its page's path (the name URL-encoded) and whether its name is
+  italic (genus and section).
+  """
+  @spec crumbs(integer()) :: [%{name: String.t(), path: String.t(), italic: boolean()}]
+  def crumbs(taxon_id) do
+    taxon_id
+    |> Taxa.lineage()
+    |> Enum.drop(-1)
+    |> Enum.flat_map(fn taxon ->
+      case TaxonomyURL.public_path(taxon) do
+        nil -> []
+        path -> [%{name: taxon.name, path: path, italic: taxon.rank in [:genus, :section]}]
+      end
+    end)
   end
 
   @doc "A taxon's common names as its description (`\"Elms, Oaks\"`), or nil."

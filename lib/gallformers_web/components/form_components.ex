@@ -4,59 +4,343 @@ defmodule GallformersWeb.FormComponents do
 
   Provides enhanced form inputs, multi-select controls, and other
   form-related UI elements that extend Phoenix's core form components.
+
+  The design system's form components (docs/design-system/components.md,
+  "Forms") are `field`, `search_field` and `facet_group`; the others here
+  are restyled or retired as pages move onto the system.
   """
   use Phoenix.Component
   use Gettext, backend: GallformersWeb.Gettext
 
-  import GallformersWeb.CoreComponents, only: [button: 1, icon: 1, modal: 1]
+  import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.ActionComponents, only: [button: 1]
+  import GallformersWeb.FeedbackComponents, only: [dialog: 1, notice: 1]
 
   alias Gallformers.TextMatch
+  alias GallformersWeb.Helpers
   alias Phoenix.LiveView.JS
 
+  # ── Design system: field, search_field, facet_group ──────────────────────
+  # docs/design-system/components.md ("Forms").
+
   @doc """
-  Renders a multi-select component with pill-style toggle buttons.
+  A control with its label, help and errors.
+
+  Layouts: `:stacked` (label above; public forms and narrow spaces) and
+  `:row` (label in a fixed left column, help and errors under the control;
+  admin edit pages). A row stacks on phones.
+
+  The control is the inner block, so `field` can't wire it up itself. Give
+  `for` the control's id; `field` then renders the help as `<for>-help` and
+  the errors as `<for>-errors`. Point the control at them:
+
+      aria-describedby="title-help title-errors"   (only the ones rendered)
+      aria-invalid={@errors != [] && "true"}
+
+  `saved` shows "Saved" beside the control, in a polite live region that is
+  always rendered so screen readers announce the change.
 
   ## Examples
 
-      <.multi_select
-        id="shapes"
-        label="Select Shapes"
-        options={[%{value: "round", label: "Round"}, %{value: "oval", label: "Oval"}]}
-        selected={@selected_shapes}
-        on_toggle="toggle_shape"
-      />
-  """
-  attr :id, :string, required: true, doc: "unique id for the component"
-  attr :label, :string, default: nil, doc: "optional label"
-  attr :options, :list, required: true, doc: "list of %{value: _, label: _} maps"
-  attr :selected, :list, default: [], doc: "list of selected values"
-  attr :on_toggle, :string, required: true, doc: "event name for toggle"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-  attr :required, :boolean, default: false, doc: "whether this field is required"
+      <.field label="Name" for="taxon-name" help="The old name is kept as a synonym."
+              errors={@errors} layout={:row} required>
+        <input id="taxon-name" name="name" aria-describedby="taxon-name-help taxon-name-errors"
+               aria-invalid={@errors != [] && "true"} class="…" />
+      </.field>
 
-  def multi_select(assigns) do
+      <.field label="Rank" for="rank" saved={@saved == :rank}>
+        <select id="rank" name="rank">…</select>
+      </.field>
+  """
+  attr :label, :string, required: true
+  attr :for, :string, default: nil, doc: "the control's id; also names the help and error ids"
+  attr :help, :string, default: nil, doc: "a line under the control saying what the value does"
+  attr :errors, :list, default: [], doc: "error messages, each shown on its own line"
+  attr :layout, :atom, default: :stacked, values: [:stacked, :row]
+  attr :required, :boolean, default: false
+  attr :saved, :boolean, default: false, doc: ~s|shows "Saved" beside the control|
+  attr :class, :any, default: nil, doc: "layout only"
+  attr :rest, :global
+  slot :inner_block, required: true, doc: "the control"
+
+  def field(assigns) do
     ~H"""
-    <div id={@id} class={@class}>
-      <label :if={@label} class="gf-label mb-2">
-        {@label}<span :if={@required} class="text-red-500 ml-0.5">*</span>
+    <div
+      data-layout={@layout}
+      class={[
+        "flex flex-col gap-1",
+        @layout == :row && "sm:flex-row sm:items-start sm:gap-3",
+        @class
+      ]}
+      {@rest}
+    >
+      <label
+        for={@for}
+        class={[
+          "text-ui font-semibold text-ink",
+          @layout == :row && "sm:flex sm:min-h-ctl sm:w-38 sm:shrink-0 sm:items-center sm:gap-1"
+        ]}
+      >
+        {@label}
+        <span :if={@required} class="text-muted" aria-hidden="true">*</span>
+        <span :if={@required} class="sr-only">(required)</span>
       </label>
-      <div class="flex flex-wrap gap-2">
-        <button
-          :for={option <- @options}
-          type="button"
-          phx-click={@on_toggle}
-          phx-value-value={option.value}
-          class={[
-            "gf-pill",
-            (option.value in @selected || to_string(option.value) in @selected) && "gf-pill-selected",
-            !(option.value in @selected || to_string(option.value) in @selected) &&
-              "gf-pill-unselected"
-          ]}
-        >
-          {option.label}
-        </button>
+      <div data-part="control" class="flex min-w-0 flex-1 flex-col gap-1">
+        <div class="flex items-center gap-2">
+          <div class="min-w-0 flex-1">{render_slot(@inner_block)}</div>
+          <span aria-live="polite" class="shrink-0 text-meta text-ok">
+            {if @saved, do: "Saved"}
+          </span>
+        </div>
+        <p :if={@help} id={@for && "#{@for}-help"} class="text-meta text-muted">{@help}</p>
+        <div :if={@errors != []} id={@for && "#{@for}-errors"} class="flex flex-col gap-0.5">
+          <p :for={error <- @errors} class="flex items-center gap-1.5 text-meta text-danger">
+            <.icon name="ph-warning-circle" class="size-4 shrink-0" />
+            {error}
+          </p>
+        </div>
       </div>
     </div>
+    """
+  end
+
+  @doc """
+  One search input: the header search, list filters, the admin top bar.
+
+  `label` names the input for screen readers (there is no visible label);
+  `placeholder` defaults to it. `on_clear` adds a "Clear search" button while
+  there is a value. `shortcut` shows a key hint while the field is empty and
+  puts the key in `data-shortcut` and `aria-keyshortcuts`; focusing the field
+  on that key needs a client-side listener for `[data-shortcut]`.
+
+  Attributes not listed here (`phx-change`, `phx-keydown`, `form` …) go on
+  the input.
+
+  ## Examples
+
+      <.search_field
+        id="gall-search"
+        name="q"
+        value={@query}
+        label="Search Galls"
+        placeholder="Name or Host"
+        shortcut="/"
+        on_clear={JS.push("clear_search")}
+        phx-change="search"
+      />
+  """
+  attr :name, :string, required: true
+  attr :value, :string, default: ""
+  attr :label, :string, required: true, doc: "the input's accessible name"
+  attr :placeholder, :string, default: nil, doc: "defaults to the label"
+  attr :shortcut, :string, default: nil, doc: ~s|a key that focuses the field, e.g. "/"|
+  attr :on_clear, JS, default: nil, doc: "shows a clear button while there is a value"
+  attr :debounce, :string, default: "300", doc: "milliseconds, or \"blur\""
+  attr :id, :string, default: nil
+  attr :class, :any, default: nil, doc: "layout only (width, placement)"
+  attr :rest, :global, include: ~w(form autocomplete disabled), doc: "goes on the input"
+
+  def search_field(assigns) do
+    assigns = assign(assigns, :empty?, assigns.value in [nil, ""])
+
+    ~H"""
+    <div class={["relative", @class]}>
+      <.icon
+        name="ph-magnifying-glass"
+        class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted"
+      />
+      <input
+        type="search"
+        id={@id}
+        name={@name}
+        value={@value}
+        placeholder={@placeholder || @label}
+        aria-label={@label}
+        aria-keyshortcuts={@shortcut}
+        data-shortcut={@shortcut}
+        phx-debounce={@debounce}
+        class="peer h-ctl w-full rounded-ctl border border-line-strong bg-surface pl-8 pr-8 text-ui text-ink placeholder:text-muted"
+        {@rest}
+      />
+      <kbd
+        :if={@shortcut && @empty?}
+        aria-hidden="true"
+        class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-ctl border border-line-strong bg-surface-2 px-1.5 font-sans text-caption text-muted peer-not-placeholder-shown:hidden"
+      >
+        {@shortcut}
+      </kbd>
+      <button
+        :if={@on_clear && !@empty?}
+        type="button"
+        aria-label="Clear search"
+        phx-click={@on_clear}
+        class="absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-ctl text-muted hover:text-ink"
+      >
+        <.icon name="ph-x" class="size-4" />
+      </button>
+    </div>
+    """
+  end
+
+  @doc """
+  A filter with counts: a heading and options, each with how many results it
+  would leave. For the ID page and browse pages.
+
+  Options are maps `%{value:, label:, count:, selected:}`. `count` may be nil
+  (no count shown). Options with a count of 0 are dimmed, never hidden or
+  disabled. Past `limit`, options hide behind "Show N more"; selected options
+  always show.
+
+  `multiple` (the default) renders checkboxes named `name[]`, with a hidden
+  empty value so clearing every box still sends the param: drop `""` from the
+  list. `multiple={false}` renders radios named `name`; to let the reader go
+  back to no choice, pass an option such as `%{value: "", label: "Any"}`.
+
+  It has no `phx-change` of its own: put it in the page's filter form.
+
+  ## Examples
+
+      <form phx-change="filter">
+        <.facet_group id="facet-part" title="Plant part" name="lo" options={@part_facets} />
+        <.facet_group id="facet-host" title="Host" name="h" options={@host_facets}
+                      multiple={false} italic />
+      </form>
+  """
+  attr :id, :string, required: true, doc: "the fieldset's id, used by the show-more toggle"
+  attr :title, :string, required: true, doc: "the legend"
+  attr :name, :string, required: true, doc: "the form param"
+  attr :options, :list, default: [], doc: "%{value:, label:, count:, selected:} maps, in order"
+  attr :multiple, :boolean, default: true, doc: "checkboxes (true) or radios (false)"
+  attr :limit, :integer, default: 8, doc: "options shown before Show N more"
+  attr :italic, :boolean, default: false, doc: "labels are scientific names"
+  attr :class, :any, default: nil, doc: "layout only"
+  attr :rest, :global
+
+  def facet_group(assigns) do
+    options =
+      assigns.options
+      |> Enum.with_index()
+      |> Enum.map(fn {option, i} ->
+        Map.put(option, :overflow?, i >= assigns.limit and not option_selected?(option))
+      end)
+
+    assigns =
+      assigns
+      |> assign(:indexed, Enum.with_index(options))
+      |> assign(:hidden_count, Enum.count(options, & &1.overflow?))
+      |> assign(:input_name, if(assigns.multiple, do: "#{assigns.name}[]", else: assigns.name))
+
+    ~H"""
+    <fieldset id={@id} class={["flex flex-col", @class]} {@rest}>
+      <legend class="mb-1 text-caption font-semibold uppercase tracking-wide text-muted">
+        {@title}
+      </legend>
+      <input :if={@multiple} type="hidden" name={@input_name} value="" />
+      <label
+        :for={{option, i} <- @indexed}
+        data-overflow={option.overflow?}
+        data-zero={option[:count] == 0}
+        class={[
+          "flex min-h-row items-center gap-2 text-ui",
+          if(option[:count] == 0, do: "text-muted", else: "text-ink"),
+          option.overflow? && "hidden"
+        ]}
+      >
+        <input
+          type={if @multiple, do: "checkbox", else: "radio"}
+          id={"#{@id}-#{i}"}
+          name={@input_name}
+          value={option.value}
+          checked={option_selected?(option)}
+          class="size-4 shrink-0 accent-brand-fill"
+        />
+        <span class={["min-w-0 flex-1", @italic && "italic"]}>{option.label}</span>
+        <span :if={option[:count]} data-part="count" class="text-meta tabular-nums text-muted">
+          {Helpers.format_number(option.count)}
+        </span>
+      </label>
+      <.button
+        :if={@hidden_count > 0}
+        id={"#{@id}-more"}
+        variant="ghost"
+        size="sm"
+        class="self-start"
+        aria-expanded="false"
+        aria-controls={@id}
+        phx-click={toggle_facet_overflow(@id)}
+      >
+        <span data-part="more">Show {@hidden_count} more</span>
+        <span data-part="fewer" class="hidden">Show fewer</span>
+      </.button>
+    </fieldset>
+    """
+  end
+
+  defp option_selected?(option), do: Map.get(option, :selected, false) == true
+
+  defp toggle_facet_overflow(id) do
+    JS.toggle_class("hidden", to: "##{id} [data-overflow]")
+    |> JS.toggle_class("hidden", to: "##{id}-more [data-part=more]")
+    |> JS.toggle_class("hidden", to: "##{id}-more [data-part=fewer]")
+    |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{id}-more")
+  end
+
+  @doc """
+  A single-value filter: a labelled select in its own form, for a row of
+  filters (the ID page). See docs/design-system/components.md (`filter_select`).
+
+  The form carries whatever change event and values the page passes
+  (`phx-change`, `phx-value-*`), so the page's handlers stay as they are.
+  While unset, each option shows how many results it would leave
+  (`counts`, keyed by option value); once set, the select is marked and the
+  counts are hidden. Multi-value filters use `multi_select_typeahead`.
+
+  ## Examples
+
+      <.filter_select
+        id="filter-season"
+        name="value"
+        label="Season"
+        prompt="Any"
+        options={[{"Spring", "Spring"}, {"Fall", "Fall"}]}
+        value={@filters.season}
+        counts={@season_counts}
+        phx-change="change_filter"
+        phx-value-filter="season"
+      />
+  """
+  attr :id, :string, required: true, doc: "the select's id (its label points to it)"
+  attr :name, :string, required: true
+  attr :label, :string, required: true
+  attr :prompt, :string, required: true, doc: "the empty choice, e.g. Any"
+  attr :options, :list, required: true, doc: "{label, value} pairs"
+  attr :value, :any, default: nil, doc: "the current value; nil when unset"
+  attr :counts, :map, default: %{}, doc: "results per option value, shown while unset"
+  attr :class, :any, default: nil, doc: "layout only"
+  attr :rest, :global, doc: "for the form: phx-change, phx-value-*, phx-target"
+
+  def filter_select(assigns) do
+    assigns = assign(assigns, :set?, assigns.value not in [nil, ""])
+
+    ~H"""
+    <form class={["min-w-0", @class]} {@rest}>
+      <label class="gf-label" for={@id}>{@label}</label>
+      <select
+        id={@id}
+        name={@name}
+        data-set={@set?}
+        class={["gf-select", @set? && "border-brand font-semibold"]}
+      >
+        <option value="">{@prompt}</option>
+        <option
+          :for={{label, value} <- @options}
+          value={value}
+          selected={to_string(value) == to_string(@value)}
+        >
+          {label}{if not @set? and Map.has_key?(@counts, value), do: " (#{@counts[value]})"}
+        </option>
+      </select>
+    </form>
     """
   end
 
@@ -91,7 +375,7 @@ defmodule GallformersWeb.FormComponents do
       ]}>
         <.icon
           name="ph-magnifying-glass"
-          class={if(@size == :sm, do: "size-4 text-gray-400", else: "size-5 text-gray-400")}
+          class={if(@size == :sm, do: "size-4 text-muted", else: "size-5 text-muted")}
         />
       </div>
       <input
@@ -109,46 +393,9 @@ defmodule GallformersWeb.FormComponents do
   end
 
   @doc """
-  Renders a form field wrapper with label and error display.
-
-  This is a simpler alternative to the full input component when you
-  need more control over the actual input element.
-
-  ## Examples
-
-      <.field_wrapper label="Species Name" error={@errors[:name]}>
-        <input type="text" name="name" class="..." />
-      </.field_wrapper>
-  """
-  attr :label, :string, required: true, doc: "field label"
-  attr :error, :any, default: nil, doc: "error message or nil"
-  attr :required, :boolean, default: false, doc: "whether the field is required"
-  attr :hint, :string, default: nil, doc: "optional hint text"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-
-  slot :inner_block, required: true
-
-  def field_wrapper(assigns) do
-    ~H"""
-    <div class={["mb-4", @class]}>
-      <label class="gf-label">
-        {@label}
-        <span :if={@required} class="text-red-500">*</span>
-      </label>
-      {render_slot(@inner_block)}
-      <p :if={@hint && !@error} class="gf-hint">
-        {@hint}
-      </p>
-      <p :if={@error} class="gf-error">
-        <.icon name="ph-warning-circle" class="size-4" />
-        {@error}
-      </p>
-    </div>
-    """
-  end
-
-  @doc """
-  Renders a toggle switch.
+  A switch: a checkbox (`role="switch"`) drawn as a track, for a setting
+  that takes effect at once. With no visible `label`, give it an
+  `aria-label`; events (`phx-click`, `phx-value-*`) go on the checkbox.
 
   ## Examples
 
@@ -174,110 +421,23 @@ defmodule GallformersWeb.FormComponents do
 
   def toggle(assigns) do
     ~H"""
-    <label class={["inline-flex items-center cursor-pointer", @disabled && "opacity-50", @class]}>
+    <label class={["inline-flex cursor-pointer items-center gap-2.5", @class]}>
       <input type="hidden" name={@name} value="false" form={@form} />
-      <div class="relative">
-        <input
-          type="checkbox"
-          id={@id}
-          name={@name}
-          value="true"
-          checked={@checked}
-          disabled={@disabled}
-          class="sr-only peer"
-          form={@form}
-          {@rest}
-        />
-        <div class="gf-toggle-track peer peer-checked:bg-gf-maroon peer-focus:ring-2 peer-focus:ring-gf-maroon/50 peer-checked:after:translate-x-full peer-checked:after:border-white">
-        </div>
-      </div>
-      <span :if={@label} class="gf-label ml-3 mb-0">{@label}</span>
+      <input
+        type="checkbox"
+        role="switch"
+        id={@id}
+        name={@name}
+        value="true"
+        checked={@checked}
+        disabled={@disabled}
+        class="sr-only"
+        form={@form}
+        {@rest}
+      />
+      <span class="gf-toggle-track" aria-hidden="true"></span>
+      <span :if={@label} class="text-ui text-ink">{@label}</span>
     </label>
-    """
-  end
-
-  @doc """
-  Renders a radio button group.
-
-  ## Examples
-
-      <.radio_group
-        id="abundance"
-        name="abundance"
-        label="Abundance"
-        options={[%{value: "common", label: "Common"}, %{value: "rare", label: "Rare"}]}
-        value={@abundance}
-      />
-  """
-  attr :id, :string, required: true, doc: "unique id for the group"
-  attr :name, :string, required: true, doc: "form input name"
-  attr :label, :string, default: nil, doc: "group label"
-  attr :options, :list, required: true, doc: "list of %{value: _, label: _} maps"
-  attr :value, :any, default: nil, doc: "currently selected value"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-  attr :rest, :global, include: ~w(phx-change form)
-
-  def radio_group(assigns) do
-    ~H"""
-    <fieldset id={@id} class={@class}>
-      <legend :if={@label} class="gf-label mb-2">{@label}</legend>
-      <div class="space-y-2">
-        <label :for={option <- @options} class="flex items-center">
-          <input
-            type="radio"
-            name={@name}
-            value={option.value}
-            checked={@value == option.value || to_string(@value) == to_string(option.value)}
-            class="gf-radio"
-            {@rest}
-          />
-          <span class="ml-2 text-base text-gray-700">{option.label}</span>
-          <span :if={option[:description]} class="gf-hint ml-1">
-            - {option.description}
-          </span>
-        </label>
-      </div>
-    </fieldset>
-    """
-  end
-
-  @doc """
-  Renders a file upload dropzone.
-
-  ## Examples
-
-      <.file_dropzone
-        id="images"
-        upload={@uploads.images}
-        label="Upload Images"
-        accept=".jpg,.jpeg,.png,.gif"
-      />
-  """
-  attr :id, :string, required: true, doc: "unique id for the dropzone"
-  attr :upload, :any, required: true, doc: "Phoenix.LiveView upload configuration"
-  attr :label, :string, default: "Drop files here or click to browse", doc: "dropzone label"
-  attr :accept, :string, default: nil, doc: "accepted file types"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-
-  def file_dropzone(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class={["gf-dropzone", @class]}
-      phx-drop-target={@upload.ref}
-    >
-      <div class="space-y-1 text-center">
-        <.icon name="ph-cloud-arrow-up" class="mx-auto size-12 text-gray-400" />
-        <div class="flex text-sm text-gray-600">
-          <label class="gf-dropzone-link">
-            <span>{gettext("Upload a file")}</span>
-            <.live_file_input upload={@upload} class="sr-only" />
-          </label>
-          <p class="pl-1">{gettext("or drag and drop")}</p>
-        </div>
-        <p class="gf-hint text-xs">{@label}</p>
-      </div>
-    </div>
     """
   end
 
@@ -435,7 +595,7 @@ defmodule GallformersWeb.FormComponents do
     ~H"""
     <div class={@class}>
       <label :if={@label} class="gf-label">
-        {@label}<span :if={@required} class="text-red-500 ml-0.5">*</span>
+        {@label}<span :if={@required} class="ml-0.5 text-danger">*</span>
       </label>
       <div
         id={@id}
@@ -495,7 +655,7 @@ defmodule GallformersWeb.FormComponents do
               phx-click={@on_add}
               phx-value-type={@type}
               phx-value-id={get_item_id(opt, @result_id_resolved)}
-              class="gf-multi-select-option hover:bg-gray-100 data-[highlighted]:bg-gray-100"
+              class="gf-multi-select-option hover:bg-sky-soft"
             >
               {get_display_label(opt, @result_label_resolved)}
             </button>
@@ -688,23 +848,23 @@ defmodule GallformersWeb.FormComponents do
       class={@class}
     >
       <label class="gf-label">
-        {@label}<span :if={@required} class="text-red-500 ml-0.5">*</span>
+        {@label}<span :if={@required} class="ml-0.5 text-danger">*</span>
         {render_slot(@label_suffix)}
       </label>
       <%= if @selected do %>
         <div
           id={"#{@id}-selected"}
           data-typeahead-selected
-          class="flex items-center gap-2 p-2 bg-gray-50 rounded border focus:ring-2 focus:ring-gf-maroon focus:border-gf-maroon cursor-text"
+          class="flex h-ctl items-center gap-2 rounded-ctl border border-line-strong bg-surface-2 px-3 cursor-text"
           tabindex="0"
           aria-label={"Selected: #{@display_fn.(@selected)}. Type to search, or press Escape to clear."}
         >
-          <span class="flex-1 text-base italic text-gray-900">{@display_fn.(@selected)}</span>
+          <span class="flex-1 truncate text-ui italic text-ink">{@display_fn.(@selected)}</span>
           <button
             type="button"
             phx-click={@clear_event}
             phx-target={@target}
-            class="text-gray-400 hover:text-gray-600"
+            class="text-muted hover:text-ink"
             aria-label="Clear selection"
             tabindex="-1"
           >
@@ -731,13 +891,13 @@ defmodule GallformersWeb.FormComponents do
             :if={length(@results) > 0 || @show_create_option || @show_no_matches}
             id={"#{@id}-results"}
             data-typeahead-results
-            class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+            class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-panel border border-line bg-surface shadow-float"
             role="listbox"
           >
             <%!-- No matches message --%>
             <div
               :if={@show_no_matches}
-              class="px-3 py-2 text-sm text-gray-500 italic"
+              class="px-3 py-2 text-meta italic text-muted"
               role="status"
             >
               No matches found
@@ -746,7 +906,7 @@ defmodule GallformersWeb.FormComponents do
             <%= for {item, index} <- Enum.with_index(@results) do %>
               <%= if @group_key && show_group_header?(item, index, @results, @group_key) do %>
                 <div
-                  class="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                  class="px-3 py-1.5 text-caption font-semibold uppercase tracking-wide text-muted"
                   role="presentation"
                 >
                   {Map.get(item, @group_key)}
@@ -758,7 +918,7 @@ defmodule GallformersWeb.FormComponents do
                 phx-click={@select_event}
                 phx-target={@target}
                 phx-value-id={item.id}
-                class="w-full text-left px-3 py-2 text-base hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                class="w-full border-b border-line px-3 py-1.5 text-left text-ui text-ink last:border-b-0 hover:bg-sky-soft"
                 role="option"
               >
                 <%= if @result != [] do %>
@@ -776,7 +936,7 @@ defmodule GallformersWeb.FormComponents do
               phx-click={@create_event}
               phx-target={@target}
               phx-value-name={@query}
-              class="w-full text-left px-3 py-2 text-base hover:bg-green-50 border-b border-gray-100 last:border-b-0 text-green-700 font-medium"
+              class="w-full border-b border-line px-3 py-1.5 text-left text-ui font-semibold text-ok last:border-b-0 hover:bg-ok-bg"
               role="option"
             >
               <.icon name="ph-plus" class="size-4 inline-block mr-1" />
@@ -861,11 +1021,11 @@ defmodule GallformersWeb.FormComponents do
       class="mb-2"
     >
       <label class="gf-label">
-        {@label}<span :if={@required} class="text-red-500 ml-0.5">*</span>
+        {@label}<span :if={@required} class="ml-0.5 text-danger">*</span>
       </label>
       <div class="relative">
         <%!-- Selected tags and input --%>
-        <div class="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md bg-white min-h-[42px]">
+        <div class="flex min-h-ctl flex-wrap items-center gap-1 rounded-ctl border border-line-strong bg-surface px-2 py-1">
           <span
             :for={opt <- @selected_options}
             class="gf-chip gf-chip-sm"
@@ -889,7 +1049,7 @@ defmodule GallformersWeb.FormComponents do
             phx-blur={"#{@name}_blur"}
             phx-debounce="100"
             placeholder={if @selected_options == [], do: @placeholder, else: ""}
-            class="flex-1 min-w-[80px] border-0 p-0 text-base focus:ring-0 focus:outline-none"
+            class="min-w-20 flex-1 border-0 bg-transparent p-0 text-ui text-ink focus:outline-none"
             role="combobox"
             aria-expanded={@focused and length(@filtered_options) > 0}
             aria-controls={"#{@id}-results"}
@@ -900,7 +1060,7 @@ defmodule GallformersWeb.FormComponents do
             :if={@selected_options != []}
             type="button"
             phx-click={"#{@name}_clear"}
-            class="flex-shrink-0 text-gray-400 hover:text-gray-600 p-1"
+            class="shrink-0 p-1 text-muted hover:text-ink"
             title="Clear all"
           >
             <.icon name="ph-x" class="size-4" />
@@ -911,7 +1071,7 @@ defmodule GallformersWeb.FormComponents do
           :if={@focused and length(@filtered_options) > 0}
           id={"#{@id}-results"}
           data-typeahead-results
-          class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-auto"
+          class="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-panel border border-line bg-surface shadow-float"
           role="listbox"
           onmousedown="event.preventDefault()"
         >
@@ -920,7 +1080,7 @@ defmodule GallformersWeb.FormComponents do
             data-typeahead-option
             phx-click={"#{@name}_select"}
             phx-value-id={to_string(opt.id)}
-            class="w-full text-left px-3 py-2 text-base hover:bg-gray-50 border-b border-gray-100 last:border-b-0 cursor-pointer"
+            class="w-full cursor-pointer border-b border-line px-3 py-1.5 text-left text-ui text-ink last:border-b-0 hover:bg-sky-soft"
             role="option"
           >
             {Map.get(opt, @option_label)}
@@ -947,7 +1107,7 @@ defmodule GallformersWeb.FormComponents do
         target={@myself}
       >
         <:header_extra>
-          <p class="text-xs text-gray-500 mb-3">Help text here.</p>
+          <p class="mb-3 text-caption text-muted">Help text here.</p>
         </:header_extra>
         <ul>...</ul>
       </.drill_down_panel>
@@ -966,16 +1126,16 @@ defmodule GallformersWeb.FormComponents do
     ~H"""
     <div class={[
       "transition-all duration-300 overflow-hidden",
-      if(@open, do: "w-80 border-l border-gray-200", else: "w-0")
+      if(@open, do: "w-80 border-l border-line", else: "w-0")
     ]}>
       <div :if={@open} class="p-4 h-full overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">{@country_name}</h3>
+          <h3 class="text-subsection font-semibold text-ink">{@country_name}</h3>
           <button
             type="button"
             phx-click={@on_close}
             phx-target={@target}
-            class="text-gray-400 hover:text-gray-600"
+            class="text-muted hover:text-ink"
             aria-label="Close panel"
           >
             <.icon name="ph-x" class="size-5" />
@@ -1005,66 +1165,56 @@ defmodule GallformersWeb.FormComponents do
 
   def dangerous_delete_modal(assigns) do
     ~H"""
-    <.modal
+    <.dialog
       :if={@show}
       id={@id}
+      title={"Permanently delete this #{@item_type}?"}
+      size={:sm}
       show
       on_cancel={JS.push("cancel_delete")}
-      class="gf-modal-sm ring-2 ring-red-600"
     >
-      <:header>
-        <span class="flex items-center gap-2 text-red-800">
-          <.icon name="ph-warning-octagon" class="size-6 shrink-0" />
-          Permanently delete this {@item_type}?
-        </span>
-      </:header>
-      <:body>
-        <div class="space-y-5">
-          <div class="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
-            <p class="font-bold">This cannot be undone.</p>
-            <p class="mt-2">
-              Deleting <strong>{@item_name}</strong> will have the following impact:
-            </p>
-            <ul class="mt-2 list-disc space-y-1 pl-5">
-              <li :for={consequence <- @consequences}>{consequence}</li>
-            </ul>
-          </div>
+      <div class="flex flex-col gap-block">
+        <.notice kind={:danger} title="This cannot be undone.">
+          Deleting <strong>{@item_name}</strong>
+          will have the following impact:
+          <ul class="mt-1 list-disc pl-5">
+            <li :for={consequence <- @consequences}>{consequence}</li>
+          </ul>
+        </.notice>
 
-          <form id={"#{@id}-form"} phx-submit="confirm_delete">
-            <label for="dangerous-delete-confirmation" class="gf-label">
-              Type <strong class="text-red-700">{@item_name}</strong> to confirm:
-            </label>
-            <input
-              type="text"
-              id="dangerous-delete-confirmation"
-              name="confirmation"
-              value={@confirmation_value}
-              phx-hook="InputEvent"
-              data-event="update_delete_confirmation"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              class="gf-input mt-2 focus:border-red-600 focus:ring-red-600"
-              autofocus
-            />
-          </form>
-        </div>
-      </:body>
-      <:footer>
-        <.button type="button" variant="secondary" phx-click="cancel_delete">
-          Cancel
-        </.button>
+        <form id={"#{@id}-form"} phx-submit="confirm_delete">
+          <label for="dangerous-delete-confirmation" class="gf-label">
+            Type <strong>{@item_name}</strong> to confirm:
+          </label>
+          <input
+            type="text"
+            id="dangerous-delete-confirmation"
+            name="confirmation"
+            value={@confirmation_value}
+            phx-hook="InputEvent"
+            data-event="update_delete_confirmation"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            class="gf-input"
+            autofocus
+          />
+        </form>
+      </div>
+      <:actions>
+        <.button type="button" variant="ghost" phx-click="cancel_delete">Cancel</.button>
         <.button
           id="dangerous-delete-submit"
           type="submit"
           form={"#{@id}-form"}
           variant="danger"
+          icon="ph-trash"
           disabled={@confirmation_value != @item_name}
         >
-          <.icon name="ph-trash" class="size-4" /> Delete permanently
+          Delete permanently
         </.button>
-      </:footer>
-    </.modal>
+      </:actions>
+    </.dialog>
     """
   end
 
@@ -1103,10 +1253,10 @@ defmodule GallformersWeb.FormComponents do
   attr :expand_group_event, :string, required: true
   attr :select_all_event, :string, required: true
   attr :deselect_all_event, :string, required: true
-  attr :container_class, :string, default: "border border-gray-200 rounded-lg p-3"
-  attr :text_class, :string, default: "text-gray-700"
-  attr :heading_class, :string, default: "text-gray-700"
-  attr :checkbox_class, :string, default: "text-gf-maroon focus:ring-gf-maroon"
+  attr :container_class, :string, default: "rounded-panel border border-line p-3"
+  attr :text_class, :string, default: "text-ink-2"
+  attr :heading_class, :string, default: "text-ink-2"
+  attr :checkbox_class, :string, default: ""
   attr :target, :any, default: nil, doc: "phx-target for events (use @myself for LiveComponents)"
 
   slot :group_footer, doc: "optional per-group content rendered when group is expanded"
@@ -1137,7 +1287,7 @@ defmodule GallformersWeb.FormComponents do
           type="button"
           phx-click={if @all_selected, do: @deselect_all_event, else: @select_all_event}
           phx-target={@target}
-          class={"text-xs #{@text_class} hover:underline"}
+          class={"text-caption #{@text_class} hover:underline"}
         >
           {if @all_selected, do: "Deselect all", else: "Select all"}
         </button>
@@ -1155,18 +1305,18 @@ defmodule GallformersWeb.FormComponents do
               phx-click={@toggle_group_event}
               phx-target={@target}
               phx-value-group={to_string(group.id)}
-              class={"rounded border-gray-300 #{@checkbox_class}"}
+              class={"gf-checkbox #{@checkbox_class}"}
             />
             <button
               type="button"
               phx-click={@expand_group_event}
               phx-target={@target}
               phx-value-group={to_string(group.id)}
-              class={"flex items-center gap-1 text-xs font-medium #{@heading_class} hover:underline"}
+              class={"flex items-center gap-1 text-caption font-medium #{@heading_class} hover:underline"}
             >
               <span class="w-3 text-center">{if gs.expanded, do: "▾", else: "▸"}</span>
               {group.label}
-              <span class="font-normal text-gray-500">
+              <span class="font-normal text-muted">
                 ({gs.selected_count}/{gs.total_count})
               </span>
             </button>
@@ -1179,9 +1329,9 @@ defmodule GallformersWeb.FormComponents do
                 phx-click={@toggle_item_event}
                 phx-target={@target}
                 phx-value-id={to_string(item.id)}
-                class={"rounded border-gray-300 #{@checkbox_class}"}
+                class={"gf-checkbox #{@checkbox_class}"}
               />
-              <span class="text-xs">{item.label}</span>
+              <span class="text-caption">{item.label}</span>
             </label>
             {render_slot(@group_footer, group)}
           </div>

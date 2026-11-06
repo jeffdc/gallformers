@@ -18,19 +18,33 @@ defmodule GallformersWeb.ReviewComponents do
   each defined (Traits step). `review_row/1` is the older compact row with actions, which the
   vocabulary page uses.
 
-  Built from the site's styles (`gf-card`, `gf-badge`, Tailwind) and the
-  core components; the review LiveViews (`GallformersWeb.Admin.ReviewLive`)
-  use them.
+  Built from the design system's components (`panel`, `chip`, `notice`,
+  `button`, `search_field`, `source_quote`) and its tokens
+  (docs/design-system/); the review LiveViews
+  (`GallformersWeb.Admin.ReviewLive`) use them.
   """
   use Phoenix.Component
   use GallformersWeb, :verified_routes
 
-  import GallformersWeb.CoreComponents, only: [badge: 1, button: 1, chip: 1, icon: 1]
-  import GallformersWeb.FormComponents, only: [search_input: 1]
+  import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.ActionComponents, only: [button: 1]
+  import GallformersWeb.DataComponents, only: [chip: 1]
+  import GallformersWeb.DomainComponents, only: [source_quote: 1]
+  import GallformersWeb.FeedbackComponents, only: [notice: 1]
+  import GallformersWeb.FormComponents, only: [search_field: 1]
+  import GallformersWeb.PageComponents, only: [panel: 1]
 
-  # The question row's columns: the chevron, the Source's words, an arrow,
-  # the answer (the design's `.item-row`).
-  @question_cols "md:grid-cols-[1.1rem_minmax(12rem,1.2fr)_1.4rem_minmax(12rem,1.5fr)]"
+  # The rows' columns, as flex items so the column heads line up with the
+  # rows: a question row (`review_question_row/1`: the chevron, the Source's
+  # words, an arrow, the answer, 1.2 : 1.5) and an older row (`review_row/1`:
+  # the Source's words, an arrow, the answer, 1.1 : 1.6, the actions).
+  @q_chevron "w-4.5 shrink-0"
+  @q_written "min-w-0 flex-1 md:min-w-48 md:flex-4"
+  @q_arrow "hidden md:block w-5.5 shrink-0"
+  @q_answer "min-w-0 basis-full pl-7.5 md:pl-0 md:min-w-48 md:flex-5"
+  @r_written "md:min-w-40 md:flex-11"
+  @r_arrow "hidden md:block w-5.5 shrink-0"
+  @r_answer "min-w-0 md:min-w-48 md:flex-16"
 
   @doc """
   A section of questions: a card whose header (title, count, explanation,
@@ -68,63 +82,73 @@ defmodule GallformersWeb.ReviewComponents do
   slot :inner_block, required: true, doc: "the rows"
 
   def review_section(assigns) do
-    assigns = assign(assigns, question_cols: @question_cols)
+    assigns =
+      assign(assigns,
+        q: %{chevron: @q_chevron, written: @q_written, arrow: @q_arrow, answer: @q_answer},
+        r: %{written: @r_written, arrow: @r_arrow, answer: @r_answer}
+      )
 
     ~H"""
-    <section id={@id} class="gf-card mt-4 overflow-hidden">
-      <div
-        class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 border-b border-gray-200 cursor-pointer"
-        phx-click={@on_toggle}
-        phx-value-section={@section}
-        data-role="section-head"
-      >
-        <.icon
-          name="ph-caret-down"
-          class={["size-4 text-gray-500 transition-transform", @closed && "-rotate-90"]}
-        />
-        <div class="flex-1 min-w-[16rem]">
-          <h2 class="text-lg font-semibold text-gray-900">
-            {@title} <span class="font-medium text-gray-500 tabular-nums">{@count}</span>
-          </h2>
-          <p :if={@explanation} class="text-sm text-gray-500">{@explanation}</p>
+    <section id={@id} class="mt-4">
+      <.panel padding={:none} class="overflow-hidden">
+        <div>
+          <div
+            class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 border-b border-line cursor-pointer"
+            phx-click={@on_toggle}
+            phx-value-section={@section}
+            data-role="section-head"
+          >
+            <.icon
+              name="ph-caret-down"
+              class={["size-4 text-muted transition-transform", @closed && "-rotate-90"]}
+            />
+            <div class="flex-1 min-w-64">
+              <h2 class="text-subsection text-ink">
+                {@title} <span class="font-medium text-muted tabular-nums">{@count}</span>
+              </h2>
+              <p :if={@explanation} class="text-meta text-muted">{@explanation}</p>
+            </div>
+            <%= cond do %>
+              <% @done -> %>
+                <.chip variant={:ok}>Done</.chip>
+              <% @holds_approval -> %>
+                <.chip variant={:warn}>{@holds}</.chip>
+              <% @holds -> %>
+                <.review_tag>{@holds}</.review_tag>
+              <% true -> %>
+            <% end %>
+            {render_slot(@actions)}
+          </div>
+          <div :if={!@closed and @confirm != []}>{render_slot(@confirm)}</div>
+          <div
+            :if={!@closed and @layout == :row}
+            data-role="columns"
+            class={[
+              "hidden md:flex gap-x-3 px-4 py-1 bg-surface-2 border-b border-line",
+              "text-caption font-semibold uppercase tracking-wide text-muted"
+            ]}
+          >
+            <span class={@r.written}>The Source wrote</span>
+            <span class={@r.arrow} aria-hidden="true"></span>
+            <span class={@r.answer}>Gallformers proposes</span>
+            <span></span>
+          </div>
+          <div
+            :if={!@closed and @layout == :question}
+            data-role="columns"
+            class={[
+              "hidden md:flex gap-x-3 px-4 py-1 bg-surface-2 border-b border-line",
+              "text-caption font-semibold uppercase tracking-wide text-muted"
+            ]}
+          >
+            <span class={@q.chevron} aria-hidden="true"></span>
+            <span class={@q.written}>The Source wrote</span>
+            <span class={@q.arrow} aria-hidden="true"></span>
+            <span class={@q.answer}>Answer</span>
+          </div>
+          <div :if={!@closed} class="divide-y divide-line">{render_slot(@inner_block)}</div>
         </div>
-        <%= cond do %>
-          <% @done -> %>
-            <.badge variant="success">Done</.badge>
-          <% @holds_approval -> %>
-            <.badge variant="warning">{@holds}</.badge>
-          <% @holds -> %>
-            <.review_tag>{@holds}</.review_tag>
-          <% true -> %>
-        <% end %>
-        {render_slot(@actions)}
-      </div>
-      <div :if={!@closed and @confirm != []}>{render_slot(@confirm)}</div>
-      <div
-        :if={!@closed and @layout == :row}
-        data-role="columns"
-        class="hidden md:grid md:grid-cols-[minmax(10rem,1.1fr)_1.4rem_minmax(12rem,1.6fr)_auto] gap-x-3 px-4 py-1 bg-gray-50 border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-500"
-      >
-        <span>The Source wrote</span>
-        <span aria-hidden="true"></span>
-        <span>Gallformers proposes</span>
-        <span></span>
-      </div>
-      <div
-        :if={!@closed and @layout == :question}
-        data-role="columns"
-        class={[
-          "hidden md:grid gap-x-3 px-4 py-1 bg-gray-50 border-b border-gray-200",
-          "text-xs font-semibold uppercase tracking-wide text-gray-500",
-          @question_cols
-        ]}
-      >
-        <span aria-hidden="true"></span>
-        <span>The Source wrote</span>
-        <span aria-hidden="true"></span>
-        <span>Answer</span>
-      </div>
-      <div :if={!@closed} class="divide-y divide-gray-200">{render_slot(@inner_block)}</div>
+      </.panel>
     </section>
     """
   end
@@ -149,29 +173,32 @@ defmodule GallformersWeb.ReviewComponents do
   slot :inner_block, doc: "shown under the row whether open or not (an error, say)"
 
   def review_row(assigns) do
+    assigns = assign(assigns, r: %{written: @r_written, arrow: @r_arrow, answer: @r_answer})
+
     ~H"""
     <div id={@id} class={[@decided && "opacity-75"]}>
       <div
         id={"#{@id}-row"}
         class={[
-          "grid grid-cols-1 md:grid-cols-[minmax(10rem,1.1fr)_1.4rem_minmax(12rem,1.6fr)_auto]",
-          "items-center gap-x-3 gap-y-1 px-4 py-2 hover:bg-gray-50",
+          "flex flex-col md:flex-row md:items-center gap-x-3 gap-y-1 px-4 py-2 hover:bg-sky-soft",
           @on_toggle && "cursor-pointer"
         ]}
         phx-click={@on_toggle}
         phx-target={@target}
         data-role="row"
       >
-        <div class="font-semibold text-gray-900 break-words">{render_slot(@written)}</div>
-        <div class="hidden md:block text-center text-gray-400" aria-hidden="true">→</div>
-        <div class="min-w-0">{render_slot(@answer)}</div>
+        <div class={["font-semibold text-ink break-words", @r.written]}>
+          {render_slot(@written)}
+        </div>
+        <div class={["text-center text-muted", @r.arrow]} aria-hidden="true">→</div>
+        <div class={@r.answer}>{render_slot(@answer)}</div>
         <div class="flex flex-wrap gap-1.5 md:justify-end">{render_slot(@actions)}</div>
       </div>
       {render_slot(@inner_block)}
       <div
         :if={@open and @detail != []}
         id={"#{@id}-detail"}
-        class="grid gap-3 px-4 pt-1 pb-4 bg-gray-50 border-t border-dashed border-gray-200"
+        class="grid gap-3 px-4 pt-1 pb-4 bg-surface-2 border-t border-dashed border-line"
       >
         {render_slot(@detail)}
       </div>
@@ -184,9 +211,7 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_tag(assigns) do
     ~H"""
-    <span class="gf-badge bg-gray-50 text-gray-600 border border-gray-200">
-      {render_slot(@inner_block)}
-    </span>
+    <.chip variant={:neutral}>{render_slot(@inner_block)}</.chip>
     """
   end
 
@@ -211,36 +236,33 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_quote(assigns) do
     ~H"""
-    <blockquote class="bg-orange-50/60 border-l-4 border-gf-autumn rounded-r-md px-3 py-2 text-sm text-gray-700">
-      <%= if @text do %>
-        “{@text}”
-      <% else %>
-        <span class="italic text-gray-500">The whole passage</span>
-      <% end %>
-      <span :if={@where} class="block text-xs text-gray-500 mt-0.5">{@where}</span>
+    <.source_quote>
+      <span :if={@text}>“{@text}”</span>
+      <span :if={!@text} class="font-sans italic text-muted">The whole passage</span>
+      <span :if={@where} class="block font-sans text-caption text-muted">{@where}</span>
       <details
         :if={@passage != []}
-        class="group mt-1 text-xs"
+        class="group font-sans text-caption"
         data-role="passage"
         open={@passage_open}
       >
-        <summary class="cursor-pointer text-gf-maroon">
+        <summary class="cursor-pointer text-link">
           <span class="group-open:hidden">Show the passage</span>
           <span class="hidden group-open:inline">Hide the passage</span>
         </summary>
-        <div class="mt-1 text-sm">{render_slot(@passage)}</div>
+        <div class="mt-1 text-ui">{render_slot(@passage)}</div>
       </details>
       <button
         :if={@passage == [] and @on_passage != nil}
         type="button"
-        class="block mt-1 text-xs text-gf-maroon hover:underline"
+        class="block self-start font-sans text-caption text-link hover:underline"
         data-role="show-passage"
         phx-click={@on_passage}
         phx-value-key={@passage_key}
       >
         Show the passage
       </button>
-    </blockquote>
+    </.source_quote>
     """
   end
 
@@ -260,9 +282,11 @@ defmodule GallformersWeb.ReviewComponents do
       )
 
     ~H"""
-    <div class={["flex h-1.5 rounded-full bg-gray-200 overflow-hidden", @class]} aria-hidden="true">
-      <span class="block h-full bg-green-700" style={"width: #{@done_pct}%"}></span>
-      <span class="block h-full bg-cadet-blue" style={"width: #{@proposed_pct}%"}></span>
+    <div class={["h-1.5 rounded-full bg-line overflow-hidden", @class]} aria-hidden="true">
+      <svg width="100%" height="100%" class="block" preserveAspectRatio="none">
+        <rect width={"#{@done_pct}%"} height="100%" class="fill-ok" />
+        <rect x={"#{@done_pct}%"} width={"#{@proposed_pct}%"} height="100%" class="fill-info" />
+      </svg>
     </div>
     """
   end
@@ -292,8 +316,8 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_stat(assigns) do
     ~H"""
-    <span class="bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1 text-sm text-gray-700">
-      <b class="tabular-nums text-gray-900">{@value}</b> {@label}
+    <span class="rounded-ctl border border-line bg-surface-2 px-2.5 py-1 text-ui text-ink-2">
+      <b class="tabular-nums text-ink">{@value}</b> {@label}
     </span>
     """
   end
@@ -312,14 +336,18 @@ defmodule GallformersWeb.ReviewComponents do
   def review_voices(assigns) do
     ~H"""
     <div :if={@checker != [] or @producer != []} id={@id} class="grid md:grid-cols-2 gap-3">
-      <div class="bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700">
-        <h4 class="text-xs uppercase tracking-wider text-gray-500 mb-1">{@producer_title}</h4>
-        <p :for={text <- @producer}>{text}</p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700">
-        <h4 class="text-xs uppercase tracking-wider text-gray-500 mb-1">{@checker_title}</h4>
-        <p :for={text <- @checker}>{text}</p>
-      </div>
+      <.panel>
+        <div class="text-ui text-ink-2">
+          <h4 class="text-caption uppercase tracking-wider text-muted mb-1">{@producer_title}</h4>
+          <p :for={text <- @producer}>{text}</p>
+        </div>
+      </.panel>
+      <.panel>
+        <div class="text-ui text-ink-2">
+          <h4 class="text-caption uppercase tracking-wider text-muted mb-1">{@checker_title}</h4>
+          <p :for={text <- @checker}>{text}</p>
+        </div>
+      </.panel>
     </div>
     """
   end
@@ -330,14 +358,13 @@ defmodule GallformersWeb.ReviewComponents do
   def review_definitions(assigns) do
     ~H"""
     <div :if={@definitions != []} class="grid sm:grid-cols-2 gap-3" data-role="definitions">
-      <div
-        :for={d <- @definitions}
-        class="bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700"
-      >
-        <span :if={d.who} class="text-xs uppercase tracking-wider text-gray-500">{d.who}</span>
-        <b class="block text-gray-900">{d.value}</b>
-        {d.definition}
-      </div>
+      <.panel :for={d <- @definitions}>
+        <div class="text-ui text-ink-2">
+          <span :if={d.who} class="text-caption uppercase tracking-wider text-muted">{d.who}</span>
+          <b class="block text-ink">{d.value}</b>
+          {d.definition}
+        </div>
+      </.panel>
     </div>
     """
   end
@@ -357,25 +384,31 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_term_gall(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class="grid md:grid-cols-[minmax(12rem,2fr)_minmax(10rem,1fr)] gap-x-3 gap-y-2 bg-white border border-gray-200 rounded-md px-3 py-2"
-    >
-      <div class="grid gap-1.5 min-w-0">
-        <b class="text-gray-900 break-words">{@name}</b>
-        <.review_quote :for={quote <- @quotes} text={quote.text}>
-          <:passage :if={@passage != []}>{render_slot(@passage, quote)}</:passage>
-        </.review_quote>
-        <ul class="text-sm text-gray-700 grid gap-0.5">
-          <li :for={line <- @said}>{line}</li>
-        </ul>
+    <.panel id={@id}>
+      <div class="flex flex-col md:flex-row gap-x-3 gap-y-2">
+        <div class="grid gap-1.5 min-w-0 md:min-w-48 md:flex-2">
+          <b class="text-ink break-words">{@name}</b>
+          <.review_quote :for={quote <- @quotes} text={quote.text}>
+            <:passage :if={@passage != []}>{render_slot(@passage, quote)}</:passage>
+          </.review_quote>
+          <ul class="text-ui text-ink-2 grid gap-0.5">
+            <li :for={line <- @said}>{line}</li>
+          </ul>
+        </div>
+        <div :if={@inner_block != []} class="grid content-start gap-1 md:min-w-40 md:flex-1">
+          {render_slot(@inner_block)}
+        </div>
       </div>
-      <div :if={@inner_block != []} class="grid content-start gap-1">
-        {render_slot(@inner_block)}
-      </div>
-    </div>
+    </.panel>
     """
   end
+
+  # The comparison tables' cells, in the look of `data_table/1` (which can't
+  # hold their tinted first row, marked rows or a cell across two columns).
+  @table_th "whitespace-nowrap border-b border-line-strong bg-surface-2 px-3 py-1.5 text-left " <>
+              "text-caption font-semibold uppercase tracking-wide text-muted"
+  @table_tr "border-b border-line last:border-b-0"
+  @table_td "px-3 py-1.5 align-top"
 
   @doc """
   A name several species hold, compared: what the Source says in the first
@@ -387,48 +420,47 @@ defmodule GallformersWeb.ReviewComponents do
   attr :candidates, :list, required: true
 
   def review_comparison(assigns) do
+    assigns = assign(assigns, th: @table_th, tr: @table_tr, td: @table_td)
+
     ~H"""
-    <div id={@id} data-role="comparison" class="overflow-x-auto">
-      <table class="gf-table gf-table-compact bg-white">
+    <div
+      id={@id}
+      data-role="comparison"
+      class="overflow-x-auto rounded-panel border border-line bg-surface"
+    >
+      <table class="w-full border-collapse text-ui text-ink">
         <thead>
           <tr>
-            <th>Species</th>
-            <th>Holds the name as</th>
-            <th>Hosts in Gallformers</th>
-            <th>Its Galls</th>
+            <th class={@th}>Species</th>
+            <th class={@th}>Holds the name as</th>
+            <th class={@th}>Hosts in Gallformers</th>
+            <th class={@th}>Its Galls</th>
           </tr>
         </thead>
         <tbody>
-          <tr class="bg-orange-50/60">
-            <td><b>{@source.who}</b></td>
-            <td>{@source.written}</td>
-            <td></td>
-            <td>{@source.quote && "“#{@source.quote}”"}</td>
-          </tr>
-          <tr :for={c <- @candidates}>
-            <td>
-              <a
-                href={~p"/admin/taxonomy/#{c.taxon_id}"}
-                class="italic text-gf-maroon hover:underline"
-              >
-                {c.name}
-              </a>
-              <span :if={c.authorship} class="text-gray-500">{c.authorship}</span>
+          <tr class={["bg-sky-soft", @tr]}>
+            <td class={@td}><b>{@source.who}</b></td>
+            <td class={@td}>{@source.written}</td>
+            <td class={@td}></td>
+            <td class={["font-serif text-ink-2", @td]}>
+              {@source.quote && "“#{@source.quote}”"}
             </td>
-            <td>{c.names |> Enum.map(& &1.name) |> Enum.join(", ")}</td>
-            <td>
+          </tr>
+          <tr :for={c <- @candidates} class={@tr}>
+            <td class={@td}>
+              <a href={~p"/admin/taxonomy/#{c.taxon_id}"} class="italic">{c.name}</a>
+              <span :if={c.authorship} class="text-muted">{c.authorship}</span>
+            </td>
+            <td class={@td}>{c.names |> Enum.map(& &1.name) |> Enum.join(", ")}</td>
+            <td class={@td}>
               {c.galls
               |> Enum.flat_map(& &1.hosts)
               |> Enum.map(& &1.name)
               |> Enum.uniq()
               |> Enum.join(", ")}
             </td>
-            <td>
-              <a
-                :for={gall <- c.galls}
-                href={~p"/gall/#{gall.gall_id}"}
-                class="block text-gf-maroon hover:underline"
-              >
+            <td class={@td}>
+              <a :for={gall <- c.galls} href={~p"/gall/#{gall.gall_id}"} class="block">
                 {gall.name}
               </a>
             </td>
@@ -444,9 +476,9 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_technical(assigns) do
     ~H"""
-    <details class="text-xs text-gray-500">
+    <details class="text-caption text-muted">
       <summary class="cursor-pointer">Technical details</summary>
-      <code class="text-xs">{@text}</code>
+      <code class="text-caption">{@text}</code>
     </details>
     """
   end
@@ -465,7 +497,7 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_identity(assigns) do
     ~H"""
-    <span class="block text-sm text-gray-600" data-role="identity">
+    <span class="block text-meta text-ink-2" data-role="identity">
       <%= if @identity.galls do %>
         <span class="font-medium">{@identity.family || "Family not recorded"}</span>
         · {galls_text(@identity)}
@@ -474,20 +506,14 @@ defmodule GallformersWeb.ReviewComponents do
       <% end %>
       <span :if={@identity.path}>
         ·
-        <a
-          href={@identity.path}
-          target="_blank"
-          rel="noopener"
-          class="text-gf-maroon hover:underline"
-          data-role="open"
-        >
+        <a href={@identity.path} target="_blank" rel="noopener" data-role="open">
           Open ↗
         </a>
       </span>
     </span>
     <span
       :if={@identity.synonyms != []}
-      class="block text-xs text-gray-500"
+      class="block text-caption text-muted"
       data-role="also-holds"
     >
       Also holds: {also_holds(@identity.synonyms)}
@@ -527,11 +553,11 @@ defmodule GallformersWeb.ReviewComponents do
     ~H"""
     <span
       class={[
-        "block text-sm font-medium",
+        "block text-meta font-medium",
         case @holding.kind do
-          :yes -> "text-green-800"
-          :near -> "text-amber-800"
-          :no -> "text-gray-600"
+          :yes -> "text-ok"
+          :near -> "text-warn"
+          :no -> "text-ink-2"
         end
       ]}
       data-role="alias"
@@ -559,22 +585,17 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_wcvp_panel(assigns) do
     ~H"""
-    <div
-      id={@id}
-      data-role="wcvp"
-      class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-gray-700"
-    >
-      <b>WCVP</b>
+    <.notice id={@id} data-role="wcvp" kind={:info}>
+      <b class="text-ink">WCVP</b>
       <%= cond do %>
         <% @host == nil -> %>
-          <span class="italic text-gray-500">is being looked up…</span>
+          <span class="italic text-muted">is being looked up…</span>
         <% @host.wcvp == nil -> %>
           doesn't hold “{@written}” or a near spelling. Search the web:
           <a
             href={"https://powo.science.kew.org/results?q=#{URI.encode_www_form(@written)}"}
             target="_blank"
             rel="noopener"
-            class="text-gf-maroon hover:underline"
           >
             POWO ↗
           </a>
@@ -583,7 +604,6 @@ defmodule GallformersWeb.ReviewComponents do
             href={"https://www.ipni.org/?q=#{URI.encode_www_form(@written)}"}
             target="_blank"
             rel="noopener"
-            class="text-gf-maroon hover:underline"
           >
             IPNI ↗
           </a>
@@ -595,12 +615,11 @@ defmodule GallformersWeb.ReviewComponents do
             href={~p"/admin/taxonomy/#{@host.held.taxon_id}"}
             target="_blank"
             rel="noopener"
-            class="text-gf-maroon hover:underline"
           >
             Open ↗
           </a>
       <% end %>
-    </div>
+    </.notice>
     """
   end
 
@@ -615,14 +634,9 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_new_plant(assigns) do
     ~H"""
-    <p id={@id} data-role="new-plant" class="text-sm text-gray-600">
+    <p id={@id} data-role="new-plant" class="text-ui text-ink-2">
       Not in Gallformers or WCVP?
-      <a
-        href={new_plant_href(@prefill)}
-        target="_blank"
-        rel="noopener"
-        class="text-gf-maroon hover:underline"
-      >
+      <a href={new_plant_href(@prefill)} target="_blank" rel="noopener">
         Create a new plant ↗
       </a>
       (opens in a new tab), then search for it here.
@@ -688,51 +702,45 @@ defmodule GallformersWeb.ReviewComponents do
   attr :comparison, :map, required: true
 
   def review_gall_comparison(assigns) do
+    assigns = assign(assigns, th: @table_th, tr: @table_tr, td: @table_td)
+
     ~H"""
     <div id={@id} data-role="gall-comparison" class="grid gap-1">
       <span
         :if={@comparison.quoted_in}
-        class="text-sm font-medium text-green-800"
+        class="text-meta font-medium text-ok"
         data-role="quoted"
       >
         {@comparison.quoted_in}
       </span>
-      <span class="text-sm text-gray-600" data-role="gall-meta">
-        {@comparison.meta} ·
-        <a
-          href={@comparison.path}
-          target="_blank"
-          rel="noopener"
-          class="text-gf-maroon hover:underline"
-        >
-          Open ↗
-        </a>
+      <span class="text-meta text-ink-2" data-role="gall-meta">
+        {@comparison.meta} · <a href={@comparison.path} target="_blank" rel="noopener">Open ↗</a>
       </span>
-      <div class="overflow-x-auto">
-        <table class="gf-table gf-table-compact bg-white text-sm">
+      <div class="overflow-x-auto rounded-panel border border-line bg-surface">
+        <table class="w-full border-collapse text-ui text-ink">
           <thead>
             <tr>
-              <th></th>
-              <th>{@comparison.who}</th>
-              <th>{@comparison.gall}</th>
-              <th></th>
+              <th class={@th}></th>
+              <th class={@th}>{@comparison.who}</th>
+              <th class={@th}>{@comparison.gall}</th>
+              <th class={@th}></th>
             </tr>
           </thead>
           <tbody>
-            <tr :for={row <- @comparison.rows} data-mark={row.mark}>
-              <td class="font-medium text-gray-600">{row.label}</td>
-              <td>{row.source || not_stated("not stated")}</td>
-              <td>{row.gall || not_stated("not recorded")}</td>
-              <td class={["whitespace-nowrap", mark_class(row.mark)]} data-role="mark">
+            <tr :for={row <- @comparison.rows} data-mark={row.mark} class={@tr}>
+              <td class={["font-medium text-ink-2", @td]}>{row.label}</td>
+              <td class={@td}>{row.source || not_stated("not stated")}</td>
+              <td class={@td}>{row.gall || not_stated("not recorded")}</td>
+              <td class={["whitespace-nowrap", mark_class(row.mark), @td]} data-role="mark">
                 {mark_text(row.mark)}
               </td>
             </tr>
-            <tr>
-              <td class="font-medium text-gray-600">Description</td>
-              <td class="text-gray-700">
+            <tr class={@tr}>
+              <td class={["font-medium text-ink-2", @td]}>Description</td>
+              <td class={["font-serif text-ink-2", @td]}>
                 {description_text(elem(@comparison.description, 0), "not stated")}
               </td>
-              <td class="text-gray-700" colspan="2">
+              <td class={["text-ink-2", @td]} colspan="2">
                 {description_text(elem(@comparison.description, 1), "no description")}
               </td>
             </tr>
@@ -744,17 +752,17 @@ defmodule GallformersWeb.ReviewComponents do
   end
 
   defp not_stated(text),
-    do: Phoenix.HTML.raw(~s(<span class="italic text-gray-400">#{text}</span>))
+    do: Phoenix.HTML.raw(~s(<span class="font-sans italic text-muted">#{text}</span>))
 
   defp mark_text(:agree), do: "✓ agrees"
   defp mark_text(:differ), do: "≠ differs"
   defp mark_text(:conflict), do: "⚠ conflicts"
   defp mark_text(_none), do: "not stated"
 
-  defp mark_class(:agree), do: "text-green-800"
-  defp mark_class(:differ), do: "text-amber-800"
-  defp mark_class(:conflict), do: "text-red-700 font-semibold"
-  defp mark_class(_none), do: "text-gray-400"
+  defp mark_class(:agree), do: "text-ok"
+  defp mark_class(:differ), do: "text-warn"
+  defp mark_class(:conflict), do: "text-danger font-semibold"
+  defp mark_class(_none), do: "text-muted"
 
   @description_length 220
 
@@ -787,11 +795,11 @@ defmodule GallformersWeb.ReviewComponents do
         :for={{value, label} <- @options}
         for={"#{@id}-#{value}"}
         class={[
-          "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm cursor-pointer",
+          "inline-flex items-center gap-1.5 rounded-ctl border px-2.5 py-1 text-ui cursor-pointer",
           cond do
-            @value == value -> "border-gf-maroon bg-gf-maroon/5 text-gray-900"
-            @recommended == value -> "border-gf-maroon bg-white text-gf-maroon"
-            true -> "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+            @value == value -> "border-brand bg-brand/5 text-ink"
+            @recommended == value -> "border-brand bg-surface text-brand"
+            true -> "border-line-strong bg-surface text-ink-2 hover:border-brand"
           end
         ]}
         data-recommended={@recommended == value || nil}
@@ -802,7 +810,7 @@ defmodule GallformersWeb.ReviewComponents do
           name={@id}
           value={value}
           checked={@value == value}
-          class="gf-radio"
+          class="size-4 shrink-0 accent-brand-fill"
           phx-click={@on_pick}
           phx-value-key={@key}
           phx-value-value={value}
@@ -811,7 +819,7 @@ defmodule GallformersWeb.ReviewComponents do
         {label}
         <span
           :if={@recommended == value}
-          class="text-[0.66rem] font-bold uppercase tracking-wider text-gf-maroon"
+          class="text-caption font-bold uppercase tracking-wider text-brand"
         >
           rec.
         </span>
@@ -840,17 +848,13 @@ defmodule GallformersWeb.ReviewComponents do
   def review_settle_list(assigns) do
     ~H"""
     <div id={@id} class="grid gap-2" data-role="settle">
-      <p class="text-sm text-gray-600">
+      <p class="text-ui text-ink-2">
         {@who} disagrees with this Gall on {length(@statements)} {if length(@statements) == 1,
           do: "statement",
           else: "statements"}. For each, keep it or leave it out. A statement left out never becomes a Fact; the quote stays in {@who}'s text.
       </p>
-      <div
-        :for={s <- @statements}
-        id={"#{@id}-#{s.key}"}
-        class="grid gap-1.5 rounded-md border border-gray-200 px-3 py-2"
-      >
-        <span class="text-sm font-medium text-gray-800">{s.label}</span>
+      <.panel :for={s <- @statements} id={"#{@id}-#{s.key}"}>
+        <span class="text-ui font-medium text-ink">{s.label}</span>
         <.review_segmented
           id={"#{@id}-#{s.key}-choice"}
           key={s.key}
@@ -862,9 +866,9 @@ defmodule GallformersWeb.ReviewComponents do
         />
         <div :if={@settled[s.key] == "other"} class="grid gap-1">
           {render_slot(@reading)}
-          <span :if={s.note} class="text-xs text-gray-500">{s.note}</span>
+          <span :if={s.note} class="text-caption text-muted">{s.note}</span>
         </div>
-      </div>
+      </.panel>
     </div>
     """
   end
@@ -886,8 +890,7 @@ defmodule GallformersWeb.ReviewComponents do
   `{:ready, later}`, nothing holds it and `later` names what stays open
   ("3 trait terms"); `:resolving`; or `:none`. With `confirm`, Approve asks
   first, in place. The events are `approve_ask`, `approve_cancel` and
-  `approve`. It sticks under the site header, which is sticky itself and
-  78px tall (as `GallformersWeb.KeyComponents.path_tracker/1`).
+  `approve`. It sticks under the admin top bar (`top-admin-bar`).
   """
   attr :id, :string, default: "step-bar"
   attr :base, :string, required: true, doc: "the overview's path; a step's is `base/slug`"
@@ -901,10 +904,11 @@ defmodule GallformersWeb.ReviewComponents do
     <nav
       id={@id}
       aria-label="Steps for this Source"
-      class="sticky top-[78px] z-40 mt-4 py-2 bg-gray-100/95 backdrop-blur border-b border-gray-200"
+      class="sticky top-admin-bar z-20 mt-4 py-2 bg-surface-2/95 backdrop-blur border-b border-line"
+      data-sticky-chrome
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div class="flex flex-wrap gap-1.5 flex-1 min-w-0">
+        <div class="flex flex-wrap gap-1.5 flex-1 min-w-64">
           <.link
             id={"#{@id}-overview"}
             navigate={@base}
@@ -924,7 +928,7 @@ defmodule GallformersWeb.ReviewComponents do
               :if={s.holding > 0}
               data-role="holds"
               title="Holds approval"
-              class="inline-block size-2 rounded-full bg-gf-autumn"
+              class="inline-block size-2 rounded-full bg-autumn"
             >
             </span>
             {s.step.n} · {s.step.title}
@@ -932,10 +936,10 @@ defmodule GallformersWeb.ReviewComponents do
               :if={s.left > 0}
               data-role="left"
               class={[
-                "px-1.5 rounded-full text-xs tabular-nums border",
+                "px-1.5 rounded-full text-caption tabular-nums border",
                 if(@current == s.step.id,
-                  do: "border-white/50",
-                  else: "bg-gray-50 border-gray-200 text-gray-700"
+                  do: "border-on-fill/50",
+                  else: "bg-surface-2 border-line text-ink-2"
                 )
               ]}
             >
@@ -945,7 +949,7 @@ defmodule GallformersWeb.ReviewComponents do
               :if={s.left == 0}
               data-role="done"
               aria-label="done"
-              class={["font-bold", @current != s.step.id && "text-green-700"]}
+              class={["font-bold", @current != s.step.id && "text-ok"]}
             >
               ✓
             </span>
@@ -957,16 +961,16 @@ defmodule GallformersWeb.ReviewComponents do
             title="Every Fact approving would write"
             class={[step_class(@current == :facts), "border-dashed"]}
           >
-            <.icon name="ph-list-checks" class="size-4" /> Facts
-            <span class={["text-xs", @current != :facts && "text-gray-500"]}>optional</span>
+            <.icon name="ph-list" class="size-4" /> Facts
+            <span class={["text-caption", @current != :facts && "text-muted"]}>optional</span>
           </.link>
         </div>
         <div id={"#{@id}-approve"} class="flex items-center gap-2 md:ml-auto">
           <%= case @approval do %>
             <% :approved -> %>
-              <.badge variant="success">Approved</.badge>
+              <.chip variant={:ok}>Approved</.chip>
             <% {:waiting, titles} -> %>
-              <span id="approve-wait" class="text-sm text-gray-500 max-w-xs md:text-right">
+              <span id="approve-wait" class="text-meta text-muted max-w-xs md:text-right">
                 Approve appears once {and_list(titles)} {if length(titles) == 1,
                   do: "is",
                   else: "are"} settled
@@ -976,46 +980,46 @@ defmodule GallformersWeb.ReviewComponents do
                 Approve…
               </.button>
             <% :resolving -> %>
-              <span class="text-sm text-gray-500">Resolving: Approve waits for it</span>
+              <span class="text-meta text-muted">Resolving: Approve waits for it</span>
             <% :none -> %>
           <% end %>
         </div>
       </div>
-      <p class="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
-        <span class="inline-block size-2 rounded-full bg-gf-autumn" aria-hidden="true"></span>
+      <p class="mt-1 flex items-center gap-1.5 text-caption text-muted">
+        <span class="inline-block size-2 rounded-full bg-autumn" aria-hidden="true"></span>
         Holds approval until settled
       </p>
-      <div
+      <.notice
         :if={@confirm and match?({:ready, _}, @approval)}
         id="approve-confirm"
-        class="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-900"
+        kind={:warn}
+        class="mt-2"
       >
-        <span class="flex-1 min-w-[16rem]">
-          Approving applies this Source's Facts to Gallformers.{later_text(@approval)}
-        </span>
-        <.button id="approve" phx-click="approve" variant="primary">Approve and apply</.button>
-        <.button id="approve-cancel" phx-click="approve_cancel" variant="ghost">Cancel</.button>
-      </div>
-      <div
-        :if={@approval == :approved}
-        class="mt-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
-      >
+        Approving applies this Source's Facts to Gallformers.{later_text(@approval)}
+        <:action>
+          <.button id="approve" phx-click="approve" variant="primary">Approve and apply</.button>
+          <.button id="approve-cancel" phx-click="approve_cancel" variant="ghost">Cancel</.button>
+        </:action>
+      </.notice>
+      <.notice :if={@approval == :approved} kind={:ok} class="mt-2">
         Approved: its Facts are applied by the import worker. Open Traits and Hedges stay on
         this Source's pages and can be settled any time.
-      </div>
+      </.notice>
     </nav>
     """
   end
 
+  @step_base "inline-flex items-center gap-1.5 px-2.5 py-1 whitespace-nowrap rounded-ctl border text-meta"
+
+  # The current step keeps `gf-step-current` (its label stays white over the
+  # brand fill, not link blue).
   defp step_class(true),
     do:
-      "gf-step-current inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm " <>
-        "bg-gf-maroon border-gf-maroon text-white"
+      "gf-step-current #{@step_base} bg-brand-fill border-brand-fill text-on-fill " <>
+        "hover:no-underline"
 
   defp step_class(false),
-    do:
-      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm " <>
-        "bg-white border-gray-200 text-gray-700 hover:border-gray-400"
+    do: "#{@step_base} bg-surface border-line text-ink-2 hover:border-line-strong"
 
   defp later_text({:ready, []}), do: ""
 
@@ -1042,70 +1046,72 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_step_overview(assigns) do
     ~H"""
-    <div id={@id} class="gf-card mt-4 overflow-hidden">
-      <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200">
-        <div class="flex-1 min-w-[16rem]">
-          <h2 class="text-lg font-semibold text-gray-900">Where this Source stands</h2>
-          <p :if={@status} class="text-sm text-gray-500">{@status}</p>
+    <.panel id={@id} padding={:none} class="mt-4 overflow-hidden">
+      <div>
+        <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-line">
+          <div class="flex-1 min-w-64">
+            <h2 class="text-subsection text-ink">Where this Source stands</h2>
+            <p :if={@status} class="text-meta text-muted">{@status}</p>
+          </div>
+          <.button
+            :if={@next}
+            id="continue"
+            navigate={"#{@base}/#{@next.slug}"}
+            variant="primary"
+          >
+            Continue: {@next.title} →
+          </.button>
         </div>
-        <.button
-          :if={@next}
-          id="continue"
-          navigate={"#{@base}/#{@next.slug}"}
-          variant="primary"
-        >
-          Continue: {@next.title} →
-        </.button>
+        <div class="divide-y divide-line">
+          <.link
+            :for={s <- @summaries}
+            id={"#{@id}-#{s.step.slug}"}
+            navigate={"#{@base}/#{s.step.slug}"}
+            class="flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-sky-soft hover:no-underline"
+          >
+            <span class="w-6 md:w-8 shrink-0 font-bold text-muted tabular-nums">{s.step.n}</span>
+            <span class="min-w-0 flex-1 md:min-w-40 md:flex-5 font-semibold text-ink">
+              {s.step.title}
+              <span class="block text-meta font-normal text-muted">{s.step.question}</span>
+            </span>
+            <span class="basis-full pl-10 md:pl-0 md:min-w-48 md:flex-7 text-meta text-ink-2">
+              <%= if s.left > 0 do %>
+                {s.left} of {s.total} left · {s.recommended} with a recommended answer
+              <% else %>
+                All settled
+              <% end %>
+              <.review_progress
+                done={s.total - s.left}
+                proposed={s.recommended}
+                total={s.total}
+                class="mt-1 max-w-64"
+              />
+            </span>
+            <span class="basis-full pl-10 md:pl-0 md:basis-auto">
+              <%= cond do %>
+                <% s.holding > 0 -> %>
+                  <.chip variant={:warn}>Holds approval</.chip>
+                <% s.left == 0 -> %>
+                  <.chip variant={:ok}>Done</.chip>
+                <% true -> %>
+                  <.review_tag>Doesn't hold approval</.review_tag>
+              <% end %>
+            </span>
+          </.link>
+          <.link
+            id={"#{@id}-facts"}
+            navigate={"#{@base}/facts"}
+            class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3 hover:bg-sky-soft"
+          >
+            <span class="font-semibold text-link">See every Fact this Source would add →</span>
+            <span class="text-meta text-muted">
+              Optional: what approving writes, by Gall, given the answers so far. Facts can be
+              edited there.
+            </span>
+          </.link>
+        </div>
       </div>
-      <div class="divide-y divide-gray-200">
-        <.link
-          :for={s <- @summaries}
-          id={"#{@id}-#{s.step.slug}"}
-          navigate={"#{@base}/#{s.step.slug}"}
-          class="grid grid-cols-[1.5rem_1fr] md:grid-cols-[2rem_minmax(10rem,1fr)_minmax(12rem,1.4fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-gray-50"
-        >
-          <span class="font-bold text-gray-500 tabular-nums">{s.step.n}</span>
-          <span class="font-semibold text-gray-900">
-            {s.step.title}
-            <span class="block text-sm font-normal text-gray-500">{s.step.question}</span>
-          </span>
-          <span class="col-start-2 md:col-start-auto text-sm text-gray-700">
-            <%= if s.left > 0 do %>
-              {s.left} of {s.total} left · {s.recommended} with a recommended answer
-            <% else %>
-              All settled
-            <% end %>
-            <.review_progress
-              done={s.total - s.left}
-              proposed={s.recommended}
-              total={s.total}
-              class="mt-1 max-w-64"
-            />
-          </span>
-          <span class="col-start-2 md:col-start-auto">
-            <%= cond do %>
-              <% s.holding > 0 -> %>
-                <.badge variant="warning">Holds approval</.badge>
-              <% s.left == 0 -> %>
-                <.badge variant="success">Done</.badge>
-              <% true -> %>
-                <.review_tag>Doesn't hold approval</.review_tag>
-            <% end %>
-          </span>
-        </.link>
-        <.link
-          id={"#{@id}-facts"}
-          navigate={"#{@base}/facts"}
-          class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3 hover:bg-gray-50"
-        >
-          <span class="font-semibold text-gf-maroon">See every Fact this Source would add →</span>
-          <span class="text-sm text-gray-500">
-            Optional: what approving writes, by Gall, given the answers so far. Facts can be
-            edited there.
-          </span>
-        </.link>
-      </div>
-    </div>
+    </.panel>
     """
   end
 
@@ -1120,14 +1126,14 @@ defmodule GallformersWeb.ReviewComponents do
   def review_step_head(assigns) do
     ~H"""
     <div id="step-head" class="mt-4 grid gap-0.5">
-      <span class="text-xs uppercase tracking-wider text-gray-500">
+      <span class="text-caption uppercase tracking-wider text-muted">
         Step {@step.n} of {@of} · {if @step.holds_approval,
           do: "holds approval",
           else: "doesn't hold approval"}
       </span>
-      <h2 class="text-2xl font-semibold text-gf-maroon">{@step.title}</h2>
-      <p class="text-gray-700">{@step.question}</p>
-      <p :if={@intro} data-role="intro" class="text-sm text-gray-600 max-w-3xl">{@intro}</p>
+      <h2 class="text-section text-ink">{@step.title}</h2>
+      <p class="text-body text-ink-2">{@step.question}</p>
+      <p :if={@intro} data-role="intro" class="text-ui text-ink-2 max-w-text">{@intro}</p>
     </div>
     """
   end
@@ -1156,14 +1162,16 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_step_done(assigns) do
     ~H"""
-    <div id="step-done" class="gf-card mt-4 flex flex-wrap items-center gap-3 px-4 py-3">
-      <span class="flex-1 min-w-[16rem] font-semibold text-green-800">
-        ✓ {@step.title} is settled.
-      </span>
-      <.button navigate={@next.path} variant="primary">
-        {if @next.step?, do: "Next: #{@next.title} →", else: "Back to the overview"}
-      </.button>
-    </div>
+    <.panel id="step-done" class="mt-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="flex-1 min-w-64 font-semibold text-ok">
+          ✓ {@step.title} is settled.
+        </span>
+        <.button navigate={@next.path} variant="primary">
+          {if @next.step?, do: "Next: #{@next.title} →", else: "Back to the overview"}
+        </.button>
+      </div>
+    </.panel>
     """
   end
 
@@ -1184,23 +1192,28 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_source_head(assigns) do
     ~H"""
-    <div id="source-head" class="gf-card p-4 mt-2 grid gap-3">
+    <.panel id="source-head" class="mt-2">
       <div class="flex flex-wrap items-start gap-3">
-        <div class="flex-1 min-w-[16rem]">
-          <p class="text-lg font-semibold leading-snug text-gray-900">{@title || @name}</p>
-          <p :if={@citation && @citation != @title} class="text-sm text-gray-500">{@citation}</p>
+        <div class="flex-1 min-w-64">
+          <p class="text-subsection font-semibold text-ink">{@title || @name}</p>
+          <p :if={@citation && @citation != @title} class="text-meta text-muted">{@citation}</p>
           <div :if={@kind || @status} class="mt-1.5 flex flex-wrap gap-1.5">
             <.review_tag :if={@kind}>{@kind}</.review_tag>
-            <.badge :if={@status} variant={@status_variant}>{@status}</.badge>
+            <.chip :if={@status} variant={chip_variant(@status_variant)}>{@status}</.chip>
           </div>
           <.review_source_link :if={@source_id} source_id={@source_id} class="mt-1.5" />
         </div>
         <div :if={@actions != []} class="flex gap-2">{render_slot(@actions)}</div>
       </div>
       {render_slot(@inner_block)}
-    </div>
+    </.panel>
     """
   end
+
+  # The old badge's variants, as chips'.
+  defp chip_variant("success"), do: :ok
+  defp chip_variant("warning"), do: :warn
+  defp chip_variant(_info), do: :info
 
   @doc """
   A link from a Source's review to the Source in Gallformers
@@ -1211,8 +1224,8 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_source_link(assigns) do
     ~H"""
-    <p class={["text-sm", @class]}>
-      <.link navigate={~p"/admin/sources/#{@source_id}"} class="text-gf-maroon hover:underline">
+    <p class={["text-meta", @class]}>
+      <.link navigate={~p"/admin/sources/#{@source_id}"} class="text-link">
         The Source in Gallformers →
       </.link>
     </p>
@@ -1233,7 +1246,7 @@ defmodule GallformersWeb.ReviewComponents do
     ~H"""
     <.link
       navigate={~p"/admin/review/sources/#{@review.source_id}"}
-      class="text-gf-maroon hover:underline"
+      class="text-link"
       {@rest}
     >
       {review_in_progress_text(@review.to_decide)}
@@ -1266,38 +1279,42 @@ defmodule GallformersWeb.ReviewComponents do
   slot :inner_block, doc: "shown under the row whether open or not (an error, the notes)"
 
   def review_question_row(assigns) do
-    assigns = assign(assigns, question_cols: @question_cols)
+    assigns =
+      assign(assigns,
+        q: %{chevron: @q_chevron, written: @q_written, arrow: @q_arrow, answer: @q_answer}
+      )
 
     ~H"""
-    <div id={@id} class={[@open && "bg-gray-50"]}>
+    <div id={@id} class={[@open && "bg-surface-2"]}>
       <button
         type="button"
         id={"#{@id}-row"}
         class={[
-          "w-full text-left grid grid-cols-[1.1rem_1fr] gap-x-3 gap-y-1 items-start px-4 py-2",
-          "hover:bg-gray-50 cursor-pointer group",
-          @question_cols
+          "w-full text-left flex flex-wrap md:flex-nowrap gap-x-3 gap-y-1 items-start px-4 py-2",
+          "hover:bg-sky-soft cursor-pointer group"
         ]}
         phx-click={@on_toggle}
         phx-target={@target}
         aria-expanded={to_string(@open)}
         title={if @open, do: "Close", else: "Open"}
       >
-        <span data-role="chevron" class={["mt-1 transition-transform", @open && "rotate-90"]}>
+        <span
+          data-role="chevron"
+          class={["mt-1 transition-transform", @q.chevron, @open && "rotate-90"]}
+        >
           <.icon
             name="ph-caret-right"
             class={[
-              "size-4 group-hover:text-gf-maroon",
-              if(@open, do: "text-gf-maroon", else: "text-gray-400")
+              "size-4 group-hover:text-brand",
+              if(@open, do: "text-brand", else: "text-muted")
             ]}
           />
         </span>
-        <span class="font-semibold text-gray-900 break-words">{render_slot(@written)}</span>
-        <span class="hidden md:block text-center text-gray-400" aria-hidden="true">→</span>
-        <span
-          data-role="answer"
-          class={["col-start-2 md:col-start-auto min-w-0", @decided && "text-green-800"]}
-        >
+        <span class={["font-semibold text-ink break-words", @q.written]}>
+          {render_slot(@written)}
+        </span>
+        <span class={["text-center text-muted", @q.arrow]} aria-hidden="true">→</span>
+        <span data-role="answer" class={[@q.answer, @decided && "text-ok"]}>
           {render_slot(@answer)}
         </span>
       </button>
@@ -1305,7 +1322,7 @@ defmodule GallformersWeb.ReviewComponents do
       <div
         :if={@open and @detail != []}
         id={"#{@id}-detail"}
-        class="grid gap-4 px-4 pt-3 pb-4 bg-white border-t border-dashed border-gray-200"
+        class="grid gap-4 px-4 pt-3 pb-4 bg-surface border-t border-dashed border-line"
       >
         {render_slot(@detail)}
       </div>
@@ -1324,9 +1341,9 @@ defmodule GallformersWeb.ReviewComponents do
   def review_ask(assigns) do
     ~H"""
     <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-      <div class="grid gap-0.5 min-w-0 flex-1 basis-[20rem]">
-        <p data-role="question" class="text-lg font-semibold text-gray-900">{@question}</p>
-        <p :if={@scope} data-role="scope" class="text-sm text-gray-700">{@scope}</p>
+      <div class="grid gap-0.5 min-w-0 flex-1 basis-80">
+        <p data-role="question" class="text-subsection font-semibold text-ink">{@question}</p>
+        <p :if={@scope} data-role="scope" class="text-ui text-ink-2">{@scope}</p>
       </div>
       <div :if={@action != []} class="shrink-0">{render_slot(@action)}</div>
     </div>
@@ -1363,71 +1380,64 @@ defmodule GallformersWeb.ReviewComponents do
     ~H"""
     <div
       class={[
-        "rounded-md border px-3 py-2",
+        "rounded-ctl border px-3 py-2",
         cond do
-          @checked -> "border-gf-maroon bg-gf-maroon/5"
-          @recommended -> "border-gf-maroon bg-white"
-          true -> "border-gray-200 bg-white hover:border-gray-400"
+          @checked -> "border-brand bg-brand/5"
+          @recommended -> "border-brand bg-surface"
+          true -> "border-line bg-surface hover:border-line-strong"
         end
       ]}
       data-recommended={@recommended}
       data-chosen={@checked}
     >
-      <label
-        for={@id}
-        class="grid grid-cols-[1.1rem_minmax(0,1fr)] md:grid-cols-[1.1rem_minmax(0,1fr)_auto] gap-x-2.5 gap-y-0.5 items-start cursor-pointer"
-      >
+      <label for={@id} class="flex flex-wrap gap-x-2.5 gap-y-0.5 items-start cursor-pointer">
         <input
           type="radio"
           id={@id}
           name={@name}
           value={@value}
           checked={@checked}
-          class="gf-radio mt-1"
+          class="mt-1 size-4 shrink-0 accent-brand-fill"
           phx-click={@on_pick}
           phx-value-choice={@value}
           phx-target={@target}
         />
-        <span class="font-semibold text-gray-900">
+        <span class="min-w-0 flex-1 font-semibold text-ink">
           {@label}
           <span
             :if={@recommended}
             data-role="recommended"
-            class="ml-1 align-[1px] rounded bg-gf-maroon/10 px-1.5 text-[0.68rem] font-bold uppercase tracking-wider text-gf-maroon"
+            class="ml-1 align-middle rounded-ctl bg-brand/10 px-1.5 text-caption font-bold uppercase tracking-wider text-brand"
           >
             Recommended
           </span>
-          <span
+          <.chip
             :for={tag <- @tags}
             data-role={"tag-#{tag.kind}"}
-            class={[
-              "ml-1 align-[1px] rounded px-1.5 text-[0.68rem] font-bold uppercase tracking-wider",
-              if(tag.kind == :conflict,
-                do: "bg-red-50 text-red-800",
-                else: "bg-blue-50 text-blue-800"
-              )
-            ]}
+            variant={if tag.kind == :conflict, do: :danger, else: :info}
+            size="sm"
+            class="ml-1 align-middle"
           >
             {tag.text}
-          </span>
+          </.chip>
         </span>
         <span
           :if={@tally}
           data-role="tally"
           class={[
-            "col-start-2 md:col-start-auto text-sm md:text-right max-w-72",
-            if(@recommended, do: "font-semibold text-gf-maroon", else: "text-gray-500")
+            "basis-full pl-6.5 md:pl-0 md:basis-auto text-meta md:text-right max-w-72",
+            if(@recommended, do: "font-semibold text-brand", else: "text-muted")
           ]}
         >
           {@tally}
         </span>
         <span
           :if={!@tally and @recommended and @by}
-          class="col-start-2 md:col-start-auto text-sm font-semibold text-gf-maroon md:text-right max-w-72"
+          class="basis-full pl-6.5 md:pl-0 md:basis-auto text-meta font-semibold text-brand md:text-right max-w-72"
         >
           {@by}
         </span>
-        <span :if={@summary} class="col-start-2 md:col-span-2 text-sm text-gray-500">
+        <span :if={@summary} class="basis-full pl-6.5 text-meta text-muted">
           {@summary}
         </span>
       </label>
@@ -1458,15 +1468,15 @@ defmodule GallformersWeb.ReviewComponents do
   def review_value_list(assigns) do
     ~H"""
     <div id={@id} class="grid gap-1 max-h-80 overflow-y-auto" data-role="values">
-      <p :if={@values == []} class="text-sm italic text-gray-500">No value matches.</p>
+      <p :if={@values == []} class="text-ui italic text-muted">No value matches.</p>
       <label
         :for={{value, definition} <- @values}
         for={"#{@id}-#{value}"}
         class={[
-          "grid grid-cols-[1.1rem_minmax(0,1fr)] gap-x-2 rounded-md border px-2.5 py-1.5 text-sm cursor-pointer",
+          "flex flex-wrap gap-x-2 rounded-ctl border px-2.5 py-1.5 text-ui cursor-pointer",
           if(value in @selected,
-            do: "border-gf-maroon bg-gf-maroon/5",
-            else: "border-gray-200 bg-white hover:border-gray-400"
+            do: "border-brand bg-brand/5",
+            else: "border-line bg-surface hover:border-line-strong"
           )
         ]}
       >
@@ -1476,18 +1486,21 @@ defmodule GallformersWeb.ReviewComponents do
           name={if @type == "radio", do: @id, else: "#{@id}[]"}
           value={value}
           checked={value in @selected}
-          class={if @type == "radio", do: "gf-radio mt-0.5", else: "gf-checkbox mt-0.5"}
+          class={[
+            "mt-0.5 shrink-0",
+            if(@type == "radio", do: "size-4 accent-brand-fill", else: "gf-checkbox")
+          ]}
           phx-click={@on_pick}
           phx-value-value={value}
           phx-target={@target}
         />
-        <span class="font-medium text-gray-900">
+        <span class="min-w-0 flex-1 font-medium text-ink">
           {value}
-          <span :if={@note && value in @noted} class="ml-1 text-xs font-normal text-gray-500">
+          <span :if={@note && value in @noted} class="ml-1 text-caption font-normal text-muted">
             {@note}
           </span>
         </span>
-        <span :if={definition} class="col-start-2 text-gray-500">{definition}</span>
+        <span :if={definition} class="basis-full pl-6 text-muted">{definition}</span>
       </label>
     </div>
     """
@@ -1509,8 +1522,8 @@ defmodule GallformersWeb.ReviewComponents do
       <span
         id={"#{@id}-effect"}
         class={[
-          "flex-1 min-w-[16rem] text-sm",
-          if(@ok, do: "text-gray-700", else: "italic text-gray-500")
+          "flex-1 min-w-64 text-ui",
+          if(@ok, do: "text-ink-2", else: "italic text-muted")
         ]}
       >
         {@effect}
@@ -1535,13 +1548,9 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_decided(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class="flex flex-wrap items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800"
-    >
-      <.icon name="ph-check" class="size-4" />
-      <span class="flex-1">Decided: {@text}<span :if={@by}>, by {@by}</span>.</span>
-    </div>
+    <.notice id={@id} kind={:ok} icon="ph-check">
+      Decided: {@text}<span :if={@by}>, by {@by}</span>.
+    </.notice>
     """
   end
 
@@ -1552,10 +1561,10 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_note_list(assigns) do
     ~H"""
-    <ul id={@id} class={["grid gap-1 text-sm text-gray-700", @class]} data-role="notes">
-      <li :for={note <- @notes} class="rounded-md bg-yellow-50 px-3 py-1.5">
+    <ul id={@id} class={["grid gap-1 text-ui text-ink-2", @class]} data-role="notes">
+      <li :for={note <- @notes} class="rounded-ctl bg-sky-soft px-3 py-1.5">
         <span class="whitespace-pre-line">{note.text}</span>
-        <span class="block text-xs text-gray-500">
+        <span class="block text-caption text-muted">
           {note.author_name}<span :if={note.inserted_at}>, {GallformersWeb.UIComponents.format_date(note.inserted_at, :short)}</span>
         </span>
       </li>
@@ -1581,8 +1590,8 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_notes(assigns) do
     ~H"""
-    <div class="grid gap-2 border-t border-gray-200 pt-3">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Notes</h3>
+    <div class="grid gap-2 border-t border-line pt-3">
+      <h3 class="text-caption font-semibold uppercase tracking-wider text-muted">Notes</h3>
       <.review_note_list :if={@notes != []} id={"#{@id}-notes"} notes={@notes} />
       <.form
         for={%{}}
@@ -1597,7 +1606,7 @@ defmodule GallformersWeb.ReviewComponents do
           id={"#{@id}-note"}
           name="note"
           rows="2"
-          class="gf-textarea flex-1 min-w-[16rem]"
+          class="gf-textarea flex-1 min-w-64"
           placeholder={@placeholder}
         >{@draft}</textarea>
         <.button id={"#{@id}-save-note"} type="submit" variant="secondary">Save note</.button>
@@ -1613,8 +1622,8 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_disclosure(assigns) do
     ~H"""
-    <details id={@id} class="text-sm text-gray-700">
-      <summary class="cursor-pointer text-gray-500">{@summary}</summary>
+    <details id={@id} class="text-ui text-ink-2">
+      <summary class="cursor-pointer text-muted">{@summary}</summary>
       <div class="mt-2 grid gap-2">{render_slot(@inner_block)}</div>
     </details>
     """
@@ -1623,7 +1632,7 @@ defmodule GallformersWeb.ReviewComponents do
   # -- the Source in context (matter d213, Task 22) ------------------------------
 
   # A quoted block's highlight, as the quote's own (`review_quote/1`).
-  @cited_class "bg-orange-50/60 border-l-[3px] border-gf-autumn pl-2 text-gray-900"
+  @cited_class "bg-surface-2 border-l-3 border-autumn pl-2 text-ink"
 
   @doc """
   The Source's passage around a quote (`Gallformers.Import.Passages.passage/2`):
@@ -1640,11 +1649,11 @@ defmodule GallformersWeb.ReviewComponents do
     <div
       :if={@blocks != []}
       data-role="passage-text"
-      class="grid gap-1.5 max-h-[22rem] overflow-y-auto bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700"
+      class="grid gap-1.5 max-h-88 overflow-y-auto bg-surface border border-line rounded-panel px-3 py-2 font-serif text-ui text-ink-2"
     >
       <.source_block :for={{block, page} <- @paged} block={block} page={page} cited={block.cited?} />
     </div>
-    <p :if={@blocks == []} class="text-sm text-gray-500">The passage isn’t in the Source’s text.</p>
+    <p :if={@blocks == []} class="text-ui text-muted">The passage isn’t in the Source’s text.</p>
     """
   end
 
@@ -1709,30 +1718,29 @@ defmodule GallformersWeb.ReviewComponents do
     <aside
       id={@id}
       aria-label="The Source’s text"
-      class="fixed inset-y-0 right-0 z-[60] flex flex-col w-full lg:w-[min(38rem,46vw)] bg-white border-l border-gray-300 shadow-xl"
+      class="fixed inset-y-0 right-0 z-60 flex flex-col w-full lg:w-reader bg-surface border-l border-line-strong shadow-float"
     >
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 border-b border-gray-200">
-        <b data-role="title" class="text-gray-900">{@title}</b>
-        <span :if={@question} data-role="question" class="basis-full text-sm text-gray-500">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 border-b border-line">
+        <b data-role="title" class="text-ink">{@title}</b>
+        <span :if={@question} data-role="question" class="basis-full text-meta text-muted">
           {@question}
         </span>
         <form
           id={"#{@id}-find"}
           phx-change={@on_find}
           phx-submit={@on_find}
-          class="flex-1 min-w-[12rem]"
+          class="flex-1 min-w-48"
         >
-          <.search_input
+          <.search_field
             id={"#{@id}-find-input"}
             name="find"
             value={@find}
-            placeholder="Find in the Source"
-            size={:sm}
-            phx-debounce="300"
+            label="Find in the Source"
+            debounce="300"
           />
         </form>
         <.button type="button" size="sm" variant="ghost" phx-click={@on_close}>Close ✕</.button>
-        <span :if={@needle != ""} id={"#{@id}-hits"} class="basis-full text-sm text-gray-500">
+        <span :if={@needle != ""} id={"#{@id}-hits"} class="basis-full text-meta text-muted">
           {hits_text(@hits)}
         </span>
       </div>
@@ -1741,7 +1749,7 @@ defmodule GallformersWeb.ReviewComponents do
         phx-hook="SourceReader"
         data-find={@needle}
         data-cited={Enum.join(@cited, " ")}
-        class="relative flex-1 overflow-y-auto grid content-start gap-2 px-4 pt-3 pb-8 text-sm text-gray-700"
+        class="relative flex-1 overflow-y-auto grid content-start gap-2 px-4 pt-3 pb-8 font-serif text-ui text-ink-2"
       >
         <.source_block
           :for={{block, page} <- @paged}
@@ -1773,15 +1781,15 @@ defmodule GallformersWeb.ReviewComponents do
       data-cited={@cited}
       data-heading={@block.heading?}
       class={[
-        "m-0 max-w-[70ch] break-words",
-        @block.heading? && "font-semibold text-gray-900",
+        "m-0 max-w-text break-words",
+        @block.heading? && "font-semibold text-ink",
         @cited && @cited_class
       ]}
     >
       <span
         :if={@page}
         data-role="page"
-        class="inline-block mr-1.5 text-xs text-gray-500 tabular-nums"
+        class="inline-block mr-1.5 font-sans text-caption text-muted tabular-nums"
       >
         p. {@page}
       </span>
@@ -1812,7 +1820,7 @@ defmodule GallformersWeb.ReviewComponents do
     |> Enum.with_index()
     |> Enum.map(fn
       {part, i} when rem(i, 2) == 1 ->
-        ["<mark class=\"bg-yellow-100 text-yellow-900 rounded-sm\">", escape(part), "</mark>"]
+        ["<mark class=\"bg-warn-bg text-warn rounded-ctl\">", escape(part), "</mark>"]
 
       {part, _i} ->
         escape(part)

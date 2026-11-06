@@ -3,6 +3,7 @@ defmodule GallformersWeb.ArticlesController do
 
   alias Gallformers.Accounts
   alias Gallformers.Articles
+  alias Gallformers.Keys
 
   def index(conn, params) do
     selected_tag = params["tag"]
@@ -17,6 +18,13 @@ defmodule GallformersWeb.ArticlesController do
         Articles.list_published_articles()
       end
 
+    # The newest article is featured on the unfiltered list.
+    {featured, articles} =
+      case {selected_tag, articles} do
+        {nil, [first | rest]} -> {first, rest}
+        _ -> {nil, articles}
+      end
+
     conn
     |> assign(:page_title, "Articles")
     |> assign(
@@ -26,7 +34,9 @@ defmodule GallformersWeb.ArticlesController do
     |> assign(:page_url, "/articles")
     |> assign(:tags, tags)
     |> assign(:selected_tag, selected_tag)
+    |> assign(:featured, featured)
     |> assign(:articles, articles)
+    |> assign(:key_count, length(Keys.list_keys()))
     |> assign(:is_admin, is_admin)
     |> render(:index)
   end

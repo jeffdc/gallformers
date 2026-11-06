@@ -119,6 +119,85 @@ defmodule Gallformers.Catalog.ReadModels.PotentialRange do
   end
 
   @doc """
+  Where each of the Galls among `gall_ids` is known to occur, by Gall ID:
+  the places of its potential range (`for_galls/1`, adjustments applied)
+  that a Host gives natively, plus those a Host gives only as introduced
+  in a country where the Gall itself is recorded (a current recorded
+  occurrence in the country or one of its subdivisions; one at continent
+  level shows no country). A Gall with no range data is known nowhere
+  (`[]`), not everywhere. Browse by place and the place page count this,
+  not the potential range: a Host planted far from home says nothing about
+  its Galls there (Jeff, 2026-11-05).
+  """
+  @spec known_for_galls([integer()]) :: %{integer() => [place()]}
+  def known_for_galls([]), do: %{}
+
+  def known_for_galls(gall_ids) when is_list(gall_ids) do
+    gall_ids = Enum.uniq(gall_ids)
+    hosts = range_taxa(gall_ids)
+
+    native =
+      from(hr in "host_range",
+        where:
+          hr.taxon_id in ^Enum.uniq(List.flatten(Map.values(hosts))) and
+            hr.distribution_type == "native",
+        distinct: true,
+        select: {hr.taxon_id, hr.place_id}
+      )
+      |> Repo.all()
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    recorded =
+      from(o in Current.occurrences(gall_ids), distinct: true, select: {o.gall_id, o.place_id})
+      |> Repo.all()
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      |> Map.new(fn {gall_id, place_ids} -> {gall_id, countries(place_ids)} end)
+
+    leaves_of =
+      Places.leaf_descendant_ids_by_place(
+        List.flatten(Map.values(native)) ++ List.flatten(Map.values(recorded))
+      )
+
+    leaves = &(&1 |> Enum.flat_map(fn id -> Map.get(leaves_of, id, []) end) |> MapSet.new())
+
+    gall_ids
+    |> for_galls()
+    |> Map.new(fn
+      {gall_id, :everywhere} ->
+        {gall_id, []}
+
+      {gall_id, places} ->
+        native_leaves =
+          hosts |> Map.get(gall_id, []) |> Enum.flat_map(&Map.get(native, &1, [])) |> leaves.()
+
+        recorded_leaves = recorded |> Map.get(gall_id, []) |> leaves.()
+
+        known =
+          Enum.filter(places, fn %{place_id: id} ->
+            MapSet.member?(native_leaves, id) or MapSet.member?(recorded_leaves, id)
+          end)
+
+        {gall_id, known}
+    end)
+  end
+
+  # The countries of `place_ids`: a country itself, a subdivision's
+  # country; a continent or region shows none.
+  defp countries(place_ids) do
+    Enum.flat_map(place_ids, fn place_id ->
+      place = Repo.get!(Place, place_id)
+
+      if place.type == "country",
+        do: [place.id],
+        else:
+          place.id
+          |> Places.get_ancestors()
+          |> Enum.filter(&(&1.type == "country"))
+          |> Enum.map(& &1.id)
+    end)
+  end
+
+  @doc """
   A Gall's potential range as a map shows it: `:everywhere` when the range
   is, else its places split for colouring (`Gallformers.Ranges.DisplayRange`)
   as the `host_range` rows of its current Hosts (a Host above species rank

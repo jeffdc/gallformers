@@ -224,7 +224,8 @@ defmodule Gallformers.Search do
         id: p.id,
         name: p.name,
         type: "place",
-        code: p.code
+        code: p.code,
+        kind: p.type
       }
     )
     |> Repo.all()

@@ -28,17 +28,19 @@ Tests use a **separate PostgreSQL test database** (`gallformers_test`; in a git 
 make test-db               # Rebuild test database manually (rarely needed)
 ```
 
-## Reusable UI Components
+## Design system and UI components
 
-**CRITICAL**: This project has reusable UI components that MUST be used. Do NOT implement custom/inline versions of these components. Creating new UI patterns requires explicit user approval.
+**CRITICAL**: All UI follows the design system in **[docs/design-system/](docs/design-system/README.md)**. Read its README before writing or changing any UI. Use its components; do NOT implement custom/inline versions of them. Creating new UI patterns or components requires explicit user approval.
 
-All component files are in `lib/gallformers_web/components/`.
+- **Components**: [docs/design-system/components.md](docs/design-system/components.md) is the catalog (status per component: Proposed, Approved, Built, Retiring). Components live in `lib/gallformers_web/components/`.
+- **Tokens**: style with the semantic utilities (`text-ink`, `bg-surface`, `text-section`, `rounded-panel` …) from `assets/css/system/tokens.css`. No Tailwind palette colors, default type scale, hex values, `dark:` variants or arbitrary values.
+- **Conformance**: `test/gallformers_web/design_system/conformance_test.exs` fails on new off-system styling. Fix the code; never raise the baseline to make it pass. After moving code onto the system, lock the gain in with `mix gallformers.design_system.baseline`.
 
 ### Before Adding UI Code
 
-1. **Check existing components** - Search `core_components.ex` and `form_components.ex`
-2. **Check existing pages** - See how similar UI is implemented elsewhere
-3. **If no component exists** - ASK before implementing inline. We may want to create a reusable component.
+1. **Check the catalog and existing pages** for a component or pattern that fits.
+2. **If one almost fits**, extend it (and its catalog entry).
+3. **If none fits**, ASK. Write the proposed component's catalog entry for approval; don't build it inline.
 
 See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for details as needed.
 

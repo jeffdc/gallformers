@@ -1,11 +1,16 @@
 defmodule GallformersWeb.Admin.GlossaryLive.Form do
   @moduledoc """
-  Admin form for creating and editing glossary entries.
+  The glossary admin's form (design system, matter bc0d; the admin edit
+  page pattern): the word, definition and source URLs; Cancel (asking first
+  when there are unsaved changes) and Save; for an entry, View on site, and
+  Delete in the danger panel through a confirmation dialog.
   """
   use GallformersWeb, :live_view
   use GallformersWeb.Admin.FormHelpers, crud_helpers: true
 
   import GallformersWeb.Admin.FormComponents, only: [form_actions: 1]
+
+  alias Phoenix.LiveView.JS
 
   alias Gallformers.Glossaries.Glossary
 
@@ -33,7 +38,10 @@ defmodule GallformersWeb.Admin.GlossaryLive.Form do
 
   @impl true
   def mount(_params, session, socket) do
-    {:ok, init_admin_form(socket, session, page_title: "Glossary Entry")}
+    {:ok,
+     socket
+     |> init_admin_form(session, page_title: "Glossary Entry")
+     |> assign(confirm_delete: false)}
   end
 
   def close_form(socket) do
@@ -57,6 +65,12 @@ defmodule GallformersWeb.Admin.GlossaryLive.Form do
   @impl true
   def handle_event("delete", params, socket), do: handle_delete(params, socket)
 
+  def handle_event("confirm_delete", _params, socket),
+    do: {:noreply, assign(socket, confirm_delete: true)}
+
+  def handle_event("cancel_delete", _params, socket),
+    do: {:noreply, assign(socket, confirm_delete: false)}
+
   @impl true
   def handle_event(event, params, socket)
       when event in ~w(request_cancel cancel_discard confirm_discard) do
@@ -66,79 +80,95 @@ defmodule GallformersWeb.Admin.GlossaryLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        <%= if @mode == :edit do %>
-          Editing <em class="font-bold">{@entry.word}</em>
-        <% else %>
-          New Glossary Entry
-        <% end %>
-      </:page_title_html>
-      <Layouts.admin_edit_layout
-        back_path={~p"/admin/glossary"}
-        back_label="Back to Glossary"
-        public_url={if @mode == :edit, do: ~p"/glossary"}
-      >
-        <:intro>
-          Glossary entries are automatically linked in species descriptions and other text throughout the site.
-          Use lowercase for terms unless they are proper nouns.
-        </:intro>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin/glossary"}>Glossary</:crumb>
+          <:title>{if @mode == :edit, do: @entry.word, else: "New glossary entry"}</:title>
+          <:description>
+            Entries are linked automatically wherever their word appears in descriptions and notes. Use lowercase unless the term is a proper noun.
+          </:description>
+          <:action :if={@mode == :edit}>
+            <.button
+              href={"/glossary##{String.downcase(@entry.word)}"}
+              variant="ghost"
+              size="sm"
+              icon="ph-arrow-square-out"
+            >
+              View on site
+            </.button>
+          </:action>
+        </.page_header>
 
-        <.form for={@form} id="glossary-form" phx-change="validate" phx-submit="save">
-          <div class="mb-3">
-            <.input
-              field={@form[:word]}
-              schema={Glossary}
-              type="text"
-              label="Word"
-              placeholder="Enter term (lowercase unless proper noun)"
-            />
-            <p class="mt-1 text-xs text-gray-500">Use lowercase unless it's a proper name</p>
-          </div>
-
-          <div class="mb-3">
-            <.input
-              field={@form[:definition]}
-              schema={Glossary}
-              type="textarea"
-              label="Definition"
-              rows="4"
-              placeholder="Enter the definition"
-            />
-          </div>
-
-          <div class="mb-3">
-            <.input
-              field={@form[:urls]}
-              schema={Glossary}
-              type="textarea"
-              label="Source URLs"
-              rows="2"
-              placeholder="Enter URLs (one per line)"
-            />
-            <p class="mt-1 text-xs text-gray-500">
-              Enter one URL per line. These are the sources for the definition.
-            </p>
-          </div>
-
-          <div class="flex justify-between pt-4 border-t border-gray-200">
+        <div class="gf-with-rail">
+          <.form
+            for={@form}
+            id="glossary-form"
+            phx-change="validate"
+            phx-submit="save"
+            class="flex max-w-form min-w-0 flex-col gap-block"
+          >
             <div>
-              <button
-                :if={@mode == :edit}
-                type="button"
-                phx-click="delete"
-                data-confirm="Are you sure you want to delete this glossary entry?"
-                class="gf-btn gf-btn-danger"
-              >
-                Delete
-              </button>
+              <.input
+                field={@form[:word]}
+                schema={Glossary}
+                type="text"
+                label="Word"
+                placeholder="lowercase unless a proper noun"
+              />
             </div>
-            <.form_actions form_dirty={@form_dirty} mode={@mode} create_label="Create Entry" />
-          </div>
-        </.form>
+            <div>
+              <.input
+                field={@form[:definition]}
+                schema={Glossary}
+                type="textarea"
+                label="Definition"
+                rows="4"
+              />
+            </div>
+            <div>
+              <.input
+                field={@form[:urls]}
+                schema={Glossary}
+                type="textarea"
+                label="Source URLs"
+                rows="2"
+              />
+              <p class="gf-hint">One per line: where the definition comes from.</p>
+            </div>
+            <div class="flex justify-end border-t border-line pt-block">
+              <.form_actions form_dirty={@form_dirty} mode={@mode} create_label="Create entry" />
+            </div>
+          </.form>
+
+          <.rail :if={@mode == :edit} width={:narrow}>
+            <.panel id="danger" variant={:danger} title="Delete">
+              <p class="mb-3 text-ui text-ink-2">
+                Removes the entry. Text that links its word stops linking it.
+              </p>
+              <.button variant="danger" phx-click="confirm_delete">Delete…</.button>
+            </.panel>
+          </.rail>
+        </div>
+
+        <.dialog
+          :if={@confirm_delete}
+          id="delete-entry"
+          title="Delete this entry?"
+          show
+          on_cancel={JS.push("cancel_delete")}
+        >
+          <p class="text-ui text-ink">
+            Delete “{@entry.word}” from the glossary? This can't be undone.
+          </p>
+          <:actions>
+            <.button variant="ghost" phx-click="cancel_delete">Keep it</.button>
+            <.button variant="danger" phx-click="delete">Delete</.button>
+          </:actions>
+        </.dialog>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
-      </Layouts.admin_edit_layout>
+      </div>
     </Layouts.admin>
     """
   end

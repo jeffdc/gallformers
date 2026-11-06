@@ -1,382 +1,137 @@
 defmodule GallformersWeb.Admin.DashboardLiveTest do
   @moduledoc """
-  LiveView tests for the admin dashboard.
+  The admin dashboard (`/admin`, design system matter bc0d): the Sources to
+  review first, then the curators' recent changes (the same `change_entry`
+  as the Changes page, with View and Edit); Find, Create and, for a
+  superadmin, Site in the rail.
+
+  Not async: admin access reads the site settings (persistent_term), and
+  review packages create Sources and load the vocabularies.
   """
-  # async: false because admin access is gated by SiteSettings.read_only?/0,
-  # which reads from persistent_term-backed global state.
   use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
+
+  import Gallformers.AuditFixtures
+  import Gallformers.CatalogFixtures
   import Gallformers.DataCase, only: [audit_test_metadata: 1]
+  import Gallformers.ImportFixtures
+  import GallformersWeb.AdminLiveHelpers
 
-  alias Gallformers.Accounts.Auth0User
-  alias Gallformers.Import
-  alias Gallformers.Import.QueueItem
-  alias Gallformers.Repo
+  setup %{conn: conn} do
+    {conn, _user} = log_in_admin(conn, "Rita Reviewer")
+    %{conn: conn}
+  end
 
-  describe "Admin dashboard" do
-    setup %{conn: conn} do
-      # Create a mock user session for admin access (must be a User struct)
-      user = %Auth0User{
-        id: "test-user-id",
-        email: "admin@test.com",
-        name: "Test Admin",
-        nickname: nil,
-        picture: nil,
-        roles: ["admin"]
-      }
+  setup :audit_test_metadata
 
-      conn =
-        conn
-        |> init_test_session(%{})
-        |> put_session(:current_user, user)
-        |> put_session(:db_display_name, "Test User")
+  test "the page: Dashboard, with the help links", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/admin")
 
-      {:ok, conn: conn, user: user}
-    end
+    assert has_element?(view, "h1", "Dashboard")
+    assert has_element?(view, "a[href*='admin-onboarding']", "Getting started")
+    assert has_element?(view, "a[href^='https://discord.com']", "Discord")
+  end
 
-    test "renders dashboard when authenticated", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
+  describe "Sources to review" do
+    test "each Source waiting, linked to its review, with what is left to decide", %{conn: conn} do
+      gall =
+        batch()
+        |> unique_batch_id()
+        |> put_in(["source", "title"], "Galls of the oaks")
+        |> put_in(["source", "citation"], "Ashmead, W. H. 1897. Galls of the oaks.")
 
-      assert html =~ "Dashboard" or html =~ "Admin"
-    end
+      package(gall: gall) |> with_review() |> deliver!()
 
-    test "displays stats cards", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      # Should show stat cards
-      assert html =~ "Galls" or html =~ "Hosts" or html =~ "Sources" or html =~ "Images"
-    end
-
-    test "stats show formatted numbers", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      # Stats should be displayed (numbers)
-      assert Regex.match?(~r/\d+/, html) == true
-    end
-
-    test "displays quick actions section", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      # Dashboard shows "Create a New" action cards
-      assert html =~ "Create a New"
-    end
-
-    test "quick action links are present", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
-      # Should have action links
-      assert has_element?(view, "a[href*='/admin/']")
+      assert has_element?(view, "#review-queue a[href^='/admin/review/']", "Galls of the oaks")
+      assert has_element?(view, "a[href='/admin/review']", "Open the review")
     end
 
-    test "welcome section is displayed", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      assert html =~ "Need help?" or html =~ "Discord"
+    test "with nothing waiting, it says so", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#review-queue-section", "Nothing waiting for review.")
     end
   end
 
-  describe "Admin dashboard stats" do
-    setup %{conn: conn} do
-      user = %Auth0User{
-        id: "test-user-id",
-        email: "admin@test.com",
-        name: "Test Admin",
-        nickname: nil,
-        picture: nil,
-        roles: ["admin"]
-      }
+  describe "Recent changes" do
+    test "the curators' latest changes, each with View and Edit, and a link to them all", %{
+      conn: conn
+    } do
+      gall = gall_fixture(%{name: "Andricus fixturi"})
+      oak = plant_fixture(name: "Quercus alba")
+      source = source_fixture("Weld", "1959")
 
-      conn =
-        conn
-        |> init_test_session(%{})
-        |> put_session(:current_user, user)
-        |> put_session(:db_display_name, "Test User")
+      {:ok, host} =
+        Gallformers.Catalog.assert_relationship(
+          Gallformers.DataCase.test_actor(),
+          %{type: "host_of", subject_taxon_id: oak.id, object_gall_id: gall.id},
+          confirm(source)
+        )
 
-      {:ok, conn: conn}
-    end
+      curator_change("Adam Kranz", "import.apply_batch", 5, [
+        {"import_batches", "update", %{id: 1, package_id: package_for(source).id}},
+        {"facts", "insert", %{id: host.fact.id, standing: "current"}}
+      ])
 
-    test "gall count is displayed", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      assert html =~ "Galls"
-    end
-
-    test "host count is displayed", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      assert html =~ "Host"
-    end
-
-    test "source count is displayed", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      assert html =~ "Source"
-    end
-
-    test "image count is displayed", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      assert html =~ "Image"
-    end
-  end
-
-  describe "Admin dashboard quick actions" do
-    setup %{conn: conn} do
-      user = %Auth0User{
-        id: "test-user-id",
-        email: "admin@test.com",
-        name: "Test Admin",
-        nickname: nil,
-        picture: nil,
-        roles: ["admin"]
-      }
-
-      conn =
-        conn
-        |> init_test_session(%{})
-        |> put_session(:current_user, user)
-        |> put_session(:db_display_name, "Test User")
-
-      {:ok, conn: conn}
-    end
-
-    test "the Galls count links to the Gall search; there is no new-Gall action",
-         %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
-      assert has_element?(view, "#admin-stats a[href='/admin/galls']", "Galls")
-      assert has_element?(view, "#admin-quick-actions a[href='/admin/galls']", "Find a Gall")
-      refute has_element?(view, "a[href^='/admin/galls/']")
-    end
-
-    test "the new-Host action, the Host range review and the Hosts count go to the taxonomy admin",
-         %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "a[href='/admin/taxonomy/new']", "Create a New Host")
-      assert has_element?(view, "a[href='/admin/host-range']", "Review Host Ranges")
-      assert has_element?(view, "#admin-stats a[href='/admin/taxonomy']", "Hosts")
-      refute has_element?(view, "a[href^='/admin/hosts']")
-      refute has_element?(view, "a[href^='/admin/section']")
-    end
-
-    test "the Sources action and count go to the Source editor", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "#admin-quick-actions a[href='/admin/sources']", "Find a Source")
-      assert has_element?(view, "#admin-stats a[href='/admin/sources']", "Sources")
-    end
-
-    test "the review action leads the quick actions", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#recent-changes li [data-part=summary]", "Adam Kranz")
 
       assert has_element?(
                view,
-               "#admin-quick-actions a[href='/admin/review']",
-               "Review Sources"
+               "#recent-changes [data-part=galls] a[href='/gall/#{gall.id}']",
+               "View"
              )
 
-      refute has_element?(view, "a[href^='/admin/queue']")
+      assert has_element?(
+               view,
+               "#recent-changes [data-part=galls] a[href='/gall/#{gall.id}?edit']",
+               "Edit"
+             )
+
+      assert has_element?(view, "a[href='/admin/changes']", "All changes")
+    end
+
+    test "with no changes yet, it says so", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#recent-changes-section", "No changes yet.")
+    end
+  end
+
+  describe "the rail" do
+    test "Find and Create link the admin's lists and forms", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      for href <- ~w(/galls /admin/sources /admin/taxonomy /admin/host-range) do
+        assert has_element?(view, "#find a[href='#{href}']"), "Find: #{href}"
+      end
+
+      for href <- ~w(/admin/taxonomy/new /admin/articles/new /admin/keys/new /admin/glossary/new) do
+        assert has_element?(view, "#create a[href='#{href}']"), "Create: #{href}"
+      end
+    end
+
+    test "Site is a superadmin's only", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      refute has_element?(view, "#site")
+      refute has_element?(view, "a[href='/admin/jobs']")
+
+      {super_conn, _} = log_in_admin(build_conn(), "Sam Super", ["superadmin"])
+      {:ok, view, _html} = live(super_conn, ~p"/admin")
+
+      for href <- ~w(/admin/users /admin/vocabulary /admin/jobs /admin/dashboard) do
+        assert has_element?(view, "#site a[href='#{href}']"), "Site: #{href}"
+      end
     end
 
     test "links to no deleted old screen", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
       for prefix <- ~w(/admin/gallhost /admin/gall-range /admin/images /admin/image-audit
-                       /admin/filter-terms /admin/species-sources) do
+                       /admin/filter-terms /admin/species-sources /admin/queue) do
         refute has_element?(view, "a[href^='#{prefix}']"), "link to #{prefix}"
       end
-
-      refute render(view) =~ "Being rebuilt"
-    end
-
-    test "the Images count is shown, unlinked", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "#admin-stats div", "Images")
-      refute has_element?(view, "#admin-stats a", "Images")
-    end
-
-    test "add article link exists", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "a[href='/admin/articles/new']") or
-               render(view) =~ "Create a New Article"
-    end
-
-    test "taxonomy link exists", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "a[href='/admin/taxonomy']") or
-               render(view) =~ "Taxonomy"
-    end
-
-    test "glossary link exists", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "a[href='/admin/glossary']") or
-               render(view) =~ "Glossary"
-    end
-
-    test "superadmin links are hidden from regular admins", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      refute has_element?(view, "a[href='/admin/jobs']")
-      refute has_element?(view, "a[href='/admin/vocabulary']")
-      refute render(view) =~ "Super Admin"
-    end
-  end
-
-  describe "Admin dashboard review queue" do
-    setup %{conn: conn} do
-      user = %Auth0User{
-        id: "test-user-id",
-        email: "admin@test.com",
-        name: "Test Admin",
-        nickname: nil,
-        picture: nil,
-        roles: ["admin"]
-      }
-
-      conn =
-        conn
-        |> init_test_session(%{})
-        |> put_session(:current_user, user)
-        |> put_session(:db_display_name, "Test User")
-
-      {:ok, conn: conn}
-    end
-
-    setup :audit_test_metadata
-
-    defp rename_item!(n) do
-      %QueueItem{}
-      |> QueueItem.create_changeset(%{
-        kind: :gall_rename,
-        subject: %{"gall_id" => n},
-        proposal: %{"gall_id" => n, "from" => "A #{n}", "to" => "B #{n}", "collision" => false},
-        reason: "renamed"
-      })
-      |> Repo.insert!()
-    end
-
-    test "counts the open questions, linking to the review", %{conn: conn} do
-      before = Import.count_open_queue_items()
-      rename_item!(1)
-      rename_item!(2)
-      renames = Map.get(before, :gall_rename, 0) + 2
-      questions = before |> Map.delete(:gall_rename) |> Map.values() |> Enum.sum()
-
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "#admin-queue a[href='/admin/review']", "Questions to decide")
-      assert has_element?(view, "#admin-queue a[href='/admin/review']", to_string(questions))
-
-      assert has_element?(
-               view,
-               "#admin-queue a[href='/admin/review/renames']",
-               "Gall rename proposals"
-             )
-
-      assert has_element?(
-               view,
-               "#admin-queue a[href='/admin/review/renames']",
-               to_string(renames)
-             )
-    end
-
-    test "shows the rename proposals only when one is open", %{conn: conn} do
-      for item <- Import.list_gall_renames(), do: Repo.delete!(item)
-
-      {:ok, view, _html} = live(conn, ~p"/admin")
-      refute has_element?(view, "#admin-queue a[href='/admin/review/renames']")
-    end
-  end
-
-  describe "Admin navigation" do
-    setup %{conn: conn} do
-      user = %Auth0User{
-        id: "test-user-id",
-        email: "admin@test.com",
-        name: "Test Admin",
-        nickname: nil,
-        picture: nil,
-        roles: ["admin"]
-      }
-
-      conn =
-        conn
-        |> init_test_session(%{})
-        |> put_session(:current_user, user)
-        |> put_session(:db_display_name, "Test User")
-
-      {:ok, conn: conn}
-    end
-
-    test "leads with the domain screens, then the content ones", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
-
-      hrefs =
-        html
-        |> LazyHTML.from_document()
-        |> LazyHTML.query("#admin-nav a[data-nav-href]")
-        |> LazyHTML.attribute("href")
-
-      assert hrefs == ~w(/admin /admin/review /admin/galls /admin/taxonomy /admin/sources
-                         /admin/glossary /admin/articles /admin/keys)
-    end
-
-    test "has the profile link and no link to a deleted screen", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "#admin-nav a[href='/admin/profile']")
-      refute has_element?(view, "#admin-nav a[href='/admin/images']")
-    end
-  end
-
-  describe "Superadmin dashboard" do
-    setup %{conn: conn} do
-      user = %Auth0User{
-        id: "test-superadmin-id",
-        email: "superadmin@test.com",
-        name: "Super Admin",
-        nickname: nil,
-        picture: nil,
-        roles: ["superadmin"]
-      }
-
-      conn =
-        conn
-        |> init_test_session(%{})
-        |> put_session(:current_user, user)
-        |> put_session(:db_display_name, "Super Admin")
-
-      {:ok, conn: conn}
-    end
-
-    test "shows jobs dashboard in the super admin section", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/admin")
-
-      assert html =~ "Super Admin"
-      assert html =~ "Jobs Dashboard"
-      assert has_element?(view, "a[href='/admin/jobs']")
-    end
-
-    test "links to the vocabulary, on the dashboard and in the nav", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
-
-      assert has_element?(view, "a[href='/admin/vocabulary']", "Vocabulary")
-      assert has_element?(view, "#admin-nav a[href='/admin/vocabulary']", "Vocabulary")
-    end
-  end
-
-  describe "Admin authentication requirement" do
-    test "redirects unauthenticated users", %{conn: conn} do
-      # Without session setup, should redirect
-      conn = get(conn, ~p"/admin")
-
-      # Should redirect to login or home
-      assert redirected_to(conn) =~ "/" or redirected_to(conn) =~ "/auth"
     end
   end
 end

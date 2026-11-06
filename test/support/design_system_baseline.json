@@ -1,0 +1,18 @@
+{
+  "lib/gallformers_web/components/layouts/root.html.heex": {
+    "hex_color": 3,
+    "inline_style": 1
+  },
+  "lib/gallformers_web/design_system/conformance.ex": {
+    "dark_variant": 3,
+    "inline_style": 1,
+    "radius": 1,
+    "shadow": 3
+  },
+  "lib/gallformers_web/live/admin/profile_live.ex": {
+    "radius": 1
+  },
+  "lib/gallformers_web/plugs/enforce_read_only.ex": {
+    "inline_style": 2
+  }
+}

@@ -1,0 +1,77 @@
+/* ==========================================================================
+   Gallformers design system — element defaults
+   In @layer base, so any utility class on an element overrides these.
+   Documentation: docs/design-system/foundations.md
+   ========================================================================== */
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Keep #anchor targets clear of the sticky site header. */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--gf-paper);
+    color: var(--gf-ink);
+    font-size: var(--gf-fs-body);
+    line-height: 1.5;
+  }
+
+  /* LiveView wrapper divs take no part in layout. */
+  [data-phx-session], [data-phx-teleported-src] { display: contents; }
+
+  /* Headings inherit color, so they read correctly on any surface. */
+  h1, h2, h3 {
+    font-family: var(--font-brand);
+    text-wrap: balance;
+  }
+  h1 { font-size: var(--gf-fs-page); font-weight: 650; line-height: 1.15; }
+  h2 { font-size: var(--gf-fs-section); font-weight: 650; line-height: 1.25; }
+  h3 { font-size: var(--gf-fs-subsection); font-weight: 600; line-height: 1.3; }
+  h4, h5, h6 { font-size: var(--gf-fs-body); font-weight: 600; line-height: 1.4; }
+
+  /* Scientific names are italic. League Spartan has no italic, so italics
+     inside brand-face text switch to Source Sans, which has true italics. */
+  :is(h1, h2, h3) :is(em, i) { font-family: var(--font-sans); }
+
+  strong, b { font-weight: 650; }
+
+  a { color: var(--gf-link); text-decoration: none; }
+  a:hover { color: var(--gf-link-hover); text-decoration: underline; }
+
+  :focus-visible { outline: 2px solid var(--gf-focus); outline-offset: 2px; }
+
+  ::placeholder { color: var(--gf-muted); opacity: 1; }
+
+  /* search_field draws its own clear button; hide WebKit's. */
+  input[type="search"]::-webkit-search-cancel-button { appearance: none; }
+
+  hr { border: 0; border-top: 1px solid var(--gf-line); }
+
+  blockquote {
+    margin: 0.75rem 0;
+    padding-left: 1rem;
+    border-left: 3px solid var(--gf-line-strong);
+    font-family: var(--font-serif);
+    color: var(--gf-ink-2);
+  }
+
+  figure { margin: 1.5rem 0; text-align: center; }
+  figure img { display: block; margin: 0 auto; max-width: 100%; height: auto; border-radius: var(--radius-panel); }
+  figcaption { margin-top: 0.5rem; font-size: var(--gf-fs-meta); font-style: italic; color: var(--gf-muted); }
+
+  code, kbd, samp { font-size: 0.9em; }
+
+  /* Digits that line up in columns. */
+  table { font-variant-numeric: tabular-nums; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}

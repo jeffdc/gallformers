@@ -1,12 +1,14 @@
 defmodule GallformersWeb.KeyLive do
   @moduledoc """
-  LiveView for displaying an interactive dichotomous identification key.
-
-  Renders all couplets with interactive navigation. Users click leads to
-  follow the key, with their path highlighted and unvisited couplets dimmed.
+  An interactive dichotomous key (design system, matter bc0d): every
+  couplet as a `key_couplet`, the path as a `key_path` (a bar on narrow
+  screens, a panel beside the key on wide ones). Choosing a lead follows
+  the key; `?path=1:0,2:3` replays a path (couplet:lead index). A missing
+  key is a 404.
   """
   use GallformersWeb, :live_view
 
+  alias Gallformers.Catalog
   alias Gallformers.ContentImages
   alias Gallformers.Keys
   alias Gallformers.Keys.Key
@@ -28,28 +30,16 @@ defmodule GallformersWeb.KeyLive do
            page_json_ld: nil,
            key: key,
            image_url_map: image_url_map,
+           gall_names: gall_names(key),
            pdf_urls: Keys.pdf_urls(key),
            key_has_images: Key.key_has_images?(key),
            path: [],
            active_couplet: "1",
-           terminal: nil,
-           error: nil
+           terminal: nil
          )}
 
       {:error, :not_found} ->
-        {:ok,
-         assign(socket,
-           page_title: "Key Not Found",
-           page_description: "The requested identification key was not found.",
-           page_url: nil,
-           page_image: nil,
-           page_json_ld: nil,
-           key: nil,
-           path: [],
-           active_couplet: nil,
-           terminal: nil,
-           error: "Key Not Found"
-         )}
+        raise GallformersWeb.NotFoundError, "No key #{slug}"
     end
   end
 
@@ -125,9 +115,9 @@ defmodule GallformersWeb.KeyLive do
     %{key: key, path: path, terminal: terminal} = socket.assigns
 
     steps =
-      Enum.map(path, fn {couplet_num, lead_index, _label} ->
+      Enum.map(path, fn {couplet_num, lead_index, _label} = step ->
         lead = Enum.at(key.couplets[couplet_num].leads, lead_index)
-        "#{couplet_num}. #{lead.text}"
+        "#{step_name(step)}. #{lead.text}"
       end)
 
     result_lines =
@@ -142,8 +132,7 @@ defmodule GallformersWeb.KeyLive do
         []
       end
 
-    path_param = encode_path(path)
-    url_path = "/keys/#{key.slug}?path=#{path_param}"
+    url_path = path_link(key, path)
 
     body = Enum.join(steps ++ result_lines, "\n")
     text = "#{key.title}\n{{KEY_URL}}\n\n#{body}"
@@ -152,7 +141,7 @@ defmodule GallformersWeb.KeyLive do
   end
 
   def handle_event("clipboard_copy_success", _params, socket) do
-    {:noreply, put_flash(socket, :info, "Path copied to clipboard")}
+    {:noreply, put_flash(socket, :info, "Copied")}
   end
 
   def handle_event("clipboard_copy_error", _params, socket) do
@@ -205,6 +194,8 @@ defmodule GallformersWeb.KeyLive do
     end
   end
 
+  defp path_link(key, path), do: "/keys/#{key.slug}?path=#{encode_path(path)}"
+
   defp encode_path(path) do
     Enum.map_join(path, ",", fn {couplet_num, lead_index, _label} ->
       "#{couplet_num}:#{lead_index}"
@@ -249,6 +240,17 @@ defmodule GallformersWeb.KeyLive do
     end
   end
 
+  # The names of the Galls the key's results point to, for results that
+  # cover several Galls.
+  defp gall_names(key) do
+    key.couplets
+    |> Enum.flat_map(fn {_number, couplet} ->
+      Enum.flat_map(couplet.leads, &(&1.destination[:species_ids] || []))
+    end)
+    |> Catalog.list_galls_by_id()
+    |> Map.new(&{&1.id, &1.name})
+  end
+
   # Collect all content_image_ids from couplet images and resolve to CDN URLs
   defp build_content_image_url_map(key) do
     key.couplets
@@ -267,88 +269,88 @@ defmodule GallformersWeb.KeyLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <%= if @error do %>
-        <div class="mx-auto max-w-4xl">
-          <div class="bg-gray-50 rounded-lg p-8 text-center">
-            <h1 class="text-2xl font-bold text-gray-700 mb-2">{@error}</h1>
-            <p class="text-gray-600 mb-4">The requested identification key could not be found.</p>
-            <.link href={~p"/keys"} class="hover:underline">
-              Browse all keys
+      <div id="key-display" phx-hook="ScrollToCouplet" class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/keys"}>Keys</:crumb>
+          <:title>{@key.title}</:title>
+          <:meta :if={@key.subtitle} label="Covers">{@key.subtitle}</:meta>
+          <:meta :if={@key.authors != []} label="By">{Enum.join(@key.authors, ", ")}</:meta>
+          <:meta label="Couplets">{length(Keys.couplet_numbers(@key))}</:meta>
+          <:meta :if={@key.citation} label="Source">
+            <.link
+              :if={@key.citation_url}
+              href={@key.citation_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {@key.citation}
             </.link>
-          </div>
-        </div>
-      <% else %>
-        <div id="key-display" phx-hook="ScrollToCouplet">
-          <%!-- Header --%>
-          <div class="mx-auto max-w-4xl mb-4">
-            <div class="mb-4">
-              <.link href={~p"/keys"} class="hover:underline inline-flex items-center gap-1 text-sm">
-                ← Back to Keys
-              </.link>
-            </div>
+            <span :if={!@key.citation_url}>{@key.citation}</span>
+          </:meta>
+          <:action>
+            <.button
+              href={@pdf_urls.text_only}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="secondary"
+              size="sm"
+              icon="ph-file-pdf"
+            >
+              PDF
+            </.button>
+          </:action>
+          <:action :if={@key_has_images}>
+            <.button
+              href={@pdf_urls.with_images}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="secondary"
+              size="sm"
+              icon="ph-file-pdf"
+            >
+              PDF with images
+            </.button>
+          </:action>
+          <:description :if={@key.description}>{@key.description}</:description>
+        </.page_header>
 
-            <h1 class="text-3xl font-bold text-gf-maroon">{@key.title}</h1>
-            <p :if={@key.subtitle} class="text-xl text-gf-autumn mt-1">{@key.subtitle}</p>
-
-            <div :if={@key.authors != []} class="text-gray-600 mt-2">
-              By {Enum.join(@key.authors, ", ")}
-            </div>
-
-            <p :if={@key.citation} class="text-sm text-gray-500 mt-2">
-              <%= if @key.citation_url do %>
-                <a
-                  href={@key.citation_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hover:underline"
-                >
-                  {@key.citation}
-                </a>
-              <% else %>
-                {@key.citation}
-              <% end %>
-            </p>
-
-            <p :if={@key.description} class="text-gray-700 mt-4">{@key.description}</p>
-
-            <div class="flex gap-3 mt-4">
-              <a
-                href={@pdf_urls.text_only}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1.5 text-sm text-gf-maroon hover:underline"
-              >
-                <.icon name="ph-file-pdf" class="w-4 h-4" /> Download PDF
-              </a>
-              <a
-                :if={@key_has_images}
-                href={@pdf_urls.with_images}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1.5 text-sm text-gf-maroon hover:underline"
-              >
-                <.icon name="ph-file-pdf" class="w-4 h-4" /> Download PDF (with images)
-              </a>
-            </div>
-          </div>
-
-          <%!-- Path tracker --%>
-          <.path_tracker path={@path} terminal={@terminal} />
-
-          <%!-- All couplets --%>
-          <div class="mx-auto max-w-4xl mt-4 space-y-3">
-            <.couplet
-              :for={number <- Keys.couplet_numbers(@key)}
-              number={number}
-              couplet={@key.couplets[number]}
-              key_slug={@key.slug}
-              state={couplet_state(number, @active_couplet, @path)}
-              chosen_lead_index={chosen_lead_for(number, @path)}
-              image_url_map={@image_url_map}
+        <div class="gf-with-rail max-w-7xl">
+          <div class="min-w-0">
+            <.key_path
+              layout={:bar}
+              key={@key}
+              path={@path}
+              terminal={@terminal}
+              link={path_link(@key, @path)}
+              gall_names={@gall_names}
+              class="lg:hidden"
             />
+            <ol class="mt-block flex flex-col gap-1 lg:mt-0">
+              <.key_couplet
+                :for={number <- Keys.couplet_numbers(@key)}
+                number={number}
+                couplet={@key.couplets[number]}
+                key_slug={@key.slug}
+                state={couplet_state(number, @active_couplet, @path)}
+                chosen={chosen_lead_for(number, @path)}
+                image_url_map={@image_url_map}
+                gall_names={@gall_names}
+              />
+            </ol>
           </div>
+
+          <.rail width={:narrow} class="max-lg:hidden lg:sticky lg:top-header lg:self-start lg:pt-2">
+            <.key_path
+              layout={:panel}
+              key={@key}
+              path={@path}
+              terminal={@terminal}
+              link={path_link(@key, @path)}
+              gall_names={@gall_names}
+            />
+          </.rail>
         </div>
-      <% end %>
+      </div>
     </Layouts.app>
     """
   end

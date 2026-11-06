@@ -124,10 +124,10 @@ defmodule GallformersWeb.FactsComponents do
     <div
       id={@id}
       class={[
-        "mt-4 rounded-md border px-3 py-2 text-sm",
+        "mt-4 rounded-ctl border px-3 py-2 text-meta",
         if(@ready,
-          do: "border-green-200 bg-green-50 text-green-900",
-          else: "border-yellow-200 bg-yellow-50 text-yellow-900"
+          do: "border-line bg-ok-bg text-ok",
+          else: "border-line bg-warn-bg text-warn"
         )
       ]}
     >
@@ -140,7 +140,7 @@ defmodule GallformersWeb.FactsComponents do
         }>
           (<span :for={{s, i} <- Enum.with_index(@steps)}><span :if={i > 0}>, </span><.link
               navigate={s.path}
-              class="underline hover:text-gf-maroon"
+              class="underline hover:text-brand"
             >{s.title} {s.n}</.link></span>)</span>. What waits on them is marked waiting.
       <% end %>
     </div>
@@ -175,7 +175,7 @@ defmodule GallformersWeb.FactsComponents do
         phx-click={@on_filter}
         phx-value-status="all"
         aria-pressed={to_string(@filter == nil)}
-        class={["gf-pill text-xs px-2 py-0.5", pill_class(@filter == nil)]}
+        class={["gf-pill text-caption px-2 py-0.5", pill_class(@filter == nil)]}
       >
         All <span class="tabular-nums">{@total}</span>
       </button>
@@ -187,7 +187,7 @@ defmodule GallformersWeb.FactsComponents do
         phx-value-status={status}
         aria-pressed={to_string(@filter == status)}
         class={[
-          "gf-pill text-xs px-2 py-0.5 inline-flex items-center gap-1",
+          "gf-pill text-caption px-2 py-0.5 inline-flex items-center gap-1",
           pill_class(@filter == status),
           Map.get(@counts, status, 0) == 0 && "opacity-60"
         ]}
@@ -203,11 +203,11 @@ defmodule GallformersWeb.FactsComponents do
   defp pill_class(true), do: "gf-pill-selected"
   defp pill_class(false), do: "gf-pill-unselected"
 
-  defp dot_class(:new), do: "bg-green-600"
-  defp dot_class(:held), do: "bg-gray-400"
-  defp dot_class(:conflict), do: "bg-red-600"
-  defp dot_class(:waiting), do: "bg-yellow-500"
-  defp dot_class(:dropped), do: "border border-gray-400"
+  defp dot_class(:new), do: "bg-ok"
+  defp dot_class(:held), do: "bg-muted"
+  defp dot_class(:conflict), do: "bg-danger"
+  defp dot_class(:waiting), do: "bg-warn"
+  defp dot_class(:dropped), do: "border border-line-strong"
 
   defp filter_text(status), do: Map.fetch!(@filter_text, status)
 
@@ -244,7 +244,7 @@ defmodule GallformersWeb.FactsComponents do
 
     ~H"""
     <div id={@id} class="grid gap-3">
-      <p :if={@shown == []} class="text-sm italic text-gray-500" data-role="empty">{@empty}</p>
+      <p :if={@shown == []} class="text-meta italic text-muted" data-role="empty">{@empty}</p>
       <.facts_gall
         :for={g <- @shown}
         id={"#{@id}-gall-#{dom(g.key)}"}
@@ -307,9 +307,9 @@ defmodule GallformersWeb.FactsComponents do
 
     ~H"""
     <section id={@id} class="gf-card overflow-hidden" data-role="facts-gall">
-      <header class="px-3 py-2 bg-gray-50 border-b border-gray-200">
+      <header class="px-3 py-2 bg-surface-2 border-b border-line">
         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h3 class="gf-facts-title text-gray-900">
+          <h3 class="gf-facts-title text-ink">
             <%= cond do %>
               <% @mode == :public and is_integer(@gall.gall_id) -> %>
                 <.link navigate={"/gall/#{@gall.gall_id}"} class="hover:underline">
@@ -327,18 +327,18 @@ defmodule GallformersWeb.FactsComponents do
             href={"/gall/#{@gall.gall_id}"}
             target="_blank"
             rel="noopener"
-            class="text-xs text-gf-maroon hover:underline"
+            class="text-caption text-brand hover:underline"
           >
             matches {@gall.name || "Gall #{@gall.gall_id}"} ↗
           </.link>
         </div>
         <p
           :if={@gall.name_as_written && @gall.name_as_written != @gall.name}
-          class="text-xs text-gray-500"
+          class="text-caption text-muted"
         >
           The Source: “{@gall.name_as_written}”
         </p>
-        <p :if={@mode == :preview and @gall.status == :waiting} class="mt-0.5 text-xs text-yellow-900">
+        <p :if={@mode == :preview and @gall.status == :waiting} class="mt-0.5 text-caption text-warn">
           <span class="gf-mark gf-mark-waiting">waiting</span>
           Which Gall this is waits on
           <.question_link
@@ -347,7 +347,7 @@ defmodule GallformersWeb.FactsComponents do
             questions={@questions}
           />; its Facts wait with it.
         </p>
-        <p :if={@mode == :preview and @gall.status == :dropped} class="mt-0.5 text-xs text-gray-600">
+        <p :if={@mode == :preview and @gall.status == :dropped} class="mt-0.5 text-caption text-ink-2">
           <span class="gf-mark gf-mark-dropped">dropped</span>
           Left out{if @gall.why, do: ": #{@gall.why}"}; its Facts are not written.
         </p>
@@ -364,11 +364,13 @@ defmodule GallformersWeb.FactsComponents do
           <%= if category == :traits do %>
             <div
               :for={{trait, rows} <- Enum.sort_by(list, fn {t, _} -> to_string(t) end)}
-              class="grid sm:grid-cols-[minmax(5rem,8rem)_minmax(0,1fr)] gap-x-2 border-t border-gray-100 first-of-type:border-t-0"
+              class="flex flex-col gap-x-2 border-t border-line first-of-type:border-t-0 sm:flex-row"
               data-trait={trait}
             >
-              <span class="pt-1 sm:py-1 text-xs text-gray-600">{humanize(trait)}</span>
-              <ul class="divide-y divide-gray-100">
+              <span class="pt-1 text-caption text-ink-2 sm:w-32 sm:shrink-0 sm:py-1">
+                {humanize(trait)}
+              </span>
+              <ul class="min-w-0 flex-1 divide-y divide-line">
                 <.fact_row
                   :for={e <- rows}
                   entry={e}
@@ -383,7 +385,7 @@ defmodule GallformersWeb.FactsComponents do
               </ul>
             </div>
           <% else %>
-            <ul class="divide-y divide-gray-100">
+            <ul class="divide-y divide-line">
               <.fact_row
                 :for={e <- list}
                 entry={e}
@@ -398,7 +400,7 @@ defmodule GallformersWeb.FactsComponents do
             </ul>
           <% end %>
         </div>
-        <p :if={@categories == []} class="text-xs italic text-gray-500">No Facts.</p>
+        <p :if={@categories == []} class="text-caption italic text-muted">No Facts.</p>
       </div>
     </section>
     """
@@ -438,9 +440,9 @@ defmodule GallformersWeb.FactsComponents do
       id={@id}
       class="gf-card overflow-hidden"
     >
-      <header class="px-3 py-2 bg-gray-50 border-b border-gray-200">
-        <h3 class="gf-facts-title text-gray-900">Taxonomy changes</h3>
-        <p class="text-xs text-gray-500">
+      <header class="px-3 py-2 bg-surface-2 border-b border-line">
+        <h3 class="gf-facts-title text-ink">Taxonomy changes</h3>
+        <p class="text-caption text-muted">
           The taxa approving adds to the tree, and what the Source says of names.
         </p>
       </header>
@@ -449,32 +451,32 @@ defmodule GallformersWeb.FactsComponents do
           <h4 class="gf-facts-category">
             New taxa <span class="font-normal tabular-nums">{length(@taxonomy.new_taxa)}</span>
           </h4>
-          <ul class="divide-y divide-gray-100">
+          <ul class="divide-y divide-line">
             <li
               :for={t <- @taxonomy.new_taxa}
               id={"#{@id}-taxon-#{dom("#{t.batch_id}-#{t.ref}")}"}
-              class="flex flex-wrap items-baseline gap-x-2 py-1 text-sm"
+              class="flex flex-wrap items-baseline gap-x-2 py-1 text-meta"
             >
               <span class="gf-mark gf-mark-new">new</span>
-              <span class="font-medium text-gray-900">
+              <span class="font-medium text-ink">
                 <.taxon_name name={t.name || t.name_as_written || "?"} rank={rank(t.rank)} />
               </span>
-              <span :if={t.rank} class="text-xs text-gray-500">{t.rank}</span>
+              <span :if={t.rank} class="text-caption text-muted">{t.rank}</span>
               <%= cond do %>
                 <% t.parent -> %>
-                  <span class="text-xs text-gray-600">
+                  <span class="text-caption text-ink-2">
                     under <.taxon_name name={t.parent.name} rank={rank(t.parent.rank)} />
                     <span :if={t.parent[:new]}>
                       (new)
                     </span>
                   </span>
                 <% t.unplaced -> %>
-                  <span class="text-xs text-yellow-900">unplaced in the tree</span>
+                  <span class="text-caption text-warn">unplaced in the tree</span>
                 <% true -> %>
               <% end %>
               <span
                 :if={t.name_as_written && t.name_as_written != t.name}
-                class="text-xs text-gray-500"
+                class="text-caption text-muted"
               >
                 “{t.name_as_written}”
               </span>
@@ -485,7 +487,7 @@ defmodule GallformersWeb.FactsComponents do
           <h4 class="gf-facts-category">
             Acts <span class="font-normal tabular-nums">{length(@acts)}</span>
           </h4>
-          <ul class="divide-y divide-gray-100">
+          <ul class="divide-y divide-line">
             <.fact_row
               :for={e <- @acts}
               entry={e}
@@ -531,24 +533,24 @@ defmodule GallformersWeb.FactsComponents do
       )
 
     ~H"""
-    <li id={@row_id} class="py-1 text-sm scroll-mt-32" data-status={@entry.status}>
+    <li id={@row_id} class="py-1 text-meta scroll-mt-32" data-status={@entry.status}>
       <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <.fact_mark entry={@entry} mode={@mode} />
-        <span :if={@entry.stance == :deny} class="text-xs font-semibold text-red-800">not</span>
+        <span :if={@entry.stance == :deny} class="text-caption font-semibold text-danger">not</span>
         <span class={[
-          "inline-flex min-w-0 flex-wrap items-baseline gap-x-1 text-gray-900",
-          @entry.status == :dropped && "line-through text-gray-500"
+          "inline-flex min-w-0 flex-wrap items-baseline gap-x-1 text-ink",
+          @entry.status == :dropped && "line-through text-muted"
         ]}>
           <.fact_value entry={@entry} />
         </span>
-        <span :if={@written != []} class="text-xs text-gray-500" title="The Source's words">
+        <span :if={@written != []} class="text-caption text-muted" title="The Source's words">
           {Enum.map_join(@written, " · ", &"“#{&1}”")}
         </span>
         <span class="ml-auto flex items-center gap-2">
           <button
             :if={@quotes != []}
             type="button"
-            class="text-xs text-gf-maroon hover:underline"
+            class="text-caption text-brand hover:underline"
             phx-click={JS.toggle_class("hidden", to: "##{@row_id}-quotes")}
             aria-controls={"#{@row_id}-quotes"}
           >
@@ -563,7 +565,7 @@ defmodule GallformersWeb.FactsComponents do
           />
         </span>
       </div>
-      <p :if={@mode == :preview and @entry.status == :waiting} class="text-xs text-yellow-900">
+      <p :if={@mode == :preview and @entry.status == :waiting} class="text-caption text-warn">
         Waits on
         <.question_link
           id={"#{@row_id}-question"}
@@ -576,21 +578,21 @@ defmodule GallformersWeb.FactsComponents do
           (@mode == :preview and @entry.status in [:conflict, :dropped] and @entry.why) &&
             not @dropped_by_edit
         }
-        class={["text-xs", if(@entry.status == :conflict, do: "text-red-800", else: "text-gray-600")]}
+        class={["text-caption", if(@entry.status == :conflict, do: "text-danger", else: "text-ink-2")]}
       >
         {@entry.why}
       </p>
-      <p :if={@entry.words.statement_text} class="text-xs text-gray-600">
+      <p :if={@entry.words.statement_text} class="text-caption text-ink-2">
         The Source: {@entry.words.statement_text}
       </p>
       <ul :if={@mode == :preview and @entry.edits != []} class="mt-0.5 grid gap-0.5">
         <li
           :for={edit <- @entry.edits}
           id={"#{@row_id}-edit-#{edit.id}"}
-          class="flex flex-wrap items-baseline gap-x-2 text-xs text-gray-700"
+          class="flex flex-wrap items-baseline gap-x-2 text-caption text-ink-2"
           data-role="edit"
         >
-          <.icon name="ph-pencil-simple" class="size-3 text-gray-400" />
+          <.icon name="ph-pencil-simple" class="size-3 text-muted" />
           <span>
             {edit_text(edit)} by {edit.author_name}<span :if={edit.note}>: {edit.note}</span>
           </span>
@@ -600,7 +602,7 @@ defmodule GallformersWeb.FactsComponents do
             type="button"
             phx-click="edit_undo"
             phx-value-id={edit.id}
-            class="text-gf-maroon hover:underline"
+            class="text-brand hover:underline"
           >
             Undo
           </button>
@@ -644,7 +646,7 @@ defmodule GallformersWeb.FactsComponents do
       <button
         id={"#{@row_id}-menu-button"}
         type="button"
-        class="inline-flex items-center gap-0.5 text-xs text-gray-600 hover:text-gf-maroon"
+        class="inline-flex items-center gap-0.5 text-caption text-ink-2 hover:text-brand"
         aria-haspopup="true"
         aria-controls={"#{@row_id}-menu"}
         phx-click={JS.toggle_class("hidden", to: "##{@row_id}-menu")}
@@ -654,7 +656,7 @@ defmodule GallformersWeb.FactsComponents do
       <span
         id={"#{@row_id}-menu"}
         role="menu"
-        class="hidden absolute right-0 z-20 mt-1 grid min-w-[9rem] rounded-md border border-gray-200 bg-white py-1 shadow-md"
+        class="hidden absolute right-0 z-20 mt-1 grid min-w-36 rounded-ctl border border-line bg-surface py-1 shadow-float"
         phx-click-away={JS.add_class("hidden", to: "##{@row_id}-menu")}
       >
         <button
@@ -662,7 +664,7 @@ defmodule GallformersWeb.FactsComponents do
           id={"#{@row_id}-edit-#{kind}"}
           type="button"
           role="menuitem"
-          class="px-3 py-1 text-left text-xs text-gray-700 hover:bg-gray-50"
+          class="px-3 py-1 text-left text-caption text-ink-2 hover:bg-surface-2"
           phx-click={
             JS.push("edit_open", value: %{key: @key, kind: kind})
             |> JS.add_class("hidden", to: "##{@row_id}-menu")
@@ -711,7 +713,7 @@ defmodule GallformersWeb.FactsComponents do
 
     ~H"""
     <%= if @target do %>
-      <.link id={@id} navigate={@target.path} class="underline hover:text-gf-maroon">
+      <.link id={@id} navigate={@target.path} class="underline hover:text-brand">
         a question in {@target.title} →
       </.link>
     <% else %>
@@ -768,12 +770,12 @@ defmodule GallformersWeb.FactsComponents do
     ~H"""
     <%= case @endpoints do %>
       <% :gall_to_gall -> %>
-        <span class="text-gray-600">{@v.label}</span> <.endpoint value={@v.object} />
+        <span class="text-ink-2">{@v.label}</span> <.endpoint value={@v.object} />
       <% :taxon_to_taxon_in_gall -> %>
-        <.endpoint value={@v.subject} /> <span class="text-gray-600">{@v.label}</span>
+        <.endpoint value={@v.subject} /> <span class="text-ink-2">{@v.label}</span>
         <.endpoint value={@v.object} />
       <% _ -> %>
-        <.endpoint value={@v.subject} /><span class="text-gray-600">· {@v.label}</span>
+        <.endpoint value={@v.subject} /><span class="text-ink-2">· {@v.label}</span>
     <% end %>
     """
   end
@@ -786,9 +788,9 @@ defmodule GallformersWeb.FactsComponents do
       <% @value -> %>
         <span class="font-medium">{@value}</span>
       <% @suggested -> %>
-        <span class="text-gray-500">suggested: {@suggested}</span>
+        <span class="text-muted">suggested: {@suggested}</span>
       <% true -> %>
-        <span class="text-gray-400">no value yet</span>
+        <span class="text-muted">no value yet</span>
     <% end %>
     """
   end
@@ -803,7 +805,7 @@ defmodule GallformersWeb.FactsComponents do
       )
 
     ~H"""
-    <span :if={@prefix} class="text-gray-600">{@prefix}</span>
+    <span :if={@prefix} class="text-ink-2">{@prefix}</span>
     <span class="font-medium">{@place || "an unknown place"}</span>
     """
   end
@@ -813,7 +815,7 @@ defmodule GallformersWeb.FactsComponents do
 
     ~H"""
     <span class="font-medium">{@v.name}</span>
-    <span :if={@v[:kind]} class="text-xs text-gray-500">{humanize(@v.kind)}</span>
+    <span :if={@v[:kind]} class="text-caption text-muted">{humanize(@v.kind)}</span>
     """
   end
 
@@ -828,7 +830,7 @@ defmodule GallformersWeb.FactsComponents do
       )
 
     ~H"""
-    <span class="line-clamp-2 text-gray-800">{if @text != "", do: @text, else: "A description"}</span>
+    <span class="line-clamp-2 text-ink">{if @text != "", do: @text, else: "A description"}</span>
     """
   end
 
@@ -836,9 +838,9 @@ defmodule GallformersWeb.FactsComponents do
     assigns = assign(assigns, v: v)
 
     ~H"""
-    <span class="text-gray-600">{humanize(@v.qualifier)}:</span><span class="font-medium">{@v.value}</span><span
+    <span class="text-ink-2">{humanize(@v.qualifier)}:</span><span class="font-medium">{@v.value}</span><span
       :if={@v[:of_ref]}
-      class="text-xs text-gray-500"
+      class="text-caption text-muted"
     >(of {@v.of_ref})</span>
     """
   end
@@ -847,26 +849,26 @@ defmodule GallformersWeb.FactsComponents do
     assigns = assign(assigns, kind: kind, v: v)
 
     ~H"""
-    <span class="text-xs text-gray-600">{humanize(@kind)}</span>
+    <span class="text-caption text-ink-2">{humanize(@kind)}</span>
     <.endpoint :if={@v[:taxon]} value={@v.taxon} show_rank />
-    <span :if={@v[:name]} class="text-gray-600">as <em>{@v.name}</em></span>
-    <span :if={@v[:parent]} class="text-gray-600">under <.endpoint value={@v.parent} /></span>
-    <span :if={@v[:accepted]} class="text-gray-600">
+    <span :if={@v[:name]} class="text-ink-2">as <em>{@v.name}</em></span>
+    <span :if={@v[:parent]} class="text-ink-2">under <.endpoint value={@v.parent} /></span>
+    <span :if={@v[:accepted]} class="text-ink-2">
       synonym of <.endpoint value={@v.accepted} />
     </span>
-    <span :if={@v[:into]} class="text-gray-600">
+    <span :if={@v[:into]} class="text-ink-2">
       into
       <span :for={{t, i} <- Enum.with_index(@v.into)}>
         <span :if={i > 0}>, </span> <.endpoint value={t} />
       </span>
     </span>
-    <span :if={@v[:common_name]} class="text-gray-600">“{@v.common_name}”</span>
+    <span :if={@v[:common_name]} class="text-ink-2">“{@v.common_name}”</span>
     """
   end
 
   defp fact_value(assigns) do
     ~H"""
-    <span class="text-gray-500">{humanize(@entry.kind)}</span>
+    <span class="text-muted">{humanize(@entry.kind)}</span>
     """
   end
 
@@ -881,7 +883,7 @@ defmodule GallformersWeb.FactsComponents do
 
   defp endpoint(%{value: nil} = assigns) do
     ~H"""
-    <span class="text-gray-400">?</span>
+    <span class="text-muted">?</span>
     """
   end
 
@@ -897,14 +899,14 @@ defmodule GallformersWeb.FactsComponents do
     <span class="font-medium">
       <span
         :if={@show_rank and @rank not in [nil, :species]}
-        class="text-xs font-normal text-gray-600"
+        class="text-caption font-normal text-ink-2"
       >
         {@rank}
       </span>
       <%= if @name do %>
         <.taxon_name name={@name} rank={rank(@rank)} />
       <% else %>
-        <span class="text-gray-400">not settled</span>
+        <span class="text-muted">not settled</span>
       <% end %>
       <span :if={@new} class="gf-mark gf-mark-new">new</span>
     </span>

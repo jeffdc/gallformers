@@ -17,7 +17,7 @@ defmodule GallformersWeb.Admin.OpsLive do
     socket =
       socket
       |> assign(:current_user, current_user)
-      |> assign(:page_title, "Site Operations")
+      |> assign(:page_title, "Site operations")
       |> assign_settings()
 
     {:ok, socket}
@@ -63,60 +63,56 @@ defmodule GallformersWeb.Admin.OpsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <div class="max-w-2xl mx-auto space-y-8">
-        <%!-- Banner Settings --%>
-        <.card title="Site Banner" icon="ph-megaphone">
-          <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-sm font-medium text-gray-700">Banner Enabled</p>
-                <p class="text-xs text-gray-500">
-                  Show a notification banner at the top of every page.
-                </p>
-              </div>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex max-w-form flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin"}>Dashboard</:crumb>
+          <:title>Site operations</:title>
+          <:description>Switches that take effect on the live site at once.</:description>
+        </.page_header>
+
+        <.panel title="Site banner">
+          <div class="flex flex-col gap-block">
+            <div>
               <.toggle
                 id="banner-enabled"
                 name="banner_enabled"
                 checked={@banner_enabled}
+                label="Show the banner"
                 phx-click="toggle_banner"
               />
+              <p class="gf-hint">A notice across the top of every page.</p>
             </div>
 
-            <form id="banner-text-form" phx-submit="save_banner_text">
+            <form id="banner-text-form" phx-submit="save_banner_text" class="flex flex-col gap-2">
               <.input
                 id="banner-text"
                 name="banner_text"
                 type="text"
-                label="Banner Text"
+                label="Banner text"
                 value={@banner_text}
               />
-              <div class="mt-3">
-                <.button type="submit" phx-disable-with="Saving...">
-                  Save Banner Text
+              <div>
+                <.button type="submit" variant="secondary" phx-disable-with="Saving…">
+                  Save banner text
                 </.button>
               </div>
             </form>
           </div>
-        </.card>
+        </.panel>
 
-        <%!-- Read-Only Mode --%>
-        <.card title="Read-Only Mode" icon="ph-lock">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-700">Read-Only Mode</p>
-              <p class="text-xs text-gray-500">
-                Block all write operations site-wide. Use during maintenance or migrations.
-              </p>
-            </div>
-            <.toggle
-              id="read-only"
-              name="read_only"
-              checked={@read_only}
-              phx-click="toggle_read_only"
-            />
-          </div>
-        </.card>
+        <.panel title="Read-only mode">
+          <.toggle
+            id="read-only"
+            name="read_only"
+            checked={@read_only}
+            label="Read-only"
+            phx-click="toggle_read_only"
+          />
+          <p class="gf-hint">
+            Blocks every change across the site. Use it during maintenance or migrations.
+          </p>
+        </.panel>
       </div>
     </Layouts.admin>
     """

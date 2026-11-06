@@ -101,7 +101,9 @@ defmodule GallformersWeb.Admin.ImagesComponentTest do
       assert has_element?(view, "#images [data-image-id='#{second.id}']")
       refute has_element?(view, "#images [data-image-id='#{second.id}'] [data-default-image]")
       refute has_element?(view, "#images [data-image-id='#{theirs.id}']")
-      assert render(view) =~ "Images (2)"
+      # The count sits beside the heading, muted (content.md: counts not in parentheses).
+      assert has_element?(view, "#images section h3", "Images")
+      assert has_element?(view, "#images section [data-part=count]", "2")
     end
 
     test "shows a taxon's images", %{conn: conn} do

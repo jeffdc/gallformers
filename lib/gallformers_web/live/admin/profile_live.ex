@@ -141,144 +141,120 @@ defmodule GallformersWeb.Admin.ProfileLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin
-      flash={@flash}
-      current_user={@current_user}
-      page_title={@page_title}
-    >
-      <:page_title_html>
-        Editing
-        <em class="font-bold">
-          {@current_user && Gallformers.Accounts.Auth0User.display_name(@current_user)}
-        </em>
-      </:page_title_html>
-      <Layouts.admin_edit_layout
-        back_path={~p"/admin"}
-        back_label="Back to Dashboard"
-        public_url={if @user && @user.nickname, do: ~p"/user/#{@user.nickname}"}
-      >
-        <:intro>
-          Your display name is used anywhere we display data change attribution and timestamps. It will be publicly visible.
-          Your About blurb and profile links will be visible on the About page if you opt in below.
-        </:intro>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin"}>Dashboard</:crumb>
+          <:title>Your profile</:title>
+          <:description>
+            Your display name is shown, publicly, wherever a change is credited. Your About blurb and links appear on the About page if you choose to be listed there.
+          </:description>
+          <:action :if={@user && @user.nickname}>
+            <.button
+              href={~p"/user/#{@user.nickname}"}
+              target="_blank"
+              variant="ghost"
+              size="sm"
+              icon="ph-arrow-square-out"
+            >
+              View on site
+            </.button>
+          </:action>
+        </.page_header>
 
-        <%= if @form do %>
-          <.form for={@form} id="profile-form" phx-change="validate" phx-submit="save">
-            <%!-- Display Name --%>
-            <div class="mb-3">
-              <.input
-                field={@form[:display_name]}
-                type="text"
-                label="Display Name:"
-                placeholder="How you want to be known"
-                required
-              />
-            </div>
+        <.notice :if={!@form} kind={:danger}>
+          Your profile couldn't be created or loaded. If this keeps happening, ask in Discord.
+        </.notice>
 
-            <%!-- Nickname (read-only, from Auth0) --%>
-            <div class="mb-3">
-              <label class="gf-label">Auth0 Nickname:</label>
-              <input
-                type="text"
-                value={@current_user.nickname || "Not set"}
-                disabled
-                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
-              />
-              <p class="mt-1 text-xs text-gray-500">
-                Synced from your Auth0 account and cannot be changed here
-              </p>
-            </div>
-
-            <%!-- Password Reset --%>
-            <div class="mb-3">
-              <label class="gf-label">Password:</label>
-              <a
-                href={Accounts.password_reset_url()}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 text-sm text-gf-maroon hover:underline"
-              >
-                Reset your password on Auth0 <.icon name="ph-arrow-square-out" class="w-4 h-4" />
-              </a>
-            </div>
-
-            <%!-- About Me --%>
-            <div class="mb-3">
-              <.input
-                field={@form[:about_me]}
-                type="textarea"
-                label="About Me:"
-                rows="4"
-                placeholder="Tell us a bit about yourself..."
-              />
-            </div>
-
-            <%!-- iNaturalist Username --%>
-            <div class="mb-3">
-              <label class="gf-label">iNaturalist Username:</label>
-              <div class="flex items-center">
-                <span class="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-sm text-gray-500">
+        <div :if={@form} class="gf-with-rail">
+          <.form
+            for={@form}
+            id="profile-form"
+            phx-change="validate"
+            phx-submit="save"
+            class="flex max-w-form min-w-0 flex-col gap-block"
+          >
+            <.input
+              field={@form[:display_name]}
+              type="text"
+              label="Display name"
+              placeholder="How you want to be known"
+              required
+            />
+            <.input
+              field={@form[:about_me]}
+              type="textarea"
+              label="About me"
+              rows="4"
+              placeholder="A few words about yourself"
+            />
+            <div>
+              <label class="gf-label" for="profile-inat">iNaturalist username</label>
+              <div class="flex">
+                <span class="flex shrink-0 items-center whitespace-nowrap rounded-l-ctl border border-r-0 border-line-strong bg-surface-2 px-3 text-meta text-muted">
                   inaturalist.org/people/
                 </span>
                 <input
+                  id="profile-inat"
                   type="text"
                   name="user[inat_username]"
                   value={@inat_username}
                   placeholder="yourusername"
-                  class="flex-1 px-3 py-2 border border-gray-300 rounded-r text-sm focus:outline-none focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"
+                  class="gf-input min-w-0 flex-1 rounded-l-none"
                 />
               </div>
-              <p class="mt-1 text-xs text-gray-500">
-                Just enter your username, not the full URL
-              </p>
+              <p class="gf-hint">Just the username, not the whole address.</p>
             </div>
-
-            <%!-- Social Media URL --%>
-            <div class="mb-3">
-              <label class="gf-label">Social Media URL:</label>
+            <div>
+              <label class="gf-label" for="profile-social">Social media</label>
               <input
+                id="profile-social"
                 type="url"
                 name={@form[:social_url].name}
                 value={Phoenix.HTML.Form.input_value(@form, :social_url)}
                 placeholder="https://bsky.app/profile/youruserprofile"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"
+                class="gf-input"
               />
             </div>
-
-            <%!-- Personal Website URL --%>
-            <div class="mb-3">
-              <label class="gf-label">
-                Personal Website URL:
-              </label>
+            <div>
+              <label class="gf-label" for="profile-website">Website</label>
               <input
+                id="profile-website"
                 type="url"
                 name={@form[:personal_url].name}
                 value={Phoenix.HTML.Form.input_value(@form, :personal_url)}
                 placeholder="https://yourwebsite.com"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"
+                class="gf-input"
               />
             </div>
+            <.input type="checkbox" field={@form[:show_on_about]} label="List me on the About page" />
 
-            <%!-- Show on About Page --%>
-            <div class="mb-3">
-              <.input type="checkbox" field={@form[:show_on_about]} label="List me on the About page" />
-            </div>
-
-            <%!-- Buttons --%>
-            <div class="flex justify-end pt-4 border-t border-gray-200">
+            <div class="flex justify-end border-t border-line pt-block">
               <.form_actions form_dirty={@form_dirty} mode={@mode} />
             </div>
           </.form>
 
-          <.discard_confirm_modal show={@show_discard_confirm} />
-        <% else %>
-          <div class="p-4 bg-red-50 border border-red-200 rounded">
-            <p class="text-red-700">
-              Unable to create or load your profile. Please contact support if this problem persists.
-            </p>
-          </div>
-        <% end %>
-      </Layouts.admin_edit_layout>
+          <.rail width={:narrow}>
+            <.panel id="account" title="Your account">
+              <dl class="flex flex-col gap-1 text-ui">
+                <dt class="text-meta text-muted">Nickname</dt>
+                <dd class="text-ink">{@current_user.nickname || "Not set"}</dd>
+              </dl>
+              <p class="gf-hint">From your Auth0 account; it can't be changed here.</p>
+              <a
+                href={Accounts.password_reset_url()}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="mt-3 inline-flex items-center gap-1 text-ui"
+              >
+                Reset your password <.icon name="ph-arrow-square-out" class="size-4" />
+              </a>
+            </.panel>
+          </.rail>
+        </div>
+
+        <.discard_confirm_modal :if={@form} show={@show_discard_confirm} />
+      </div>
     </Layouts.admin>
     """
   end

@@ -27,18 +27,13 @@ defmodule GallformersWeb.GallLiveTest do
       assert html =~ "agamic"
     end
 
-    test "shows error for invalid ID format", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/gall/invalid")
-
-      assert html =~ "Invalid gall ID"
+    test "an ID that isn't a number is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/gall/invalid") end
     end
 
-    test "shows not found for a missing ID and for an ID that is not a Gall", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/gall/999999999")
-      assert html =~ "Gall not found"
-
-      {:ok, _view, html} = live(conn, ~p"/gall/10")
-      assert html =~ "Gall not found"
+    test "a missing ID and an ID that is not a Gall are 404s", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/gall/999999999") end
+      assert_error_sent 404, fn -> get(conn, ~p"/gall/10") end
     end
 
     test "an old ID excluded as a non-gall redirects (301) to the gall-lookalikes Article",
@@ -54,21 +49,21 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "shows the Inducer's taxonomy as a breadcrumb", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/gall/300")
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
 
       assert has_element?(view, "a[href='/family/Cynipidae']")
       assert has_element?(view, "a[href='/subfamily/Cynipinae']")
       assert has_element?(view, "a[href='/tribe/Cynipini']")
       assert has_element?(view, "a[href='/genus/Andricus']")
-      assert html =~ "Tribe:"
+      assert has_element?(view, "h1", "Andricus seedii")
     end
 
     test "shows Traits and abundance", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")
 
-      assert view |> element("div", ~r/Detachable:\s*Detachable/) |> has_element?()
-      assert view |> element("div", ~r/Abundance:\s*common/) |> has_element?()
-      assert render(view) =~ "Location:"
+      assert has_element?(view, "#gall-traits div", ~r/^\s*Detachable\s*Detachable\s*$/)
+      assert has_element?(view, "#gall-traits div", ~r/^\s*Abundance\s*common\s*$/)
+      assert has_element?(view, "#gall-traits", "Not recorded")
     end
 
     test "displays completion status badge", %{conn: conn} do
@@ -76,33 +71,31 @@ defmodule GallformersWeb.GallLiveTest do
       assert html =~ "Complete"
 
       {:ok, _view, html} = live(conn, ~p"/gall/301")
-      assert html =~ "In Progress"
+      assert html =~ "In progress"
     end
 
     test "shows common names and the Inducer's synonyms", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/gall/300")
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
 
-      assert html =~ "Common Name(s):"
-      assert html =~ "seed oak apple"
-      assert html =~ "Synonymy (1)"
-      assert html =~ "Callirhytis seedii"
+      assert has_element?(view, "header", "seed oak apple")
+      assert has_element?(view, "#gall-names", "seed oak apple")
+      assert has_element?(view, "#gall-names", "Callirhytis seedii")
     end
 
     test "shows former labels and codes in the names table, not as common names",
          %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/gall/304")
+      {:ok, view, _html} = live(conn, ~p"/gall/304")
 
-      refute html =~ "Common Name(s):"
-      assert html =~ "Synonymy (2)"
-      assert has_element?(view, "tr", ~r/Andricus q-seed-old-label\s*former label/)
-      assert has_element?(view, "tr", ~r/q-seed-code\s*code/)
+      refute has_element?(view, "#gall-names", "common name")
+      assert has_element?(view, "#gall-names", ~r/Andricus q-seed-old-label\s*\(former label\)/)
+      assert has_element?(view, "#gall-names", ~r/q-seed-code\s*\(code\)/)
     end
 
     test "lists the other generation as a related Gall", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/gall/300")
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
 
-      assert html =~ "Related Galls (1)"
-      assert has_element?(view, "a[href='/gall/301']")
+      assert has_element?(view, "header", "Other generation")
+      assert has_element?(view, "header a[href='/gall/301']")
     end
   end
 
@@ -189,36 +182,36 @@ defmodule GallformersWeb.GallLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
 
-      assert has_element?(view, "div", ~r/^\s*Shape:\s*globular \(oval, ovoid\)\s*$/)
-      assert has_element?(view, "div", ~r/^\s*Color:\s*red\s*$/)
+      assert has_element?(view, "#gall-traits div", ~r/^\s*Shape\s*globular \(oval, ovoid\)\s*$/)
+      assert has_element?(view, "#gall-traits div", ~r/^\s*Color\s*red\s*$/)
 
       assert has_element?(
                view,
-               "div",
-               ~r/^\s*Texture:\s*hairless; also described as “reticulate”\s*$/
+               "#gall-traits div",
+               ~r/^\s*Texture\s*hairless; also described as “reticulate”\s*$/
              )
 
-      assert has_element?(view, "div", ~r/^\s*Walls:\s*described as “papery”\s*$/)
+      assert has_element?(view, "#gall-traits div", ~r/^\s*Walls\s*described as “papery”\s*$/)
     end
   end
 
   describe "the admin link" do
-    test "an admin gets a link to the Gall page in admin; a visitor does not", %{conn: conn} do
+    test "an admin gets Edit; a visitor doesn't", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")
-      refute has_element?(view, "a[href='/admin/galls/300']")
+      refute has_element?(view, "a[href='/gall/300?edit']")
 
       {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
       {:ok, view, _html} = live(admin_conn, ~p"/gall/300")
-      assert has_element?(view, "a[href='/admin/galls/300']")
+      assert has_element?(view, "a[href='/gall/300?edit']", "Edit")
     end
 
-    test "an admin's image edit link goes to the Gall page's images", %{conn: conn} do
+    test "an admin's image edit link opens the image manager in Edit mode", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")
-      refute has_element?(view, "a[href='/admin/galls/300#images']")
+      refute has_element?(view, "#gall-images a[href='/gall/300?edit&photos']")
 
       {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
       {:ok, view, _html} = live(admin_conn, ~p"/gall/300")
-      assert has_element?(view, "#gall-images a[href='/admin/galls/300#images']")
+      assert has_element?(view, "#gall-images a[href='/gall/300?edit&photos']", "Edit photos")
     end
 
     test "a Gall with no images offers an admin to add them on the Gall page", %{conn: conn} do
@@ -226,7 +219,7 @@ defmodule GallformersWeb.GallLiveTest do
       {admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn)
       {:ok, view, _html} = live(admin_conn, ~p"/gall/#{gall.id}")
 
-      assert has_element?(view, "a[href='/admin/galls/#{gall.id}#images']", "Add images")
+      assert has_element?(view, "a[href='/gall/#{gall.id}?edit&photos']", "Add images")
     end
 
     test "no admin link goes to a deleted old screen", %{conn: conn} do
@@ -261,12 +254,6 @@ defmodule GallformersWeb.GallLiveTest do
       assert page_title(view) =~ "Andricus seedii (agamic)"
     end
 
-    test "sets page title for not found", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/gall/999999999")
-
-      assert page_title(view) =~ "Not Found"
-    end
-
     test "describes the Gall from its Traits", %{conn: conn} do
       html = conn |> get(~p"/gall/300") |> html_response(200)
 
@@ -289,13 +276,57 @@ defmodule GallformersWeb.GallLiveTest do
     end
   end
 
+  defp source_titles(html) do
+    html
+    |> LazyHTML.from_document()
+    |> LazyHTML.query("#gall-sources li a[href^='/source/']")
+    |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
+  end
+
   describe "Range map" do
+    test "Enlarge opens the large map in a dialog; closing returns to the card", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
+
+      view |> element("button", "Enlarge") |> render_click()
+      assert has_element?(view, "#range-dialog #gall-range-map-large")
+      refute has_element?(view, "#gall-range-map")
+
+      render_click(view, "close_map", %{})
+      refute has_element?(view, "#range-dialog")
+      assert has_element?(view, "#gall-range-map")
+    end
+
+    test "the map frames the native range, not the introduced one", %{conn: conn} do
+      import Gallformers.CatalogFixtures
+
+      oak = plant_fixture()
+      host_range_fixture(oak, [{"US-CA", "exact"}, {"RO-B", "exact", "introduced"}])
+      gall = gall_fixture()
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          DataCase.test_actor(),
+          %{type: "host_of", subject_taxon_id: oak.id, object_gall_id: gall.id},
+          confirm(source_fixture("Weld", "1959"))
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+      map = view |> element("#gall-range-map") |> render()
+
+      assert map =~ "RO-B"
+      assert [_, bounds] = Regex.run(~r/data-bounds="([^"]*)"/, map)
+
+      assert Jason.decode!(String.replace(bounds, "&quot;", ~s("))) ==
+               Gallformers.Places.get_bounds_for_codes(["US-CA"])
+               |> Jason.encode!()
+               |> Jason.decode!()
+    end
+
     test "shows the Hosts' range with its disclaimer", %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/gall/300")
 
       assert has_element?(view, "#gall-range-map")
-      assert html =~ "Not an occurrence map"
-      assert html =~ "has not been documented throughout this area"
+      assert html =~ "not where the gall was found"
     end
 
     test "a Gall with no Host range data has no map", %{conn: conn} do
@@ -311,20 +342,84 @@ defmodule GallformersWeb.GallLiveTest do
          %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/gall/300")
 
-      assert html =~ "Further Information (2)"
-      assert has_element?(view, "a[href='/source/59']", "Cynipid galls of the seed slope")
-      assert has_element?(view, "a[href='/source/58']", "Gallformers ID Notes")
+      assert has_element?(view, "#gall-sources-section [data-part=count]", "1")
+
+      assert has_element?(
+               view,
+               "#gall-sources a[href='/source/59']",
+               "Cynipid galls of the seed slope"
+             )
+
       assert html =~ "seed citation"
-      assert html =~ "Our ID Notes may contain important tips"
+      # The Gallformers note is pinned, in full, above the Sources.
+      assert has_element?(view, "#id-notes", "The seed note")
+      assert has_element?(view, "#id-notes a[href='/source/58']", "Gallformers ID Notes")
     end
 
-    test "Show notes opens the Gallformers note", %{conn: conn} do
+    test "Read opens the ID Notes in the reader, as it does a Source", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")
 
-      view |> element("button", "Show notes") |> render_click()
+      view |> element("#id-notes button", "Read") |> render_click()
 
       assert has_element?(view, "#source-detail-modal")
       assert render(view) =~ "The seed note"
+    end
+
+    test "the ID Notes and the reader set the text in serif; A+ and A- step its size",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
+
+      assert has_element?(
+               view,
+               "#id-notes .gf-prose[data-font=serif][data-size=sm]",
+               "The seed note"
+             )
+
+      view |> element("#id-notes button", "Read") |> render_click()
+      assert has_element?(view, "#source-detail-modal .gf-prose[data-font=serif][data-size=base]")
+
+      view
+      |> element("#source-detail-modal button[phx-click=increase_font_size]")
+      |> render_click()
+
+      assert has_element?(view, "#source-detail-modal .gf-prose[data-size=lg]")
+
+      view
+      |> element("#source-detail-modal button[phx-click=decrease_font_size]")
+      |> render_click()
+
+      view
+      |> element("#source-detail-modal button[phx-click=decrease_font_size]")
+      |> render_click()
+
+      assert has_element?(view, "#source-detail-modal .gf-prose[data-size=sm]")
+    end
+
+    test "run by year, oldest first; Newest first reverses them", %{conn: conn} do
+      for {title, year} <- [{"Later fixture source", "2024"}, {"Earlier fixture source", "1990"}] do
+        source =
+          Gallformers.Repo.insert!(%Gallformers.Sources.Source{
+            title: title,
+            author: "Fixture",
+            pubyear: year,
+            link: "",
+            citation: title,
+            license: "Public Domain"
+          })
+
+        {:ok, 1} =
+          Catalog.insert_legacy_citations(DataCase.test_actor(), [
+            %{gall_id: 100, source_id: source.id, description: title, useasdefault: false}
+          ])
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/gall/100")
+      titles = fn -> view |> render() |> source_titles() end
+
+      assert titles.() == ["Earlier fixture source", "Later fixture source"]
+
+      view |> element("button[phx-click=sources_order][phx-value-order=desc]") |> render_click()
+      assert titles.() == ["Later fixture source", "Earlier fixture source"]
     end
 
     test "a Gall with none says so", %{conn: conn} do
@@ -400,10 +495,12 @@ defmodule GallformersWeb.GallLiveTest do
       assert html =~ "Seed Photographer"
     end
 
-    test "shows no gallery when the Gall has no images", %{conn: conn} do
+    test "says when the Gall has no photos, without arrows or thumbnails", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/301")
 
-      refute has_element?(view, "#gall-images")
+      assert has_element?(view, "#gall-images [data-part=empty]", "No photos yet.")
+      refute has_element?(view, "#gall-images [data-thumbs]")
+      refute has_element?(view, "#gall-images a[href$='#images']")
     end
   end
 end

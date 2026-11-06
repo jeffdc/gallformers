@@ -19,47 +19,46 @@ defmodule GallformersWeb.FamilyLiveTest do
   alias Gallformers.Catalog
   alias Gallformers.Taxa
 
-  # The words of the table row naming `name`.
-  defp row_words(view, name) do
+  # The words of the element naming `name`.
+  defp words(view, selector, name) do
     view
-    |> element("tbody tr", name)
+    |> element(selector, name)
     |> render()
     |> String.replace(~r/<[^>]+>/, " ")
     |> String.split()
   end
 
   describe "FamilyLive with name-based URLs" do
-    test "renders family page with table of children", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/family/Cynipidae")
-
-      assert html =~ "Family:"
-      assert html =~ "Cynipidae"
-      assert html =~ "Cynipinae"
-      assert page_title(view) =~ "Cynipidae"
-    end
-
-    test "shows each child's rank and its gall and host counts", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/family/Cynipidae")
-
-      assert html =~ "Children (1)"
-      assert html =~ "Galls"
-      assert html =~ "Hosts"
-      assert row_words(view, "Cynipinae") == ["Cynipinae", "subfamily", "8", "0"]
-
-      # A child shows its common name (the migrated taxonomy description).
-      {:ok, view, _html} = live(conn, "/family/Fagaceae")
-
-      assert row_words(view, "Notholithocarpus") ==
-               ["Notholithocarpus", "(Tanoaks)", "genus", "0", "1"]
-    end
-
-    test "child URLs use names not IDs", %{conn: conn} do
+    test "opens on its Galls, with a tab for the taxa within it", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/family/Cynipidae")
 
-      assert has_element?(view, ~s{a[href="/subfamily/Cynipinae"]})
+      assert has_element?(view, "h1", "Cynipidae")
+      assert has_element?(view, "header", "Family")
+      assert page_title(view) =~ "Cynipidae"
+      assert has_element?(view, "#rank-galls-section [data-part=count]", "8")
+      assert has_element?(view, ~s{nav a[aria-current=page]}, "Galls")
+      assert has_element?(view, ~s{nav a[href="?tab=within"]}, "Within it")
     end
 
-    test "lists the Galls placed at the family itself", %{conn: conn} do
+    test "the taxa within a Gallformer family, with their rank and Galls", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/family/Cynipidae?tab=within")
+
+      assert words(view, "#children li", "Cynipinae") == ["Cynipinae", "subfamily", "8", "galls"]
+      assert has_element?(view, ~s{#children a[href="/subfamily/Cynipinae"]})
+    end
+
+    test "a plant family lists its genera with common name, species and the Galls on them", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, "/family/Fagaceae")
+
+      assert has_element?(view, "header", "Host plants")
+
+      assert words(view, "#children tr", "Notholithocarpus") ==
+               ["Notholithocarpus", "Tanoaks", "1", "5"]
+    end
+
+    test "its Galls include those placed at the family itself", %{conn: conn} do
       cynipidae = Taxa.get_by_legacy_id(:taxonomy, 30)
       gall = gall_fixture(name: "Unknown (Cynipidae) family-page-fixture")
 
@@ -70,21 +69,19 @@ defmodule GallformersWeb.FamilyLiveTest do
           confirm(source_fixture("Weld", "1959"))
         )
 
-      {:ok, view, html} = live(conn, "/family/Cynipidae")
+      :ok = Catalog.refresh_gall_index([gall.id])
+      {:ok, view, _html} = live(conn, "/family/Cynipidae")
 
-      assert html =~ "Galls placed in this family (1)"
-      assert has_element?(view, ~s{a[href="/gall/#{gall.id}"]})
+      assert has_element?(view, "#rank-galls-section [data-part=count]", "9")
+      assert has_element?(view, ~s{a[href="/gall/#{gall.id}"]}, "Undescribed")
     end
 
     test "an old numeric URL redirects through the crosswalk", %{conn: conn} do
       assert {:error, {:live_redirect, %{to: "/family/Cynipidae"}}} = live(conn, "/family/30")
     end
 
-    test "returns error for nonexistent family name", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/family/Nonexistent")
-
-      assert html =~ "Family not found"
-      assert page_title(view) =~ "Not Found"
+    test "an unknown family name is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/family/Nonexistent") end
     end
   end
 end

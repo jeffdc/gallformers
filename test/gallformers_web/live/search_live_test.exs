@@ -65,66 +65,52 @@ defmodule GallformersWeb.SearchLiveTest do
       assert_patch(view, ~p"/globalsearch?q=test+query")
     end
 
-    test "sort event toggles sort direction", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/globalsearch?q=quercus")
+    test "sorting by type and back by name", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus")
+      assert has_element?(view, "#results-table")
 
-      # Only test sort if there are results (sort header only appears with results)
-      if html =~ "results-table" do
-        # Click sort by type header
-        view
-        |> element("th[phx-click=sort][phx-value-column=type]")
-        |> render_click()
+      view |> element("button[phx-click=sort][phx-value-field=type]") |> render_click()
+      assert has_element?(view, "th[aria-sort=ascending]", "Type")
 
-        # Sort should change (indicated by arrow in HTML)
-        html = render(view)
-        assert html =~ "↑" or html =~ "↓"
-      else
-        # No results, so no sort headers - test passes
-        assert true
-      end
+      view |> element("button[phx-click=sort][phx-value-field=type]") |> render_click()
+      assert has_element?(view, "th[aria-sort=descending]", "Type")
+
+      view |> element("button[phx-click=sort][phx-value-field=name]") |> render_click()
+      assert has_element?(view, "th[aria-sort=ascending]", "Name")
     end
 
-    test "keydown ArrowDown event increments selected index", %{conn: conn} do
+    test "ArrowDown and ArrowUp move the highlight; Enter opens the highlighted result", %{
+      conn: conn
+    } do
       {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus")
 
-      # Send keydown event
       render_keydown(view, "keydown", %{"key" => "ArrowDown"})
+      assert has_element?(view, "#result-0[aria-current=true]")
 
-      # The first result should be selected (bg-canary class)
-      html = render(view)
-      # Selection should be visible in the rendered output
-      assert is_binary(html)
-    end
-
-    test "keydown ArrowUp event decrements selected index", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus")
-
-      # First go down twice
       render_keydown(view, "keydown", %{"key" => "ArrowDown"})
-      render_keydown(view, "keydown", %{"key" => "ArrowDown"})
+      assert has_element?(view, "#result-1[aria-current=true]")
+      refute has_element?(view, "#result-0[aria-current=true]")
 
-      # Then go up once
       render_keydown(view, "keydown", %{"key" => "ArrowUp"})
+      assert has_element?(view, "#result-0[aria-current=true]")
 
-      html = render(view)
-      assert is_binary(html)
+      href =
+        view
+        |> element("#result-0 a")
+        |> render()
+        |> then(&Regex.run(~r/href="([^"]+)"/, &1))
+        |> List.last()
+
+      assert {:error, {:live_redirect, %{to: ^href}}} =
+               render_keydown(view, "keydown", %{"key" => "Enter"})
     end
 
-    test "select_result event selects row", %{conn: conn} do
+    test "clicking a row highlights it", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus")
 
-      # Click on a result row (if results exist)
-      html = render(view)
+      view |> element("#result-1") |> render_click()
 
-      if html =~ "result-0" do
-        view
-        |> element("#result-0")
-        |> render_click()
-
-        # Row should be selected
-        html = render(view)
-        assert html =~ "bg-canary" or is_binary(html)
-      end
+      assert has_element?(view, "#result-1[aria-current=true]")
     end
   end
 
@@ -246,21 +232,19 @@ defmodule GallformersWeb.SearchLiveTest do
       refute has_element?(view, "#results-table a[href='/gall/100']")
     end
 
-    test "region scope bar uses amber styling when filter is active", %{conn: conn} do
+    test "region scope bar is marked filtered when a region is active", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/globalsearch")
 
       # Activate a region filter
       render_click(view, "change_region", %{"code" => "XN"})
-      html = render(view)
 
-      assert html =~ "bg-amber-50"
+      assert has_element?(view, ~s(#region-scope[data-filtered="true"]))
     end
 
-    test "region scope bar uses neutral styling when no filter active", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/globalsearch")
+    test "region scope bar is not marked filtered when no region is active", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch")
 
-      assert html =~ "bg-gray-100"
-      refute html =~ "bg-amber-50"
+      assert has_element?(view, ~s(#region-scope[data-filtered="false"]))
     end
 
     test "no-results region hint has clickable All Regions link", %{conn: conn} do
@@ -285,6 +269,66 @@ defmodule GallformersWeb.SearchLiveTest do
       {:ok, _view, html} = live(conn, ~p"/globalsearch?q=+++")
 
       assert html =~ "Enter a search term" or html =~ "No results"
+    end
+  end
+
+  describe "result types" do
+    test "a row of types with counts; choosing one narrows the results and goes in the URL", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus")
+
+      assert has_element?(view, ~s{nav[aria-label="Result types"] a[aria-current=page]}, "All")
+      assert has_element?(view, ~s{nav[aria-label="Result types"] a}, "Host")
+
+      view |> element(~s{nav[aria-label="Result types"] a}, "Host") |> render_click()
+      assert_patch(view, "/globalsearch?q=quercus&type=Host")
+
+      types =
+        view
+        |> render()
+        |> LazyHTML.from_document()
+        |> LazyHTML.query("#results-table [data-part=type]")
+        |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
+        |> Enum.uniq()
+
+      assert types == ["Host"]
+    end
+
+    test "a type the results don't have shows them all", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus&type=Nonsense")
+
+      assert has_element?(view, ~s{nav[aria-label="Result types"] a[aria-current=page]}, "All")
+    end
+  end
+
+  describe "result rows" do
+    test "a gall shows its photo, and its hosts and traits", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=andricus+seedii")
+
+      row = view |> element("#results-table tr", "Andricus seedii (agamic)") |> render()
+      assert row =~ "<img"
+      assert row =~ "Notholithocarpus densiflorus"
+    end
+
+    test "a host shows its other names and how many galls are on it", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=notholithocarpus+densiflorus")
+
+      row = view |> element("#results-table tr:has(a[href='/host/10'])") |> render()
+      assert row =~ "tanoak"
+      assert row =~ ~r/5\s+galls/
+    end
+
+    test "a glossary term shows its definition", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=cynipid")
+
+      assert has_element?(view, "#results-table tr", "A member of the family Cynipidae")
+    end
+
+    test "a place shows what kind of place it is", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=california")
+
+      assert has_element?(view, "#results-table tr", ~r/California.*State/s)
     end
   end
 end

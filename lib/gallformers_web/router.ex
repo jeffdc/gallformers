@@ -109,6 +109,8 @@ defmodule GallformersWeb.Router do
     get "/section/*path", AdminRedirectController, :taxonomy
     get "/species-sources/*path", AdminRedirectController, :sources
     get "/gallhost", AdminRedirectController, :gall_host
+    get "/galls", AdminRedirectController, :galls
+    get "/galls/:id", AdminRedirectController, :gall
     get "/images", AdminRedirectController, :images
     # The item-first review queue, replaced by the Source-down review (6611)
     get "/queue", AdminRedirectController, :queue
@@ -127,6 +129,7 @@ defmodule GallformersWeb.Router do
       # Source-down review of import packages, and Gall rename proposals (6611)
       live "/review", Admin.ReviewLive.Sources, :index
       live "/review/renames", Admin.ReviewLive.Renames, :index
+      live "/changes", Admin.ChangesLive, :index
       live "/review/sources/:id", Admin.ReviewLive.Source, :source
       live "/review/packages/:package_id", Admin.ReviewLive.Source, :package
       # A Source's Facts: what approving writes, with edits (f14c, item 4)
@@ -141,8 +144,6 @@ defmodule GallformersWeb.Router do
       live "/sources/:id", Admin.SourceLive.Edit, :edit
 
       # Gall page
-      live "/galls", Admin.GallLive.Index, :index
-      live "/galls/:id", Admin.GallLive.Edit, :edit
 
       # Taxonomy admin (plants and their Host ranges included)
       live "/taxonomy", Admin.TaxonomyLive.Index, :index
@@ -195,6 +196,7 @@ defmodule GallformersWeb.Router do
     live_session :public,
       on_mount: [
         {GallformersWeb.Live.UserAuth, :fetch_current_user},
+        {GallformersWeb.Live.UserAuth, :fetch_curator},
         {GallformersWeb.Live.ContinentScope, :default},
         {GallformersWeb.Analytics.TrackPageView, :default}
       ] do
@@ -219,7 +221,7 @@ defmodule GallformersWeb.Router do
       # Entity pages
       live "/gall/:id", GallLive
       live "/host/:id", HostLive
-      live "/family/:name", FamilyLive
+      live "/family/:name", IntermediateLive, :family
       live "/genus/:name", GenusLive
       live "/source/:id", SourceLive
       live "/section/:name", SectionLive
@@ -316,6 +318,23 @@ defmodule GallformersWeb.Router do
       pipe_through :browser
 
       forward "/mailbox", Plug.Swoosh.MailboxPreview
+    end
+
+    # The design system's living reference and page mockups
+    # (docs/design-system/README.md, mockups.md). Dev only; the modules live
+    # in dev/gallformers_web, compiled only in the dev environment.
+    scope "/dev", GallformersWeb.Dev do
+      pipe_through :browser
+
+      # The public pages' user and region hooks (not page-view tracking), so
+      # mockups of public pages behave as the pages do.
+      live_session :dev_mockups,
+        on_mount: [
+          {GallformersWeb.Live.UserAuth, :fetch_current_user},
+          {GallformersWeb.Live.ContinentScope, :default}
+        ] do
+        live "/design-system", DesignSystemLive
+      end
     end
   end
 end

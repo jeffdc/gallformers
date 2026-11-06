@@ -50,6 +50,40 @@ defmodule Gallformers.Sources do
     |> Repo.all()
   end
 
+  @type recent_change :: %{
+          id: integer(),
+          title: String.t(),
+          authors: String.t() | nil,
+          year: String.t() | nil,
+          change: :added | :updated,
+          changed_at: DateTime.t()
+        }
+
+  @doc """
+  The `limit` Sources changed most recently (added, or their record
+  updated), newest first. A Source counts as added when it has not changed
+  since the minute it was added. Until Sources record when their data last
+  changed (matter f14c), "updated" means the Source's own record.
+  """
+  @spec list_recently_changed(pos_integer()) :: [recent_change()]
+  def list_recently_changed(limit) do
+    from(s in Source, order_by: [desc: s.updated_at, desc: s.id], limit: ^limit)
+    |> Repo.all()
+    |> Enum.map(fn s ->
+      %{
+        id: s.id,
+        title: s.title,
+        authors: s.author,
+        year: s.pubyear,
+        change: if(added?(s), do: :added, else: :updated),
+        changed_at: s.updated_at
+      }
+    end)
+  end
+
+  defp added?(%Source{inserted_at: inserted, updated_at: updated}),
+    do: DateTime.diff(updated, inserted) < 60
+
   @doc """
   Returns the count of all sources.
   """

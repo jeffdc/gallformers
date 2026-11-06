@@ -84,16 +84,16 @@ defmodule GallformersWeb.UserProfileLive do
     <Layouts.app flash={@flash} current_user={@current_user}>
       <%= if @user do %>
         <div class="max-w-2xl mx-auto">
-          <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <div class="bg-surface rounded-panel border border-line p-6">
             <%!-- Header with name and edit button --%>
             <div class="flex items-center justify-between mb-4">
-              <h1 class="text-2xl font-bold text-gf-maroon">
+              <h1 class="text-section font-bold text-brand">
                 {display_name(@user)}
               </h1>
               <%= if @own_profile do %>
                 <a
                   href="/admin/profile"
-                  class="flex items-center gap-1 text-sm hover:underline"
+                  class="flex items-center gap-1 text-meta hover:underline"
                   title="Edit profile"
                 >
                   <.icon name="ph-pencil-simple" class="h-4 w-4" /> Edit
@@ -104,7 +104,7 @@ defmodule GallformersWeb.UserProfileLive do
             <%!-- About Me --%>
             <%= if @user.about_me && @user.about_me != "" do %>
               <div class="mb-6">
-                <p class="text-gray-600 whitespace-pre-wrap">{@user.about_me}</p>
+                <p class="text-ink-2 whitespace-pre-wrap">{@user.about_me}</p>
               </div>
             <% end %>
 
@@ -132,7 +132,7 @@ defmodule GallformersWeb.UserProfileLive do
                     href={@user.social_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1 text-gf-maroon hover:underline"
+                    class="inline-flex items-center gap-1 text-brand hover:underline"
                   >
                     <.icon name={social_icon} class="h-5 w-5" /> {social_label}
                   </a>
@@ -142,7 +142,7 @@ defmodule GallformersWeb.UserProfileLive do
                     href={@user.personal_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1 text-gf-maroon hover:underline"
+                    class="inline-flex items-center gap-1 text-brand hover:underline"
                   >
                     <.icon name="ph-globe" class="h-5 w-5" /> Website
                   </a>
@@ -152,15 +152,15 @@ defmodule GallformersWeb.UserProfileLive do
 
             <%!-- Empty state if no about_me and no links --%>
             <%= if (!@user.about_me || @user.about_me == "") && !has_links?(@user) do %>
-              <p class="text-gray-500 italic">This user hasn't added any profile information yet.</p>
+              <p class="text-muted italic">This user hasn't added any profile information yet.</p>
             <% end %>
           </div>
         </div>
       <% else %>
         <div class="max-w-2xl mx-auto">
-          <div class="bg-white rounded-lg border border-gray-200 p-6 text-center">
-            <h1 class="text-2xl font-bold text-gray-700 mb-2">User Not Found</h1>
-            <p class="text-gray-500">The user you're looking for doesn't exist.</p>
+          <div class="bg-surface rounded-panel border border-line p-6 text-center">
+            <h1 class="text-section font-bold text-ink-2 mb-2">User Not Found</h1>
+            <p class="text-muted">The user you're looking for doesn't exist.</p>
           </div>
         </div>
       <% end %>

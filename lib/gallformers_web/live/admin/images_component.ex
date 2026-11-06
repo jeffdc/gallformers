@@ -93,7 +93,7 @@ defmodule GallformersWeb.Admin.ImagesComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="space-y-6">
+    <div id={@id} class="flex flex-col gap-section">
       <%!-- A component's flash stays its own (LiveView copies it to the page only on navigation) --%>
       <.flash
         id={"#{@id}-flash-info"}
@@ -104,411 +104,298 @@ defmodule GallformersWeb.Admin.ImagesComponent do
       />
       <.flash id={"#{@id}-flash-error"} kind={:error} flash={@flash} phx-target={@myself} />
 
-      <%!-- Image Grid --%>
-      <div class="bg-white rounded-lg border border-gray-200 p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-medium text-gray-900">
-            Images ({length(@images)})
-          </h2>
-          <div class="flex items-center gap-4">
-            <p :if={@images != [] && @view_mode == :grid} class="text-sm text-gray-500">
+      <%!-- Images: a grid (drag to reorder) or a table --%>
+      <.section title="Images" count={length(@images)} level={3}>
+        <:aside>
+          <div class="flex flex-wrap items-center gap-3">
+            <span :if={@images != [] && @view_mode == :grid}>
               Drag to reorder. First image is the default.
-            </p>
-            <%!-- View Toggle --%>
-            <div class="flex border border-gray-300 rounded-md overflow-hidden">
+            </span>
+            <span
+              class="inline-flex overflow-hidden rounded-ctl border border-line-strong"
+              role="group"
+              aria-label="View"
+            >
               <button
+                :for={
+                  {view, icon, label} <- [
+                    {:grid, "ph-squares-four", "Grid view"},
+                    {:table, "ph-list", "Table view"}
+                  ]
+                }
                 type="button"
                 phx-click="toggle_view"
-                phx-value-view="grid"
+                phx-value-view={view}
                 phx-target={@myself}
                 disabled={@copy_mode != nil}
+                aria-pressed={to_string(@view_mode == view)}
+                aria-label={label}
+                title={label}
                 class={[
-                  "px-3 py-1.5 text-sm",
-                  @view_mode == :grid && "bg-gf-maroon text-white",
-                  @view_mode != :grid && !@copy_mode && "bg-white text-gray-600 hover:bg-gray-50",
-                  @copy_mode && @view_mode != :grid && "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  "flex h-7 items-center px-2.5 disabled:cursor-not-allowed",
+                  view == :table && "border-l border-line-strong",
+                  cond do
+                    @view_mode == view -> "bg-brand-fill text-on-fill"
+                    @copy_mode -> "bg-surface-2 text-muted"
+                    true -> "bg-surface text-ink-2 hover:bg-surface-2"
+                  end
                 ]}
-                title="Grid view"
               >
-                <.icon name="ph-squares-four" class="h-4 w-4" />
+                <.icon name={icon} class="size-4" />
               </button>
-              <button
-                type="button"
-                phx-click="toggle_view"
-                phx-value-view="table"
-                phx-target={@myself}
-                disabled={@copy_mode != nil}
-                class={[
-                  "px-3 py-1.5 text-sm border-l border-gray-300",
-                  @view_mode == :table && "bg-gf-maroon text-white",
-                  @view_mode != :table && !@copy_mode && "bg-white text-gray-600 hover:bg-gray-50",
-                  @copy_mode && @view_mode != :table &&
-                    "bg-gray-100 text-gray-400 cursor-not-allowed"
-                ]}
-                title="Table view"
-              >
-                <.icon name="ph-list" class="h-4 w-4" />
-              </button>
-            </div>
+            </span>
           </div>
-        </div>
+        </:aside>
 
-        <div :if={@images == []} class="text-center py-8 text-gray-500">
-          No images uploaded yet.
-        </div>
+        <div class="flex flex-col gap-block">
+          <.empty_state :if={@images == []} title="No images uploaded yet" icon="ph-image" />
 
-        <%!-- Warning banner for unattributed images --%>
-        <div
-          :if={Enum.any?(@images, &unattributed?/1)}
-          data-unattributed-warning
-          class="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-3"
-        >
-          <.icon name="ph-warning" class="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-          <div class="text-sm text-orange-800">
-            <p class="font-medium">Some images are not attributed</p>
-            <p class="mt-1">
-              Images marked with an orange border need a license, and a creator unless they are
-              Public Domain / CC0 or come from a Source with a license. Hover over the image and
-              click the edit button, or switch to the table view, to add this information.
-            </p>
-          </div>
-        </div>
+          <%!-- Warning for unattributed images --%>
+          <.notice
+            :if={Enum.any?(@images, &unattributed?/1)}
+            kind={:warn}
+            title="Some images are not attributed"
+            data-unattributed-warning
+          >
+            Images marked with an orange border need a license, and a creator unless they are
+            Public Domain / CC0 or come from a Source with a license. Hover over the image and
+            click the edit button, or switch to the table view, to add this information.
+          </.notice>
 
-        <div :if={@images != []} id={"#{@id}-version-#{@images_version}"}>
-          <%!-- Grid View --%>
-          <div :if={@view_mode == :grid}>
+          <div :if={@images != []} id={"#{@id}-version-#{@images_version}"}>
+            <%!-- Grid View --%>
             <div
+              :if={@view_mode == :grid}
               id={"#{@id}-sortable"}
               phx-hook="SortableImages"
               phx-target={@myself}
-              class="flex flex-wrap gap-6"
+              class="flex flex-wrap gap-4 p-1"
             >
               <div
                 :for={{image, index} <- Enum.with_index(@images)}
                 data-image-id={image.id}
                 class={[
-                  "relative group cursor-move",
-                  index == 0 && "ring-2 ring-gf-maroon ring-offset-2",
-                  unattributed?(image) && "ring-2 ring-orange-400 ring-offset-2"
+                  "group relative cursor-move rounded-panel",
+                  cond do
+                    unattributed?(image) -> "ring-2 ring-autumn ring-offset-2 ring-offset-surface"
+                    index == 0 -> "ring-2 ring-brand ring-offset-2 ring-offset-surface"
+                    true -> nil
+                  end
                 ]}
               >
                 <img
                   src={Image.sized_url(image.path, :original)}
                   alt={image.caption || "Image"}
-                  class="w-48 h-48 object-cover rounded"
+                  class="size-48 rounded-panel object-cover"
                 />
-                <div
+                <.chip
                   :if={index == 0}
+                  variant={:info}
                   data-default-image
-                  class="absolute top-2 left-2 bg-gf-maroon text-white text-sm px-2 py-1 rounded"
+                  class="absolute top-2 left-2"
                 >
                   Default
-                </div>
+                </.chip>
                 <%!-- Warning badge for unattributed images --%>
                 <div
                   :if={unattributed?(image)}
                   data-unattributed
-                  class="absolute top-2 right-2 bg-orange-500 text-white w-7 h-7 rounded-full flex items-center justify-center"
+                  class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-autumn text-on-fill"
                   title="Not attributed"
                 >
-                  <.icon name="ph-warning" class="w-4 h-4" />
+                  <.icon name="ph-warning" class="size-4" />
                 </div>
                 <%!-- Hover overlay with all actions --%>
-                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-4">
-                  <button
-                    type="button"
+                <div class="absolute inset-0 flex items-center justify-center gap-3 rounded-panel bg-overlay opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                  <.button
+                    icon="ph-eye"
+                    icon_only
+                    label="View image"
                     phx-click="view_image"
                     phx-value-id={image.id}
                     phx-target={@myself}
                     data-action="view"
-                    class="p-2 bg-white rounded text-gray-700 hover:text-gf-maroon"
-                    aria-label="View image"
-                  >
-                    <.icon name="ph-eye" class="h-6 w-6" />
-                  </button>
-                  <button
-                    type="button"
+                  />
+                  <.button
+                    icon="ph-pencil"
+                    icon_only
+                    label="Edit image"
                     phx-click="edit_image"
                     phx-value-id={image.id}
                     phx-target={@myself}
                     data-action="edit"
-                    class="p-2 bg-white rounded text-gray-700 hover:text-gf-maroon"
-                    aria-label="Edit image"
-                  >
-                    <.icon name="ph-pencil" class="h-6 w-6" />
-                  </button>
-                  <button
-                    type="button"
+                  />
+                  <.button
+                    variant="danger"
+                    icon="ph-trash"
+                    icon_only
+                    label="Delete image"
                     phx-click="confirm_delete"
                     phx-value-id={image.id}
                     phx-target={@myself}
                     data-action="delete"
-                    class="p-2 bg-white rounded text-gray-700 hover:text-red-600"
-                    aria-label="Delete image"
-                  >
-                    <.icon name="ph-trash" class="h-6 w-6" />
-                  </button>
+                  />
                 </div>
               </div>
             </div>
-          </div>
 
-          <%!-- Table View --%>
-          <div
-            :if={@view_mode == :table}
-            class="overflow-x-auto"
-            phx-window-keydown={@copy_mode && "cancel_copy"}
-            phx-key={@copy_mode && "Escape"}
-            phx-target={@myself}
-          >
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th :if={@copy_mode} class="px-3 py-3 text-center w-[50px]">
+            <%!-- Table View --%>
+            <div
+              :if={@view_mode == :table}
+              class="flex flex-col gap-block"
+              phx-window-keydown={@copy_mode && "cancel_copy"}
+              phx-key={@copy_mode && "Escape"}
+              phx-target={@myself}
+            >
+              <.notice :if={@copy_mode} title="Copy metadata">
+                Tick the images to copy this image's metadata to. Escape cancels.
+                <:action>
+                  <label class="inline-flex items-center gap-2 text-meta text-ink">
                     <input
                       type="checkbox"
                       phx-click="select_all_targets"
                       phx-target={@myself}
                       checked={all_targets_selected?(@copy_mode, @images)}
-                      class="rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
+                      class="gf-checkbox"
+                    /> Select all
+                  </label>
+                  <.button
+                    variant="primary"
+                    size="sm"
+                    phx-click="confirm_copy"
+                    phx-target={@myself}
+                    disabled={MapSet.size(@copy_mode.selected_ids) == 0}
+                  >
+                    Apply ({MapSet.size(@copy_mode.selected_ids)})
+                  </.button>
+                  <.button size="sm" phx-click="cancel_copy" phx-target={@myself}>
+                    Cancel
+                  </.button>
+                </:action>
+              </.notice>
+
+              <.data_table id={"#{@id}-table"} rows={@images}>
+                <%!-- Checkbox column (copy mode only) --%>
+                <:col :let={image} :if={@copy_mode} label="Copy to">
+                  <%= if image.id == @copy_mode.source_id do %>
+                    <.chip variant={:info} size="sm">From</.chip>
+                  <% else %>
+                    <input
+                      type="checkbox"
+                      phx-click="toggle_copy_target"
+                      phx-value-id={image.id}
+                      phx-target={@myself}
+                      checked={MapSet.member?(@copy_mode.selected_ids, image.id)}
+                      aria-label="Copy to this image"
+                      class="gf-checkbox align-middle"
                     />
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">
-                    Image
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px]">
-                    Def
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Creator
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    License
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Source
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Source Link
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    License Link
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Attribution
-                  </th>
-                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Caption
-                  </th>
-                  <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr
-                  :for={{image, index} <- Enum.with_index(@images)}
-                  data-image-id={image.id}
-                  class={[
-                    "hover:bg-gray-50",
-                    unattributed?(image) && "bg-orange-50",
-                    @copy_mode && image.id == @copy_mode.source_id && "bg-canary",
-                    @copy_mode && MapSet.member?(@copy_mode.selected_ids, image.id) && "bg-blue-50"
-                  ]}
-                >
-                  <%!-- Checkbox column (copy mode only) --%>
-                  <td :if={@copy_mode} class="px-3 py-2 text-center">
-                    <%= if image.id == @copy_mode.source_id do %>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gf-maroon text-white">
-                        SRC
-                      </span>
-                    <% else %>
-                      <input
-                        type="checkbox"
-                        phx-click="toggle_copy_target"
-                        phx-value-id={image.id}
-                        phx-target={@myself}
-                        checked={MapSet.member?(@copy_mode.selected_ids, image.id)}
-                        class="rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-                      />
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2">
-                    <div class="relative w-20">
-                      <img
-                        src={Image.sized_url(image.path, :small)}
-                        onerror={"this.onerror=null; this.src='#{Image.sized_url(image.path, :original)}'"}
-                        alt={image.caption || "Image"}
-                        class="w-20 h-20 object-cover rounded"
-                      />
-                      <div
-                        :if={unattributed?(image)}
-                        data-unattributed
-                        class="absolute top-1 right-1 bg-orange-500 text-white w-5 h-5 rounded-full flex items-center justify-center"
-                        title="Not attributed"
-                      >
-                        <.icon name="ph-warning" class="w-3 h-3" />
-                      </div>
+                  <% end %>
+                </:col>
+                <:col :let={image} label="Image">
+                  <div class="relative w-16">
+                    <img
+                      src={Image.sized_url(image.path, :small)}
+                      onerror={"this.onerror=null; this.src='#{Image.sized_url(image.path, :original)}'"}
+                      alt={image.caption || "Image"}
+                      class="size-16 rounded-ctl object-cover"
+                    />
+                    <div
+                      :if={unattributed?(image)}
+                      data-unattributed
+                      class="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-autumn text-on-fill"
+                      title="Not attributed"
+                    >
+                      <.icon name="ph-warning" class="size-3" />
                     </div>
-                  </td>
-                  <td class="px-3 py-2 text-center">
-                    <span :if={index == 0} data-default-image class="text-gf-maroon">
-                      <.icon name="ph-check-circle-fill" class="h-5 w-5" />
-                    </span>
-                  </td>
-                  <td class="px-3 py-2 text-sm text-gray-900">
-                    <%= if present?(image.creator) do %>
-                      {image.creator}
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2 text-sm text-gray-900">
-                    <%= if present?(image.license) do %>
-                      {image.license}
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2 text-sm text-gray-900">
-                    <%= if image.source do %>
-                      <.link
-                        navigate={~p"/source/#{image.source.id}"}
-                        class="text-gf-maroon hover:underline"
-                      >
-                        {truncate(image.source.title, 30)}
-                      </.link>
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2 text-sm">
-                    <%= if present?(image.sourcelink) do %>
-                      <a
-                        href={image.sourcelink}
-                        target="_blank"
-                        rel="noopener"
-                        class="text-gf-maroon hover:underline"
-                        title={image.sourcelink}
-                      >
-                        {URI.parse(image.sourcelink).host || String.slice(image.sourcelink, 0, 20)}
-                      </a>
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2 text-sm">
-                    <%= if valid_url?(image.licenselink) do %>
-                      <a
-                        href={image.licenselink}
-                        target="_blank"
-                        rel="noopener"
-                        class="text-gf-maroon hover:underline"
-                        title={image.licenselink}
-                      >
-                        {URI.parse(image.licenselink).host || String.slice(image.licenselink, 0, 20)}
-                      </a>
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td
-                    class="px-3 py-2 text-sm text-gray-900 max-w-[150px] truncate"
-                    title={image.attribution}
+                  </div>
+                </:col>
+                <:col :let={image} label="Default">
+                  <span :if={default_image?(image, @images)} data-default-image class="text-brand">
+                    <.icon name="ph-check-circle-fill" class="size-5" />
+                    <span class="sr-only">Default</span>
+                  </span>
+                </:col>
+                <:col :let={image} label="Creator" field={:creator}>{image.creator}</:col>
+                <:col :let={image} label="License" field={:license}>{image.license}</:col>
+                <:col :let={image} label="Source" field={:source}>
+                  <.link :if={image.source} navigate={~p"/source/#{image.source.id}"}>
+                    {truncate(image.source.title, 30)}
+                  </.link>
+                </:col>
+                <:col :let={image} label="Source link" field={:sourcelink}>
+                  <a
+                    :if={present?(image.sourcelink)}
+                    href={image.sourcelink}
+                    target="_blank"
+                    rel="noopener"
+                    title={image.sourcelink}
                   >
-                    <%= if present?(image.attribution) do %>
-                      {image.attribution}
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td
-                    class="px-3 py-2 text-sm text-gray-900 max-w-[150px] truncate"
-                    title={image.caption}
+                    {URI.parse(image.sourcelink).host || String.slice(image.sourcelink, 0, 20)}
+                  </a>
+                </:col>
+                <:col :let={image} label="License link" field={:licenselink}>
+                  <a
+                    :if={valid_url?(image.licenselink)}
+                    href={image.licenselink}
+                    target="_blank"
+                    rel="noopener"
+                    title={image.licenselink}
                   >
-                    <%= if present?(image.caption) do %>
-                      {image.caption}
-                    <% else %>
-                      <span class="text-gray-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    <%= if @copy_mode && image.id == @copy_mode.source_id do %>
-                      <%!-- Source row: Apply/Cancel buttons --%>
-                      <div class="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          phx-click="confirm_copy"
-                          phx-target={@myself}
-                          disabled={MapSet.size(@copy_mode.selected_ids) == 0}
-                          class={[
-                            "px-3 py-1 text-sm rounded",
-                            MapSet.size(@copy_mode.selected_ids) > 0 &&
-                              "bg-gf-maroon text-white hover:bg-gf-maroon/90",
-                            MapSet.size(@copy_mode.selected_ids) == 0 &&
-                              "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          ]}
-                        >
-                          Apply ({MapSet.size(@copy_mode.selected_ids)})
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="cancel_copy"
-                          phx-target={@myself}
-                          class="px-3 py-1 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    <% else %>
-                      <%!-- Normal row actions (hidden during copy mode for non-source rows) --%>
-                      <div :if={!@copy_mode} class="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          phx-click="start_copy"
-                          phx-value-id={image.id}
-                          phx-target={@myself}
-                          class="p-1 text-gray-500 hover:text-gf-maroon"
-                          title="Copy metadata from this image"
-                        >
-                          <.icon name="ph-copy" class="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="edit_image"
-                          phx-value-id={image.id}
-                          phx-target={@myself}
-                          data-action="edit"
-                          class="p-1 text-gray-500 hover:text-gf-maroon"
-                          title="Edit"
-                        >
-                          <.icon name="ph-pencil" class="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="confirm_delete"
-                          phx-value-id={image.id}
-                          phx-target={@myself}
-                          data-action="delete"
-                          class="p-1 text-gray-500 hover:text-red-600"
-                          title="Delete"
-                        >
-                          <.icon name="ph-trash" class="h-4 w-4" />
-                        </button>
-                      </div>
-                    <% end %>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    {URI.parse(image.licenselink).host || String.slice(image.licenselink, 0, 20)}
+                  </a>
+                </:col>
+                <:col :let={image} label="Attribution" field={:attribution}>
+                  {image.attribution}
+                </:col>
+                <:col :let={image} label="Caption" field={:caption}>{image.caption}</:col>
+                <:col :let={image} label="Actions" numeric>
+                  <%!-- Row actions (hidden during copy mode) --%>
+                  <div :if={!@copy_mode} class="flex justify-end gap-1">
+                    <.button
+                      variant="ghost"
+                      size="sm"
+                      icon="ph-copy"
+                      icon_only
+                      label="Copy metadata from this image"
+                      title="Copy metadata from this image"
+                      phx-click="start_copy"
+                      phx-value-id={image.id}
+                      phx-target={@myself}
+                    />
+                    <.button
+                      variant="ghost"
+                      size="sm"
+                      icon="ph-pencil"
+                      icon_only
+                      label="Edit"
+                      title="Edit"
+                      phx-click="edit_image"
+                      phx-value-id={image.id}
+                      phx-target={@myself}
+                      data-action="edit"
+                    />
+                    <.button
+                      variant="ghost"
+                      size="sm"
+                      icon="ph-trash"
+                      icon_only
+                      label="Delete"
+                      title="Delete"
+                      phx-click="confirm_delete"
+                      phx-value-id={image.id}
+                      phx-target={@myself}
+                      data-action="delete"
+                    />
+                  </div>
+                </:col>
+              </.data_table>
+            </div>
           </div>
         </div>
-      </div>
+      </.section>
 
-      <%!-- Upload Section --%>
-      <div class="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Upload Images</h2>
-
+      <%!-- Upload --%>
+      <.section title="Upload images" level={3}>
         <div
           id={"#{@id}-uploader"}
           phx-hook="ImageUpload"
@@ -516,278 +403,259 @@ defmodule GallformersWeb.Admin.ImagesComponent do
           phx-update="ignore"
           data-max-files="20"
           data-accepted-types="image/jpeg,image/png,image/jpg"
+          class="flex flex-col items-start gap-block"
         >
           <%!-- Dropzone --%>
           <div
             data-dropzone
-            class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gf-maroon transition-colors"
+            class="flex w-full cursor-pointer flex-col items-center gap-1 rounded-panel border-2 border-dashed border-line-strong p-6 text-center transition-colors hover:border-brand"
           >
-            <.icon name="ph-cloud-arrow-up" class="h-12 w-12 mx-auto text-gray-400" />
-            <p class="mt-2 text-sm text-gray-600">
-              Drag and drop images here, or click to select
-            </p>
-            <p class="mt-1 text-xs text-gray-500">
-              Max 20 files. JPG or PNG only.
-            </p>
+            <.icon name="ph-cloud-arrow-up" class="size-10 text-muted" />
+            <p class="text-ui text-ink-2">Drag and drop images here, or click to select</p>
+            <p class="text-meta text-muted">Max 20 files. JPG or PNG only.</p>
             <input data-file-input type="file" accept="image/jpeg,image/png" multiple class="hidden" />
           </div>
 
           <%!-- Preview Container --%>
-          <div data-preview-container class="flex flex-wrap gap-4 mt-4"></div>
+          <div data-preview-container class="flex flex-wrap gap-4"></div>
 
           <%!-- Progress Container --%>
-          <div data-progress-container class="hidden mt-4"></div>
+          <div data-progress-container class="hidden w-full"></div>
 
-          <%!-- Upload Button --%>
-          <div class="mt-4">
-            <button
-              data-upload-button
-              type="button"
-              disabled
-              class="px-4 py-2 bg-gf-maroon text-white rounded-md hover:bg-gf-maroon/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Upload Images
-            </button>
-          </div>
+          <.button data-upload-button variant="primary" disabled>Upload Images</.button>
         </div>
+      </.section>
 
-        <%!-- iNat Import --%>
-        <.live_component
-          module={InatImportComponent}
-          id={"#{@id}-inat"}
-          owner={@owner}
-          uploader={@uploader}
-          notify={{__MODULE__, @id}}
-        />
-      </div>
+      <%!-- iNat Import --%>
+      <.live_component
+        module={InatImportComponent}
+        id={"#{@id}-inat"}
+        owner={@owner}
+        uploader={@uploader}
+        notify={{__MODULE__, @id}}
+      />
 
-      <%!-- Edit Modal --%>
-      <.modal
+      <%!-- Edit dialog --%>
+      <.dialog
         :if={@editing_image}
         id={"#{@id}-edit-modal"}
+        title="Edit image metadata"
+        size={:lg}
         show
         on_cancel={JS.push("cancel_edit", target: @myself)}
       >
-        <:header>Edit Image Metadata</:header>
-        <:body>
-          <div class="flex gap-6 items-start">
-            <%!-- Image Thumbnail (left column) --%>
-            <div class="flex-shrink-0">
-              <img
-                src={Image.sized_url(@editing_image.path, :medium)}
-                onerror={"this.onerror=null; this.src='#{Image.sized_url(@editing_image.path, :original)}'"}
-                alt="Image being edited"
-                class="w-[200px] rounded border border-gray-200"
-              />
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <%!-- Image Thumbnail (left column) --%>
+          <img
+            src={Image.sized_url(@editing_image.path, :medium)}
+            onerror={"this.onerror=null; this.src='#{Image.sized_url(@editing_image.path, :original)}'"}
+            alt="Image being edited"
+            class="w-50 shrink-0 rounded-panel border border-line"
+          />
+
+          <%!-- Form Content (right column) --%>
+          <div class="flex min-w-0 flex-1 flex-col gap-block">
+            <.notice
+              :if={@attribution_error}
+              kind={:danger}
+              title="Not attributed"
+              data-attribution-error
+            >
+              {@attribution_error}
+            </.notice>
+
+            <%!-- Source Typeahead (outside form to prevent conflicts) --%>
+            <div
+              id={"#{@id}-source-typeahead-wrapper-#{@editing_image.id}"}
+              class="flex flex-col gap-1"
+            >
+              <%= if @source_options == [] do %>
+                <span class="gf-label">Source</span>
+                <div class="flex h-ctl items-center rounded-ctl border border-line bg-surface-2 px-3 text-ui text-muted">
+                  No sources available
+                </div>
+                <p class="text-meta text-muted">This Gall has no Sources yet.</p>
+              <% else %>
+                <.typeahead
+                  id={"#{@id}-source-picker-#{@editing_image.id}"}
+                  label="Source"
+                  placeholder="Search for a source..."
+                  query={@source_query}
+                  results={@source_results}
+                  selected={@selected_source}
+                  search_event="search_source"
+                  select_event="select_source"
+                  clear_event="clear_source"
+                  display_fn={& &1.title}
+                  target={@myself}
+                >
+                  <:result :let={source}>
+                    <div class="flex flex-col">
+                      <span class="text-ink">{source.title}</span>
+                      <span class="text-meta text-muted">
+                        {source.author} ({source.pubyear})
+                      </span>
+                    </div>
+                  </:result>
+                </.typeahead>
+                <p class="text-meta text-muted">
+                  If the image is from a publication, select the source here. This will auto-populate the license and creator fields. {source_tip(
+                    @source_options
+                  )}
+                </p>
+              <% end %>
             </div>
 
-            <%!-- Form Content (right column) --%>
-            <div class="flex-1 space-y-4">
-              <.error_message
-                :if={@attribution_error}
-                data-attribution-error
-                title="Not attributed"
-                message={@attribution_error}
-              />
+            <hr class="border-line" />
 
-              <%!-- Source Typeahead (outside form to prevent conflicts) --%>
-              <div id={"#{@id}-source-typeahead-wrapper-#{@editing_image.id}"} class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-gray-700">Source</span>
-                  <.info_tip content={source_tip(@source_options)} />
-                </div>
-                <%= if @source_options == [] do %>
-                  <p class="text-xs text-gray-500 mb-2">
-                    This Gall has no Sources yet.
-                  </p>
-                  <div class="p-2 bg-gray-100 rounded border border-gray-200 text-gray-400 text-sm">
-                    No sources available
-                  </div>
-                <% else %>
-                  <p class="text-xs text-gray-500 mb-2">
-                    If the image is from a publication, select the source here. This will auto-populate the license and creator fields.
-                  </p>
-                  <.typeahead
-                    id={"#{@id}-source-picker-#{@editing_image.id}"}
-                    label=""
-                    placeholder="Search for a source..."
-                    query={@source_query}
-                    results={@source_results}
-                    selected={@selected_source}
-                    search_event="search_source"
-                    select_event="select_source"
-                    clear_event="clear_source"
-                    display_fn={& &1.title}
-                    target={@myself}
-                  >
-                    <:result :let={source}>
-                      <div class="flex flex-col">
-                        <span class="text-gray-900">{source.title}</span>
-                        <span class="text-xs text-gray-500">
-                          {source.author} ({source.pubyear})
-                        </span>
-                      </div>
-                    </:result>
-                  </.typeahead>
-                <% end %>
-              </div>
-
-              <hr class="border-gray-200" />
-
-              <form
-                id={"#{@id}-edit-form"}
-                phx-submit="save_image"
-                phx-change="form_change"
-                phx-target={@myself}
-                class="space-y-4"
+            <form
+              id={"#{@id}-edit-form"}
+              phx-submit="save_image"
+              phx-change="form_change"
+              phx-target={@myself}
+              class="flex flex-col gap-block"
+            >
+              <.field
+                label={
+                  if @selected_source,
+                    do: "Direct Link to Image",
+                    else: "Source URL (e.g., iNaturalist)"
+                }
+                for={"#{@id}-sourcelink"}
+                help="A URL that points to the image in the original publication or observation."
               >
-                <%!-- Source Link --%>
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700">
-                      {if @selected_source,
-                        do: "Direct Link to Image",
-                        else: "Source URL (e.g., iNaturalist)"}
-                    </span>
-                    <.info_tip content="A URL that points to the image in the original publication or observation." />
-                  </div>
-                  <.input
-                    type="text"
-                    name="sourcelink"
-                    label=""
-                    value={@editing_image.sourcelink || ""}
-                    placeholder={
-                      if @selected_source,
-                        do: "Link to image in publication",
-                        else: "Link to observation"
-                    }
-                  />
-                </div>
+                <.input
+                  type="text"
+                  id={"#{@id}-sourcelink"}
+                  name="sourcelink"
+                  value={@editing_image.sourcelink || ""}
+                  placeholder={
+                    if @selected_source,
+                      do: "Link to image in publication",
+                      else: "Link to observation"
+                  }
+                  aria-describedby={"#{@id}-sourcelink-help"}
+                />
+              </.field>
 
-                <hr class="border-gray-200" />
+              <hr class="border-line" />
 
-                <p class="text-xs text-gray-500">
-                  These fields should be filled out regardless of the source type. If you select a Source, the license info will be pre-populated.
-                </p>
+              <p class="text-meta text-muted">
+                These fields should be filled out regardless of the source type. If you select a Source, the license info will be pre-populated.
+              </p>
 
-                <%!-- License --%>
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700">
-                      License<span class="text-red-600 ml-0.5">*</span>
-                    </span>
-                    <.info_tip content="The license for the image. We can only accept images with one of the licenses listed." />
-                  </div>
-                  <select
-                    name="license"
-                    class="gf-select"
-                    phx-change="update_license"
-                    phx-target={@myself}
+              <.field
+                label="License"
+                for={"#{@id}-license"}
+                help="The license for the image. We can only accept images with one of the licenses listed."
+                required
+              >
+                <select
+                  id={"#{@id}-license"}
+                  name="license"
+                  class="gf-select"
+                  phx-change="update_license"
+                  phx-target={@myself}
+                  aria-describedby={"#{@id}-license-help"}
+                >
+                  <option value="">Select a license</option>
+                  <option
+                    :for={license <- Licenses.all()}
+                    value={license}
+                    selected={license == @editing_image.license}
                   >
-                    <option value="">Select a license</option>
-                    <option
-                      :for={license <- Licenses.all()}
-                      value={license}
-                      selected={license == @editing_image.license}
-                    >
-                      {license}
-                    </option>
-                  </select>
-                </div>
+                    {license}
+                  </option>
+                </select>
+              </.field>
 
-                <%!-- License Link --%>
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700">License Link</span>
-                    <.info_tip content="The link to the license. Mandatory if CC-BY is chosen." />
-                  </div>
-                  <.input
-                    :if={Licenses.url_readonly?(@editing_image.license)}
-                    type="text"
-                    name="licenselink"
-                    label=""
-                    value={Licenses.url(@editing_image.license)}
-                    readonly
-                    class="gf-input bg-gray-50 text-gray-500 cursor-not-allowed"
-                  />
-                  <div :if={not Licenses.url_readonly?(@editing_image.license)}>
-                    <.input
-                      type="text"
-                      name="licenselink"
-                      label=""
-                      value={@editing_image.licenselink || Licenses.url(@editing_image.license) || ""}
-                      placeholder={
-                        if @editing_image.license == "All Rights Reserved",
-                          do: "Optional - link to usage terms",
-                          else: ""
-                      }
-                    />
-                    <p
-                      :if={@editing_image.license == "Public Domain / CC0"}
-                      class="mt-1 text-xs text-gray-500"
-                    >
-                      Defaults to CC0, but can be changed for other public domain references
-                    </p>
-                  </div>
-                </div>
+              <.field
+                label="License Link"
+                for={"#{@id}-licenselink"}
+                help={license_link_help(@editing_image.license)}
+              >
+                <.input
+                  :if={Licenses.url_readonly?(@editing_image.license)}
+                  type="text"
+                  id={"#{@id}-licenselink"}
+                  name="licenselink"
+                  value={Licenses.url(@editing_image.license)}
+                  readonly
+                  class="gf-input cursor-not-allowed text-muted"
+                  aria-describedby={"#{@id}-licenselink-help"}
+                />
+                <.input
+                  :if={not Licenses.url_readonly?(@editing_image.license)}
+                  type="text"
+                  id={"#{@id}-licenselink"}
+                  name="licenselink"
+                  value={@editing_image.licenselink || Licenses.url(@editing_image.license) || ""}
+                  placeholder={
+                    if @editing_image.license == "All Rights Reserved",
+                      do: "Optional - link to usage terms",
+                      else: ""
+                  }
+                  aria-describedby={"#{@id}-licenselink-help"}
+                />
+              </.field>
 
-                <%!-- Creator --%>
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700">
-                      Creator / Photographer<span
-                        :if={@editing_image.license != "Public Domain / CC0"}
-                        class="text-red-600 ml-0.5"
-                      >*</span>
-                    </span>
-                    <.info_tip content="Who created the image. Usually a link to the individual or their name. Please no emails! Not needed for Public Domain / CC0 or an image from a Source with a license." />
-                  </div>
-                  <.input type="text" name="creator" label="" value={@editing_image.creator || ""} />
-                </div>
+              <.field
+                label="Creator / Photographer"
+                for={"#{@id}-creator"}
+                help="Who created the image. Usually a link to the individual or their name. Please no emails! Not needed for Public Domain / CC0 or an image from a Source with a license."
+                required={@editing_image.license != "Public Domain / CC0"}
+              >
+                <.input
+                  type="text"
+                  id={"#{@id}-creator"}
+                  name="creator"
+                  value={@editing_image.creator || ""}
+                  aria-describedby={"#{@id}-creator-help"}
+                />
+              </.field>
 
-                <%!-- Attribution Notes --%>
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700">Attribution Notes</span>
-                    <.info_tip content="Any additional attribution information." />
-                  </div>
-                  <.input
-                    type="textarea"
-                    name="attribution"
-                    label=""
-                    rows="2"
-                    value={@editing_image.attribution || ""}
-                  />
-                </div>
+              <.field
+                label="Attribution Notes"
+                for={"#{@id}-attribution"}
+                help="Any additional attribution information."
+              >
+                <.input
+                  type="textarea"
+                  id={"#{@id}-attribution"}
+                  name="attribution"
+                  rows="2"
+                  value={@editing_image.attribution || ""}
+                  aria-describedby={"#{@id}-attribution-help"}
+                />
+              </.field>
 
-                <%!-- Caption --%>
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700">Caption</span>
-                    <.info_tip content="An optional caption to be displayed with the image." />
-                  </div>
-                  <.input
-                    type="textarea"
-                    name="caption"
-                    label=""
-                    rows="2"
-                    value={@editing_image.caption || ""}
-                  />
-                </div>
-              </form>
+              <.field
+                label="Caption"
+                for={"#{@id}-caption"}
+                help="An optional caption to be displayed with the image."
+              >
+                <.input
+                  type="textarea"
+                  id={"#{@id}-caption"}
+                  name="caption"
+                  rows="2"
+                  value={@editing_image.caption || ""}
+                  aria-describedby={"#{@id}-caption-help"}
+                />
+              </.field>
+            </form>
 
-              <hr class="border-gray-200" />
+            <hr class="border-line" />
 
-              <%!-- Uploader / Last Changed --%>
-              <div class="flex justify-between text-sm text-gray-500">
-                <span>Uploader: {@editing_image.uploader || "Unknown"}</span>
-                <span>Last Changed: {@editing_image.lastchangedby || "Unknown"}</span>
-              </div>
+            <%!-- Uploader / Last Changed --%>
+            <div class="flex flex-wrap justify-between gap-2 text-meta text-muted">
+              <span>Uploader: {@editing_image.uploader || "Unknown"}</span>
+              <span>Last Changed: {@editing_image.lastchangedby || "Unknown"}</span>
             </div>
           </div>
-        </:body>
-        <:footer>
-          <.button type="button" variant="secondary" phx-click="cancel_edit" phx-target={@myself}>
+        </div>
+        <:actions>
+          <.button type="button" phx-click="cancel_edit" phx-target={@myself}>
             {if @form_dirty, do: "Discard Changes", else: "Cancel"}
           </.button>
           <.button
@@ -798,126 +666,106 @@ defmodule GallformersWeb.Admin.ImagesComponent do
           >
             Save Changes
           </.button>
-        </:footer>
-      </.modal>
+        </:actions>
+      </.dialog>
 
-      <%!-- Delete Confirmation Modal --%>
-      <.modal
+      <%!-- Delete confirmation --%>
+      <.dialog
         :if={@delete_image}
         id={"#{@id}-delete-modal"}
+        title="Delete this image?"
+        size={:sm}
         show
         on_cancel={JS.push("cancel_delete", target: @myself)}
-        class="gf-modal-md"
       >
-        <:header>Delete Image</:header>
-        <:body>
-          <p class="text-gray-600 mb-4">
+        <div class="flex flex-col items-center gap-block">
+          <p class="self-start text-ink-2">
             Are you sure you want to delete this image? This action cannot be undone.
           </p>
-          <div class="flex justify-center mb-4">
-            <img
-              src={Image.sized_url(@delete_image.path, :medium)}
-              onerror={"this.onerror=null; this.src='#{Image.sized_url(@delete_image.path, :original)}'"}
-              alt="Image to delete"
-              class="max-w-xs rounded"
-            />
-          </div>
-        </:body>
-        <:footer>
-          <.button type="button" variant="secondary" phx-click="cancel_delete" phx-target={@myself}>
+          <img
+            src={Image.sized_url(@delete_image.path, :medium)}
+            onerror={"this.onerror=null; this.src='#{Image.sized_url(@delete_image.path, :original)}'"}
+            alt="Image to delete"
+            class="max-w-xs rounded-panel"
+          />
+        </div>
+        <:actions>
+          <.button type="button" phx-click="cancel_delete" phx-target={@myself}>
             Cancel
           </.button>
           <.button
             type="button"
             variant="danger"
+            icon="ph-trash"
             phx-click="delete_image"
             phx-value-id={@delete_image.id}
             phx-target={@myself}
           >
-            Delete
+            Delete image
           </.button>
-        </:footer>
-      </.modal>
+        </:actions>
+      </.dialog>
 
-      <%!-- View Image Modal --%>
-      <.modal
+      <%!-- Full-size view --%>
+      <.dialog
         :if={@viewing_image}
         id={"#{@id}-view-modal"}
+        title={@name}
+        size={:full}
         show
         on_cancel={JS.push("cancel_view", target: @myself)}
-        class="max-w-7xl"
       >
-        <:header>{@name}</:header>
-        <:body>
-          <div class="flex justify-center">
-            <img
-              src={Image.sized_url(@viewing_image.path, :original)}
-              alt={@viewing_image.caption || "Image"}
-              class="max-h-[90vh] w-auto object-contain"
-            />
-          </div>
-        </:body>
-      </.modal>
+        <img
+          src={Image.sized_url(@viewing_image.path, :original)}
+          alt={@viewing_image.caption || "Image"}
+          class="size-full object-contain"
+        />
+      </.dialog>
 
-      <%!-- Copy Confirmation Modal --%>
-      <.modal
+      <%!-- Copy confirmation --%>
+      <.dialog
         :if={@show_copy_confirm && @copy_mode}
         id={"#{@id}-copy-modal"}
+        title="Copy image metadata"
         show
         on_cancel={JS.push("cancel_copy_confirm", target: @myself)}
       >
-        <:header>Copy Image Metadata</:header>
-        <:body>
-          <div class="space-y-4">
-            <p class="text-gray-600">
-              Copy metadata from:
-            </p>
-            <% source_image = Enum.find(@images, &(&1.id == @copy_mode.source_id)) %>
-            <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-              <img
-                :if={source_image}
-                src={Image.sized_url(source_image.path, :small)}
-                onerror={"this.onerror=null; this.src='#{Image.sized_url(source_image.path, :original)}'"}
-                alt="Source image"
-                class="w-16 h-16 object-cover rounded"
-              />
-              <div :if={source_image} class="text-sm">
-                <p><strong>Creator:</strong> {source_image.creator || "—"}</p>
-                <p><strong>License:</strong> {source_image.license || "—"}</p>
-              </div>
-            </div>
-            <p class="text-gray-600">
-              To <strong>{MapSet.size(@copy_mode.selected_ids)}</strong> selected image(s)?
-            </p>
-            <div class="text-sm text-gray-500 bg-gray-50 p-3 rounded">
-              <p class="font-medium mb-1">Fields to be copied:</p>
-              <p>Creator, License, License Link, Source Link, Attribution, Caption, Source</p>
-            </div>
-            <div
-              :if={source_image && unattributed?(source_image)}
-              class="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-3"
-            >
-              <.icon name="ph-warning" class="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-              <p class="text-sm text-orange-800">
-                The source image is not attributed. Its empty values will overwrite the target images' data.
-              </p>
+        <% source_image = Enum.find(@images, &(&1.id == @copy_mode.source_id)) %>
+        <div class="flex flex-col gap-block">
+          <p class="text-ink-2">Copy metadata from:</p>
+          <div class="flex items-center gap-4 rounded-panel bg-surface-2 p-3">
+            <img
+              :if={source_image}
+              src={Image.sized_url(source_image.path, :small)}
+              onerror={"this.onerror=null; this.src='#{Image.sized_url(source_image.path, :original)}'"}
+              alt="Source image"
+              class="size-16 rounded-ctl object-cover"
+            />
+            <div :if={source_image} class="text-ui">
+              <p><strong>Creator:</strong> {source_image.creator || "—"}</p>
+              <p><strong>License:</strong> {source_image.license || "—"}</p>
             </div>
           </div>
-        </:body>
-        <:footer>
-          <.button
-            type="button"
-            variant="secondary"
-            phx-click="cancel_copy_confirm"
-            phx-target={@myself}
-          >
+          <p class="text-ink-2">
+            To <strong>{MapSet.size(@copy_mode.selected_ids)}</strong> selected image(s)?
+          </p>
+          <div class="rounded-panel bg-surface-2 p-3 text-meta text-ink-2">
+            <p class="font-semibold">Fields to be copied:</p>
+            <p>Creator, License, License Link, Source Link, Attribution, Caption, Source</p>
+          </div>
+          <.notice :if={source_image && unattributed?(source_image)} kind={:warn}>
+            The source image is not attributed. Its empty values will overwrite the target images' data.
+          </.notice>
+        </div>
+        <:actions>
+          <.button type="button" phx-click="cancel_copy_confirm" phx-target={@myself}>
             Cancel
           </.button>
           <.button type="button" variant="primary" phx-click="execute_copy" phx-target={@myself}>
             Copy Metadata
           </.button>
-        </:footer>
-      </.modal>
+        </:actions>
+      </.dialog>
     </div>
     """
   end
@@ -1321,6 +1169,19 @@ defmodule GallformersWeb.Admin.ImagesComponent do
       "The source that the image came from: one of this Gall's Sources (its citations, its Gallformers notes and the Sources of its Facts)."
 
   defp unattributed?(image), do: not Attribution.image_attributed?(image)
+
+  # The first image is the default.
+  defp default_image?(image, [first | _rest]), do: image.id == first.id
+  defp default_image?(_image, []), do: false
+
+  # The license link's help; a Public Domain link may be changed from CC0's.
+  defp license_link_help(license) do
+    base = "The link to the license. Mandatory if CC-BY is chosen."
+
+    if license == "Public Domain / CC0" and not Licenses.url_readonly?(license),
+      do: base <> " Defaults to CC0, but can be changed for other public domain references.",
+      else: base
+  end
 
   defp present?(value), do: value not in [nil, ""]
 

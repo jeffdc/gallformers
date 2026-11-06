@@ -42,6 +42,37 @@ defmodule Gallformers.SourcesTest do
     end
   end
 
+  describe "list_recently_changed/1" do
+    test "the Sources changed most recently, each marked added or updated" do
+      attrs = %{
+        author: "Adder, A.",
+        pubyear: "2024",
+        citation: "C",
+        license: "All Rights Reserved"
+      }
+
+      {:ok, added} = Sources.create_source(Map.put(attrs, :title, "Recently added"))
+      {:ok, updated} = Sources.create_source(Map.put(attrs, :title, "Recently updated"))
+
+      later = ~U[2099-01-02 00:00:00Z]
+      latest = ~U[2099-01-03 00:00:00Z]
+
+      Repo.update_all(from(s in Sources.Source, where: s.id == ^added.id),
+        set: [inserted_at: later, updated_at: later]
+      )
+
+      Repo.update_all(from(s in Sources.Source, where: s.id == ^updated.id),
+        set: [inserted_at: later, updated_at: latest]
+      )
+
+      assert [first, second] = Sources.list_recently_changed(2)
+      assert %{id: id, title: "Recently updated", change: :updated, changed_at: ^latest} = first
+      assert id == updated.id
+      assert %{title: "Recently added", change: :added, changed_at: ^later} = second
+      assert Map.has_key?(first, :authors) and Map.has_key?(first, :year)
+    end
+  end
+
   describe "list_sources_by_id/1" do
     test "the Sources with the given IDs, by ID; unknown IDs are left out" do
       assert [%{id: 58}, %{id: 59}] = Sources.list_sources_by_id([59, 58, 999_999])

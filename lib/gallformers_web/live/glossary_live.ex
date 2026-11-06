@@ -1,8 +1,11 @@
 defmodule GallformersWeb.GlossaryLive do
   @moduledoc """
-  LiveView for the glossary page.
-
-  Displays a sortable table of glossary terms with cross-linking.
+  The glossary page, on the design system (matter bc0d): every term with
+  its definition (other terms in it linked) and numbered references, in a
+  `data_table` sortable by word and definition, filtered by a name filter.
+  Each row is anchored by its lowercase word: search results and the
+  glossary tooltips link to `/glossary#word`. A signed-in user gets an edit
+  link per term.
   """
   use GallformersWeb, :live_view
 
@@ -44,7 +47,7 @@ defmodule GallformersWeb.GlossaryLive do
   end
 
   @impl true
-  def handle_event("sort", %{"column" => column}, socket) when column in @valid_sort_columns do
+  def handle_event("sort", %{"field" => column}, socket) when column in @valid_sort_columns do
     column_atom = String.to_atom(column)
 
     {new_sort_by, new_sort_dir} =
@@ -89,7 +92,11 @@ defmodule GallformersWeb.GlossaryLive do
     |> String.split("\n")
     |> Enum.filter(&(String.trim(&1) != ""))
     |> Enum.with_index(1)
-    |> Enum.map(fn {url, index} -> %{url: String.trim(url), index: index} end)
+    |> then(fn refs ->
+      Enum.map(refs, fn {url, index} ->
+        %{url: String.trim(url), index: index, sep: if(index < length(refs), do: ", ")}
+      end)
+    end)
   end
 
   @impl true
@@ -99,97 +106,60 @@ defmodule GallformersWeb.GlossaryLive do
 
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div class="mx-auto max-w-6xl">
-        <h1 class="text-3xl font-bold text-gf-maroon mb-6">
-          A Glossary of Gall Related Terminology
-        </h1>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Glossary</:title>
+          <:description>A glossary of gall related terminology.</:description>
+        </.page_header>
 
-        <div class="mb-4 max-w-md">
-          <form phx-change="search" phx-submit="search" id="glossary-search-form">
-            <.search_input
-              id="glossary-search"
-              name="query"
-              value={@search_query}
-              placeholder="Filter glossary terms..."
-              phx-debounce="300"
-            />
-          </form>
-        </div>
+        <form phx-change="search" phx-submit="search" id="glossary-search-form" class="max-w-md">
+          <.search_field
+            id="glossary-search"
+            name="query"
+            value={@search_query}
+            label="Filter glossary terms"
+            placeholder="Filter glossary terms..."
+          />
+        </form>
 
-        <%= if Enum.empty?(@entries) do %>
-          <div class="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
-            <p>No glossary entries found.</p>
-          </div>
-        <% else %>
-          <div class="bg-white rounded-lg shadow overflow-hidden">
-            <table class="gf-table">
-              <thead>
-                <tr>
-                  <th
-                    class="sortable w-1/4"
-                    phx-click="sort"
-                    phx-value-column="word"
-                  >
-                    Word
-                    <span :if={@sort_by == :word} class="ml-1">
-                      {if @sort_dir == :asc, do: "↑", else: "↓"}
-                    </span>
-                  </th>
-                  <th
-                    class="sortable"
-                    phx-click="sort"
-                    phx-value-column="definition"
-                  >
-                    Definition
-                    <span :if={@sort_by == :definition} class="ml-1">
-                      {if @sort_dir == :asc, do: "↑", else: "↓"}
-                    </span>
-                  </th>
-                  <th class="w-24">
-                    Refs
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr :for={entry <- @sorted_entries} id={String.downcase(entry.word)}>
-                  <td class="font-bold">
-                    <span class="inline-flex items-center gap-1">
-                      {entry.word}
-                      <.link
-                        :if={@current_user}
-                        navigate={~p"/admin/glossary/#{entry.id}"}
-                        class="text-gray-400 hover:text-gf-maroon"
-                        title="Edit"
-                      >
-                        <.icon name="ph-pencil-simple" class="size-4" />
-                      </.link>
-                    </span>
-                  </td>
-                  <td class="text-gray-600">
-                    {Phoenix.HTML.raw(Markdown.linkify_glossary_terms(entry.definition || ""))}
-                  </td>
-                  <td class="text-gray-500">
-                    <span :for={ref <- format_refs(entry.urls)}>
-                      <.link
-                        href={ref.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        class="hover:underline"
-                      >
-                        {ref.index}
-                      </.link>
-                      <span :if={ref.index < length(format_refs(entry.urls))}>, </span>
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="mt-4 text-sm text-gray-500">
-            Showing {length(@entries)} entries
-          </div>
-        <% end %>
+        <.data_table
+          id="glossary"
+          rows={@sorted_entries}
+          row_id={&String.downcase(&1.word)}
+          sort={%{field: @sort_by, dir: @sort_dir}}
+        >
+          <:col :let={entry} label="Word" field={:word} sortable>
+            <span class="inline-flex items-center gap-1 font-semibold text-ink">
+              {entry.word}
+              <.link
+                :if={@current_user}
+                navigate={~p"/admin/glossary/#{entry.id}"}
+                class="text-muted hover:text-ink"
+                title="Edit"
+              >
+                <.icon name="ph-pencil-simple" class="size-4" />
+              </.link>
+            </span>
+          </:col>
+          <:col :let={entry} label="Definition" field={:definition} sortable grow full>
+            <span class="text-ink-2">
+              {Phoenix.HTML.raw(Markdown.linkify_glossary_terms(entry.definition || ""))}
+            </span>
+          </:col>
+          <:col :let={entry} label="Refs">
+            <span class="text-meta">
+              <span :for={ref <- format_refs(entry.urls)}>
+                <.link href={ref.url} target="_blank" rel="noreferrer">{ref.index}</.link>{ref.sep}
+              </span>
+            </span>
+          </:col>
+          <:empty>
+            <.empty_state title="No glossary entries found." />
+          </:empty>
+          <:footer>
+            <p class="text-meta text-muted">Showing {length(@entries)} entries</p>
+          </:footer>
+        </.data_table>
       </div>
     </Layouts.app>
     """

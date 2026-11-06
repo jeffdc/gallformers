@@ -1,6 +1,7 @@
 defmodule GallformersWeb.Admin.SourceLive.Index do
   @moduledoc """
-  The Source editor's list (matter a856, Task 10): the Sources by title,
+  The Source editor's list (matter a856, Task 10; on the design system's
+  admin list pattern, matter bc0d): the Sources by title,
   searched by title or author and paginated, each linking to its editor.
   Sources are created by imports; there is no "new" and no delete.
 
@@ -65,88 +66,82 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="Sources">
-      <div class="space-y-6">
-        <p class="text-sm text-gray-600">
-          Sources arrive with imports. Here you can correct a Source's details, or mark it
-          retracted by a retraction notice (and undo that).
-        </p>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Sources</:title>
+          <:meta label="Sources">{@total}</:meta>
+          <:description>
+            Sources arrive with imports. Here you can correct a Source's details, or mark it retracted by a retraction notice (and undo that).
+          </:description>
+        </.page_header>
 
-        <div class="max-w-xl">
-          <form id="source-search-form" phx-change="search" phx-submit="search">
-            <.search_input
-              id="source-search"
-              name="query"
-              value={@query}
-              placeholder="Search sources by title or author..."
-              phx-debounce="300"
-            />
-          </form>
+        <form id="source-search-form" phx-change="search" phx-submit="search" class="max-w-md">
+          <.search_field
+            id="source-search"
+            name="query"
+            value={@query}
+            label="Search the Sources"
+            placeholder="Title or author"
+          />
+        </form>
+
+        <div id="sources-table">
+          <.data_table id="sources" rows={@sources} row_id={&"source-#{&1.id}"} compact>
+            <:col :let={source} label="Title" grow>
+              <.link navigate={~p"/admin/sources/#{source.id}"} class="font-semibold">
+                {source.title}
+              </.link>
+            </:col>
+            <:col :let={source} label="Author" hide_below={:md}>
+              <span class="text-ink-2">{source.author}</span>
+            </:col>
+            <:col :let={source} label="Year">
+              <span class="text-ink-2">{source.pubyear}</span>
+            </:col>
+            <:col :let={source} label="Kind" hide_below={:lg}>
+              <span class="text-ink-2">{source.kind}</span>
+            </:col>
+            <:col :let={source} label="Ingested" hide_below={:lg}>
+              <% dates = @dates[source.id] %>
+              <span data-role="ingested" class="text-meta text-muted">
+                {if dates.legacy?, do: legacy_source_text(), else: date_text(dates.ingested)}
+              </span>
+            </:col>
+            <:col :let={source} label="Updated" hide_below={:md}>
+              <span data-role="updated" class="text-meta text-muted">
+                {date_text(@dates[source.id].updated)}
+              </span>
+            </:col>
+            <:col :let={source} label="Status">
+              <span class="flex items-center gap-2">
+                <span :if={@reviews[source.id]} class="text-meta">
+                  <.review_in_progress_link review={@reviews[source.id]} />
+                </span>
+                <.chip :if={source.retracted_by_id} variant={:warn} size="sm">Retracted</.chip>
+                <.chip
+                  :if={!source.retracted_by_id && source.datacomplete}
+                  variant={:ok}
+                  size="sm"
+                >
+                  Complete
+                </.chip>
+              </span>
+            </:col>
+            <:empty>No sources found. Try a different search term.</:empty>
+            <:footer>
+              <.pagination
+                :if={total_pages(@total, @page_size) > 1}
+                page={@page}
+                total_pages={total_pages(@total, @page_size)}
+                total_items={@total}
+                page_size={@page_size}
+                on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+              />
+              <span :if={total_pages(@total, @page_size) <= 1}>Showing {@total} sources</span>
+            </:footer>
+          </.data_table>
         </div>
-
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table id="sources-table" class="gf-table gf-table-dark">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Author</th>
-                <th>Year</th>
-                <th>Kind</th>
-                <th>Ingested</th>
-                <th>Updated</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={source <- @sources} id={"source-#{source.id}"}>
-                <td>
-                  <.link
-                    navigate={~p"/admin/sources/#{source.id}"}
-                    class="hover:underline font-medium"
-                  >
-                    {source.title}
-                  </.link>
-                </td>
-                <td class="text-gray-500">{source.author}</td>
-                <td class="text-gray-500">{source.pubyear}</td>
-                <td class="text-gray-500">{source.kind}</td>
-                <% dates = @dates[source.id] %>
-                <td data-role="ingested" class="text-gray-500">
-                  {if dates.legacy?, do: legacy_source_text(), else: date_text(dates.ingested)}
-                </td>
-                <td data-role="updated" class="text-gray-500 whitespace-nowrap">
-                  {date_text(dates.updated)}
-                </td>
-                <td>
-                  <div :if={@reviews[source.id]} class="text-sm">
-                    <.review_in_progress_link review={@reviews[source.id]} />
-                  </div>
-                  <.badge :if={source.retracted_by_id} variant="warning">Retracted</.badge>
-                  <.badge :if={!source.retracted_by_id && source.datacomplete} variant="success">
-                    Complete
-                  </.badge>
-                </td>
-              </tr>
-              <tr :if={@sources == []}>
-                <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                  No sources found. Try a different search term.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <.pagination
-          :if={total_pages(@total, @page_size) > 1}
-          page={@page}
-          total_pages={total_pages(@total, @page_size)}
-          total_items={@total}
-          page_size={@page_size}
-          on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
-        />
-        <p :if={total_pages(@total, @page_size) <= 1} class="text-sm text-gray-500">
-          Showing {@total} sources
-        </p>
       </div>
     </Layouts.admin>
     """

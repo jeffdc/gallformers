@@ -119,6 +119,13 @@ defmodule GallformersWeb do
       # Core UI components — our form/1 wrapper takes precedence over Phoenix's
       import Phoenix.Component, except: [form: 1]
       import GallformersWeb.CoreComponents
+      # Design system components (docs/design-system/components.md)
+      import GallformersWeb.ActionComponents
+      import GallformersWeb.DataComponents
+      import GallformersWeb.PageComponents
+      import GallformersWeb.DomainComponents
+      import GallformersWeb.CurationComponents
+      import GallformersWeb.FeedbackComponents
       # Shared UI components (cards, alerts, spinners, etc.)
       import GallformersWeb.UIComponents
       # Form components (buttons, multi-select, etc.)

@@ -16,7 +16,7 @@ defmodule GallformersWeb.Admin.UsersLive do
     socket =
       socket
       |> assign(:current_user, current_user)
-      |> assign(:page_title, "User Management")
+      |> assign(:page_title, "Users")
       |> load_users()
 
     {:ok, socket}
@@ -50,75 +50,36 @@ defmodule GallformersWeb.Admin.UsersLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="User Management">
-      <div class="space-y-6">
-        <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded flex items-center gap-4">
-          <span class="text-sm font-medium text-gray-700">Quick Links:</span>
-          <.link navigate={~p"/admin"} class="text-sm hover:underline">← Back to Admin</.link>
-        </div>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin"}>Dashboard</:crumb>
+          <:title>Users</:title>
+          <:meta label="Users">{length(@users)}</:meta>
+          <:description>
+            Manage which users appear on the About page. Turn it off for anyone who has lost admin access but still shows there.
+          </:description>
+        </.page_header>
 
-        <%!-- Info banner --%>
-        <div class="gf-admin-info">
-          <.icon name="ph-info" class="h-5 w-5 text-blue-400 mr-2 flex-shrink-0" />
-          <p>
-            Manage which users appear on the About page. Use this to remove users who have
-            lost admin access but still have "Show on About" enabled.
-          </p>
-        </div>
-
-        <%!-- Users table --%>
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table class="gf-table gf-table-dark">
-            <thead>
-              <tr>
-                <th>Display Name</th>
-                <th>Nickname</th>
-                <th class="text-center">Show on About</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={user <- @users}>
-                <td class="font-medium">
-                  {display_name(user)}
-                </td>
-                <td class="text-gray-500">
-                  {user.nickname || "-"}
-                </td>
-                <td class="text-center">
-                  <button
-                    type="button"
-                    phx-click="toggle_show_on_about"
-                    phx-value-id={user.id}
-                    class={[
-                      "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gf-maroon focus:ring-offset-2",
-                      if(user.show_on_about, do: "bg-gf-maroon", else: "bg-gray-200")
-                    ]}
-                    role="switch"
-                    aria-checked={to_string(user.show_on_about)}
-                    aria-label={"Toggle show on about for #{display_name(user)}"}
-                  >
-                    <span
-                      aria-hidden="true"
-                      class={[
-                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                        if(user.show_on_about, do: "translate-x-5", else: "translate-x-0")
-                      ]}
-                    />
-                  </button>
-                </td>
-              </tr>
-              <tr :if={@users == []}>
-                <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                  No users found.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p class="text-sm text-gray-500">
-          Showing {length(@users)} users
-        </p>
+        <.data_table id="users" rows={@users} row_id={&"users-#{&1.id}"}>
+          <:col :let={user} label="Display name" grow>
+            <span class="font-semibold">{display_name(user)}</span>
+          </:col>
+          <:col :let={user} label="Nickname">
+            <span class="text-ink-2">{user.nickname || "–"}</span>
+          </:col>
+          <:col :let={user} label="On the About page">
+            <.toggle
+              id={"show-on-about-#{user.id}"}
+              name="show_on_about"
+              checked={user.show_on_about}
+              aria-label={"Show #{display_name(user)} on the About page"}
+              phx-click="toggle_show_on_about"
+              phx-value-id={user.id}
+            />
+          </:col>
+          <:empty>No users yet.</:empty>
+        </.data_table>
       </div>
     </Layouts.admin>
     """

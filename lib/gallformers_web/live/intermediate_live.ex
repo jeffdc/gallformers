@@ -1,23 +1,28 @@
 defmodule GallformersWeb.IntermediateLive do
   @moduledoc """
-  LiveView for the public pages of the ranks between family and genus
-  (subfamily, tribe, subtribe).
+  The pages of a family and the ranks between family and genus (subfamily,
+  tribe, subtribe), on the design system (matter bc0d; behavior in
+  docs/design-system/inventory/rank-pages.md). The rank comes from the
+  route's live action.
 
-  Displays the taxon (`Gallformers.Taxa.get_by_name/2`, its rank from the
-  route) with its breadcrumb lineage, its children (genera and lower
-  intermediate ranks) with their gall and host counts, and the Galls
-  placed at the taxon itself. Data through `GallformersWeb.RankPage`.
-  Routes for ranks the taxonomy no longer has (infratribe, supertribe,
-  infrafamily) find nothing.
+  A Gallformer taxon shows two tabs (`?tab=`): its Galls, every Gall whose
+  Inducer is in its subtree, the undescribed ones placed at the taxon too
+  (`GallformersWeb.RankGalls`), and the taxa within it with their Galls. A
+  plant taxon shows its genera (or the taxa within it) with their species
+  and the Galls on them, and any Galls it induces. One name filter narrows
+  both; one sort orders them. An unknown name, a name of another rank, and
+  the routes for ranks the taxonomy no longer has (infratribe, supertribe,
+  infrafamily) are 404s.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Taxa
+  alias Gallformers.Catalog
   alias Gallformers.Taxa.Rank
-  alias GallformersWeb.LineageBreadcrumb
+  alias GallformersWeb.RankGalls
   alias GallformersWeb.RankPage
-  alias GallformersWeb.RankPageComponents
   alias GallformersWeb.TaxonomyURL
+
+  import GallformersWeb.RankPageComponents
 
   @impl true
   def mount(%{"name" => name}, _session, socket) do
@@ -30,247 +35,196 @@ defmodule GallformersWeb.IntermediateLive do
 
     case lookup do
       {:redirect, path} -> {:ok, push_navigate(socket, to: path, replace: true)}
-      {:ok, []} -> {:ok, assign_not_found(socket, "Taxonomy not found")}
-      {:ok, [taxon | _]} -> {:ok, load_intermediate(socket, taxon.id, name, rank)}
+      {:ok, []} -> raise GallformersWeb.NotFoundError, "No #{rank} named #{name}"
+      {:ok, [taxon | _]} -> {:ok, load(socket, taxon, name, rank)}
     end
   end
 
-  defp load_intermediate(socket, id, name, rank) do
-    rank_label = rank |> Atom.to_string() |> String.capitalize()
-    children = RankPage.children(id)
+  defp load(socket, taxon, name, rank) do
+    plants? = taxon.kingdom == "Plantae"
+    children = children(taxon.id, plants?)
+    galls = RankGalls.load(%{inducer_family_id: taxon.id})
+    label = rank |> Atom.to_string() |> String.capitalize()
 
-    lineage =
-      id
-      |> Taxa.lineage()
-      |> Enum.reject(&(&1.taxon_id == id))
-      |> LineageBreadcrumb.from_lineage()
-
-    assign(socket,
-      page_title: "#{rank_label}: #{name}",
-      page_description:
-        "#{name} - A taxonomic #{String.downcase(rank_label)} documented on Gallformers.",
+    socket
+    |> assign(
+      page_title: if(rank == :family, do: name, else: "#{label}: #{name}"),
+      page_description: "#{name} - A taxonomic #{rank} documented on Gallformers.",
       page_url: TaxonomyURL.public_path(%{rank: rank, name: name}),
       page_image: nil,
       page_json_ld: nil,
       page_noindex: false,
-      taxonomy: %{id: id, name: name, rank: rank_label, description: RankPage.description(id)},
-      lineage: lineage,
+      taxon: %{id: taxon.id, name: name, rank: rank, label: label},
+      description: RankPage.description(taxon.id),
+      crumbs: RankPage.crumbs(taxon.id),
+      plants?: plants?,
       children: children,
-      filtered_children: children,
-      total_children_count: length(children),
-      galls: RankPage.galls_of_inducers([id]),
+      galls: RankGalls.new(galls),
+      galls_on: if(plants?, do: galls_on(taxon.id), else: nil),
       search_query: "",
-      sort_by: :name,
-      sort_dir: :asc,
-      error: nil
+      sort: %{field: :name, dir: :asc}
+    )
+    |> compute()
+  end
+
+  # The taxa within, with their Galls: for a plant taxon the Galls on it
+  # (its Host count); for others the Galls their Inducers cause.
+  defp children(taxon_id, false), do: RankPage.children(taxon_id)
+
+  defp children(taxon_id, true) do
+    counts = Catalog.host_gall_counts()
+
+    taxon_id
+    |> RankPage.children()
+    |> Enum.map(&%{&1 | gall_count: counts |> Map.get(&1.id, %{count: 0}) |> Map.fetch!(:count)})
+  end
+
+  defp galls_on(taxon_id), do: Catalog.host_gall_counts() |> Map.get(taxon_id, %{count: 0})
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    tabs = tab_list(socket.assigns)
+
+    tab =
+      Enum.find(
+        Enum.map(tabs, & &1.key),
+        List.first(Enum.map(tabs, & &1.key)),
+        &(&1 == params["tab"])
+      )
+
+    {:noreply, assign(socket, tab: tab, tabs: tabs)}
+  end
+
+  # The Galls tab when it has Galls, then the taxa within.
+  defp tab_list(assigns) do
+    galls = length(assigns.galls.all)
+    children = length(assigns.children)
+
+    within =
+      if Enum.all?(assigns.children, &(&1.rank == "genus")), do: "Genera", else: "Within it"
+
+    [
+      galls > 0 && %{key: "galls", label: "Galls", count: galls},
+      children > 0 && %{key: "within", label: within, count: children}
+    ]
+    |> Enum.filter(& &1)
+  end
+
+  defp compute(socket) do
+    %{search_query: query, sort: sort, children: children} = socket.assigns
+
+    assign(socket,
+      galls: RankGalls.compute(socket.assigns.galls, query, sort),
+      shown_children:
+        children
+        |> RankPage.filter_children(query)
+        |> RankPage.sort_children(children_field(sort.field), sort.dir)
     )
   end
 
-  defp assign_not_found(socket, error) do
-    assign(socket,
-      page_title: "Not Found",
-      page_description: "The requested taxonomy was not found on Gallformers.",
-      page_url: nil,
-      page_image: nil,
-      page_json_ld: nil,
-      page_noindex: true,
-      taxonomy: nil,
-      lineage: nil,
-      children: [],
-      filtered_children: [],
-      total_children_count: 0,
-      galls: [],
-      search_query: "",
-      sort_by: :name,
-      sort_dir: :asc,
-      error: error
-    )
-  end
+  defp children_field(field) when field in [:name, :type, :gall_count, :host_count], do: field
+  defp children_field(_field), do: :name
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     {:noreply,
-     assign(socket,
-       search_query: query,
-       filtered_children: RankPage.filter_children(socket.assigns.children, query)
-     )}
+     socket |> assign(search_query: query) |> update(:galls, &%{&1 | page: 1}) |> compute()}
   end
 
-  @impl true
-  def handle_event("sort", %{"column" => column}, socket)
-      when column in ["name", "type", "gall_count", "host_count"] do
-    {sort_by, sort_dir} =
-      RankPage.toggle_sort(
-        socket.assigns.sort_by,
-        socket.assigns.sort_dir,
-        String.to_existing_atom(column)
-      )
+  def handle_event("sort", %{"field" => field}, socket)
+      when field in ["name", "type", "gall_count", "host_count", "common_name", "count"] do
+    %{field: current, dir: dir} = socket.assigns.sort
+    {field, dir} = RankPage.toggle_sort(current, dir, String.to_existing_atom(field))
+    # A count reads best from the most.
+    dir =
+      if field in [:gall_count, :host_count, :count] and field != current, do: :desc, else: dir
 
-    {:noreply, assign(socket, sort_by: sort_by, sort_dir: sort_dir)}
+    {:noreply, socket |> assign(sort: %{field: field, dir: dir}) |> compute()}
+  end
+
+  def handle_event("galls_" <> _ = event, params, socket) do
+    {:noreply, socket |> update(:galls, &RankGalls.handle(&1, event, params)) |> compute()}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div class="mx-auto max-w-7xl">
-        <%= if @error do %>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
-        <% else %>
-          <%= if @taxonomy do %>
-            <%!-- Header --%>
-            <div class="mb-6">
-              <div class="flex items-center gap-2 mb-2">
-                <h1 class="text-2xl font-bold text-gf-maroon">
-                  <span class="text-lg font-normal text-gray-600">{@taxonomy.rank}:</span>
-                  {@taxonomy.name}
-                </h1>
-                <RankPageComponents.admin_edit_link
-                  current_user={@current_user}
-                  taxon_id={@taxonomy.id}
-                />
-              </div>
-              <p
-                :if={@taxonomy.description not in [nil, ""]}
-                class="text-gray-600 mb-2"
-              >
-                {@taxonomy.description}
-              </p>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb :for={c <- @crumbs} navigate={c.path} italic={c.italic}>{c.name}</:crumb>
+          <:title>{@taxon.name}</:title>
+          <:chip variant={:rank}>{@taxon.label}</:chip>
+          <:chip :if={@plants?}>Host plants</:chip>
+          <:meta :if={@description} label="Common name">{@description}</:meta>
+          <:action>
+            <.admin_edit_link current_user={@current_user} taxon_id={@taxon.id} />
+          </:action>
+        </.page_header>
 
-              <%!-- Breadcrumb --%>
-              <.taxonomy_breadcrumb
-                :if={@lineage}
-                family={@lineage.family}
-                intermediates={@lineage.intermediates}
-              />
-            </div>
+        <.empty_state :if={@tabs == []} title="No children found." />
 
-            <%!-- Children list --%>
-            <div class="mt-6">
-              <%= if @total_children_count > 0 do %>
-                <h2 class="text-lg font-semibold text-gray-800 mb-3">
-                  Children ({@total_children_count})
-                </h2>
+        <div :if={@tabs != []} class="flex flex-wrap items-end gap-x-10 gap-y-4">
+          <.stat :if={@plants?} value={@galls_on.count} label="Galls on it" />
+          <.stat
+            :if={@plants?}
+            value={@children |> Enum.map(& &1.host_count) |> Enum.sum()}
+            label="Species"
+          />
+          <.stat :if={@galls.all != []} value={length(@galls.all)} label="Galls" />
+          <.stat
+            :if={@galls.all != []}
+            value={@galls.all |> Enum.flat_map(& &1.host_genera) |> Enum.uniq() |> length()}
+            label="Host genera"
+          />
+          <.stat
+            :if={@galls.all != []}
+            value={Enum.count(@galls.all, & &1.undescribed)}
+            label="Undescribed"
+          />
+          <form
+            id={if @taxon.rank == :family, do: "family-search-form", else: "intermediate-search-form"}
+            phx-change="search"
+            phx-submit="search"
+            class="w-full sm:ml-auto sm:w-80"
+          >
+            <.search_field
+              id={if @taxon.rank == :family, do: "family-search", else: "intermediate-search"}
+              name="query"
+              value={@search_query}
+              label="Filter by name or common name"
+              placeholder="Filter by name or common name…"
+            />
+          </form>
+        </div>
 
-                <%!-- Search box --%>
-                <div class="mb-4 max-w-md">
-                  <form phx-change="search" phx-submit="search" id="intermediate-search-form">
-                    <.search_input
-                      id="intermediate-search"
-                      name="query"
-                      value={@search_query}
-                      placeholder="Filter by name, type, or description..."
-                      phx-debounce="300"
-                    />
-                  </form>
-                </div>
+        <.tab_nav :if={length(@tabs) > 1} label="Show" class="-mb-2">
+          <:tab :for={tab <- @tabs} patch={"?tab=#{tab.key}"} current={tab.key == @tab}>
+            {tab.label}
+            <span class="text-meta tabular-nums text-muted">{format_number(tab.count)}</span>
+          </:tab>
+        </.tab_nav>
 
-                <%= if Enum.empty?(@filtered_children) do %>
-                  <div class="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
-                    <p>No children found matching "{@search_query}"</p>
-                  </div>
-                <% else %>
-                  <div class="bg-white rounded border border-gray-200 overflow-hidden">
-                    <table class="gf-table">
-                      <thead>
-                        <tr>
-                          <th class="sortable" phx-click="sort" phx-value-column="name">
-                            Name
-                            <span :if={@sort_by == :name} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                          <th
-                            class="sortable text-center"
-                            phx-click="sort"
-                            phx-value-column="type"
-                          >
-                            Type
-                            <span :if={@sort_by == :type} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                          <th
-                            class="sortable text-center"
-                            phx-click="sort"
-                            phx-value-column="gall_count"
-                          >
-                            Galls
-                            <span :if={@sort_by == :gall_count} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                          <th
-                            class="sortable text-center"
-                            phx-click="sort"
-                            phx-value-column="host_count"
-                          >
-                            Hosts
-                            <span :if={@sort_by == :host_count} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr :for={
-                          child <- RankPage.sort_children(@filtered_children, @sort_by, @sort_dir)
-                        }>
-                          <td>
-                            <.link
-                              :if={child.url}
-                              href={child.url}
-                              class="hover:underline font-medium"
-                            >
-                              <.taxon_name name={child.name} rank={child.rank} />
-                            </.link>
-                            <.taxon_name :if={!child.url} name={child.name} rank={child.rank} />
-                            <span
-                              :if={child.description not in [nil, ""]}
-                              class="text-gray-500 text-sm ml-1"
-                            >
-                              ({child.description})
-                            </span>
-                          </td>
-                          <td class="text-center">
-                            <span class="text-sm text-gray-600">{child.rank}</span>
-                          </td>
-                          <td class="text-center text-gray-600">{child.gall_count}</td>
-                          <td class="text-center text-gray-600">{child.host_count}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+        <.rank_galls
+          :if={@tab == "galls"}
+          id="rank-galls"
+          list={@galls}
+          sort={@sort}
+          narrowed={@search_query != ""}
+        />
 
-                  <%!-- Filter status message --%>
-                  <div class="mt-4 text-sm text-gray-500">
-                    <%= if @search_query != "" do %>
-                      Filtering {length(@filtered_children)} of {@total_children_count} children
-                    <% else %>
-                      Showing {length(@filtered_children)} children
-                    <% end %>
-                  </div>
-                <% end %>
-              <% else %>
-                <p class="text-gray-500 italic">No children found.</p>
-              <% end %>
-            </div>
-
-            <%!-- Galls placed at this rank itself --%>
-            <div :if={@galls != []} class="mt-6">
-              <h2 class="text-lg font-semibold text-gray-800 mb-3">
-                Galls placed in this {String.downcase(@taxonomy.rank)} ({length(@galls)})
-              </h2>
-              <RankPageComponents.species_table
-                id="intermediate-galls"
-                rows={@galls}
-                url_prefix="/gall/"
-                name_header="Gall"
-                count_header="Number of Hosts"
-              />
-            </div>
-          <% end %>
-        <% end %>
+        <.section
+          :if={@tab == "within"}
+          id="within"
+          title={Enum.find(@tabs, &(&1.key == "within")).label}
+          count={
+            if length(@shown_children) == length(@children),
+              do: format_number(length(@children)),
+              else: "#{length(@shown_children)} of #{length(@children)}"
+          }
+        >
+          <.children_list children={@shown_children} sort={@sort} plants={@plants?} />
+        </.section>
       </div>
     </Layouts.app>
     """

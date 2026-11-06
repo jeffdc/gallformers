@@ -315,6 +315,71 @@ defmodule Gallformers.Catalog.ReadModelsTest do
 
   # -- summary -----------------------------------------------------------------
 
+  describe "known range" do
+    # Where a Gall is known to occur (Browse by place, the place page): its
+    # Hosts' native ranges, and their introduced ranges only in a country
+    # where the Gall itself is recorded.
+    setup do
+      oak = plant_fixture()
+      host_range_fixture(oak, [{"US-CA", "exact"}, {"RO-B", "exact", "introduced"}])
+      %{oak: oak, gall: gall_fixture()}
+    end
+
+    defp known(gall),
+      do:
+        gall.id
+        |> List.wrap()
+        |> PotentialRange.known_for_galls()
+        |> Map.fetch!(gall.id)
+        |> codes()
+
+    defp occurs!(gall, code, source) do
+      {:ok, _} =
+        Catalog.assert_occurrence(
+          test_actor(),
+          %{gall_id: gall.id, place_id: place_id(code)},
+          confirm(source)
+        )
+    end
+
+    test "is the Hosts' native range, not their introduced range", ctx do
+      host!(ctx.oak, ctx.gall, confirm(ctx.source))
+
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["RO-B", "US-CA"]
+      assert known(ctx.gall) == ["US-CA"]
+    end
+
+    test "takes an introduced place in a country where the Gall is recorded", ctx do
+      host!(ctx.oak, ctx.gall, confirm(ctx.source))
+      occurs!(ctx.gall, "RO", ctx.source)
+
+      assert known(ctx.gall) == ["RO-B", "US-CA"]
+    end
+
+    test "a record in one of the country's subdivisions shows the country", ctx do
+      host!(ctx.oak, ctx.gall, confirm(ctx.source))
+      occurs!(ctx.gall, "RO-B", ctx.source)
+
+      assert known(ctx.gall) == ["RO-B", "US-CA"]
+    end
+
+    test "a record in another country or only at continent level shows nothing new", ctx do
+      host!(ctx.oak, ctx.gall, confirm(ctx.source))
+      occurs!(ctx.gall, "MX", ctx.source)
+      occurs!(ctx.gall, "XE", ctx.source)
+
+      assert known(ctx.gall) == ["US-CA"]
+    end
+
+    test "is empty for a Gall with no range data, and keeps the adjustments", ctx do
+      assert known(ctx.gall) == []
+
+      host!(ctx.oak, ctx.gall, confirm(ctx.source))
+      range!(ctx.gall, :exclude, "US-CA", confirm(ctx.source))
+      assert known(ctx.gall) == []
+    end
+  end
+
   describe "gall summary" do
     setup do
       load_vocab!()

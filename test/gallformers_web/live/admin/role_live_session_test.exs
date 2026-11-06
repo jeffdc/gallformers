@@ -100,7 +100,7 @@ defmodule GallformersWeb.Admin.RoleLiveSessionTest do
                |> follow_redirect(conn)
 
       assert {:ok, _view, html} = live(conn)
-      assert html =~ "Site Operations"
+      assert html =~ "Site operations"
     end
   end
 end

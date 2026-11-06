@@ -30,6 +30,10 @@ defmodule Gallformers.Catalog.Identify do
       whose potential range meets any of the places' leaves, and Galls whose
       range is every region (no range data). A code that is no place leaves
       only those.
+    * `:known_place_codes` — place codes: Galls known to occur in any of the
+      places' leaves (`gall_index.known_place_ids`: the Hosts' native
+      ranges, introduced ranges only where the Gall is recorded); Galls with
+      no range data are not. The place page lists these.
 
   Non-galls are not in the catalog, and a match carries no tag saying how
   its place matched (`803b` decision 2): every place match is the potential
@@ -80,7 +84,8 @@ defmodule Gallformers.Catalog.Identify do
           optional(:trait_logic) => %{String.t() => :and | :or} | nil,
           optional(:detachable) => String.t() | nil,
           optional(:undescribed) => boolean() | nil,
-          optional(:place_codes) => [String.t()] | nil
+          optional(:place_codes) => [String.t()] | nil,
+          optional(:known_place_codes) => [String.t()] | nil
         }
 
   @type result :: %{
@@ -213,6 +218,7 @@ defmodule Gallformers.Catalog.Identify do
     |> detachable(filters[:detachable])
     |> undescribed(filters[:undescribed])
     |> place(filters[:place_codes])
+    |> known_place(filters[:known_place_codes])
   end
 
   defp host(query, nil), do: query
@@ -287,15 +293,21 @@ defmodule Gallformers.Catalog.Identify do
   defp place(query, codes) when codes in [nil, []], do: query
 
   defp place(query, codes) when is_list(codes) do
-    leaves =
-      codes
-      |> Enum.map(&Places.get_place_by_code/1)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(& &1.id)
-      |> Places.batch_leaf_descendant_ids()
-
-    where(query, [g], g.everywhere or fragment("? && ?::bigint[]", g.place_ids, ^leaves))
+    where(query, [g], g.everywhere or fragment("? && ?::bigint[]", g.place_ids, ^leaf_ids(codes)))
   end
+
+  defp leaf_ids(codes) do
+    codes
+    |> Enum.map(&Places.get_place_by_code/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(& &1.id)
+    |> Places.batch_leaf_descendant_ids()
+  end
+
+  defp known_place(query, codes) when codes in [nil, []], do: query
+
+  defp known_place(query, codes) when is_list(codes),
+    do: where(query, [g], fragment("? && ?::bigint[]", g.known_place_ids, ^leaf_ids(codes)))
 
   # -- terms (`d213`) -------------------------------------------------------------
 

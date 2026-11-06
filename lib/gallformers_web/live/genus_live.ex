@@ -1,17 +1,20 @@
 defmodule GallformersWeb.GenusLive do
   @moduledoc """
-  LiveView for the taxonomic genus page.
-
-  Displays a genus (`Gallformers.Taxa.get_by_name/2`) with its lineage and
-  up to three lists, each shown when it has rows:
+  The genus page (design system, matter bc0d; behavior in
+  docs/design-system/inventory/rank-pages.md). A genus
+  (`Gallformers.Taxa.get_by_name/2`) with its lineage and up to three
+  lists, each shown when it has rows (a genus can have both, e.g.
+  mistletoes):
 
     * **Galls** — the Galls whose Inducer is in the genus (its species, the
-      genus itself for undescribed Galls, a section in it), with their
-      number of Hosts, filterable by the genera of their Hosts;
-    * **Hosts** — the plants in the genus, with their number of Galls,
-      filterable by the genera of the Inducers of their Galls;
+      genus itself for undescribed Galls, a section in it), as photos or a
+      table with facets (`GallformersWeb.RankGalls`);
+    * **Species** — the plants in the genus with their Galls, filterable by
+      the Gallformer genera with Galls on them (the rail);
     * **Galls on the genus as a whole** — the Galls whose Host is the genus
-      itself (today's "Genus spp." placeholder plants).
+      itself (today's "Genus spp." placeholder plants), in the rail.
+
+  One name filter narrows every list, and one sort orders both tables.
 
   A genus name used more than once (e.g. in two kingdoms) offers each,
   with its family; `?family=` picks one. Data through
@@ -21,10 +24,11 @@ defmodule GallformersWeb.GenusLive do
 
   alias Gallformers.Catalog
   alias Gallformers.Taxa
-  alias GallformersWeb.LineageBreadcrumb
+  alias GallformersWeb.RankGalls
   alias GallformersWeb.RankPage
-  alias GallformersWeb.RankPageComponents
   alias GallformersWeb.TaxonomyURL
+
+  import GallformersWeb.RankPageComponents
 
   @impl true
   def mount(%{"name" => name} = params, _session, socket) do
@@ -33,7 +37,7 @@ defmodule GallformersWeb.GenusLive do
         {:ok, push_navigate(socket, to: path, replace: true)}
 
       {:ok, []} ->
-        {:ok, assign_genus_not_found(socket, "Genus not found")}
+        raise GallformersWeb.NotFoundError, "No genus named #{name}"
 
       {:ok, [genus]} ->
         {:ok, assign_genus_data(socket, genus.id, name)}
@@ -41,20 +45,6 @@ defmodule GallformersWeb.GenusLive do
       {:ok, genera} ->
         {:ok, resolve_disambiguation(socket, name, params["family"], genera)}
     end
-  end
-
-  defp assign_genus_not_found(socket, error) do
-    assign(socket,
-      page_title: "Genus Not Found",
-      page_description: "The requested taxonomic genus was not found on Gallformers.",
-      page_url: nil,
-      page_image: nil,
-      page_json_ld: nil,
-      page_noindex: true,
-      genus: nil,
-      disambiguation: nil,
-      error: error
-    )
   end
 
   defp resolve_disambiguation(socket, name, family_hint, genera) do
@@ -93,16 +83,24 @@ defmodule GallformersWeb.GenusLive do
       page_json_ld: nil,
       page_noindex: true,
       genus: nil,
-      disambiguation: options,
-      error: nil
+      disambiguation: options
     )
   end
 
   defp assign_genus_data(socket, id, name) do
-    sections = sections(id)
-    total = sections |> Enum.map(&length(&1.rows)) |> Enum.sum()
+    galls = RankGalls.load(%{inducer_family_id: id})
+    plants = RankPage.host_rows(id)
+    on_genus = RankPage.galls_on_hosts([id])
 
-    assign(socket,
+    inducers =
+      if plants == [],
+        do: [],
+        else: plants |> Enum.map(& &1.id) |> Catalog.inducer_genera_on_hosts()
+
+    total = length(galls) + length(plants) + length(on_genus)
+
+    socket
+    |> assign(
       page_title: "Genus #{name}",
       page_description:
         "#{name} - A taxonomic genus documented on Gallformers with #{total} species.",
@@ -111,385 +109,183 @@ defmodule GallformersWeb.GenusLive do
       page_json_ld: nil,
       page_noindex: total == 0,
       genus: %{id: id, name: name, description: RankPage.description(id)},
-      lineage: id |> Taxa.lineage() |> LineageBreadcrumb.from_lineage(),
+      crumbs: RankPage.crumbs(id),
       disambiguation: nil,
-      sections: sections,
-      total_species_count: total,
+      galls: RankGalls.new(galls),
+      plants: plants,
+      on_genus: on_genus,
+      inducers: inducers,
+      selected_inducer: nil,
+      total: total,
       search_query: "",
-      show_related: %{},
-      selected_related: %{},
-      sort_by: :name,
-      sort_dir: :asc,
-      error: nil
+      sort: %{field: :name, dir: :asc}
     )
+    |> compute()
   end
 
-  # The lists the page shows, each only when it has rows.
-  defp sections(genus_id) do
-    inducer_ids = Taxa.subtree_ids([genus_id]) |> Map.get(genus_id, [genus_id])
-    galls = RankPage.galls_of_inducers(inducer_ids)
-    hosts = RankPage.host_rows(genus_id)
-    on_genus = RankPage.galls_on_hosts([genus_id])
+  # The lists as shown: narrowed by the name filter (and the plants by the
+  # chosen Gallformer genus), sorted by the page's sort.
+  defp compute(%{assigns: %{genus: nil}} = socket), do: socket
 
-    [
-      %{
-        key: "galls",
-        title: "Galls",
-        rows: galls,
-        url_prefix: "/gall/",
-        name_header: "Gall",
-        count_header: "Number of Hosts",
-        related: related(galls, &Catalog.host_genera_of_galls/1),
-        related_heading: "Host genera used by this genus",
-        related_filter_label: "host genus"
-      },
-      %{
-        key: "hosts",
-        title: "Hosts",
-        rows: hosts,
-        url_prefix: "/host/",
-        name_header: "Species Name",
-        count_header: "Number of Galls",
-        related: related(hosts, &Catalog.inducer_genera_on_hosts/1),
-        related_heading: "Gall-former genera found on this host",
-        related_filter_label: "gall-former genus"
-      },
-      %{
-        key: "genus_host",
-        title: "Galls on the genus as a whole",
-        rows: on_genus,
-        url_prefix: "/gall/",
-        name_header: "Gall",
-        count_header: "Number of Hosts",
-        related: [],
-        related_heading: nil,
-        related_filter_label: nil
-      }
-    ]
-    |> Enum.reject(&(&1.rows == []))
-  end
+  defp compute(socket) do
+    %{search_query: query, sort: sort, selected_inducer: selected} = socket.assigns
+    field = if sort.field in [:name, :common_name, :count], do: sort.field, else: :name
 
-  defp related([], _fun), do: []
-  defp related(rows, fun), do: rows |> Enum.map(& &1.id) |> fun.()
+    plants =
+      case Enum.find(socket.assigns.inducers, &(&1.taxon_id == selected)) do
+        nil -> socket.assigns.plants
+        genus -> Enum.filter(socket.assigns.plants, &(&1.id in genus.focal_ids))
+      end
 
-  defp format_with_description(name, description) do
-    if description && String.trim(description) != "" do
-      "#{name} (#{description})"
-    else
-      name
-    end
+    assign(socket,
+      galls: RankGalls.compute(socket.assigns.galls, query, sort),
+      shown_plants: plants |> RankPage.filter_rows(query) |> RankPage.sort_rows(field, sort.dir),
+      shown_on_genus: RankPage.filter_rows(socket.assigns.on_genus, query)
+    )
   end
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    {:noreply, assign(socket, :search_query, query)}
-  end
-
-  @impl true
-  def handle_event("filter_related_genus", %{"section" => key, "id" => id}, socket) do
-    selected = if id == "all", do: nil, else: String.to_integer(id)
-
     {:noreply,
-     socket
-     |> update(:show_related, &Map.put(&1, key, true))
-     |> update(:selected_related, &Map.put(&1, key, selected))}
+     socket |> assign(search_query: query) |> update(:galls, &%{&1 | page: 1}) |> compute()}
+  end
+
+  def handle_event("sort", %{"field" => field}, socket)
+      when field in ["name", "common_name", "count"] do
+    %{field: current, dir: dir} = socket.assigns.sort
+    {field, dir} = RankPage.toggle_sort(current, dir, String.to_existing_atom(field))
+    {:noreply, socket |> assign(sort: %{field: field, dir: dir}) |> compute()}
+  end
+
+  def handle_event("plants_filter", %{"id" => id}, socket) do
+    selected = if id == "all", do: nil, else: String.to_integer(id)
+    {:noreply, socket |> assign(selected_inducer: selected) |> compute()}
+  end
+
+  def handle_event("galls_" <> _ = event, params, socket) do
+    {:noreply, socket |> update(:galls, &RankGalls.handle(&1, event, params)) |> compute()}
   end
 
   @impl true
-  def handle_event("toggle_related_genera", %{"section" => key}, socket) do
-    {:noreply, update(socket, :show_related, &Map.update(&1, key, true, fn shown -> !shown end))}
-  end
-
-  @impl true
-  def handle_event("sort", %{"column" => column}, socket)
-      when column in ["name", "common_name", "count"] do
-    {sort_by, sort_dir} =
-      RankPage.toggle_sort(
-        socket.assigns.sort_by,
-        socket.assigns.sort_dir,
-        String.to_existing_atom(column)
-      )
-
-    {:noreply, assign(socket, sort_by: sort_by, sort_dir: sort_dir)}
-  end
-
-  # A section's rows narrowed by its selected related genus and the search.
-  defp visible_rows(section, selected_related, query) do
-    rows =
-      case Map.get(selected_related, section.key) do
-        nil ->
-          section.rows
-
-        genus_id ->
-          focal =
-            section.related
-            |> Enum.find(%{focal_ids: []}, &(&1.taxon_id == genus_id))
-            |> Map.fetch!(:focal_ids)
-            |> MapSet.new()
-
-          Enum.filter(section.rows, &MapSet.member?(focal, &1.id))
-      end
-
-    RankPage.filter_rows(rows, query)
-  end
-
-  defp related_name(section, genus_id),
-    do: Enum.find(section.related, &(&1.taxon_id == genus_id)).name
-
-  @impl true
-  def render(assigns) do
+  def render(%{disambiguation: options} = assigns) when options != nil do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div class="mx-auto max-w-7xl">
-        <%= if @error do %>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
-        <% else %>
-          <%= if @disambiguation do %>
-            <div class="mb-6">
-              <h1 class="text-2xl font-bold text-gf-maroon mb-4">
-                Genus <.taxon_name name={hd(@disambiguation).name} rank="genus" />
-              </h1>
-              <p class="text-gray-600 mb-6">
-                This genus name exists under multiple families. Select the one you're looking for:
-              </p>
-              <div class="grid gap-4 max-w-2xl">
-                <.link
-                  :for={option <- @disambiguation}
-                  navigate={"/genus/#{URI.encode(option.name)}?family=#{URI.encode(option.family_name)}"}
-                  class="block p-4 bg-white border border-gray-200 rounded-lg hover:border-gf-maroon hover:bg-gf-cream transition-colors"
-                >
-                  <div class="font-semibold text-gf-maroon">
-                    <.taxon_name name={option.name} rank="genus" />
-                    <span class="text-gray-500 font-normal">
-                      in Family {option.family_name}
-                      <span :if={option.family_description not in [nil, ""]}>
-                        ({option.family_description})
-                      </span>
-                    </span>
-                  </div>
-                  <div class="text-sm text-gray-500 mt-1">
-                    {option.species_count} species
-                  </div>
-                </.link>
-              </div>
-            </div>
-          <% end %>
-          <%= if @genus do %>
-            <%!-- Header --%>
-            <div class="mb-6">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <h1 class="text-2xl font-bold text-gf-maroon">
-                    Genus
-                    <.taxon_name
-                      name={format_with_description(@genus.name, @genus.description)}
-                      rank="genus"
-                    />
-                  </h1>
-                  <RankPageComponents.admin_edit_link
-                    current_user={@current_user}
-                    taxon_id={@genus.id}
-                  />
-                </div>
-              </div>
-
-              <.taxonomy_breadcrumb
-                :if={@lineage}
-                family={@lineage.family}
-                intermediates={@lineage.intermediates}
-                show_genus={false}
-              />
-            </div>
-
-            <%!-- Species lists --%>
-            <div class="mt-6">
-              <%= if @total_species_count > 0 do %>
-                <%!-- Search box --%>
-                <div class="mb-4 max-w-md">
-                  <form phx-change="search" phx-submit="search" id="genus-search-form">
-                    <.search_input
-                      id="genus-search"
-                      name="query"
-                      value={@search_query}
-                      placeholder="Filter by name or common name..."
-                      phx-debounce="300"
-                    />
-                  </form>
-                </div>
-
-                <.genus_section
-                  :for={section <- @sections}
-                  section={section}
-                  genus_name={@genus.name}
-                  selected={Map.get(@selected_related, section.key)}
-                  shown={Map.get(@show_related, section.key, false)}
-                  rows={visible_rows(section, @selected_related, @search_query)}
-                  search_query={@search_query}
-                  sort_by={@sort_by}
-                  sort_dir={@sort_dir}
-                />
-              <% else %>
-                <p class="text-gray-500 italic">No species found for this genus.</p>
-              <% end %>
-            </div>
-          <% end %>
-        <% end %>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title name>Genus {hd(@disambiguation).name}</:title>
+          <:description>
+            This genus name exists under multiple families. Select the one you're looking for:
+          </:description>
+        </.page_header>
+        <ul class="grid max-w-form gap-3">
+          <li :for={option <- @disambiguation}>
+            <.link
+              navigate={"/genus/#{URI.encode(option.name)}?family=#{URI.encode(option.family_name)}"}
+              class="flex flex-col gap-0.5 rounded-panel border border-line bg-surface p-3 hover:border-line-strong hover:no-underline"
+            >
+              <span class="font-semibold">
+                <.taxon_name name={option.name} rank="genus" />
+                <span class="font-normal text-ink-2">
+                  in Family {option.family_name}
+                  <span :if={option.family_description not in [nil, ""]}>
+                    ({option.family_description})
+                  </span>
+                </span>
+              </span>
+              <span class="text-meta text-muted">{option.species_count} species</span>
+            </.link>
+          </li>
+        </ul>
       </div>
     </Layouts.app>
     """
   end
 
-  attr :section, :map, required: true
-  attr :genus_name, :string, required: true
-  attr :selected, :integer, default: nil, doc: "the related genus filtering the list"
-  attr :shown, :boolean, default: false, doc: "whether the related-genera filters are open"
-  attr :rows, :list, required: true, doc: "the rows left after filtering"
-  attr :search_query, :string, required: true
-  attr :sort_by, :atom, required: true
-  attr :sort_dir, :atom, required: true
-
-  defp genus_section(assigns) do
+  def render(assigns) do
     ~H"""
-    <div class="mb-8">
-      <div :if={@section.related != []} class="mb-6">
-        <.button
-          :if={!@shown}
-          type="button"
-          variant="secondary"
-          phx-click="toggle_related_genera"
-          phx-value-section={@section.key}
-          aria-expanded="false"
-          aria-controls={"related-genera-filters-#{@section.key}"}
-          class="w-full text-left shadow-sm"
-        >
-          <span class="flex w-full items-center justify-between gap-4">
-            <span class="flex min-w-0 items-center gap-2">
-              <.icon name="ph-arrows-left-right" class="size-5 shrink-0" />
-              <span class="font-medium">{@section.related_heading}</span>
-              <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                {length(@section.related)}
-              </span>
-              <span :if={@selected} class="truncate text-sm text-gray-600">
-                — filtered by <.taxon_name name={related_name(@section, @selected)} rank="genus" />
-              </span>
-            </span>
-            <span class="flex shrink-0 items-center gap-1 text-sm">
-              Show filters <.icon name="ph-caret-down" class="size-4" />
-            </span>
-          </span>
-        </.button>
-
-        <.card
-          :if={@shown}
-          title={"#{@section.related_heading} (#{length(@section.related)})"}
-          icon="ph-arrows-left-right"
-          id={"related-genera-filters-#{@section.key}"}
-        >
-          <:actions>
+    <Layouts.app flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb :for={c <- @crumbs} navigate={c.path} italic={c.italic}>{c.name}</:crumb>
+          <:title name>{@genus.name}</:title>
+          <:chip variant={:rank}>Genus</:chip>
+          <:chip :if={@plants != [] and @galls.all == []}>Host plants</:chip>
+          <:meta :if={@genus.description} label="Common name">{@genus.description}</:meta>
+          <:action>
             <.button
-              type="button"
-              variant="ghost"
-              size="sm"
-              phx-click="toggle_related_genera"
-              phx-value-section={@section.key}
-              aria-expanded="true"
-              aria-controls={"related-genera-filters-#{@section.key}"}
-              class="gap-1 hover:underline"
+              :if={@plants != []}
+              navigate={"/id?g=#{URI.encode_www_form(@genus.name)}"}
+              variant="primary"
+              icon="ph-magnifying-glass-plus"
             >
-              Hide <.icon name="ph-caret-up" class="size-4" />
+              Identify a gall on {@genus.name}
             </.button>
-          </:actions>
-          <p class="text-sm text-gray-600 mb-4">
-            Select a genus to filter the list below. Counts show how many entries
-            in <.taxon_name name={@genus_name} rank="genus" /> have that association.
-          </p>
-          <div
-            class="flex flex-wrap gap-2"
-            role="group"
-            aria-label={"Filter by #{@section.related_filter_label}"}
+            <.admin_edit_link current_user={@current_user} taxon_id={@genus.id} />
+          </:action>
+        </.page_header>
+
+        <.empty_state :if={@total == 0} title="No species found for this genus." />
+
+        <div :if={@total > 0} class="flex flex-wrap items-end gap-x-10 gap-y-4">
+          <.stat :if={@galls.all != []} value={length(@galls.all)} label="Galls" />
+          <.stat
+            :if={@galls.all != []}
+            value={@galls.all |> Enum.flat_map(& &1.host_genera) |> Enum.uniq() |> length()}
+            label="Host genera"
+          />
+          <.stat :if={@plants != []} value={length(@plants)} label="Species" />
+          <.stat
+            :if={@plants != []}
+            value={Enum.count(@plants, &(&1.count > 0))}
+            label="Species with galls"
+          />
+          <.stat :if={@inducers != []} value={length(@inducers)} label="Gallformer genera" />
+          <form
+            id="genus-search-form"
+            phx-change="search"
+            phx-submit="search"
+            class="w-full sm:ml-auto sm:w-80"
           >
-            <.button
-              type="button"
-              variant={if is_nil(@selected), do: "primary", else: "secondary"}
-              size="sm"
-              shape="pill"
-              phx-click="filter_related_genus"
-              phx-value-section={@section.key}
-              phx-value-id="all"
-              aria-pressed={is_nil(@selected)}
-              class="gap-2"
-            >
-              All <span class="text-xs opacity-80">{length(@section.rows)}</span>
-            </.button>
-            <.button
-              :for={genus <- @section.related}
-              type="button"
-              variant={if @selected == genus.taxon_id, do: "primary", else: "secondary"}
-              size="sm"
-              shape="pill"
-              phx-click="filter_related_genus"
-              phx-value-section={@section.key}
-              phx-value-id={genus.taxon_id}
-              aria-pressed={@selected == genus.taxon_id}
-              title={"#{genus.association_count} associations"}
-              class="gap-2"
-            >
-              <.taxon_name name={genus.name} rank="genus" />
-              <span class={[
-                "rounded-full px-1.5 py-0.5 text-xs",
-                @selected == genus.taxon_id && "bg-white/20",
-                @selected != genus.taxon_id && "bg-gray-100 text-gray-600"
-              ]}>
-                {length(genus.focal_ids)}
-              </span>
-            </.button>
-          </div>
-          <p :if={@selected} class="mt-4 text-sm text-gray-600">
-            Showing entries associated with
-            <.taxon_name name={related_name(@section, @selected)} rank="genus" />.
-            <.button
-              type="button"
-              variant="ghost"
-              size="sm"
-              phx-click="filter_related_genus"
-              phx-value-section={@section.key}
-              phx-value-id="all"
-              class="ml-1 underline hover:no-underline"
-            >
-              Clear filter
-            </.button>
-          </p>
-        </.card>
-      </div>
-
-      <h2 class="text-lg font-semibold text-gray-800 mb-3">
-        {@section.title} ({length(@section.rows)})
-      </h2>
-
-      <%= if @rows == [] do %>
-        <div class="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
-          <p>No entries found matching "{@search_query}"</p>
+            <.search_field
+              id="genus-search"
+              name="query"
+              value={@search_query}
+              label="Filter by name or common name"
+              placeholder="Filter by name or common name…"
+            />
+          </form>
         </div>
-      <% else %>
-        <RankPageComponents.species_table
-          id={"genus-#{@section.key}"}
-          rows={@rows}
-          url_prefix={@section.url_prefix}
-          name_header={@section.name_header}
-          count_header={@section.count_header}
-          sort_by={@sort_by}
-          sort_dir={@sort_dir}
+
+        <.rank_galls
+          :if={@galls.all != []}
+          id="genus-galls"
+          list={@galls}
+          sort={@sort}
+          narrowed={@search_query != ""}
         />
 
-        <div class="mt-4 text-sm text-gray-500">
-          <%= if @search_query != "" or @selected do %>
-            Filtering {length(@rows)} of {length(@section.rows)}
-          <% else %>
-            Showing {length(@rows)}
-          <% end %>
+        <div :if={@plants != [] or @on_genus != []} class="gf-with-rail">
+          <div class="min-w-0">
+            <.plant_table
+              :if={@plants != []}
+              id="genus-hosts"
+              rows={@shown_plants}
+              total={length(@plants)}
+              sort={@sort}
+            />
+          </div>
+          <.rail width={:narrow} stack={:last}>
+            <.inducer_genera_panel
+              :if={@inducers != []}
+              name={@genus.name}
+              genera={@inducers}
+              selected={@selected_inducer}
+            />
+            <.galls_on_panel :if={@shown_on_genus != []} name={@genus.name} galls={@shown_on_genus} />
+          </.rail>
         </div>
-      <% end %>
-    </div>
+      </div>
+    </Layouts.app>
     """
   end
 end

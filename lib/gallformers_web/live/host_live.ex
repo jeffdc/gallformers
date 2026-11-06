@@ -1,11 +1,15 @@
 defmodule GallformersWeb.HostLive do
   @moduledoc """
-  LiveView for the host plant detail page.
-
-  Displays a host plant from `Gallformers.Taxa.host_page/1` (its names and
-  taxonomy) with the Galls on it (`Gallformers.Catalog.list_galls_for_hosts/1`),
-  its images and its range map. Citations on plants were not migrated, so
-  the page has no Sources (`803b`, decision 1).
+  The Host page, on the design system (matter bc0d; behavior in
+  docs/design-system/inventory/host-and-source-pages.md): a plant from
+  `Gallformers.Taxa.host_page/1` (its names and lineage), "Identify a gall
+  on …", the Galls on it as the rank pages' list (`GallformersWeb.RankGalls`,
+  photos or a table with facets; for admins each links to its Gall's range
+  exclusions), a pointer to the Galls on its genus as a whole, its photos,
+  its range (framed on the native range; Enlarge opens a large map), its
+  synonyms and More info. Citations on plants were not migrated, so the page
+  has no Sources (`803b`, decision 1). An unknown or malformed ID, a Gall or
+  a plant above species rank is a 404.
   """
   use GallformersWeb, :live_view
 
@@ -13,36 +17,24 @@ defmodule GallformersWeb.HostLive do
   alias Gallformers.Images.Image
   alias Gallformers.Taxa.ReadModels.HostPage
   alias GallformersWeb.LineageBreadcrumb
+  alias GallformersWeb.RankGalls
+  alias GallformersWeb.RankPage
   alias GallformersWeb.SEO
 
-  @page_size 10
-  @synonymy_page_size 10
+  import GallformersWeb.RankPageComponents, only: [admin_edit_link: 1, rank_galls: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     case Integer.parse(id) do
       {host_id, ""} -> load_host(socket, host_id)
-      _ -> {:ok, not_found(socket, "Invalid host ID")}
+      _ -> raise GallformersWeb.NotFoundError, "No host #{id}"
     end
-  end
-
-  defp not_found(socket, error) do
-    assign(socket,
-      page_title: "Host Not Found",
-      page_description: "The requested host plant was not found on Gallformers.",
-      page_url: nil,
-      page_image: nil,
-      page_json_ld: nil,
-      page_noindex: true,
-      host: nil,
-      error: error
-    )
   end
 
   defp load_host(socket, host_id) do
     case Taxa.host_page(host_id) do
       :not_found ->
-        {:ok, not_found(socket, "Host not found")}
+        raise GallformersWeb.NotFoundError, "No host #{host_id}"
 
       {:ok, %HostPage{} = host} ->
         galls = Catalog.list_galls_for_hosts([host.id])
@@ -81,14 +73,15 @@ defmodule GallformersWeb.HostLive do
            range: range,
            inherited_range: inherited_range,
            introduced_range: range_data.introduced_range,
-           range_bounds: Places.get_bounds_for_codes(range ++ inherited_range),
-           current_page: 1,
-           page_size: @page_size,
-           sort_by: :name,
-           sort_dir: :asc,
-           synonymy_page: 1,
-           synonymy_page_size: @synonymy_page_size,
-           error: nil
+           # Framed on the native range; introduced places are drawn, not framed.
+           range_bounds:
+             Places.get_bounds_for_codes(
+               (range -- range_data.introduced_range) ++ inherited_range
+             ),
+           host_galls: %{host_id: host.id} |> RankGalls.load() |> RankGalls.new(views: [:photos]),
+           rank_sort: %{field: :name, dir: :asc},
+           on_genus: on_genus(host),
+           map_open: false
          )}
     end
   end
@@ -119,54 +112,56 @@ defmodule GallformersWeb.HostLive do
       Map.merge(img, %{
         url: full_url,
         src: full_url,
+        thumb: "#{base_url}/#{small_path}",
         small_url: "#{base_url}/#{small_path}",
-        alt: "Host plant image"
+        alt: nil
       })
     end)
   end
 
+  # The Galls recorded on the plant's genus as a whole, for a pointer.
+  defp on_genus(host) do
+    case Enum.find(host.lineage, &(&1.rank == :genus)) do
+      nil -> nil
+      genus -> %{name: genus.name, count: length(RankPage.galls_on_hosts([genus.taxon_id]))}
+    end
+  end
+
+  defp shown_galls(assigns), do: RankGalls.compute(assigns.host_galls, "", assigns.rank_sort)
+
+  defp crumbs(lineage) do
+    for taxon <- Enum.drop(lineage, -1),
+        path = GallformersWeb.TaxonomyURL.public_path(taxon),
+        path != nil,
+        do: %{name: crumb_name(taxon), path: path, italic: taxon.rank in [:genus, :section]}
+  end
+
+  # A section is named "sect. Quercus", so it isn't read as its genus.
+  defp crumb_name(%{rank: :section, name: name}), do: "sect. " <> name
+  defp crumb_name(%{name: name}), do: name
+
+  # The Galls list's events, and its sort.
   @impl true
-  def handle_event("prev_page", _params, socket) do
-    new_page = max(1, socket.assigns.current_page - 1)
-    {:noreply, assign(socket, current_page: new_page)}
+  def handle_event("galls_" <> _ = event, params, socket),
+    do: {:noreply, update(socket, :host_galls, &RankGalls.handle(&1, event, params))}
+
+  @impl true
+  def handle_event("sort", %{"field" => field}, socket)
+      when field in ["name", "common_name", "count"] do
+    %{field: current, dir: dir} = socket.assigns.rank_sort
+    {field, dir} = RankPage.toggle_sort(current, dir, String.to_existing_atom(field))
+    {:noreply, assign(socket, rank_sort: %{field: field, dir: dir})}
   end
 
   @impl true
-  def handle_event("next_page", _params, socket) do
-    total_pages = ceil(length(socket.assigns.galls) / socket.assigns.page_size)
-    new_page = min(total_pages, socket.assigns.current_page + 1)
-    {:noreply, assign(socket, current_page: new_page)}
-  end
+  def handle_event("open_map", _params, socket), do: {:noreply, assign(socket, map_open: true)}
+
+  @impl true
+  def handle_event("close_map", _params, socket), do: {:noreply, assign(socket, map_open: false)}
 
   @impl true
   def handle_event("gallery_index_changed", _params, socket) do
     {:noreply, socket}
-  end
-
-  @valid_sort_fields ~w(name datacomplete)
-
-  @impl true
-  def handle_event("sort", %{"field" => field}, socket) when field in @valid_sort_fields do
-    field = String.to_atom(field)
-
-    {sort_by, sort_dir} =
-      if socket.assigns.sort_by == field do
-        # Toggle direction if same field
-        new_dir = if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
-        {field, new_dir}
-      else
-        # New field, default to ascending
-        {field, :asc}
-      end
-
-    {:noreply, assign(socket, sort_by: sort_by, sort_dir: sort_dir, current_page: 1)}
-  end
-
-  @impl true
-  def handle_event("synonymy_page", %{"page" => page}, socket) do
-    total = synonymy_total_pages(socket.assigns.host.synonyms, socket.assigns.synonymy_page_size)
-    page = max(1, min(page, total))
-    {:noreply, assign(socket, synonymy_page: page)}
   end
 
   @impl true
@@ -174,297 +169,150 @@ defmodule GallformersWeb.HostLive do
     {:noreply, push_navigate(socket, to: "/place/#{code}")}
   end
 
-  defp sorted_galls(galls, sort_by, sort_dir) do
-    sorted =
-      case sort_by do
-        :name -> Enum.sort_by(galls, & &1.name)
-        :datacomplete -> Enum.sort_by(galls, & &1.datacomplete)
-        _ -> galls
-      end
-
-    if sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
-  end
-
-  defp paginated_galls(galls, current_page, page_size) do
-    galls
-    |> Enum.drop((current_page - 1) * page_size)
-    |> Enum.take(page_size)
-  end
-
-  defp total_pages(galls, page_size) do
-    ceil(length(galls) / page_size)
-  end
-
-  defp paginated_synonyms(synonyms, page, page_size) do
-    synonyms
-    |> Enum.drop((page - 1) * page_size)
-    |> Enum.take(page_size)
-  end
-
-  defp synonymy_total_pages(synonyms, page_size) do
-    max(1, ceil(length(synonyms) / page_size))
-  end
-
-  attr :field, :atom, required: true
-  attr :sort_by, :atom, required: true
-  attr :sort_dir, :atom, required: true
-
-  defp sort_indicator(assigns) do
-    ~H"""
-    <span :if={@sort_by == @field} class="text-gray-400 text-xs">
-      {if @sort_dir == :asc, do: "▲", else: "▼"}
-    </span>
-    """
-  end
-
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, list: shown_galls(assigns))
+
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <%= if @error do %>
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
-      <% else %>
-        <%= if @host do %>
-          <%!-- Main grid: left column (header + galls), right column (map) --%>
-          <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <%!-- Left column: header info + galls table --%>
-            <div class="lg:col-span-2 space-y-3">
-              <div class="flex items-start justify-between gap-4">
-                <div class="flex items-center gap-2">
-                  <h2 class="text-2xl font-bold">
-                    <.link
-                      href={"/id?h=#{URI.encode(@host.name)}"}
-                      class="hover:underline"
-                    >
-                      <.taxon_name name={@host.name} />
-                    </.link>
-                  </h2>
-                  <.link
-                    :if={Accounts.admin?(@current_user)}
-                    href={~p"/admin/taxonomy/#{@host.id}"}
-                    class="text-gray-400 hover:text-gf-maroon"
-                    title="Edit in admin"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-5 w-5" />
-                  </.link>
-                </div>
-                <.data_complete_badge
-                  complete={@host.datacomplete}
-                  complete_tooltip="All galls known to occur on this plant have been added to the database. However, sources and images may be incomplete."
-                  incomplete_tooltip="We are still working on this species so data might be missing."
-                />
-              </div>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb :for={c <- crumbs(@host.lineage)} navigate={c.path} italic={c.italic}>
+            {c.name}
+          </:crumb>
+          <:title name><.taxon_name name={@host.name} /></:title>
+          <:chip variant={:rank}>{String.capitalize(to_string(@host.rank))}</:chip>
+          <:chip>Host plant</:chip>
+          <:chip variant={if @host.datacomplete, do: :ok, else: :warn}>
+            <span title={
+              if @host.datacomplete,
+                do: "All galls known to occur on this plant have been added.",
+                else: "We are still working on this plant so galls might be missing."
+            }>
+              {if @host.datacomplete, do: "Complete", else: "In progress"}
+            </span>
+          </:chip>
+          <:meta :if={@host.common_names != []} label="Common name">
+            {Enum.join(@host.common_names, ", ")}
+          </:meta>
+          <:meta :if={@host.abundance} label="Abundance">{@host.abundance}</:meta>
+          <:action>
+            <.button
+              navigate={"/id?h=#{URI.encode_www_form(@host.name)}"}
+              variant="primary"
+              icon="ph-magnifying-glass-plus"
+            >
+              Identify a gall on {@host.name}
+            </.button>
+            <.admin_edit_link current_user={@current_user} taxon_id={@host.id} />
+          </:action>
+        </.page_header>
 
-              <.taxonomy_breadcrumb
-                :if={@taxonomy}
-                family={@taxonomy.family}
-                intermediates={@taxonomy.intermediates}
-                genus={@taxonomy.genus}
-                section={@taxonomy.section}
-              />
+        <div class="gf-with-rail">
+          <div class="flex min-w-0 flex-col gap-section">
+            <.rank_galls
+              :if={@host_galls.all != []}
+              id="host-galls"
+              list={@list}
+              sort={@rank_sort}
+              narrowed={false}
+              title="Galls on it"
+              edit_path={if Accounts.admin?(@current_user), do: &"/gall/#{&1.id}?edit"}
+            />
+            <.empty_state :if={@host_galls.all == []} title="No galls recorded on this plant yet." />
 
-              <p :if={@host.abundance}><strong>Abundance:</strong> {@host.abundance}</p>
+            <p :if={@on_genus && @on_genus.count > 0} id="on-genus" class="text-meta text-ink-2">
+              {@on_genus.count} more {if @on_genus.count == 1, do: "gall is", else: "galls are"} recorded on
+              <.link navigate={"/genus/#{URI.encode(@on_genus.name)}"}>
+                <.taxon_name name={@on_genus.name} rank="genus" />
+              </.link>
+              as a whole, with no species named.
+            </p>
+          </div>
 
-              <%!-- Common Names --%>
-              <div :if={@host.common_names != []}>
-                <strong>Common Name(s):</strong>
-                <span class="text-gray-700">{Enum.join(@host.common_names, ", ")}</span>
-              </div>
+          <.rail width={:wide}>
+            <%!-- Plants rarely have photos: an empty viewer only for an admin, to add some. --%>
+            <.photo_viewer
+              :if={@images != [] or Accounts.admin?(@current_user)}
+              id="host-images"
+              photos={@images}
+              name={@host.name}
+              edit_href={~p"/admin/taxonomy/#{@host.id}" <> "#images"}
+              admin={Accounts.admin?(@current_user)}
+            />
 
-              <%!-- Galls table --%>
-              <div class="pt-2">
-                <h3 class="font-semibold text-gray-800 mb-2">
-                  Associated Galls ({length(@galls)})
-                </h3>
-                <%= if @galls != [] do %>
-                  <div class="overflow-hidden rounded border border-gray-200">
-                    <table class="gf-table gf-table-compact">
-                      <thead>
-                        <tr>
-                          <th
-                            class="sortable"
-                            phx-click="sort"
-                            phx-value-field="name"
-                          >
-                            <div class="flex items-center gap-1">
-                              Gall
-                              <.sort_indicator field={:name} sort_by={@sort_by} sort_dir={@sort_dir} />
-                            </div>
-                          </th>
-                          <th
-                            class="sortable w-24 text-center"
-                            phx-click="sort"
-                            phx-value-field="datacomplete"
-                          >
-                            <div class="flex items-center justify-center gap-1">
-                              Complete
-                              <.sort_indicator
-                                field={:datacomplete}
-                                sort_by={@sort_by}
-                                sort_dir={@sort_dir}
-                              />
-                            </div>
-                          </th>
-                          <th :if={Accounts.admin?(@current_user)} class="w-10"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr :for={
-                          gall <-
-                            paginated_galls(
-                              sorted_galls(@galls, @sort_by, @sort_dir),
-                              @current_page,
-                              @page_size
-                            )
-                        }>
-                          <td>
-                            <.link
-                              href={"/gall/#{gall.id}"}
-                              class="hover:underline"
-                            >
-                              <.taxon_name name={gall.name} />
-                            </.link>
-                          </td>
-                          <td class="text-center">
-                            <%= if gall.datacomplete do %>
-                              <span class="text-green-600">
-                                <.icon name="ph-check" class="size-5 inline-block" />
-                              </span>
-                            <% else %>
-                              <span class="text-red-500">
-                                <.icon name="ph-x" class="size-5 inline-block" />
-                              </span>
-                            <% end %>
-                          </td>
-                          <td :if={Accounts.admin?(@current_user)} class="text-center">
-                            <.link
-                              href={~p"/admin/galls/#{gall.id}"}
-                              class="text-gray-400 hover:text-gf-maroon"
-                              title="Edit in admin"
-                            >
-                              <.icon name="ph-pencil-simple" class="h-4 w-4" />
-                            </.link>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <div
-                      :if={total_pages(@galls, @page_size) > 1}
-                      class="flex items-center justify-between px-3 py-1 bg-white border-t border-gray-200"
-                    >
-                      <div class="text-sm">
-                        {(@current_page - 1) * @page_size + 1}-{min(
-                          @current_page * @page_size,
-                          length(@galls)
-                        )} of {length(@galls)}
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button
-                          class="px-2 py-0.5 text-sm border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={@current_page == 1}
-                          phx-click="prev_page"
-                        >
-                          Previous
-                        </button>
-                        <span class="text-sm">
-                          Page {@current_page} of {total_pages(@galls, @page_size)}
-                        </span>
-                        <button
-                          class="px-2 py-0.5 text-sm border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={@current_page == total_pages(@galls, @page_size)}
-                          phx-click="next_page"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                <% else %>
-                  <p class="italic">No galls recorded for this host.</p>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Right column: range map --%>
-            <div class="lg:col-span-3 flex flex-col min-h-0">
-              <h3 class="font-semibold text-gray-800 mb-2">Range</h3>
+            <.panel title="Range">
+              <:header_action>
+                <.button
+                  :if={@range != [] or @inherited_range != []}
+                  variant="ghost"
+                  size="sm"
+                  icon="ph-arrows-out"
+                  phx-click="open_map"
+                >
+                  Enlarge
+                </.button>
+              </:header_action>
+              <p :if={@range == [] and @inherited_range == []} class="text-ui text-muted">
+                No range data.
+              </p>
               <.range_map
+                :if={(@range != [] or @inherited_range != []) and not @map_open}
                 id="host-range-map"
-                class="flex-1"
+                class="h-72"
                 in_range={@range}
                 inherited_range={@inherited_range}
                 introduced_range={@introduced_range}
                 bounds={@range_bounds}
                 navigable
               />
-              <div :if={@inherited_range != [] or @introduced_range != []} class="mt-1">
+              <:footer :if={@inherited_range != [] or @introduced_range != []}>
                 <.range_map_legend mode={:public} />
+              </:footer>
+            </.panel>
+
+            <dl :if={@host.synonyms != []} class="flex flex-col gap-3 text-ui">
+              <div>
+                <dt class="text-meta font-semibold uppercase tracking-wide text-muted">
+                  Also known as
+                </dt>
+                <dd id="host-names" class="text-ink-2">
+                  <span :for={{s, i} <- Enum.with_index(@host.synonyms)}>
+                    {if i > 0, do: " · "}<.taxon_name name={s.name} />
+                    <span
+                      :if={s.sensu}
+                      class="text-meta text-muted"
+                    >
+                      (misapplied, {s.sensu})
+                    </span>
+                  </span>
+                </dd>
               </div>
-            </div>
-          </div>
+            </dl>
+            <.see_also name={@host.name} type={:host} />
+            <.record_metadata inserted_at={@host.inserted_at} updated_at={@host.updated_at} />
+          </.rail>
+        </div>
+      </div>
 
-          <%!-- Synonymy and photos row --%>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <%!-- Synonymy --%>
-            <div :if={@host.synonyms != []}>
-              <h3 class="font-semibold text-gray-800 mb-2">
-                Synonymy ({length(@host.synonyms)})
-              </h3>
-              <div class="bg-white rounded border border-gray-200 overflow-hidden">
-                <table class="gf-table gf-table-compact">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr :for={
-                      s <- paginated_synonyms(@host.synonyms, @synonymy_page, @synonymy_page_size)
-                    }>
-                      <td><.taxon_name name={s.name} /></td>
-                      <td class="text-gray-600">{s.sensu || "—"}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <.pagination
-                :if={synonymy_total_pages(@host.synonyms, @synonymy_page_size) > 1}
-                page={@synonymy_page}
-                total_pages={synonymy_total_pages(@host.synonyms, @synonymy_page_size)}
-                total_items={length(@host.synonyms)}
-                page_size={@synonymy_page_size}
-                on_page_change={fn page -> JS.push("synonymy_page", value: %{page: page}) end}
-                class="mt-4"
-              />
-            </div>
-
-            <%!-- Photos (compact) --%>
-            <div :if={length(@images) > 0}>
-              <h3 class="font-semibold text-gray-800 mb-2">
-                Photos ({length(@images)})
-              </h3>
-              <.image_gallery
-                images={@images}
-                id="host-images"
-                edit_href={~p"/admin/taxonomy/#{@host.id}" <> "#images"}
-                current_user={@current_user}
-                no_image_src="/images/noimagehost.jpg"
-              />
-            </div>
-          </div>
-
-          <hr class="border-gray-200 my-4" />
-
-          <.see_also name={@host.name} type={:host} />
-
-          <.record_metadata inserted_at={@host.inserted_at} updated_at={@host.updated_at} />
-        <% else %>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            Host not found
-          </div>
-        <% end %>
-      <% end %>
+      <.dialog
+        :if={@map_open}
+        id="range-dialog"
+        title={"Range of #{@host.name}"}
+        size={:full}
+        show
+        on_cancel={JS.push("close_map")}
+      >
+        <.range_map
+          id="host-range-map-large"
+          class="h-160"
+          in_range={@range}
+          inherited_range={@inherited_range}
+          introduced_range={@introduced_range}
+          bounds={@range_bounds}
+          navigable
+        />
+      </.dialog>
     </Layouts.app>
     """
   end

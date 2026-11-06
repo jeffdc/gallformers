@@ -1,72 +1,65 @@
 <Layouts.app flash={@flash} current_user={@current_user}>
-  <div class="max-w-4xl">
-    <h1 class="text-3xl font-bold text-gf-maroon mb-2">ID Tool Filter Guide</h1>
-    <p class="text-gray-600 mb-6">
-      This guide explains the filter terms used in our gall identification tool.
-    </p>
+  <div class="flex flex-col gap-section">
+    <.page_header>
+      <:title>ID Tool Filter Guide</:title>
+      <:description>
+        This guide explains the filter terms used in our <.link navigate="/id">gall identification tool</.link>.
+      </:description>
+    </.page_header>
 
-    <%!-- Jump links --%>
-    <nav class="mb-8 flex flex-wrap gap-2">
-      <.jump_link href="#alignment">Alignment</.jump_link>
-      <.jump_link href="#cells">Cells</.jump_link>
-      <.jump_link href="#detachable">Detachable</.jump_link>
-      <.jump_link href="#forms">Forms</.jump_link>
-      <.jump_link href="#plant_part">Plant Part</.jump_link>
-      <.jump_link href="#season">Season</.jump_link>
-      <.jump_link href="#shape">Shape</.jump_link>
-      <.jump_link href="#texture">Texture</.jump_link>
-      <.jump_link href="#walls">Walls</.jump_link>
+    <nav aria-label="Filters" class="-mt-4 flex flex-wrap gap-x-4 gap-y-1 text-ui">
+      <a
+        :for={
+          {id, label} <- [
+            {"alignment", "Alignment"},
+            {"cells", "Cells"},
+            {"detachable", "Detachable"},
+            {"forms", "Forms"},
+            {"plant_part", "Plant Part"},
+            {"season", "Season"},
+            {"shape", "Shape"},
+            {"texture", "Texture"},
+            {"walls", "Walls"}
+          ]
+        }
+        href={"##{id}"}
+      >
+        {label}
+      </a>
     </nav>
 
-    <div class="space-y-8">
-      <%!-- Alignment --%>
+    <div class="grid gap-section lg:grid-cols-2">
       <.filter_section
         id="alignment"
         title="Alignment"
         items={sort_by_field(@filter_fields.alignment)}
       />
-
-      <%!-- Cells --%>
       <.filter_section
         id="cells"
         title="Cells"
         items={sort_by_field(@filter_fields.cells)}
         note="If multiple larvae are found in one space, these may be inquilines rather than gall-inducers."
       />
-
-      <%!-- Detachable --%>
       <.filter_section
         id="detachable"
         title="Detachable"
         items={sort_by_field(@filter_fields.detachable)}
         note="Filtering for integral or detachable also finds the galls recorded as both."
       />
-
-      <%!-- Forms --%>
       <.filter_section id="forms" title="Forms" items={sort_by_field(@filter_fields.form)} />
-
-      <%!-- Plant Part --%>
       <.filter_section
         id="plant_part"
         title="Plant Part"
         items={sort_by_field(@filter_fields.plant_part)}
       />
-
-      <%!-- Season --%>
       <.filter_section
         id="season"
         title="Season"
         items={@filter_fields.season}
         note="When the gall forms and grows. Not when it is seen or found, and not when the inducer emerges."
       />
-
-      <%!-- Shape --%>
       <.filter_section id="shape" title="Shape" items={sort_by_field(@filter_fields.shape)} />
-
-      <%!-- Texture --%>
       <.filter_section id="texture" title="Texture" items={sort_by_field(@filter_fields.texture)} />
-
-      <%!-- Walls --%>
       <.filter_section id="walls" title="Walls" items={sort_by_field(@filter_fields.walls)} />
     </div>
   </div>

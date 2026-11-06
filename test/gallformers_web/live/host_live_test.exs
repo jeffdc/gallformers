@@ -14,6 +14,10 @@ defmodule GallformersWeb.HostLiveTest do
   use GallformersWeb.ConnCase
   import Phoenix.LiveViewTest
 
+  # The page's visible text: a name's italic and upright parts are separate
+  # elements, so assert on text rather than raw HTML.
+  defp page_text(html), do: html |> LazyHTML.from_document() |> LazyHTML.text()
+
   # Reading the seeds, converted, is most of what this module tests.
   # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
 
@@ -24,9 +28,9 @@ defmodule GallformersWeb.HostLiveTest do
 
   describe "Host page rendering" do
     test "renders the host's accepted name as its title", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/host/10")
+      {:ok, view, _html} = live(conn, ~p"/host/10")
 
-      assert html =~ "Notholithocarpus densiflorus"
+      assert has_element?(view, "h1", "Notholithocarpus densiflorus")
       assert page_title(view) =~ "Notholithocarpus densiflorus"
     end
 
@@ -38,26 +42,32 @@ defmodule GallformersWeb.HostLiveTest do
     end
 
     test "shows its common names and synonyms", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/host/10")
+      {:ok, view, _html} = live(conn, ~p"/host/10")
 
-      assert html =~ "Common Name(s):"
-      assert html =~ "tanoak"
-      assert html =~ "Synonymy (1)"
-      assert html =~ "Lithocarpus densiflorus"
+      assert has_element?(view, "header dd", "tanoak")
+      assert has_element?(view, "#host-names", "Lithocarpus densiflorus")
     end
 
     test "lists the Galls on the host by name", %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/host/10")
 
-      assert html =~ "Associated Galls (5)"
+      assert has_element?(view, "#host-galls-section [data-part=count]", "5")
 
       for id <- 300..304 do
         assert has_element?(view, "a[href='/gall/#{id}']")
       end
 
-      undescribed = :binary.match(html, "Andricus n-densiflorus-seed-gall") |> elem(0)
-      agamic = :binary.match(html, "Neuroterus seedatorius (australis) (agamic)") |> elem(0)
+      text = page_text(html)
+      undescribed = :binary.match(text, "Andricus n-densiflorus-seed-gall") |> elem(0)
+      agamic = :binary.match(text, "Neuroterus seedatorius (australis) (agamic)") |> elem(0)
       assert undescribed < agamic
+    end
+
+    test "the Galls are photos only: no table view", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/host/10")
+
+      assert has_element?(view, "#host-galls-section .gf-photo-grid")
+      refute has_element?(view, "[phx-click=galls_view]")
     end
 
     test "shows the host's image and range map with the introduced range", %{conn: conn} do
@@ -70,18 +80,18 @@ defmodule GallformersWeb.HostLiveTest do
     end
 
     test "shows the data-complete badge and the abundance", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/host/10")
+      {:ok, view, html} = live(conn, ~p"/host/10")
 
       assert html =~ "All galls known to occur on this plant have been added"
-      assert html =~ "<strong>Abundance:</strong> common"
+      assert has_element?(view, "header", ~r/Abundance\s*common/)
     end
 
     test "an incomplete host without an abundance shows no Abundance line", %{conn: conn} do
       plant = plant_fixture()
       {:ok, _view, html} = live(conn, ~p"/host/#{plant.id}")
 
-      assert html =~ "In Progress"
-      assert html =~ "We are still working on this species"
+      assert html =~ "In progress"
+      assert html =~ "We are still working on this plant"
       refute html =~ "Abundance:"
     end
 
@@ -96,7 +106,34 @@ defmodule GallformersWeb.HostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/host/1")
 
       assert html =~ "Quercus alba"
-      assert html =~ "No galls recorded for this host."
+      assert html =~ "No galls recorded on this plant yet."
+    end
+  end
+
+  describe "the design system's Host page" do
+    test "offers to identify a gall on the plant", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/host/10")
+
+      assert has_element?(
+               view,
+               ~s{a[href="/id?h=Notholithocarpus+densiflorus"]},
+               "Identify a gall on Notholithocarpus densiflorus"
+             )
+    end
+
+    test "points to the Galls recorded on its genus as a whole", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/host/10")
+
+      # Gall 304's Host is the genus Notholithocarpus itself.
+      assert has_element?(view, "#on-genus a[href='/genus/Notholithocarpus']")
+      assert has_element?(view, "#on-genus", "recorded on")
+    end
+
+    test "Enlarge opens the large range map", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/host/10")
+
+      view |> element("button", "Enlarge") |> render_click()
+      assert has_element?(view, "#range-dialog #host-range-map-large")
     end
   end
 
@@ -106,7 +143,8 @@ defmodule GallformersWeb.HostLiveTest do
       {:ok, view, _html} = live(admin_conn, ~p"/host/10")
 
       for id <- 300..304 do
-        assert has_element?(view, "a[href='/admin/galls/#{id}'][title='Edit in admin']")
+        # A Gall's range exclusions are edited in Edit mode on its page.
+        assert has_element?(view, "a[href='/gall/#{id}?edit']")
       end
 
       assert has_element?(view, "#host-images a[href='/admin/taxonomy/10#images']")
@@ -122,20 +160,15 @@ defmodule GallformersWeb.HostLiveTest do
   end
 
   describe "Not found" do
-    test "shows error for invalid ID format", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/host/invalid")
-
-      assert html =~ "Invalid host ID"
+    test "an ID that isn't a number is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/host/invalid") end
     end
 
-    test "for a missing ID, a Gall and a higher plant taxon", %{conn: conn} do
+    test "a missing ID, a Gall and a higher plant taxon are 404s", %{conn: conn} do
       genus = Taxa.get_by_legacy_id(:taxonomy, 41)
 
       for id <- [999_999_999, 300, genus.id] do
-        {:ok, view, html} = live(conn, ~p"/host/#{id}")
-
-        assert html =~ "Host not found", "host #{id}"
-        assert page_title(view) =~ "Not Found"
+        assert_error_sent 404, fn -> get(conn, ~p"/host/#{id}") end
       end
     end
   end

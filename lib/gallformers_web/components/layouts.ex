@@ -10,12 +10,16 @@ defmodule GallformersWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
-  Renders the Gallformers app layout with header, main content, and footer.
+  The site shell: the public page frame (docs/design-system/components.md,
+  `site_shell`).
+
+  A 56px sticky header, the page content in the page column at Reading
+  density, and a footer at the end of the page (never fixed).
 
   ## Examples
 
-      <Layouts.app flash={@flash}>
-        <h1>Content</h1>
+      <Layouts.app flash={@flash} current_user={@current_user}>
+        <.page_header><:title>Glossary</:title></.page_header>
       </Layouts.app>
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
@@ -35,455 +39,303 @@ defmodule GallformersWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <div class="flex min-h-screen flex-col">
+    <div class="flex min-h-screen flex-col bg-paper">
       <.site_header current_user={@current_user} />
 
       {render_slot(@subheader)}
 
-      <main class="flex-1 pb-32">
-        <div class="px-6 sm:px-10 lg:px-16 py-8">
+      <main class="flex-1">
+        <div class="mx-auto w-full max-w-page px-4 py-6 sm:px-page-x">
           {render_slot(@inner_block)}
         </div>
       </main>
 
-      <.site_footer current_user={@current_user} />
+      <.site_footer />
     </div>
 
     <.flash_group flash={@flash} />
     """
   end
 
-  @doc """
-  Renders the site header with logo, navigation, and search.
+  @browse_links [
+    %{href: "/galls", label: "Galls"},
+    %{href: "/hosts", label: "Hosts"},
+    %{href: "/places", label: "Places"}
+  ]
 
-  Named `site_header` to avoid conflict with CoreComponents.header/1.
+  @resource_links [
+    %{href: "/filterguide", label: "Filter Terms"},
+    %{href: "/glossary", label: "Glossary"},
+    %{href: "/articles", label: "Articles"},
+    %{href: "/keys", label: "Keys"},
+    %{href: "/analytics", label: "Analytics"}
+  ]
+
+  @doc """
+  The site header: wordmark, navigation, search and the account link.
   """
   attr :current_user, :map, default: nil, doc: "the currently logged in user, if any"
-  attr :hide_admin_link, :boolean, default: false, doc: "whether to hide the admin link"
 
   def site_header(assigns) do
-    nav_links = [
-      %{href: "/id", label: "Identify"}
-    ]
-
-    browse_links = [
-      %{href: "/galls", label: "Galls"},
-      %{href: "/hosts", label: "Hosts"},
-      %{href: "/places", label: "Places"}
-    ]
-
-    resource_links = [
-      %{href: "/filterguide", label: "Filter Terms"},
-      %{href: "/glossary", label: "Glossary"},
-      %{href: "/articles", label: "Articles"},
-      %{href: "/keys", label: "Keys"},
-      %{href: "/analytics", label: "Analytics"}
-    ]
-
     assigns =
       assigns
-      |> assign(:nav_links, nav_links)
-      |> assign(:browse_links, browse_links)
-      |> assign(:resource_links, resource_links)
+      |> assign(:browse_links, @browse_links)
+      |> assign(:resource_links, @resource_links)
 
     ~H"""
-    <header class="sticky top-0 z-50 bg-gf-sky-blue shadow-md">
-      <nav class="px-3">
-        <div class="flex items-center justify-between py-1">
-          <%!-- Logo --%>
-          <div class="flex-shrink-0">
-            <a href="/" class="flex items-center">
-              <img
-                src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
-                alt="Gallformers logo: an oak gall wasp with a spherical oak gall and a white oak leaf"
-                class="h-[70px]"
-              />
-            </a>
-          </div>
+    <header class="sticky top-0 z-50 bg-sky" data-sticky-chrome>
+      <nav class="mx-auto flex h-16 max-w-page items-center gap-4 px-4 sm:px-page-x lg:gap-6">
+        <a href="/" class="flex shrink-0 items-center" aria-label="Gallformers home">
+          <img
+            src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
+            alt="Gallformers logo: an oak gall wasp with a spherical oak gall and a white oak leaf"
+            class="gf-only-light h-12 w-auto"
+          />
+          <img
+            src="/branding/Wide Logo Versions/gallformers_logo_wide_white.png"
+            alt="Gallformers logo: an oak gall wasp with a spherical oak gall and a white oak leaf"
+            class="gf-only-dark h-12 w-auto"
+          />
+        </a>
 
-          <%!-- Desktop Navigation --%>
-          <div class="hidden md:flex md:items-center gap-1">
-            <%!-- Admin link (when logged in) --%>
-            <a
-              :if={@current_user && !@hide_admin_link}
-              href="/admin"
-              class="px-2 text-lg font-medium hover:underline"
-            >
-              Admin
-            </a>
-
-            <a
-              :for={link <- @nav_links}
-              href={link.href}
-              class="px-2 text-lg font-medium hover:underline"
-            >
-              {link.label}
-            </a>
-
-            <%!-- Browse Dropdown --%>
-            <div class="relative">
-              <button
-                type="button"
-                phx-click={toggle_browse_menu()}
-                class="flex items-center px-2 text-lg font-medium hover:underline"
-                aria-expanded="false"
-                aria-haspopup="true"
-              >
-                Browse <.icon name="ph-caret-down" class="ml-1 h-4 w-4" />
-              </button>
-              <div
-                id="browse-menu"
-                phx-click-away={hide_browse_menu()}
-                class="hidden absolute right-0 z-10 mt-1 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
-              >
-                <a
-                  :for={link <- @browse_links}
-                  href={link.href}
-                  class="block px-4 py-2 text-lg hover:bg-gray-100"
-                >
-                  {link.label}
-                </a>
-              </div>
-            </div>
-
-            <%!-- Search Form --%>
-            <form action="/globalsearch" method="get" class="flex items-center">
-              <input
-                type="search"
-                name="q"
-                placeholder="Search"
-                aria-label="Search"
-                class="w-36 rounded-l-md border border-gf-maroon bg-white px-2 py-1 text-lg text-gray-900
-                       placeholder:text-gray-400 focus:ring-2 focus:ring-gf-maroon focus:outline-none"
-              />
-              <button
-                type="submit"
-                class="rounded-r-md border border-gf-maroon bg-transparent px-2 py-1 text-lg
-                       font-medium text-gf-maroon hover:bg-gf-maroon hover:text-white"
-              >
-                Search
-              </button>
-            </form>
-
-            <%!-- Resources Dropdown --%>
-            <div class="relative">
-              <button
-                type="button"
-                phx-click={toggle_resources_menu()}
-                class="flex items-center px-2 text-lg font-medium hover:underline"
-                aria-expanded="false"
-                aria-haspopup="true"
-              >
-                Resources <.icon name="ph-caret-down" class="ml-1 h-4 w-4" />
-              </button>
-              <div
-                id="resources-menu"
-                phx-click-away={hide_resources_menu()}
-                class="hidden absolute right-0 z-10 mt-1 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
-              >
-                <a
-                  :for={link <- @resource_links}
-                  href={link.href}
-                  class="block px-4 py-2 text-lg hover:bg-gray-100"
-                >
-                  {link.label}
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <%!-- Mobile menu button --%>
-          <div class="flex md:hidden">
-            <button
-              type="button"
-              phx-click={toggle_mobile_menu()}
-              class="inline-flex items-center justify-center rounded-md p-2 text-gf-maroon
-                     hover:bg-white/50 focus:outline-none focus:ring-2 focus:ring-gf-maroon"
-              aria-expanded="false"
-              aria-controls="mobile-menu"
-            >
-              <span class="sr-only">Open main menu</span>
-              <%!-- Hamburger icon --%>
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-          </div>
+        <div class="ml-auto hidden items-center gap-1 font-brand text-body md:flex">
+          <a
+            href="/id"
+            class="mr-2 inline-flex h-9 items-center gap-1.5 rounded-ctl bg-brand-fill px-3 font-semibold text-on-fill hover:bg-brand-hover hover:text-on-fill hover:no-underline"
+          >
+            <.icon name="ph-magnifying-glass-plus" class="size-4" /> Identify
+          </a>
+          <.menu id="browse-menu" label="Browse" trigger_class={nav_trigger()}>
+            <:item :for={link <- @browse_links} navigate={link.href}>{link.label}</:item>
+          </.menu>
+          <.menu id="resources-menu" label="Resources" trigger_class={nav_trigger()}>
+            <:item :for={link <- @resource_links} navigate={link.href}>{link.label}</:item>
+          </.menu>
         </div>
 
-        <%!-- Mobile menu (hidden by default, toggle with JS) --%>
-        <div class="hidden md:hidden" id="mobile-menu">
-          <div class="space-y-1 px-2 pb-3 pt-2">
-            <%!-- Mobile Admin link (when logged in) --%>
-            <a
-              :if={@current_user && !@hide_admin_link}
-              href="/admin"
-              class="block rounded-md px-3 py-2 text-lg font-medium hover:bg-white/50"
-            >
-              Admin
-            </a>
+        <.palette_trigger class="hidden w-56 md:flex lg:w-72" />
 
-            <a
-              :for={link <- @nav_links}
-              href={link.href}
-              class="block rounded-md px-3 py-2 text-lg font-medium hover:bg-white/50"
-            >
-              {link.label}
-            </a>
-
-            <%!-- Mobile Browse --%>
-            <div class="border-t border-gf-maroon/30 pt-2">
-              <span class="block px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gf-maroon/70">
-                Browse
-              </span>
-              <a
-                :for={link <- @browse_links}
-                href={link.href}
-                class="block rounded-md px-3 py-2 text-lg font-medium hover:bg-white/50"
-              >
-                {link.label}
-              </a>
-            </div>
-
-            <%!-- Mobile Search --%>
-            <form action="/globalsearch" method="get" class="px-3 py-2">
-              <div class="flex">
-                <input
-                  type="search"
-                  name="q"
-                  placeholder="Search"
-                  aria-label="Search"
-                  class="flex-1 rounded-l-md border border-gf-maroon bg-white px-3 py-2 text-lg text-gray-900
-                         placeholder:text-gray-400 focus:ring-2 focus:ring-gf-maroon focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  class="rounded-r-md border border-gf-maroon bg-transparent px-3 py-2 text-lg
-                         font-medium text-gf-maroon hover:bg-gf-maroon hover:text-white"
-                >
-                  Search
-                </button>
-              </div>
-            </form>
-
-            <%!-- Mobile Resources --%>
-            <div class="border-t border-gf-maroon/30 pt-2">
-              <span class="block px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gf-maroon/70">
-                Resources
-              </span>
-              <a
-                :for={link <- @resource_links}
-                href={link.href}
-                class="block rounded-md px-3 py-2 text-lg font-medium hover:bg-white/50"
-              >
-                {link.label}
-              </a>
-            </div>
-          </div>
+        <div class="hidden md:block">
+          <.account current_user={@current_user} />
         </div>
+
+        <.palette_trigger compact class="ml-auto md:hidden" />
+        <.theme_switch class="md:ml-0" />
+
+        <button
+          type="button"
+          phx-click={JS.toggle(to: "#mobile-menu")}
+          class="inline-flex size-10 items-center justify-center rounded-ctl text-ink md:hidden"
+          aria-controls="mobile-menu"
+          aria-expanded="false"
+          aria-label="Open menu"
+        >
+          <.icon name="ph-list" class="size-6" />
+        </button>
       </nav>
+
+      <div id="mobile-menu" class="hidden border-t border-line bg-surface px-4 pb-4 md:hidden">
+        <div class="mt-2 flex flex-col font-brand text-body">
+          <a href="/id" class="py-2 font-semibold text-brand">Identify a gall</a>
+          <span class="pt-3 text-caption font-semibold uppercase tracking-wide text-muted">
+            Browse
+          </span>
+          <a :for={link <- @browse_links} href={link.href} class="py-2 text-ink">{link.label}</a>
+          <span class="pt-3 text-caption font-semibold uppercase tracking-wide text-muted">
+            Resources
+          </span>
+          <a :for={link <- @resource_links} href={link.href} class="py-2 text-ink">{link.label}</a>
+          <div class="mt-3 border-t border-line pt-3">
+            <.account current_user={@current_user} stacked />
+          </div>
+        </div>
+      </div>
     </header>
     """
   end
 
-  defp toggle_mobile_menu do
-    JS.toggle(to: "#mobile-menu")
-  end
-
-  defp toggle_browse_menu do
-    JS.toggle(to: "#browse-menu")
-  end
-
-  defp hide_browse_menu do
-    JS.hide(to: "#browse-menu")
-  end
-
-  defp toggle_resources_menu do
-    JS.toggle(to: "#resources-menu")
-  end
-
-  defp hide_resources_menu do
-    JS.hide(to: "#resources-menu")
-  end
+  @doc """
+  The conn the root layout renders the command palette with: outside the
+  page's live session. A request routed to a `live` page carries that
+  live session's on_mount hooks (`conn.private[:phoenix_live_view]`), so
+  `live_render/3` would run them for the palette too, and a page's access
+  check (a superadmin's, say) would stop the palette on the 403 it renders.
+  """
+  def outside_live_session(%Plug.Conn{} = conn),
+    do: %{conn | private: Map.delete(conn.private, :phoenix_live_view)}
 
   @doc """
-  Renders the site footer with links and copyright.
+  Opens the command palette (`GallformersWeb.PaletteLive`): a button that
+  looks like a search field ("Search Gallformers" and its key), or with
+  `compact` a search icon (phones). It dispatches `gf:open-palette`.
   """
-  attr :current_user, :map, default: nil, doc: "the currently logged in user, if any"
+  attr :compact, :boolean, default: false
+  attr :class, :any, default: nil, doc: "layout only"
 
-  def site_footer(assigns) do
-    current_year = Date.utc_today().year
+  def palette_trigger(assigns) do
+    ~H"""
+    <button
+      type="button"
+      data-palette-trigger
+      phx-click={JS.dispatch("gf:open-palette")}
+      aria-label="Search Gallformers"
+      class={[
+        if(@compact,
+          do: "inline-flex size-10 items-center justify-center rounded-ctl text-ink",
+          else:
+            "h-ctl items-center gap-2 rounded-ctl border border-line-strong bg-surface px-3 text-ui text-muted hover:border-brand"
+        ),
+        @class
+      ]}
+    >
+      <.icon name="ph-magnifying-glass" class={if(@compact, do: "size-6", else: "size-4")} />
+      <span :if={!@compact} class="flex-1 text-left">Search Gallformers</span>
+      <kbd :if={!@compact} class="gf-kbd">/</kbd>
+    </button>
+    """
+  end
 
-    assigns = assign(assigns, :current_year, current_year)
+  @theme_options [
+    {"system", "gf-contrast", "Match my device"},
+    {"light", "gf-sun", "Light"},
+    {"dark", "gf-moon", "Dark"}
+  ]
+
+  @doc """
+  The theme switch: an icon button (showing the current choice, from
+  `data-theme-choice` on `<html>`) opening System, Light and Dark. A choice
+  dispatches `gf:set-theme`; `assets/js/theme.js` saves and applies it and
+  checks its option. LiveView leaves it alone (`phx-update="ignore"`), so
+  the checked option survives re-renders.
+  """
+  attr :class, :any, default: nil, doc: "layout only"
+
+  def theme_switch(assigns) do
+    assigns = assign(assigns, :options, @theme_options)
 
     ~H"""
-    <footer class="fixed bottom-0 left-0 right-0 z-40 bg-gray-100 text-gf-maroon">
-      <div class="flex items-center justify-between px-4 py-2">
-        <%!-- User info or Login - left side (desktop only) --%>
-        <%= if @current_user do %>
-          <div class="hidden sm:flex items-center gap-2">
-            <a
-              href={
-                if @current_user.nickname,
-                  do: "/user/#{@current_user.nickname}",
-                  else: "/admin/profile"
-              }
-              class="flex items-center gap-2 hover:opacity-80"
-            >
-              <img
-                :if={@current_user.picture}
-                class="h-6 w-6 rounded-full"
-                src={@current_user.picture}
-                alt=""
-              />
-              <span class="text-base font-medium text-gf-maroon">
-                {Gallformers.Accounts.Auth0User.display_name(@current_user)}
-              </span>
-            </a>
-            <a
-              href="/auth/logout"
-              class="text-base font-medium hover:underline"
-            >
-              Log Out
-            </a>
-          </div>
-        <% else %>
-          <a
-            href="/auth/auth0"
-            class="hidden sm:block text-base font-medium hover:underline"
-          >
-            Login
-          </a>
-        <% end %>
-
-        <%!-- Copyright - center --%>
-        <span class="hidden sm:block text-sm text-gray-600">
-          &copy; {@current_year} Gallformers |
-          <a
-            href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="hover:underline"
-          >
-            CC BY-NC-SA 4.0
-          </a>
+    <div
+      id="theme-menu"
+      class={["relative", @class]}
+      phx-update="ignore"
+      phx-window-keydown={hide_theme_menu()}
+      phx-key="Escape"
+    >
+      <button
+        type="button"
+        aria-label="Theme"
+        title="Theme"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-controls="theme-menu-list"
+        phx-click={
+          JS.toggle(to: "#theme-menu-list")
+          |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "#theme-menu > button")
+        }
+        class="inline-flex size-10 items-center justify-center rounded-ctl text-ink hover:bg-surface/40"
+      >
+        <span :for={{choice, icon, _} <- @options} class="gf-theme-icon" data-for={choice}>
+          <.icon name={icon} class="size-5" />
         </span>
-
-        <%!-- Navigation Links - right side (desktop) --%>
-        <nav class="hidden sm:flex items-center gap-x-4" aria-label="Footer navigation">
-          <a
-            href="https://megachile.shinyapps.io/doycalc/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-base font-medium hover:underline"
-          >
-            Phenology Tool
-          </a>
-          <a
-            href="https://www.patreon.com/gallformers"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-base font-medium hover:underline"
-          >
-            Donate
-          </a>
-          <a href="/privacy" class="text-base font-medium hover:underline">
-            Privacy
-          </a>
-          <a href="/about" class="text-base font-medium hover:underline">
-            About
-          </a>
-        </nav>
-
-        <%!-- Mobile menu button --%>
+      </button>
+      <div
+        id="theme-menu-list"
+        class="gf-menu hidden mt-1 right-0"
+        role="menu"
+        aria-label="Theme"
+        phx-click-away={hide_theme_menu()}
+      >
         <button
+          :for={{choice, icon, label} <- @options}
           type="button"
-          phx-click={toggle_footer_menu()}
-          class="sm:hidden p-2 text-gf-maroon ml-auto"
-          aria-label="Toggle footer menu"
+          role="menuitemradio"
+          aria-checked="false"
+          data-theme-option={choice}
+          phx-click={JS.dispatch("gf:set-theme", detail: %{theme: choice}) |> hide_theme_menu()}
+          class="flex items-center gap-2"
         >
-          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
+          <.icon name={icon} class="size-4" /> {label}
+          <.icon name="ph-check" class="gf-theme-check ml-auto size-4" />
         </button>
       </div>
+    </div>
+    """
+  end
 
-      <%!-- Mobile footer menu (hidden by default) --%>
-      <div
-        class="hidden sm:hidden absolute bottom-full left-0 right-0 bg-gray-100 py-3 border-t border-gray-300"
-        id="footer-menu"
-      >
-        <%= if @current_user do %>
-          <a
-            href={
-              if @current_user.nickname, do: "/user/#{@current_user.nickname}", else: "/admin/profile"
-            }
-            class="flex items-center gap-2 py-1 px-4 mb-2 border-b border-gray-300 pb-2 hover:opacity-80"
-          >
-            <img
-              :if={@current_user.picture}
-              class="h-6 w-6 rounded-full"
-              src={@current_user.picture}
-              alt=""
-            />
-            <span class="text-base font-medium text-gf-maroon">
-              {Gallformers.Accounts.Auth0User.display_name(@current_user)}
-            </span>
+  defp hide_theme_menu(js \\ %JS{}) do
+    js
+    |> JS.hide(to: "#theme-menu-list")
+    |> JS.set_attribute({"aria-expanded", "false"}, to: "#theme-menu > button")
+  end
+
+  defp nav_trigger,
+    do:
+      "inline-flex items-center gap-1 px-2 font-brand text-body font-medium text-ink cursor-pointer"
+
+  # Log in, or the signed-in user's menu (Admin, profile, Log out).
+  attr :current_user, :map, default: nil
+  attr :stacked, :boolean, default: false
+
+  defp account(%{current_user: nil} = assigns) do
+    ~H"""
+    <a href="/auth/auth0" class="font-medium text-link">Log in</a>
+    """
+  end
+
+  defp account(%{stacked: true} = assigns) do
+    ~H"""
+    <div class="flex flex-col">
+      <a href="/admin" class="py-2 text-ink">Admin</a>
+      <a href={profile_path(@current_user)} class="py-2 text-ink">
+        {Gallformers.Accounts.Auth0User.display_name(@current_user)}
+      </a>
+      <a href="/auth/logout" class="py-2 text-ink">Log out</a>
+    </div>
+    """
+  end
+
+  defp account(assigns) do
+    ~H"""
+    <.menu
+      id="account-menu"
+      label={Gallformers.Accounts.Auth0User.display_name(@current_user)}
+      trigger_class={nav_trigger()}
+    >
+      <:item href="/admin">Admin</:item>
+      <:item href={profile_path(@current_user)}>My profile</:item>
+      <:item href="/auth/logout">Log out</:item>
+    </.menu>
+    """
+  end
+
+  defp profile_path(%{nickname: nickname}) when is_binary(nickname), do: "/user/#{nickname}"
+  defp profile_path(_user), do: "/admin/profile"
+
+  @doc """
+  The site footer: at the end of the page, never fixed.
+  """
+  def site_footer(assigns) do
+    assigns = assign(assigns, :current_year, Date.utc_today().year)
+
+    ~H"""
+    <footer class="mt-section border-t border-line bg-surface-2">
+      <div class="mx-auto flex max-w-page flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 text-meta sm:px-page-x">
+        <nav class="flex flex-wrap gap-x-5 gap-y-1" aria-label="Footer">
+          <a href="https://megachile.shinyapps.io/doycalc/" target="_blank" rel="noopener noreferrer">
+            Phenology Tool ↗
           </a>
-          <a
-            href="/auth/logout"
-            class="block text-base font-medium hover:underline py-1 px-4"
-          >
-            Log Out
+          <a href="https://www.patreon.com/gallformers" target="_blank" rel="noopener noreferrer">
+            Donate ↗
           </a>
-        <% else %>
-          <a
-            href="/auth/auth0"
-            class="block text-base font-medium hover:underline py-1 px-4"
-          >
-            Login
-          </a>
-        <% end %>
-        <a
-          href="https://megachile.shinyapps.io/doycalc/"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="block text-base font-medium hover:underline py-1 px-4"
-        >
-          Phenology Tool
-        </a>
-        <a
-          href="https://www.patreon.com/gallformers"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="block text-base font-medium hover:underline py-1 px-4"
-        >
-          Donate
-        </a>
-        <a href="/privacy" class="block text-base font-medium hover:underline py-1 px-4">
-          Privacy
-        </a>
-        <a href="/about" class="block text-base font-medium hover:underline py-1 px-4">
-          About
-        </a>
-        <%!-- Copyright in mobile menu --%>
-        <span class="block text-sm text-gray-600 py-1 px-4 mt-2 border-t border-gray-300 pt-2">
-          &copy; {@current_year} Gallformers |
+          <a href="/privacy">Privacy</a>
+          <a href="/about">About</a>
+        </nav>
+        <span class="text-muted sm:ml-auto">
+          &copy; {@current_year} Gallformers ·
           <a
             href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
             target="_blank"
             rel="noopener noreferrer"
-            class="hover:underline"
           >
             CC BY-NC-SA 4.0
           </a>
@@ -493,127 +345,179 @@ defmodule GallformersWeb.Layouts do
     """
   end
 
-  defp toggle_footer_menu do
-    JS.toggle(to: "#footer-menu")
-  end
-
   @doc """
-  Renders the admin layout with sidebar navigation.
+  The admin shell (docs/design-system/components.md, `admin_shell`).
+
+  A sidebar of admin sections, a 44px top bar, and the page at Working
+  density. A page not yet on `page_header` passes `page_title` (or the
+  `page_title_html` slot) and the shell renders it as the page's `h1`;
+  a page with its own `page_header` passes neither.
 
   ## Examples
 
       <Layouts.admin flash={@flash} current_user={@current_user}>
-        <h1>Admin Content</h1>
+        <.page_header><:title>Sources</:title></.page_header>
       </Layouts.admin>
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :current_user, :map, required: true, doc: "the currently logged in user"
-  attr :page_title, :string, default: nil, doc: "the page title for the header"
+  attr :page_title, :string, default: nil, doc: "the page title, for pages without a page_header"
 
-  slot :page_title_html, doc: "rich HTML page title (overrides plain page_title in the bar)"
+  attr :counts, :map,
+    default: %{},
+    doc: "numbers that need the curator, by section: %{review: 358}"
+
+  slot :page_title_html, doc: "rich page title, for pages without a page_header"
   slot :inner_block, required: true
 
   def admin(assigns) do
-    # The domain screens (matter a856), then the content ones.
-    admin_nav_links = [
-      %{href: "/admin", label: "Dashboard", icon: "ph-house"},
-      %{href: "/admin/review", label: "Review", icon: "ph-check-circle"},
-      %{href: "/admin/galls", label: "Galls", icon: "gf-gall"},
-      %{href: "/admin/taxonomy", label: "Taxonomy", icon: "gf-taxon"},
-      %{href: "/admin/sources", label: "Sources", icon: "gf-source"},
-      %{href: "/admin/glossary", label: "Glossary", icon: "gf-entry"},
-      %{href: "/admin/articles", label: "Articles", icon: "ph-article"},
-      %{href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
-    ]
-
-    superadmin_nav_links = [
-      %{href: "/admin/vocabulary", label: "Vocabulary", icon: "ph-book-open"}
-    ]
-
-    is_superadmin = Gallformers.Accounts.superadmin?(assigns.current_user)
-    is_operator = Gallformers.Accounts.operator?(assigns.current_user)
-
     assigns =
       assigns
-      |> assign(:admin_nav_links, admin_nav_links)
-      |> assign(:superadmin_nav_links, superadmin_nav_links)
-      |> assign(:is_superadmin, is_superadmin)
-      |> assign(:is_operator, is_operator)
+      |> assign(:sections, admin_sections(assigns.current_user))
+      |> assign(:superadmin?, Gallformers.Accounts.superadmin?(assigns.current_user))
 
     ~H"""
-    <div class="flex min-h-screen flex-col">
-      <.site_header current_user={@current_user} hide_admin_link={true} />
-
-      <main class="flex-1 pb-32">
-        <%!-- Admin navigation links - always in same position --%>
-        <div class="bg-white border-b border-gray-200 px-6 sm:px-10 lg:px-16 py-3">
-          <div class="flex flex-wrap gap-4 items-center" id="admin-nav" phx-hook="AdminNav">
+    <div class="gf-density-working flex min-h-screen bg-paper text-body text-ink">
+      <aside
+        id="admin-sidebar"
+        class="gf-sidenav fixed inset-y-0 left-0 z-40 hidden w-53 shrink-0 flex-col overflow-y-auto border-r border-line bg-surface-2 p-3 lg:sticky lg:top-0 lg:flex lg:h-screen"
+      >
+        <div class="flex items-center gap-2 px-2 pb-4 pt-1">
+          <a href="/" aria-label="Gallformers home" title="The public site">
+            <img
+              src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
+              alt="Gallformers"
+              class="gf-only-light h-7 w-auto"
+            />
+            <img
+              src="/branding/Wide Logo Versions/gallformers_logo_wide_white.png"
+              alt="Gallformers"
+              class="gf-only-dark h-7 w-auto"
+            />
+          </a>
+          <span class="font-brand text-body font-semibold text-brand">Admin</span>
+        </div>
+        <nav id="admin-nav" phx-hook="AdminNav" aria-label="Admin" class="flex flex-col text-ui">
+          <div :for={{group, i} <- Enum.with_index(@sections)} class="flex flex-col gap-0.5">
+            <hr :if={i > 0} class="mx-1 my-2" />
             <a
-              :for={link <- @admin_nav_links}
+              :for={link <- group}
               href={link.href}
               data-nav-href={link.href}
-              class="flex items-center gap-2 text-lg font-medium text-gf-maroon hover:text-gf-autumn"
+              class="flex items-center gap-2 rounded-ctl px-2.5 py-1.5 text-ink-2 hover:bg-surface hover:text-ink hover:no-underline"
             >
-              <.icon name={link.icon} class="h-5 w-5" />
-              {link.label}
+              <.icon name={link.icon} class="size-4 shrink-0 text-muted" />
+              <span class="flex-1">{link.label}</span>
+              <span
+                :if={count = @counts[link.key]}
+                class="text-caption font-bold tabular-nums text-autumn-ink"
+              >
+                {count}
+              </span>
             </a>
+          </div>
+          <hr class="mx-1 my-2" />
+          <a
+            href="/admin/profile"
+            class="flex items-center gap-2 rounded-ctl px-2.5 py-1.5 text-muted hover:bg-surface"
+          >
+            <.icon name="ph-user-circle" class="size-4 shrink-0" /> My profile
+          </a>
+          <a
+            href="/"
+            class="flex items-center gap-2 rounded-ctl px-2.5 py-1.5 text-muted hover:bg-surface"
+          >
+            <.icon name="ph-arrow-square-out" class="size-4 shrink-0" /> View public site
+          </a>
+        </nav>
+      </aside>
 
-            <%!-- Super Admin links --%>
-            <a
-              :for={link <- @superadmin_nav_links}
-              :if={@is_superadmin}
-              href={link.href}
-              data-nav-href={link.href}
-              class="flex items-center gap-2 text-lg font-medium text-gf-maroon hover:text-gf-autumn"
-            >
-              <.icon name={link.icon} class="h-5 w-5" />
-              {link.label}
-            </a>
-
-            <%!-- Operator link --%>
-            <a
-              :if={@is_operator}
-              href="/admin/ops"
-              data-nav-href="/admin/ops"
-              class="flex items-center gap-2 text-lg font-medium text-gf-maroon hover:text-gf-autumn"
-            >
-              <.icon name="ph-shield-check" class="h-5 w-5" /> Ops
-            </a>
-
-            <%!-- My Profile link --%>
-            <a
-              href="/admin/profile"
-              class="flex items-center gap-2 text-lg font-medium text-gf-maroon hover:text-gf-autumn ml-auto"
-            >
-              <.icon name="ph-user-circle" class="h-5 w-5" /> My Profile
-            </a>
+      <div class="flex min-w-0 flex-1 flex-col">
+        <div
+          class="sticky top-0 z-30 flex h-admin-bar items-center gap-3 border-b border-line bg-surface px-4 sm:px-page-x"
+          data-sticky-chrome
+        >
+          <button
+            type="button"
+            class="inline-flex size-8 items-center justify-center rounded-ctl text-ink lg:hidden"
+            phx-click={JS.toggle(to: "#admin-sidebar", display: "flex")}
+            aria-controls="admin-sidebar"
+            aria-label="Admin menu"
+          >
+            <.icon name="ph-list" class="size-5" />
+          </button>
+          <div class="ml-auto flex items-center gap-4 text-meta">
+            <.palette_trigger class="flex w-64 max-sm:hidden" />
+            <span class="text-ink-2">
+              {Gallformers.Accounts.Auth0User.display_name(@current_user)}
+            </span>
+            <a href="/auth/logout">Log out</a>
+            <.theme_switch />
           </div>
         </div>
 
-        <%!-- Small page title bar --%>
-        <div
-          :if={@page_title || @page_title_html != []}
-          class="bg-gray-50 border-b border-gray-200 px-6 sm:px-10 lg:px-16 py-2"
-        >
-          <h1 :if={@page_title_html != []} class="text-lg font-semibold text-gf-maroon">
-            {render_slot(@page_title_html)}
-          </h1>
-          <h1 :if={@page_title_html == []} class="text-lg font-semibold text-gf-maroon">
-            {@page_title}
-          </h1>
-        </div>
-
-        <%!-- Page content --%>
-        <div class="px-6 sm:px-10 lg:px-16 py-8">
-          {render_slot(@inner_block)}
-        </div>
-      </main>
-
-      <.site_footer current_user={@current_user} />
+        <main class="flex flex-1 flex-col gap-section px-4 py-5 sm:px-page-x">
+          <.page_header :if={@page_title_html != [] or @page_title}>
+            <:title>
+              {if @page_title_html != [], do: render_slot(@page_title_html), else: @page_title}
+            </:title>
+          </.page_header>
+          <div>{render_slot(@inner_block)}</div>
+        </main>
+      </div>
     </div>
 
     <.flash_group flash={@flash} />
     """
+  end
+
+  # The sidebar's groups: the domain screens, the content ones, then the
+  # role-restricted tools.
+  defp admin_sections(user) do
+    superadmin? = Gallformers.Accounts.superadmin?(user)
+    operator? = Gallformers.Accounts.operator?(user)
+
+    domain = [
+      %{key: :dashboard, href: "/admin", label: "Dashboard", icon: "ph-house"},
+      %{key: :review, href: "/admin/review", label: "Review", icon: "ph-check-circle"},
+      %{key: :changes, href: "/admin/changes", label: "Changes", icon: "ph-list"},
+      %{key: :taxonomy, href: "/admin/taxonomy", label: "Taxonomy", icon: "gf-taxon"},
+      %{key: :sources, href: "/admin/sources", label: "Sources", icon: "gf-source"},
+      %{key: :host_range, href: "/admin/host-range", label: "Host ranges", icon: "ph-map-trifold"}
+    ]
+
+    content =
+      [
+        %{key: :glossary, href: "/admin/glossary", label: "Glossary", icon: "gf-entry"},
+        %{key: :articles, href: "/admin/articles", label: "Articles", icon: "ph-article"},
+        %{key: :keys, href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
+      ] ++
+        if(superadmin?,
+          do: [
+            %{
+              key: :vocabulary,
+              href: "/admin/vocabulary",
+              label: "Vocabulary",
+              icon: "ph-book-open"
+            }
+          ],
+          else: []
+        )
+
+    tools =
+      if(superadmin?,
+        do: [
+          %{key: :users, href: "/admin/users", label: "Users", icon: "ph-users"},
+          %{key: :jobs, href: "/admin/jobs", label: "Jobs", icon: "ph-arrows-clockwise"}
+        ],
+        else: []
+      ) ++
+        if(operator?,
+          do: [%{key: :ops, href: "/admin/ops", label: "Ops", icon: "ph-shield-check"}],
+          else: []
+        )
+
+    Enum.reject([domain, content, tools], &(&1 == []))
   end
 
   @doc """
@@ -655,97 +559,6 @@ defmodule GallformersWeb.Layouts do
         {gettext("Attempting to reconnect")}
         <.icon name="ph-arrows-clockwise" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
-    </div>
-    """
-  end
-
-  @doc """
-  Renders a back link for admin forms.
-
-  ## Examples
-
-      <Layouts.back_link navigate={~p"/admin/glossary"} label="Back to Glossary" />
-  """
-  attr :navigate, :string, required: true, doc: "the path to navigate to"
-  attr :label, :string, required: true, doc: "the link text"
-
-  def back_link(assigns) do
-    ~H"""
-    <div class="mb-6">
-      <.link navigate={@navigate} class="hover:underline">
-        <.icon name="ph-arrow-left" class="h-4 w-4 inline" /> {@label}
-      </.link>
-    </div>
-    """
-  end
-
-  @doc """
-  Standard layout for admin edit pages (Gall, Host, Source, etc.)
-
-  Provides consistent structure with:
-  - Quick Links bar (back link + optional public URL + entity-specific links)
-  - Intro text slot
-  - Main content area
-
-  Note: The page title is set via the `page_title_html` slot on the parent `admin` layout.
-
-  ## Example
-
-      <Layouts.admin
-        page_title={@page_title}
-      >
-        <:page_title_html>
-          Editing <em>Species Name</em>
-        </:page_title_html>
-        <Layouts.admin_edit_layout
-          back_path={~p"/admin/galls"}
-          back_label="Back to Galls"
-          public_url={~p"/gall/123"}
-        >
-          <:intro>
-            This is for all the details about a Gall...
-          </:intro>
-          <:quick_links>
-            <.link navigate={...}>Manage Images</.link>
-          </:quick_links>
-
-          <.form ...>
-            ... form fields ...
-          </.form>
-        </Layouts.admin_edit_layout>
-      </Layouts.admin>
-  """
-  attr :back_path, :any, required: true, doc: "path for the back link"
-  attr :back_label, :any, required: true, doc: "text for the back link"
-  attr :public_url, :string, default: nil, doc: "URL to the public page for this item"
-
-  slot :intro, doc: "intro text paragraph"
-  slot :quick_links, doc: "entity-specific quick links"
-  slot :inner_block, required: true, doc: "main form content"
-
-  def admin_edit_layout(assigns) do
-    ~H"""
-    <div class="max-w-7xl mx-auto">
-      <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded flex items-center gap-4">
-        <span class="text-sm font-medium text-gray-700">Quick Links:</span>
-        <.link navigate={@back_path} class="text-sm hover:underline">
-          &larr; {@back_label}
-        </.link>
-        <a
-          :if={@public_url}
-          href={@public_url}
-          class="text-sm hover:underline inline-flex items-center gap-1"
-        >
-          <.icon name="ph-eye" class="h-4 w-4" /> View public page
-        </a>
-        {render_slot(@quick_links)}
-      </div>
-
-      <p :if={@intro != []} class="text-sm text-gray-600 mb-4">
-        {render_slot(@intro)}
-      </p>
-
-      {render_slot(@inner_block)}
     </div>
     """
   end

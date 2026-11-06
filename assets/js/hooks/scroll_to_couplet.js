@@ -5,8 +5,11 @@ const ScrollToCouplet = {
       requestAnimationFrame(() => {
         const el = document.getElementById(id)
         if (el) {
-          // Account for sticky header (~78px) and path tracker (~40px)
-          const offset = 130
+          // Clear whatever sticky chrome sits on top (the site header, the
+          // path tracker), measured, plus a little breathing room.
+          const chrome = [...document.querySelectorAll("[data-sticky-chrome]")]
+            .reduce((sum, bar) => sum + bar.offsetHeight, 0)
+          const offset = chrome + 8
           const top = el.getBoundingClientRect().top + window.scrollY - offset
           window.scrollTo({ top, behavior: "smooth" })
         }

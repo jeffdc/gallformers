@@ -39,19 +39,19 @@ defmodule GallformersWeb.AdminRedirectControllerTest do
 
   describe "the gall–host screen" do
     test "goes to the Gall page of its Gall", %{conn: conn} do
-      assert_moved(conn, "/admin/gallhost?id=300", "/admin/galls/300")
+      assert_moved(conn, "/admin/gallhost?id=300", "/gall/300?edit")
     end
 
     test "with no Gall, goes to the Gall search", %{conn: conn} do
-      assert_moved(conn, "/admin/gallhost", "/admin/galls")
-      assert_moved(conn, "/admin/gallhost?id=abc", "/admin/galls")
+      assert_moved(conn, "/admin/gallhost", "/galls")
+      assert_moved(conn, "/admin/gallhost?id=abc", "/galls")
     end
   end
 
   describe "the image admin" do
     test "goes to the images of the Gall page for a Gall", %{conn: conn} do
       gall = CatalogFixtures.gall_fixture()
-      assert_moved(conn, "/admin/images?species_id=#{gall.id}", "/admin/galls/#{gall.id}#images")
+      assert_moved(conn, "/admin/images?species_id=#{gall.id}", "/gall/#{gall.id}?edit")
     end
 
     test "goes to the images of the taxon page for a taxon", %{conn: conn} do

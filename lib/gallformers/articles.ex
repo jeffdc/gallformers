@@ -10,7 +10,8 @@ defmodule Gallformers.Articles do
       Gallformers.Repo,
       Gallformers.ChangesetHelpers,
       Gallformers.SchemaFields,
-      Gallformers.ContentImages
+      Gallformers.ContentImages,
+      Gallformers.TextMatch
     ],
     exports: :all
 
@@ -58,6 +59,25 @@ defmodule Gallformers.Articles do
         ^tag
       )
     )
+  end
+
+  @doc """
+  The published articles whose title has every word of `query` (any order),
+  by title, at most `limit`. A blank query finds none.
+  """
+  @spec search_published(String.t(), pos_integer()) :: [Article.t()]
+  def search_published(query, limit \\ 10) do
+    if Gallformers.TextMatch.parse_terms(query) == [] do
+      []
+    else
+      from(a in Article,
+        where: a.is_published == true,
+        where: ^Gallformers.TextMatch.build_filter(query, [:title]),
+        order_by: a.title,
+        limit: ^limit
+      )
+      |> Repo.all()
+    end
   end
 
   @doc """

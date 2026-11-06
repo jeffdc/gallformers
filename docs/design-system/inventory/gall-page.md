@@ -1,0 +1,185 @@
+# Inventory: the Gall page (`/gall/:id`)
+
+The behavior contract for the public Gall page, taken from the code on 2026-11-05 (design-system branch). A redesign may change how it looks. It must keep every behavior listed here unless a change is explicitly approved and recorded below. Line references: `GL` is `lib/gallformers_web/live/gall_live.ex`, `GP` `lib/gallformers/catalog/read_models/gall_page.ex`, `GS` `gall_summary.ex` and `PR` `potential_range.ex` (same directory), `DDC` `lib/gallformers_web/components/data_display_components.ex`, `UI` `ui_components.ex`, `CC` `core_components.ex` and `SEO` `seo.ex` (same directory), `SUM` `lib/gallformers/galls/summary.ex`, `LER` `lib/gallformers_web/plugs/legacy_entity_redirect.ex`. The shared components (gallery and its hook, range map and legend, Source cards and modal, `taxon_name`, breadcrumb, glossary) are described in `domain-and-media.md`; this file covers how the Gall page uses them. The target layout is `docs/design-system/patterns.md` "Detail page (public)".
+
+## Findings
+
+- **On phones the photo comes last in the top block.** The grid is `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` with the gallery as the second cell (GL:384, 608), so below `md` it renders after the name, notices, breadcrumb, Hosts, Traits, the range map, common names, the synonymy table and Related Galls. Between `md` and `lg` the left column is half the width (it has only `lg:col-span-2`) and still holds the three-column Traits grid (`md:grid-cols-3`, GL:491). The design system's rule is header, photo, then the main column.
+- **No h1.** The Gall's name is an `h2` (GL:388); `Layouts.app` gets no title. Section headings are `h3` ("Synonymy", "Related Galls", "Further Information"), and the modal title is an `h3` that also contains the A−/A+ buttons (CC:626-629 wraps the header slot in the `h3`).
+- **The name is italic as a whole.** The h2 wraps `@base_name` in `<em class="taxon-name">` instead of `taxon_name`, so undescribed names ("Andricus n-densiflorus-seed-gall", "Unknown (Cynipidae) …"), rank words and qualifiers are all italic, against the `TaxonName.segments` rules approved 2026-11-04. The generation qualifier "(agamic)" is inside the `<em>` too. Everywhere else on the page (Hosts, synonyms, Related Galls) names go through `taxon_name`.
+- **An undescribed Gall without a Gallformers Code says nothing about being undescribed.** The amber notice needs `@gall.undescribed? && @gallformers_code` (GL:416). See also is hidden for every undescribed Gall (UI:637), with or without a code.
+- **Undescribed Galls list their Inducer's synonyms.** `GP.synonyms/1` (GP:231-235) takes the synonyms of whatever the current Inducer is; for an undescribed Gall that is the genus, family or tribe it hangs on, so a genus's synonyms would appear in the Gall's "Synonymy" table as if they were the Gall's (not seen in the seeds; Related Galls is suppressed for undescribed Galls, synonyms are not, GP:192-193).
+- **Several Inducers (a dispute) show only the first one's breadcrumb** (`breadcrumb/1`, GL:155-156, by accepted name then ID, GS); synonyms are concatenated from all of them. Nothing tells the reader the Inducer is disputed.
+- **Not found is a 200.** A missing ID, an ID that is a plant (`/gall/10`) or a non-numeric ID renders a red box ("Gall not found" / "Invalid gall ID", Tailwind palette `bg-red-50 … text-red-700`, GL:381) with title "Gall Not Found", `page_noindex: true`, no canonical. `/gall/12abc` is "Invalid gall ID" (`Integer.parse` must consume everything); `/gall/007` renders Gall 7 with canonical `/gall/7`. A number above bigint passes the plug (LER:30) and reaches `Repo.get` — likely a 500 (not verified). The `else` "Gall not found" branch at GL:741-745 is unreachable (`error` is always set when `gall` is nil).
+- **The canonical is a `<meta name="canonical">`, not `<link rel="canonical">`** (SEO:48), site-wide; search engines ignore the meta form.
+- **The SEO description's generic fallback is dead.** `SUM.from_traits/1` always returns every key, so `for_seo/2`'s `map_size(filters) == 0` clause (SUM:66) never matches; a Gall with no Traits gets "Name - A gall." rather than "Name - A gall species documented on Gallformers.". Test pins "Andricus seedii (agamic) - A gall. Detachable.".
+- **Images are always the original size and always alt "Gall image".** `format_images/1` (GL:196-211) sets `src`/`url` to the original path and computes a `small_url` nothing reads; the og:image and JSON-LD image are the original too. Every image's `alt` is the literal "Gall image" (no caption, no name).
+- **The card's external-link icon is the citation's `externallink`, not the Source's `link`.** `GP.entry/5` passes the citation's deep link (`""` for the note and the lead-only Source); the Source's own `link` is loaded but never shown on the Gall page (only via the Source page).
+- **Source descriptions are rendered raw.** `Markdown.render!` (Earmark, no sanitizer) then `Phoenix.HTML.raw` (GL:704, 790): inline HTML is escaped, but a block-level tag passes through unchanged (checked: `<script>alert(1)</script>` at the start of a paragraph survives; the CSP nonce probably stops it executing). Descriptions now also come from imported Sources.
+- **The excerpt is a `<button>` containing glossary `<a>` links** (GL:696-707; already in domain-and-media). "Read more..." shows on every excerpt, however short.
+- **Generation glossary link:** `glossary_word` is now the vocabulary's `name_qualifier` (GL:250-262), so for seasonal generations the tooltip links `/glossary#spring generation` (space, not encoded, probably no such entry). The old code mapped "sexual" to "sexgen"; the vocabulary now stores "sexgen" as the qualifier, so that case still works. The tooltip only appears when the display name ends with " (qualifier)"; a `name_override` without it shows no generation at all, and the generation is never shown as its own field.
+- **Hosts:** links are `href` (full page loads) and not URL-encoded (`"/#{rank}/#{name}"`, GL:179); a Host at a rank with no page (subgenus) would link to a dead route. Every Host renders with `taxon_name`'s default species rank, so a family Host would be italic. All Hosts show, with no limit, separated " / ".
+- **Season values are alphabetical**, not seasonal (`GS` orders Trait values by value), and every Trait row is shown even when empty ("Color:" with nothing after it).
+- **"Created" is probably the catalog migration's date for every Gall** (`Catalog.create_gall` in `catalog_migration/galls.ex:230-247` sets no timestamps), and "Last updated" is the Gall row's `updated_at`, which Fact changes (Hosts, Traits, Sources) likely don't touch (not verified).
+- **The ID Notes banner's dismissal is per LiveView process** (`notes_alert_dismissed`, GL:143, 267-269): reload or reconnect brings it back. Nothing is stored.
+- **The modal doesn't touch the URL.** Opening a Source from the list doesn't add `?source=`; closing a modal opened by `?source=` leaves it in the URL; `handle_params` only reads it.
+- **Crashes on crafted events:** `show_source_detail` calls `String.to_integer` on `id` (GL:295). An unknown integer ID just opens nothing.
+- **The whole read model is built twice per visit** (mount runs on the dead render and on connect, GL:36-55), including attributions, which are loaded but not shown (GP:41-46, 392-428).
+- `info_tip` (range explanation) is hover-only and points `aria-describedby="tooltip"` at no element (UI:456-458); the badge's explanation is a `title` (hover only); the admin pencil, external-link and copy-link icons have only a `title` as their accessible name; the synonymy table sits in `overflow-hidden` (GL:562), so a wide row is clipped on phones rather than scrolled.
+- `see_also` computes an `undescribed_code` it never uses (UI:624-630).
+
+## 1. Route, mount, redirects, head
+
+**Route** (router.ex:220, `:public` live_session with `UserAuth :fetch_current_user`, `ContinentScope` and `TrackPageView` on_mount): `live "/gall/:id", GallLive`, in the `[:browser, :legacy_entity_redirects]` scope (router.ex:184-185). Inbound links: rank pages and `RankGalls` (`navigate`), host page (`href`), home ("a gall to meet"), the ID tool, keys (`taxon_links`), facts/review components, the sitemap (every `Catalog.list_gall_ids/0`, priority 0.8), and the Source page (`/gall/:id?source=:source_id`, source_live.ex:251).
+
+**Redirects:**
+
+- Old gall IDs are the Gall IDs (the catalog migration keeps the seed/legacy species ID as `gall.id`, `catalog_migration/galls.ex:234`), so old `/gall/:id` URLs keep working with no redirect. Each generation of a species is its own Gall with its own ID (300 agamic, 301 sexgen); there is no redirect between generations.
+- An old ID excluded as a non-gall (`non_gall_redirects`, `Catalog.non_gall?/1`) 301s to `/articles/gall-lookalikes` from the plug, before the LiveView (LER:28-37; a plug because a LiveView redirect would be a 302). IDs outside `1..9_223_372_036_854_775_807` pass through.
+- No other redirect: no merged-Gall redirect, no slug, no redirect from a plant ID.
+
+**Mount** (GL:36-55, 70-152): `Integer.parse(id)` must consume the whole param, else the "Invalid gall ID" state. Then `Catalog.gall_page/1` (`:not_found` → "Gall not found" state) or the found assigns: `gall`, `base_name`/`generation_term`/`glossary_word`/`generation_definition`, `images`, `sources`, `taxonomy` (breadcrumb), `range`, `inherited_range`, `introduced_range`, `range_bounds` (`Places.get_bounds_for_codes(range ++ inherited_range)`), `range_unknown?` (`display_range == :everywhere`), `related_galls`, `common_names`, `name_rows`, `gallformers_code`, `has_gallformers_notes`, `note_source_id`, `notes_alert_dismissed: false`, `aliases_page: 1`, `aliases_page_size: 10`, `selected_source: nil`, `modal_font_size: :base`, `sources_expanded: false`.
+
+**`handle_params`** (GL:57-68): `?source=ID` (integer, and one of the page's `sources`) sets `selected_source` (opens the modal) and `sources_expanded: true`. Invalid or unknown IDs are ignored; on a not-found page `sources` is nil and handled.
+
+**Head assigns** (GL:101-123, root.html.heex:9-32, SEO): `page_title` = the full display name including the generation qualifier ("Andricus seedii (agamic)"; `live_title` default "Gallformers", no suffix in the tab; og/twitter titles get " | Gallformers"); `page_description` = `SUM.for_seo(name, SUM.from_traits(traits))` (≤160 chars: medium summary, else short, else truncated with "..."); `page_url` `/gall/:id` (canonical and og:url, prefixed `https://gallformers.org`); `page_image` the first image's original URL (og:image, twitter:image; site default `/images/cynipid_R.svg` without one); `page_json_ld` `{"@context": "https://schema.org", "@type": "Thing", name, description, url, identifier: name, image?}` rendered in root with the CSP nonce (ef2a1474); `page_noindex` false when found, true for both not-found states. `page_type` unset ("website"). Only the title updates on live navigation; the meta tags are from the dead render.
+
+## 2. What the page shows, in order
+
+Inside `Layouts.app` (`max-w-page`, side padding). Desktop (`lg`): a three-column grid, left two columns the main block, right column the gallery; then full-width below. Tablet (`md`): two equal columns. Phone: one column, everything in this order with the gallery after Related Galls.
+
+**Header row** (GL:386-413), `flex justify-between items-start`:
+
+- `h2.text-2xl.font-bold` > `em.taxon-name`: `base_name` (the display name, `name_override` or `name`, with " (qualifier)" removed when the Gall has a generation whose `name_qualifier` ends the name). After it, inside the em, `glossary_tooltip` showing "(agamic)" with a dotted underline; on hover a dark tooltip "agamic: <first sentence of the definition>" and "View in glossary →" to `/glossary#agamic` (lowercased). The definition is the generation value's (vocabulary loader, `catalog/vocab/loader.ex:59-104`), else the glossary entry named by the qualifier (`Glossaries.get_definitions/1`).
+- Admin only (`Accounts.admin?(current_user)`): pencil `ph-pencil-simple` h-5 w-5, `href` `/admin/galls/:id`, `title="Edit in admin"`.
+- Right: `data_complete_badge` (CC:521): "Complete" (`gf-badge-success`) or "In Progress" (`gf-badge-warning`), `cursor-help`, `title` "All sources containing unique information relevant to this gall have been added and are reflected in its associated data." / "We are still working on this gall so data might be missing." From `gall.datacomplete`.
+
+**Undescribed notice** (GL:415-451), when `undescribed?` (no current Inducer at species, subspecies, variety or form rank, GP:69-70, 172) and a `gallformers_code`: amber box; red "The inducer of this gall is unknown or undescribed."; "Gallformers Code:" then a button `#copy-gallformers-code` (CopyToClipboard, `data-copy-text` = the code, no `data-copy-url`) showing the code in a `<code>` chip and "Click to Copy"; a line with "View observations collected with this code on iNaturalist." (`https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=` + `URI.encode(code)`, `target=_blank rel=noreferrer`) and "Learn more about how it works and how you can help." (`href` `/articles/link-undescribed-inat`).
+
+**Formerly undescribed** (GL:453-466), when described and a code is still set: one muted line "Formerly tracked as undescribed — view iNat observations linked under Gallformers Code "CODE"" (the same iNat URL).
+
+**Breadcrumb** (GL:469-474), `taxonomy_breadcrumb` with `family`, `intermediates`, `genus` of the first Inducer's lineage (`LineageBreadcrumb.from_lineage`, `Taxa.lineage/1` root first): "Family: X | Subfamily: Y | Tribe: Z | Genus: *Andricus*", `navigate` links by raw name. No section, no species crumb (the Inducer's species name is only the h2). Hidden when there is no Inducer or no such rank in the lineage. A genus-level Inducer (undescribed) shows its genus; a family-level one shows only the family.
+
+**Hosts** (GL:476-489), when any: "**Hosts:**" then every current Host (`host_of` Facts, GS:57-69, by accepted name then taxon ID), " / " between. Species, subspecies, variety and form Hosts link to `/host/:taxon_id`; higher taxa to `/{rank}/{accepted name}` (a genus Host → `/genus/Quercus`, GP:215-216), with `taxon_name` and, for genus Hosts, the upright "(genus-level)" note with its `title` (DDC:56-60). Links are `href`.
+
+**Traits** (GL:491-515), a `md:grid-cols-3` grid of bold labels, always all eleven rows: column 1 Detachable, Color, Texture, Abundance; column 2 Shape, Season, Alignment, Walls; column 3 Location (`plant_part`), Form, Cells. Phone: one column in that order.
+
+- Values are the current Trait values (raw vocabulary words, lowercase), alphabetical, joined ", ".
+- Each value is followed by its Sources' terms in parentheses when they differ from the value ("globular (oval, ovoid)"; `GP.trait_terms`: confirming, unretracted attributions' terms, distinct after `TraitTermMapping.normalize`, sorted, as first written, the value's own name left out).
+- Terms with no category (waiting on a question or settled as text, `GP.text_terms`) follow as "; also described as “reticulate”", or alone "described as “papery”" when the Trait has no value. Curly quotes.
+- Detachable shows only its first value, labelled "Integral", "Detachable", "Both", or nothing for "unknown" (GL:28-33, 217-222).
+- Abundance is the Gall's `abundance` (lookup table text, e.g. "common"), not a Trait; empty when nil.
+
+**Possible Range** (GL:518-549): "**Possible Range:**" with an `info_tip` "i": "The gall's range is computed from the range of all hosts that the gall occurs on. In some cases we have evidence that the gall does not occur across the full range of the hosts and we will remove these places from the range. For undescribed species we will show the expected range based on hosts plus where the galls have been observed."
+
+- `:everywhere` (no Host, or Hosts without range rows, PR:22-29): italic "Range unknown — no host range data available." and no map.
+- Otherwise: an info `alert` "Not an occurrence map: this shows where this gall's hosts grow. In most cases the gall has not been documented throughout this area." (b95df017), then `range_map` `#gall-range-map`, `min-h-[250px] h-[300px]`, `in_range`, `inherited_range` (country-level), `introduced_range`, `bounds`, `navigable` (a click on a place pushes `navigate_to_place` → `/place/:code`). No `excluded_range`: exclusions are already removed (`PR.for_display/1`, PR:211-229: the Hosts' range, a genus Host with its subtree, then `only`/`exclude` adjustments; in-range minus inherited).
+- `range_map_legend mode={:public}` (Documented, Country-level, Introduced hatched) only when there are inherited or introduced codes. Map behavior and tooltips: domain-and-media §2.
+
+**Common Name(s)** (GL:551-556), when any: "**Common Name(s):** a, b" (current `common_name` alias Facts, alphabetical, GP:219-229).
+
+**Synonymy (N)** (GL:558-592), when any rows: `gf-table gf-table-compact`, columns Name / Type / Notes. Rows: the Inducers' synonyms in the order added (`Taxa.list_synonyms/1`; Type "synonym", or "misapplied" with the `sensu` text as Notes), then the Gall's former labels and codes alphabetically (Type "former label" / "code", Notes "—"). Synonyms render with `taxon_name`; labels and codes as plain text. Ten a page: `pagination` ("Showing 1 to 10 of N results", Previous / "Page n of m" / Next) only with more than ten, pushing `aliases_page {page}` (clamped).
+
+**Related Galls (N)** (GL:594-605), when any: a bulleted list of the other Galls with the same current species-rank Inducer (alternate generations and forms; GP:237-250, by display name then ID), `href` `/gall/:id`, `taxon_name` (so "(sexgen)" is upright here). Never for undescribed Galls. The other generation is not labelled as a generation.
+
+**Gallery** (GL:608-615): `image_gallery` `#gall-images`, the Gall's images by `sort_order` then ID (`Images.list_images_for_gall/1`), `edit_href` `/admin/galls/:id#images` (✎ for admins), no `no_image_src`. With no images: the grey "No images available" box (no `#gall-images` id), plus "Add images" for admins. Lightbox, credits, licenses, info dialog, keys: domain-and-media §1. Image editing itself is the admin Gall page's `ImagesComponent`.
+
+**Below the grid:** an `hr` (GL:618), then:
+
+**ID Notes banner** (GL:620-650), when the Gall has a Gallformers note, the banner isn't dismissed, and the note isn't the open modal: `role="alert"`, sky-blue box, info icon, "Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls and/or important information about the taxonomic status of this gall inducer.", "Show notes" (`show_source_detail` with the note's Source ID) and × (`dismiss_notes_alert`, `aria-label="Dismiss"`).
+
+**Further Information (N)** (GL:652-736): the Sources (`GP.sources/1`, GP:260-288): the legacy citations, plus the newest Gallformers note (its document items joined by blank lines, GP:303-312), plus the default Source when neither gives it (lead-only, no description, GP:292-301); ordered default first, then the note, then by title. N counts all. Each card (`p-3 rounded border bg-white`; the note with a blue left border and an info icon):
+
+- title link `href` `/source/:id`; " - author"; " (pubyear)"; external-link icon (`ph-arrow-square-out`, `title="View external source"`, new tab) when the citation's `externallink` is a valid http(s) URL (`valid_url?`, d9b244fa); copy-link button `#copy-source-link-{id}` (CopyToClipboard, `data-copy-text="/gall/:id?source=:id"`, `data-copy-url` prepends `window.location.origin`, `title="Copy link to this description"`).
+- excerpt, when the description isn't blank: a full-width button (`show_source_detail`, `phx-value-id`) with the Markdown (`Markdown.render!`: Earmark GFM, line breaks, glossary auto-links) clamped to three lines (`prose prose-sm line-clamp-3`), then "Read more...".
+- "License: X", linked (new tab) when `licenselink` is valid.
+
+At most 8 cards until expanded; with a note, the note plus the first 7 others, in list order (GL:348-370, 7aa82be0). "Show all N sources" (`expand_sources`) when there are more than 8; no collapse. No Sources: italic "No further information available for this species."
+
+**Source modal** (GL:748-840), `modal` `#source-detail-modal` `max-w-3xl` when `selected_source`: header the title plus "A-" / "A+" (`decrease_font_size` / `increase_font_size`, through `prose-sm` → `prose-base` → `prose-lg` → `prose-xl`, disabled at the ends, `title`s "Decrease/Increase font size"); body "author (pubyear)", the full Markdown at the chosen size, "License: X" (linked when valid); footer "View external link →" (the citation's `externallink`, when valid), "View source page →" (`/source/:id`), "Copy link" button `#copy-source-link` (same URL as the card's). Escape, the close ×, and click-away push `close_source_modal`, which also resets the font size to `:base`. Focus is trapped (`focus_wrap`) and moves to the first focusable element.
+
+**See Also** (GL:738, UI:612-680), only for described Galls: its own `hr`, "See Also:", four logo links in `grid-cols-2 md:grid-cols-4`, new tab, `rel=noreferrer`, each with an `aria-label`: iNaturalist (`/search?q=`), BugGuide, Google Scholar, Biodiversity Heritage Library; the query is "Genus epithet" from `TaxonName.parse` (qualifier dropped), `URI.encode`d.
+
+**Record metadata** (GL:740, CC:749-772): border-top line "Created Mon D, YYYY H:MM AM UTC • Last updated …" from the Gall row's timestamps.
+
+Nothing else: no Inducer link or page for the gall-former, no per-Fact Source attributions (loaded, GP:41-46), no generation field, no lookalikes, no Region scope strip.
+
+## 3. Events, hooks, storage
+
+Events handled (GL:266-331):
+
+| event | from | params | effect |
+|---|---|---|---|
+| `dismiss_notes_alert` | banner × | none | hide the banner for this process |
+| `show_source_detail` | "Show notes", each excerpt | `id` (string) | open the modal on that Source |
+| `close_source_modal` | modal cancel (`JS.push`) | none | close, reset font size |
+| `increase_font_size` / `decrease_font_size` | modal header | none | step `:sm :base :lg :xl` |
+| `expand_sources` | "Show all N sources" | none | show every card |
+| `aliases_page` | synonymy pagination (`JS.push`) | `page` (integer) | clamp to 1..pages |
+| `clipboard_copy_success` / `clipboard_copy_error` | CopyToClipboard | none | flash "Copied to clipboard" / "Failed to copy to clipboard" |
+| `gallery_index_changed` | ImageGallery | `index` | no-op |
+| `navigate_to_place` | RangeMap (navigable) | `code` | `push_navigate` to `/place/:code` (not encoded) |
+
+Hooks: `ImageGallery` on `#gall-images` and `RangeMap` on `#gall-range-map` (both `phx-update="ignore"`; domain-and-media); `CopyToClipboard` (`assets/js/hooks/copy_to_clipboard.js`) on `#copy-gallformers-code`, every `#copy-source-link-{id}` and the modal's `#copy-source-link`: on click reads `data-copy-text` (prefixing `window.location.origin` when `data-copy-url` is present), `navigator.clipboard.writeText`, pushes success or error. The modal uses `phx-mounted` `show_modal` / `phx-remove` `hide_modal` JS commands.
+
+Storage: none. No localStorage, no cookies, no server-side dismissals; the notes banner, expanded list, synonymy page and font size are socket assigns lost on reload. `?source=` is the only URL state, read-only.
+
+## 4. Read models
+
+- `Catalog.gall_page/1` → `GallPage.for_gall/1` (GP:161-201): `{:ok, %GallPage{}}` or `:not_found` (`Repo.get(Gall, id)`). Fields used by the page: `id`, `name` (display name), `gallformers_code`, `abundance` (text), `datacomplete`, `generation` (`%{value, name_qualifier, definition}` or nil), `undescribed?`, `inducers` (each with `lineage`), `hosts` (each with `link`), `traits`, `trait_terms`, `text_terms`, `common_names`, `labels`, `synonyms`, `related_galls` (`%{id, name}`), `sources` (`%{id, title, author, pubyear, link, citation, license, licenselink, description, useasdefault, externallink, note?}`), `images` (Image structs with `source` preloaded), `display_range` (`:everywhere` or `%DisplayRange{in_range, inherited_range, introduced_range}`), `inserted_at`, `updated_at`. `attributions` is loaded and unused.
+- Built on `GallSummary.for_gall/1` (name, generation value, current `inducer_of` and `host_of` taxa by name, Traits by Trait) and `PotentialRange.for_display/1`; uses `Taxa.lineage/1`, `Taxa.list_synonyms/1`, `Current.aliases/1`, `Current.relationships/1`, `LegacyCitation`, `Sources.list_gall_notes/1`, `Sources.list_document_items/1`, `Sources.list_sources_by_id/1`, `PendingTerms.list/2`, `Sources.retracted_source_ids/1`, `Images.list_images_for_gall/1`.
+- In the LiveView: `Places.get_bounds_for_codes/1` (map frame), `Glossaries.get_definitions/1` (generation fallback), `SUM.for_seo/2` + `from_traits/1`, `Image.base_url/0` (CDN), `Markdown.render!/1`, `Accounts.admin?/1`, `LineageBreadcrumb.from_lineage/1`.
+
+## 5. Tests (selectors and texts asserted)
+
+- `test/gallformers_web/live/gall_live_test.exs` (seeds: 300/301 agamic/sexgen Andricus seedii, 304 undescribed with a code and genus Host, 102 no Hosts, 302 no Sources, plant 10): "Andricus seedii" and "agamic"; "Invalid gall ID" for `/gall/invalid`; "Gall not found" for `/gall/999999999` and `/gall/10`; `/gall/990250` (non-gall redirect row) `redirected_to(conn, 301) == "/articles/gall-lookalikes"`; breadcrumb `a[href='/family/Cynipidae']`, `a[href='/subfamily/Cynipinae']`, `a[href='/tribe/Cynipini']`, `a[href='/genus/Andricus']`, "Tribe:"; `element("div", ~r/Detachable:\s*Detachable/)`, `~r/Abundance:\s*common/`, "Location:"; "Complete" (300) and "In Progress" (301); "Common Name(s):", "seed oak apple", "Synonymy (1)", "Callirhytis seedii"; for 304 no "Common Name(s):", "Synonymy (2)", `tr` `~r/Andricus q-seed-old-label\s*former label/` and `~r/q-seed-code\s*code/`; "Related Galls (1)", `a[href='/gall/301']`; Trait terms: `div` `~r/^\s*Shape:\s*globular \(oval, ovoid\)\s*$/`, `~r/^\s*Color:\s*red\s*$/`, `~r/^\s*Texture:\s*hairless; also described as “reticulate”\s*$/`, `~r/^\s*Walls:\s*described as “papery”\s*$/` (each label and value must stay one `div`); admin: `a[href='/admin/galls/300']` only for admins, `#gall-images a[href='/admin/galls/300#images']`, `a[href='/admin/galls/:id#images']` "Add images" for a Gall without images, no `a[href^='/admin/gallhost']` or `a[href^='/admin/images']`; "The inducer of this gall is unknown or undescribed.", "iNaturalist", "n-densiflorus-seed-gall" (304), no "unknown or undescribed" (300); `page_title` "Andricus seedii (agamic)" and "Not Found"; dead-render HTML contains "Andricus seedii (agamic) - A gall. Detachable."; `a[href='/host/10']` "Notholithocarpus densiflorus", `a[href='/genus/Notholithocarpus']` "(genus-level)"; `#gall-range-map`, "Not an occurrence map", "has not been documented throughout this area"; 102: no `#gall-range-map`, "Range unknown"; "Further Information (2)", `a[href='/source/59']` "Cynipid galls of the seed slope", `a[href='/source/58']` "Gallformers ID Notes", "seed citation", "Our ID Notes may contain important tips"; `element("button", "Show notes")` click → `#source-detail-modal`, "The seed note"; 302 "No further information available"; `?source=` opens `#source-detail-modal` for a citation ("Deep link test description") and for the note (`?source=58`), not for `invalid`, `999999` or none; `#gall-images img[alt]`, "Seed Photographer"; no `#gall-images` for 301.
+- `test/gallformers_web/integration_test.exs:69-97, 116-130, 186-200`: `page_title` contains the full display name (comment: the heading drops the qualifier); "not found" or "Not Found"; `a[href="/host/:id"]` for a species Host; the API v2 gall's `name` appears in the page.
+- `test/e2e/browse/browse_test.exs:46-62, 82-95`: `h2 em` with the name before " (" (`base_name/1`); "not found" in `body`; `click_link(host.name)` from the Gall page lands on a page with `h2` = the Host name.
+- Conformance baseline (`test/support/design_system_baseline.json:335-341`): gall_live.ex has 2 arbitrary values, 11 legacy palette, 52 palette colors, 11 radius, 15 type-scale uses.
+
+## Hard-won lessons
+
+1. Old Gall URLs must keep working: Gall IDs are the old species IDs, and old IDs that became no Gall (non-galls) 301 to the lookalikes Article from a plug, because a LiveView redirect is a 302 (67378c93, 803b §4).
+2. The range map shows where Hosts grow, not where the Gall occurs; the caveat was in a tooltip and was missed, so it became an always-visible alert (b95df017, #560). A Gall with no range data is "Range unknown", never an empty map (missing data is not absence, PR moduledoc). Excluded places are removed before the map, not painted (b2e3c645, "match V1"). A genus Host's range is its whole subtree (803b decision 8).
+3. The map moved to a wider landscape box and `maxZoom` 5 so global ranges keep context (eec81560).
+4. Empty strings are truthy: URL guards must reject `""` (`href=""` reloads the page, cd52132b), and bad URL data must not crash the template (`valid_url?`, d9b244fa).
+5. The JSON-LD `<script>` lives in the root layout so it gets the CSP nonce (ef2a1474).
+6. Undescribed status is taxonomic (no species-rank Inducer), separate from data completeness; the Gallformers Code is a stored field, not derived from the name (60abbf82, after 0ecae7d3's "Unknown (Cynipidae)" stripping bug).
+7. Deep links to one Source's description (`?source=`) and copy-link buttons exist because people share a specific description (e3010f6f, #158); the Source page links into Gall pages that way.
+8. Show 8 Sources at first, always including the Gallformers note; once expanded stay expanded (7aa82be0). The note is found by `note?`, no longer by Source ID 58 (67378c93).
+9. Common names are listed apart from synonyms; former labels and codes go in the names table, never as common names (b2e3c645, 67378c93).
+10. Genus-level Hosts ("Quercus spp") became the genus taxon as Host and link to the genus page, marked "(genus-level)" (41ad2d39, 67378c93).
+11. Trait lines show the Sources' own words under the category and, as text, the words with no category yet (`d213`, 7a701a71).
+12. Admin links must not point at deleted old-domain screens (`/admin/gallhost`, `/admin/species-sources`); they go to `/admin/galls/:id` and `#images` (a075e07a).
+13. `format_fields` once called `Enum.join` on filter maps and 500'd the page (51687779): Trait values are plain strings now.
+
+## Must preserve
+
+- Route `/gall/:id`, integer IDs that are the old species IDs; the non-gall 301 plug; "Invalid gall ID" and "Gall not found" states with a title containing "Not Found" and noindex (decide whether to make them real 404s).
+- `?source=ID` opens that Source's full text and expands the list; invalid or unknown IDs are ignored; copy-link buttons give `origin + /gall/:id?source=:id`.
+- Head: title = full display name; description from the Traits (`for_seo`); canonical `/gall/:id`; first image as og/twitter image; JSON-LD with the nonce; indexed when found.
+- The name with its generation qualifier and the qualifier's definition and glossary link (make it work on focus and touch); the admin edit link to `/admin/galls/:id`; Complete / In Progress with its explanation.
+- Undescribed: the notice, the copyable Gallformers Code with its flash, the iNaturalist observations link (exact URL shape) and the how-it-works Article link; "Formerly tracked as undescribed" with the iNat link for described Galls with a code.
+- The breadcrumb of the Inducer's lineage (family, intermediates, genus), linked by name.
+- Every current Host, by name, species-rank to `/host/:id`, higher ranks to their rank page, genus Hosts marked "(genus-level)".
+- All eleven Trait rows (or an approved "Not recorded" collapse), the Detachable labels, the Sources' terms in parentheses and the "also described as" / "described as" text terms; Abundance.
+- Possible Range: "Range unknown" without data; otherwise the not-an-occurrence alert, the map (in, country-level, introduced; bounds; places clickable to `/place/:code`), the legend when it matters, and the range explanation.
+- Common names; the names table (synonyms with "misapplied" and sensu, former labels, codes; paginated or otherwise bounded); Related Galls for described Galls.
+- The gallery (`#gall-images`, credits per image, lightbox, info, admin ✎ and "Add images" to `/admin/galls/:id#images`).
+- The ID Notes banner: shown with a note, "Show notes" opens it, dismissible, hidden while the note is open.
+- Further Information: order (default, note, title), count, 8 at first keeping the note, "Show all N sources", Source links, author and year, external deep link, Markdown with glossary links, full text with font sizes, license (linked when valid), the empty message.
+- See Also links (iNaturalist, BugGuide, Google Scholar, BHL) by "Genus epithet", hidden for undescribed Galls; Created / Last updated.
+- Events and hooks above (`gallery_index_changed` and `navigate_to_place` in step with their hooks), and the test selectors and texts above or their replacements in updated tests (`#gall-images`, `#gall-range-map`, `#source-detail-modal`, "Show notes", one element per Trait line).
+
+## Approved changes
+- **The Gall page on the design system** (Jeff approved mockup round 3, 2026-11-05). Kept: the route, the non-gall 301 plug, `?source=` opening that Source's full text in the reader (and expanding the list), copy-link buttons, head assigns (title, description from Traits, canonical, first image, JSON-LD), the generation qualifier with its glossary definition, the admin edit link (an Edit button), Complete / In progress with its explanation (a chip with the explanation as a title), the undescribed notice (code copy, iNaturalist link, how-it-works Article) and "Formerly tracked", every current Host and its link ("(genus-level)" kept), all eleven Traits with their Sources' terms and text terms, Abundance, "Range unknown", the map (in, country-level, introduced; places clickable), the legend, common names, synonyms with misapplied/sensu, former labels and codes, Related Galls, the gallery (`#gall-images`, admin edit and "Add images"), the reader dialog `#source-detail-modal` (A−/A+ font sizes, license, external link, Source page, copy link), 8 Sources at first then "Show all N sources", the Source and external links, the empty message, created and updated. Changes:
+  - The name is the page's h1, through `page_header` (italics by `TaxonName`); crumbs from the Inducer's lineage, encoded (`TaxonomyURL.public_path`).
+  - A summary line under the title: the other generation (or "Related galls") linked, common name, season, location, form. The "Related Galls" list at the bottom is gone.
+  - Hosts as a four-column `name_list`; Traits as a `fact_list` with "N of 11 recorded" and the empty ones on one "Not recorded" line; Abundance is a trait row.
+  - The ID Notes are pinned in full in an info panel above the Sources ("Read" opens the reader, as for a Source). The dismissible banner ("Show notes") is gone.
+  - Sources run by year (n.d. last) with an Oldest first / Newest first switch (`sources_order`), not default-then-note-then-title. A row shows year, title, authors, the external and copy-link icons, two plain-text lines and the license; "Read" opens the reader.
+  - The rail: photos, the map card (h-72, framed on the native range; introduced places drawn but not framed), Enlarge (`open_map` / `close_map`) opening a full-size map dialog `#range-dialog`; "Also known as" (common names first, then synonyms, misapplied names, former labels, codes) instead of the paginated Synonymy table; "More info" (`see_also`, text links, not logos); created and updated.
+  - An unknown or malformed ID is a 404 (`GallformersWeb.NotFoundError`), as for the rank pages.
+  - On phones: header, photo, map, then Hosts, Traits, notes, Sources.
+
+- **The admin Gall pages are gone; admin links go to Edit mode** (Jeff, 2026-11-06, matter ec2c). `/admin/galls` and `/admin/galls/:id` were removed: their editing moved onto the Gall page's Edit mode (`/gall/:id?edit`: Inducer, Hosts, Traits, common names, the editorial fields and name parts through the tray; photos, the ID note and range exclusions as dialogs; the lead Source through the tray). Every admin link that went to them (the Gall page's ✎ and "Add images", the Host page's Gall edit links, the review questions' comparison link) now goes to `/gall/:id?edit`; the old URLs redirect there (301), and `/admin/galls` to `/galls`.

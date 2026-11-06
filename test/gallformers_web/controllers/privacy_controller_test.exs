@@ -4,8 +4,13 @@ defmodule GallformersWeb.PrivacyControllerTest do
   test "GET /privacy renders the privacy page", %{conn: conn} do
     conn = get(conn, ~p"/privacy")
 
-    assert html_response(conn, 200) =~ "Privacy Policy"
-    assert html_response(conn, 200) =~ "Privacy-Protecting Analytics"
+    html = html_response(conn, 200)
+    doc = LazyHTML.from_document(html)
+
+    assert doc |> LazyHTML.query("h1") |> LazyHTML.text() |> String.trim() == "Privacy Policy"
+
+    assert doc |> LazyHTML.query(~s{.gf-prose[data-size="lg"] h2}) |> LazyHTML.text() =~
+             "Privacy-Protecting Analytics"
   end
 
   test "GET /privacy sets page metadata", %{conn: conn} do

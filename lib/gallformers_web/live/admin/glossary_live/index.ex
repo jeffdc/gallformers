@@ -1,6 +1,9 @@
 defmodule GallformersWeb.Admin.GlossaryLive.Index do
   @moduledoc """
-  Admin page for listing and managing glossary entries.
+  The glossary admin's list (design system, matter bc0d; the admin list
+  pattern): every entry, filtered by its word, each linked to its form and
+  to where it shows on the site; New entry. Updates live as entries change.
+  Deleting is on an entry's form.
   """
   use GallformersWeb, :live_view
 
@@ -43,22 +46,6 @@ defmodule GallformersWeb.Admin.GlossaryLive.Index do
   end
 
   @impl true
-  def handle_event("delete", %{"id" => id}, socket) do
-    entry = Glossaries.get_glossary!(String.to_integer(id))
-
-    case Glossaries.delete_glossary(entry) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Glossary entry deleted successfully")
-         |> load_glossary()}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete glossary entry")}
-    end
-  end
-
-  @impl true
   def handle_info({event, _entry}, socket)
       when event in [:glossary_created, :glossary_updated, :glossary_deleted] do
     {:noreply, load_glossary(socket)}
@@ -77,97 +64,52 @@ defmodule GallformersWeb.Admin.GlossaryLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="Glossary">
-      <div class="space-y-6">
-        <%!-- Header with search and new button --%>
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex-1 max-w-xl">
-            <form phx-change="search" phx-submit="search" id="glossary-search-form">
-              <.search_input
-                id="glossary-search"
-                name="query"
-                value={@search_query}
-                placeholder="Filter glossary terms..."
-                phx-debounce="300"
-              />
-            </form>
-          </div>
-          <.link navigate={~p"/admin/glossary/new"} class="gf-btn gf-btn-primary">
-            New Entry
-          </.link>
-        </div>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Glossary</:title>
+          <:meta label="Entries">{length(@entries)}</:meta>
+          <:description>
+            Terms linked automatically wherever they appear in descriptions and notes across the site.
+          </:description>
+          <:action>
+            <.button navigate={~p"/admin/glossary/new"} variant="primary" icon="ph-plus">
+              New entry
+            </.button>
+          </:action>
+        </.page_header>
 
-        <%!-- Glossary list table --%>
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table class="gf-table gf-table-dark">
-            <thead>
-              <tr>
-                <th>Word</th>
-                <th>Definition</th>
-                <th class="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={entry <- @entries} id={String.downcase(entry.word)}>
-                <td>
-                  <.link
-                    navigate={~p"/admin/glossary/#{entry.id}"}
-                    class="hover:underline font-medium"
-                  >
-                    {entry.word}
-                  </.link>
-                </td>
-                <td class="text-gray-500">
-                  {truncate(entry.definition, 80)}
-                </td>
-                <td class="text-right">
-                  <.table_actions>
-                    <.action_button
-                      icon="ph-pencil-simple"
-                      label="Edit"
-                      navigate={~p"/admin/glossary/#{entry.id}"}
-                      variant="primary"
-                    />
-                    <.action_button
-                      icon="ph-arrow-square-out"
-                      label="View"
-                      href={"/glossary##{String.downcase(entry.word)}"}
-                    />
-                    <.action_button
-                      icon="ph-trash"
-                      label="Delete"
-                      variant="danger"
-                      phx-click="delete"
-                      phx-value-id={entry.id}
-                      confirm="Are you sure you want to delete this glossary entry?"
-                    />
-                  </.table_actions>
-                </td>
-              </tr>
-              <tr :if={@entries == []}>
-                <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                  No glossary entries found. Try a different search term.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <form id="glossary-search-form" phx-change="search" phx-submit="search" class="max-w-md">
+          <.search_field
+            id="glossary-search"
+            name="query"
+            value={@search_query}
+            label="Filter the glossary"
+            placeholder="Filter the terms"
+          />
+        </form>
 
-        <p class="text-sm text-gray-500">
-          Showing {@entries |> length()} entries
-        </p>
+        <.data_table id="glossary-entries" rows={@entries} row_id={&"entry-#{&1.id}"} compact>
+          <:col :let={entry} label="Word">
+            <.link navigate={~p"/admin/glossary/#{entry.id}"} class="font-semibold">
+              {entry.word}
+            </.link>
+          </:col>
+          <:col :let={entry} label="Definition" grow>
+            <span class="text-ink-2">{entry.definition}</span>
+          </:col>
+          <:col :let={entry} label="On the site">
+            <.link
+              href={"/glossary##{String.downcase(entry.word)}"}
+              title="Where it shows on the site"
+            >
+              View ↗
+            </.link>
+          </:col>
+          <:empty>No entries match.</:empty>
+        </.data_table>
       </div>
     </Layouts.admin>
     """
-  end
-
-  defp truncate(nil, _), do: ""
-
-  defp truncate(string, max_length) do
-    if String.length(string) > max_length do
-      String.slice(string, 0, max_length) <> "..."
-    else
-      string
-    end
   end
 end

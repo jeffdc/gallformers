@@ -560,11 +560,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditor do
 
   def editor(assigns) do
     ~H"""
-    <div id="host-range-editor">
+    <div id="host-range-editor" class="flex flex-col gap-block">
       <%!-- WCVP Refresh --%>
-      <div :if={@refreshable && @wcvp_available} class="mb-4">
+      <div :if={@refreshable && @wcvp_available}>
         <%= if @wcvp_refreshing do %>
-          <div id="wcvp-refresh-loading" class="flex items-center gap-2 text-sm text-gray-500">
+          <div id="wcvp-refresh-loading" class="flex items-center gap-2 text-meta text-muted">
             <.loading_spinner size="sm" label="Refreshing from WCVP..." />
             <span>Refreshing from WCVP...</span>
           </div>
@@ -595,11 +595,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditor do
       </div>
 
       <%!-- Range Map Section --%>
-      <div class="mb-3 border border-gray-300 rounded">
+      <div class="rounded-panel border border-line">
         <div class="grid grid-cols-6 gap-2 p-3">
           <%!-- Legend --%>
           <div class="col-span-1">
-            <div class="text-sm font-medium text-gray-700 mb-2">Legend:</div>
+            <div class="mb-2 text-meta font-semibold text-ink-2">Legend:</div>
             <.range_map_legend mode={:host_admin} />
           </div>
           <%!-- Map + Drill-down panel --%>
@@ -614,7 +614,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditor do
                   introduced_range={@introduced_range}
                   bounds={@range_bounds}
                   editable
-                  class="border border-gray-300 rounded bg-gray-50 min-h-[500px]"
+                  class="min-h-125 rounded-panel border border-line bg-surface-2"
                 />
               </div>
               <.live_component
@@ -628,83 +628,70 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditor do
         </div>
       </div>
 
-      <.modal
+      <.dialog
         :if={@wcvp_nomatch_search}
         id="wcvp-nomatch-modal"
+        title="No exact match found"
         show
         on_cancel={JS.push("cancel_wcvp_search")}
-        class="gf-modal-md"
       >
-        <:header>No exact match found</:header>
-        <:body>
-          <p class="text-gray-600 mb-4">
-            No exact match found in WCVP for <span class="italic font-medium">{@range_taxon_name}</span>. Search below to find the correct entry.
-          </p>
-          <div id="wcvp-nomatch-search">
-            <input
-              type="text"
-              value={@wcvp_nomatch_search.query}
-              phx-keyup="wcvp_nomatch_search"
-              phx-debounce="300"
-              placeholder="Search WCVP..."
-              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              autofocus
-            />
-            <div
-              :if={@wcvp_searching}
-              id="wcvp-nomatch-loading"
-              class="flex items-center gap-2 mt-2 text-sm text-gray-500"
-            >
-              <.loading_spinner size="sm" label="Searching..." />
-              <span>Searching...</span>
-            </div>
-            <ul
-              :if={!@wcvp_searching && @wcvp_nomatch_search.results != []}
-              class="mt-2 max-h-60 overflow-y-auto border border-gray-200 rounded-md divide-y divide-gray-100"
-            >
-              <li
-                :for={result <- @wcvp_nomatch_search.results}
-                phx-click="select_wcvp_nomatch"
-                phx-value-id={result.plant_name_id}
-                class={[
-                  "px-3 py-2 cursor-pointer text-sm hover:bg-blue-50",
-                  @wcvp_nomatch_search.selected == result.plant_name_id &&
-                    "bg-blue-100 font-medium"
-                ]}
-              >
-                <span class="italic">{result.taxon_name}</span>
-              </li>
-            </ul>
-            <p
-              :if={
-                !@wcvp_searching && @wcvp_nomatch_search.results == [] &&
-                  String.length(@wcvp_nomatch_search.query) >= 2
-              }
-              class="mt-2 text-sm text-gray-500"
-            >
-              No results found.
-            </p>
-          </div>
-        </:body>
-        <:footer>
-          <button
-            type="button"
-            phx-click="cancel_wcvp_search"
-            class="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+        <p class="mb-4 text-ink-2">
+          No exact match found in WCVP for <span class="italic font-semibold">{@range_taxon_name}</span>. Search below to find the correct entry.
+        </p>
+        <div id="wcvp-nomatch-search">
+          <input
+            type="text"
+            value={@wcvp_nomatch_search.query}
+            phx-keyup="wcvp_nomatch_search"
+            phx-debounce="300"
+            placeholder="Search WCVP..."
+            aria-label="Search WCVP"
+            class="gf-input"
+            autofocus
+          />
+          <div
+            :if={@wcvp_searching}
+            id="wcvp-nomatch-loading"
+            class="mt-2 flex items-center gap-2 text-meta text-muted"
           >
-            Cancel
-          </button>
-          <button
-            type="button"
+            <.loading_spinner size="sm" label="Searching..." />
+            <span>Searching...</span>
+          </div>
+          <ul
+            :if={!@wcvp_searching && @wcvp_nomatch_search.results != []}
+            class="mt-2 max-h-60 divide-y divide-line overflow-y-auto rounded-ctl border border-line"
+          >
+            <li
+              :for={result <- @wcvp_nomatch_search.results}
+              phx-click="select_wcvp_nomatch"
+              phx-value-id={result.plant_name_id}
+              class={[
+                "cursor-pointer px-3 py-2 text-ui",
+                if(@wcvp_nomatch_search.selected == result.plant_name_id,
+                  do: "bg-sky font-semibold",
+                  else: "hover:bg-sky-soft"
+                )
+              ]}
+            >
+              <span class="italic">{result.taxon_name}</span>
+            </li>
+          </ul>
+          <p
+            :if={
+              !@wcvp_searching && @wcvp_nomatch_search.results == [] &&
+                String.length(@wcvp_nomatch_search.query) >= 2
+            }
+            class="mt-2 text-meta text-muted"
+          >
+            No results found.
+          </p>
+        </div>
+        <:actions>
+          <.button phx-click="cancel_wcvp_search">Cancel</.button>
+          <.button
+            variant="primary"
             phx-click="continue_wcvp_search"
             disabled={is_nil(@wcvp_nomatch_search.selected) || @wcvp_loading}
-            class={[
-              "px-4 py-2 rounded-md",
-              if(@wcvp_nomatch_search.selected && !@wcvp_loading,
-                do: "bg-blue-600 text-white hover:bg-blue-700",
-                else: "bg-gray-300 text-gray-500 cursor-not-allowed"
-              )
-            ]}
           >
             <%= if @wcvp_loading do %>
               <span class="flex items-center gap-2">
@@ -713,9 +700,9 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditor do
             <% else %>
               Continue
             <% end %>
-          </button>
-        </:footer>
-      </.modal>
+          </.button>
+        </:actions>
+      </.dialog>
     </div>
     """
   end

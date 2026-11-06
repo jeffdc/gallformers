@@ -447,13 +447,12 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
       )
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={"#{@name} · Facts"}>
-      <:page_title_html>
-        <.link navigate={~p"/admin/review"} class="hover:underline">Sources to review</.link>
-        <span class="text-gray-400">›</span>
-        <.link navigate={@base} class="hover:underline">{@name}</.link>
-        <span class="text-gray-400">›</span> <span>Facts</span>
-      </:page_title_html>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <.page_header>
+        <:crumb navigate={~p"/admin/review"}>Sources to review</:crumb>
+        <:crumb navigate={@base}>{@name}</:crumb>
+        <:title>Facts</:title>
+      </.page_header>
 
       <.review_source_head
         name={@name}
@@ -471,8 +470,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
       />
 
       <div id="facts-head" class="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 class="text-2xl font-semibold text-gf-maroon">Facts</h2>
-        <p class="text-sm text-gray-600">
+        <h2 class="text-section text-ink">Facts</h2>
+        <p class="text-meta text-ink-2">
           <%= case @view do %>
             <% {:preview, _} -> %>
               Every Fact approving would write, given the answers so far, by Gall. Looking is optional.
@@ -485,7 +484,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
         <span
           :if={@loading and @facts}
           id="facts-updating"
-          class="inline-flex items-center gap-1 text-xs text-gray-500"
+          class="inline-flex items-center gap-1 text-caption text-muted"
         >
           <.loading_spinner size="sm" label="Updating" /> Updating…
         </span>
@@ -494,19 +493,25 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
       <div
         :if={@facts == nil and @loading}
         id="facts-loading"
-        class="mt-6 flex items-center gap-2 text-sm text-gray-600"
+        class="mt-6 flex items-center gap-2 text-meta text-ink-2"
       >
         <.loading_spinner size="sm" /> Working out what approving writes…
       </div>
 
-      <.error_message
+      <.notice
         :if={@failed}
         id="facts-failed"
+        kind={:danger}
         class="mt-4"
         title="The Facts could not be worked out"
-        message={@failed}
-        on_retry={JS.push("retry")}
-      />
+      >
+        {@failed}
+        <:action>
+          <.button size="sm" icon="ph-arrows-clockwise" phx-click={JS.push("retry")}>
+            Retry
+          </.button>
+        </:action>
+      </.notice>
 
       <%= if @facts do %>
         <%= case @view do %>
@@ -517,9 +522,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
               steps={readiness_steps(@facts.blocking, @entries, @base)}
               blocked={@facts.blocking.blocked_batches}
             />
-            <.alert :if={@facts.errors != []} id="facts-errors" variant="error" class="mt-3">
+            <.notice :if={@facts.errors != []} id="facts-errors" kind={:danger} class="mt-3">
               <p :for={e <- @facts.errors}>{e.file} could not be worked out: {inspect(e.reason)}</p>
-            </.alert>
+            </.notice>
             <.facts_filter counts={@facts.counts} filter={@filter} on_filter="filter" />
             <div class="mt-3 grid gap-3">
               <.facts_taxonomy
@@ -565,12 +570,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
               </.facts_view>
             </div>
           <% {:applied, _} -> %>
-            <p
-              id="facts-applied"
-              class="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900"
-            >
+            <.notice id="facts-applied" kind={:ok} class="mt-4">
               This Source is approved and applied: these are its Facts in Gallformers. Read-only.
-            </p>
+            </.notice>
             <.facts_view
               galls={@facts.galls}
               mode={:applied}
@@ -598,9 +600,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
       for={%{}}
       id="fact-editor"
       phx-submit="edit_save"
-      class="grid gap-2 rounded-md border border-gray-200 bg-gray-50 p-2"
+      class="grid gap-2 rounded-panel border border-line bg-surface-2 p-2"
     >
-      <p class="text-xs font-semibold text-gray-700">{editor_title(@kind)}</p>
+      <p class="text-caption font-semibold text-ink-2">{editor_title(@kind)}</p>
       <.typeahead
         :if={@kind == "host"}
         id="fact-editor-plant"
@@ -617,7 +619,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
       >
         <:result :let={result}>
           <span class="italic">{result.name}</span>
-          <span :if={result.meta != ""} class="text-xs text-gray-500 ml-1">{result.meta}</span>
+          <span :if={result.meta != ""} class="text-caption text-muted ml-1">{result.meta}</span>
         </:result>
       </.typeahead>
       <.review_value_list
@@ -632,9 +634,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
         <label for="fact-editor-note" class="gf-label-sm">
           Note{if @kind != "note", do: " (optional)"}
         </label>
-        <textarea id="fact-editor-note" name="note" rows="2" class="gf-textarea text-sm">{@pick.note}</textarea>
+        <textarea id="fact-editor-note" name="note" rows="2" class="gf-textarea text-ui">{@pick.note}</textarea>
       </div>
-      <p :if={@error} id="fact-editor-error" class="text-xs text-red-700">{@error}</p>
+      <p :if={@error} id="fact-editor-error" class="text-caption text-danger">{@error}</p>
       <div class="flex flex-wrap gap-2">
         <.button id="fact-editor-save" type="submit" size="sm" variant="primary">
           {save_text(@kind)}

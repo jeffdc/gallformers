@@ -446,10 +446,13 @@ defmodule GallformersWeb.Admin.FormHelpers do
   end
 
   use Phoenix.Component
-  import GallformersWeb.CoreComponents, only: [modal: 1]
+  import GallformersWeb.ActionComponents, only: [button: 1]
+  import GallformersWeb.FeedbackComponents, only: [dialog: 1]
 
   @doc """
-  Renders the discard confirmation modal.
+  Renders the discard confirmation: a `dialog` asking before unsaved
+  changes are thrown away. "Keep editing" (and Escape, the backdrop or
+  Close) sends `cancel_discard`; "Discard changes" sends `confirm_discard`.
 
   ## Example
 
@@ -460,36 +463,22 @@ defmodule GallformersWeb.Admin.FormHelpers do
 
   def discard_confirm_modal(assigns) do
     ~H"""
-    <.modal
+    <.dialog
       :if={@show}
       id="discard-confirm-modal"
+      title="Discard your changes?"
+      size={:sm}
       show
       on_cancel={Phoenix.LiveView.JS.push("cancel_discard")}
-      class="gf-modal-md"
     >
-      <:header>Discard Changes?</:header>
-      <:body>
-        <p class="text-gray-600 mb-4">
-          You have unsaved changes. Are you sure you want to discard them?
-        </p>
-      </:body>
-      <:footer>
-        <button
-          type="button"
-          phx-click="cancel_discard"
-          class="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-        >
-          Keep Editing
-        </button>
-        <button
-          type="button"
-          phx-click="confirm_discard"
-          class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-        >
-          Discard Changes
-        </button>
-      </:footer>
-    </.modal>
+      <p>You have unsaved changes. Are you sure you want to discard them?</p>
+      <:actions>
+        <.button type="button" variant="ghost" phx-click="cancel_discard">Keep editing</.button>
+        <.button type="button" variant="danger" phx-click="confirm_discard">
+          Discard changes
+        </.button>
+      </:actions>
+    </.dialog>
     """
   end
 end

@@ -412,16 +412,16 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   defp wcvp_badges(host) do
     cond do
       host.wcvp_id not in [nil, ""] and host.wcvp_match_status == "ignored" ->
-        [{"linked", "info"}, {"ignored", "warning"}]
+        [{"linked", :info}, {"ignored", :warn}]
 
       host.wcvp_id not in [nil, ""] ->
-        [{"linked", "info"}]
+        [{"linked", :info}]
 
       host.wcvp_match_status == "no_match" ->
-        [{"no match", "warning"}]
+        [{"no match", :warn}]
 
       host.wcvp_match_status == "ignored" ->
-        [{"ignored", "warning"}]
+        [{"ignored", :warn}]
 
       true ->
         []
@@ -485,334 +485,269 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <div class="max-w-7xl mx-auto">
-        <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded flex items-center gap-4">
-          <span class="text-sm font-medium text-gray-700">Quick Links:</span>
-          <.link navigate={~p"/admin"} class="text-sm hover:underline">← Back to Admin</.link>
-          <.link navigate={~p"/admin/taxonomy"} class="text-sm hover:underline">Taxonomy</.link>
-        </div>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin"}>Dashboard</:crumb>
+          <:title>Host Range Review</:title>
+          <:meta label="Hosts">{@total_count}</:meta>
+          <:meta :if={@wcvp_built_at} label="WCVP data">
+            {format_date(@wcvp_built_at, :short)}
+          </:meta>
+          <:description>
+            Hosts needing range attention are listed below. Click a host name to
+            edit its range, or select multiple hosts for bulk actions.
+          </:description>
+          <:action>
+            <.button navigate={~p"/admin/taxonomy"}>Taxonomy</.button>
+          </:action>
+        </.page_header>
 
-        <div class="bg-white border border-gray-200 rounded shadow-sm">
-          <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-            <h4 class="text-lg font-semibold text-gf-maroon">Host Range Review</h4>
-            <span class="text-sm text-gray-500">
-              {@total_count} host(s)
-              <span :if={@wcvp_built_at} class="text-xs text-gray-400 ml-2">
-                WCVP data: {format_date(@wcvp_built_at, :short)}
-              </span>
+        <div class="flex flex-col gap-block">
+          <%!-- Filter bar --%>
+          <div class="flex flex-wrap items-end gap-3">
+            <form phx-change="filter" id="filter" class="w-40">
+              <.input
+                type="select"
+                id="host-range-status"
+                name="value"
+                label="Status"
+                options={[
+                  {"Unconfirmed", "unconfirmed"},
+                  {"Confirmed", "confirmed"},
+                  {"All", "all"}
+                ]}
+                value={@filter}
+              />
+            </form>
+
+            <form phx-change="wcvp_filter" id="wcvp_filter" class="w-36">
+              <.input
+                type="select"
+                id="host-range-match"
+                name="value"
+                label="Match"
+                options={[
+                  {"Default", "active"},
+                  {"Linked", "linked"},
+                  {"Unmatched", "unmatched"},
+                  {"No match", "no_match"},
+                  {"Ignored", "ignored"},
+                  {"All", "all"}
+                ]}
+                value={@wcvp_filter}
+              />
+            </form>
+
+            <form phx-change="range_filter" id="range_filter" class="w-36">
+              <.input
+                type="select"
+                id="host-range-range"
+                name="value"
+                label="Range"
+                options={[{"All", "all"}, {"Has range", "yes"}, {"No range", "no"}]}
+                value={@range_filter}
+              />
+            </form>
+
+            <form phx-change="sync_status_filter" id="sync_status_filter" class="w-36">
+              <.input
+                type="select"
+                id="host-range-sync"
+                name="value"
+                label="Sync"
+                options={[
+                  {"All", "all"},
+                  {"Never synched", "never"},
+                  {"Stale", "stale"},
+                  {"Current", "current"}
+                ]}
+                value={@sync_status}
+              />
+            </form>
+
+            <.search_field
+              id="host-range-search"
+              name="value"
+              value={@search}
+              label="Search hosts"
+              placeholder="Search by host name, genus, or family..."
+              class="w-80 max-w-full"
+              phx-keyup="search"
+            />
+          </div>
+
+          <div
+            :if={@superadmin? and is_nil(@processing)}
+            class="flex flex-wrap items-center gap-3"
+          >
+            <.button icon="ph-link" phx-click="match_all_filtered">
+              Match All Filtered to WCVP
+            </.button>
+            <span class="text-caption text-muted">
+              Super Admin only. Uses the current filters across all pages.
             </span>
           </div>
 
-          <div class="p-4">
-            <p class="text-sm text-gray-600 mb-4">
-              Hosts needing range attention are listed below. Click a host name to
-              edit its range, or select multiple hosts for bulk actions.
-            </p>
-
-            <%!-- Filter bar --%>
-            <div class="mb-4 flex flex-wrap items-center gap-4">
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700">Status:</label>
-                <form phx-change="filter" id="filter" class="w-40">
-                  <.input
-                    type="select"
-                    name="value"
-                    options={[
-                      {"Unconfirmed", "unconfirmed"},
-                      {"Confirmed", "confirmed"},
-                      {"All", "all"}
-                    ]}
-                    value={@filter}
-                  />
-                </form>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700">Match:</label>
-                <form phx-change="wcvp_filter" id="wcvp_filter" class="w-36">
-                  <.input
-                    type="select"
-                    name="value"
-                    options={[
-                      {"Default", "active"},
-                      {"Linked", "linked"},
-                      {"Unmatched", "unmatched"},
-                      {"No match", "no_match"},
-                      {"Ignored", "ignored"},
-                      {"All", "all"}
-                    ]}
-                    value={@wcvp_filter}
-                  />
-                </form>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700">Range:</label>
-                <form phx-change="range_filter" id="range_filter" class="w-35">
-                  <.input
-                    type="select"
-                    name="value"
-                    options={[{"All", "all"}, {"Has range", "yes"}, {"No range", "no"}]}
-                    value={@range_filter}
-                  />
-                </form>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700">Sync:</label>
-                <form phx-change="sync_status_filter" id="sync_status_filter" class="w-35">
-                  <.input
-                    type="select"
-                    name="value"
-                    options={[
-                      {"All", "all"},
-                      {"Never synched", "never"},
-                      {"Stale", "stale"},
-                      {"Current", "current"}
-                    ]}
-                    value={@sync_status}
-                  />
-                </form>
-              </div>
-
-              <.search_input
-                id="host-range-search"
-                name="value"
-                value={@search}
-                placeholder="Search by host name, genus, or family..."
-                size={:sm}
-                phx-keyup="search"
-                phx-debounce="300"
-              />
-            </div>
-
-            <div
-              :if={@superadmin? and is_nil(@processing)}
-              class="mb-4 flex items-center gap-3"
+          <%!-- Sync progress --%>
+          <.notice :if={@processing} kind={:info} icon="ph-arrows-clockwise">
+            {processing_label(@processing)}: {@processing.done} / {@processing.total}
+            <progress
+              class="mt-2 block h-2 w-full accent-brand"
+              value={@processing.done}
+              max={max(@processing.total, 1)}
             >
-              <button
-                type="button"
-                phx-click="match_all_filtered"
-                class="gf-btn gf-btn-secondary text-sm"
-              >
-                <.icon name="ph-link" class="h-4 w-4 inline" /> Match All Filtered to WCVP
-              </button>
-              <span class="text-xs text-gray-500">
-                Super Admin only. Uses the current filters across all pages.
-              </span>
-            </div>
+              {@processing.done} / {@processing.total}
+            </progress>
+          </.notice>
 
-            <%!-- Sync progress bar --%>
-            <div :if={@processing} class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <div class="flex items-center gap-2 text-sm text-blue-800">
-                <.icon name="ph-arrows-clockwise" class="h-4 w-4 animate-spin" />
-                {processing_label(@processing)}: {@processing.done} / {@processing.total}
-              </div>
-              <div class="mt-2 w-full bg-blue-200 rounded-full h-2">
-                <div
-                  class="bg-blue-600 h-2 rounded-full transition-all"
-                  style={"width: #{if @processing.total > 0, do: @processing.done / @processing.total * 100, else: 0}%"}
-                >
-                </div>
-              </div>
-            </div>
-
-            <%!-- Bulk actions --%>
-            <div
-              :if={MapSet.size(@selected_ids) > 0 and is_nil(@processing)}
-              class="mb-4 flex items-center gap-3"
-            >
-              <button
-                type="button"
-                phx-click="confirm_selected"
-                class="gf-btn gf-btn-primary text-sm"
-              >
-                <.icon name="ph-check" class="h-4 w-4 inline" />
+          <%!-- Selection and bulk actions --%>
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="mr-2 inline-flex cursor-pointer items-center gap-2 text-ui text-ink-2">
+              <input
+                type="checkbox"
+                id="host-range-select-all"
+                checked={MapSet.size(@selected_ids) == length(@hosts) and length(@hosts) > 0}
+                phx-click={
+                  if MapSet.size(@selected_ids) == length(@hosts),
+                    do: "deselect_all",
+                    else: "select_all"
+                }
+                class="gf-checkbox"
+                disabled={@processing != nil}
+              /> Select all on this page
+            </label>
+            <%= if MapSet.size(@selected_ids) > 0 and is_nil(@processing) do %>
+              <.button variant="primary" icon="ph-check" phx-click="confirm_selected">
                 Confirm Selected ({MapSet.size(@selected_ids)})
-              </button>
-              <button
-                type="button"
-                phx-click="match_selected"
-                class="gf-btn gf-btn-secondary text-sm"
-              >
-                <.icon name="ph-link" class="h-4 w-4 inline" /> Match Selected to WCVP
-              </button>
-              <button
-                type="button"
-                phx-click="sync_selected"
-                class="gf-btn gf-btn-secondary text-sm"
-              >
-                <.icon name="ph-arrows-clockwise" class="h-4 w-4 inline" /> Sync Selected from WCVP
-              </button>
-              <button
-                type="button"
-                phx-click="ignore_selected"
-                class="text-sm text-gray-600 hover:underline"
-              >
-                Ignore Selected
-              </button>
-              <button
-                type="button"
-                phx-click="unignore_selected"
-                class="text-sm text-gray-600 hover:underline"
-              >
-                Clear Match Status
-              </button>
-              <button
-                type="button"
-                phx-click="deselect_all"
-                class="text-sm text-gray-600 hover:underline"
-              >
-                Clear selection
-              </button>
-            </div>
-
-            <%!-- Table --%>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b border-gray-200 text-left">
-                    <th class="pb-2 pr-4 w-8">
-                      <input
-                        type="checkbox"
-                        checked={MapSet.size(@selected_ids) == length(@hosts) and length(@hosts) > 0}
-                        phx-click={
-                          if MapSet.size(@selected_ids) == length(@hosts),
-                            do: "deselect_all",
-                            else: "select_all"
-                        }
-                        class="rounded border-gray-300"
-                        disabled={@processing != nil}
-                      />
-                    </th>
-                    <th class="pb-2 pr-4">Host</th>
-                    <th class="pb-2 pr-4">Family</th>
-                    <th class="pb-2 pr-4">Genus</th>
-                    <th class="pb-2 pr-4 text-center">Range</th>
-                    <th class="pb-2 pr-4 text-center">WCVP</th>
-                    <th class="pb-2 pr-4">Last Synced</th>
-                    <th class="pb-2 pr-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr :for={host <- @hosts} class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="py-2 pr-4">
-                      <input
-                        type="checkbox"
-                        checked={MapSet.member?(@selected_ids, host.id)}
-                        phx-click="toggle_select"
-                        phx-value-id={host.id}
-                        class="rounded border-gray-300"
-                        disabled={@processing != nil}
-                      />
-                    </td>
-                    <td class="py-2 pr-4">
-                      <.link navigate={~p"/admin/taxonomy/#{host.id}"} class="hover:underline">
-                        <.taxon_name name={host.name} />
-                      </.link>
-                    </td>
-                    <td class="py-2 pr-4 text-gray-600">{host.family_name || "—"}</td>
-                    <td class="py-2 pr-4 text-gray-600">{host.genus_name || "—"}</td>
-                    <td class="py-2 pr-4 text-center text-gray-600">{host.range_count}</td>
-                    <td class="py-2 pr-4 text-center">
-                      <div class="flex items-center justify-center gap-1">
-                        <.badge :for={{label, variant} <- wcvp_badges(host)} variant={variant}>
-                          {label}
-                        </.badge>
-                        <span :if={wcvp_badges(host) == []} class="text-gray-400">—</span>
-                      </div>
-                    </td>
-                    <td class="py-2 pr-4 text-gray-600">{format_synced_at(host.wcvp_synced_at)}</td>
-                    <td class="py-2 pr-4 text-center">
-                      <.badge :if={host.range_confirmed} variant="success">Confirmed</.badge>
-                      <.badge :if={!host.range_confirmed} variant="warning">Needs Review</.badge>
-                    </td>
-                  </tr>
-                  <tr :if={@hosts == []}>
-                    <td colspan="8" class="py-8 text-center text-gray-500">
-                      {cond do
-                        @search != "" -> "No hosts match your search"
-                        @wcvp_filter == :ignored -> "No ignored hosts found"
-                        @filter == :unconfirmed -> "All host ranges confirmed!"
-                        true -> "No hosts found"
-                      end}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <%= if ceil(@total_count / @page_size) > 1 do %>
-              <.pagination
-                page={@current_page}
-                total_pages={ceil(@total_count / @page_size)}
-                total_items={@total_count}
-                page_size={@page_size}
-                on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
-              />
-            <% else %>
-              <p class="text-sm text-gray-500 mt-2">
-                Showing {@total_count} host(s)
-              </p>
+              </.button>
+              <.button icon="ph-link" phx-click="match_selected">
+                Match Selected to WCVP
+              </.button>
+              <.button icon="ph-arrows-clockwise" phx-click="sync_selected">
+                Sync Selected from WCVP
+              </.button>
+              <.button variant="ghost" phx-click="ignore_selected">Ignore Selected</.button>
+              <.button variant="ghost" phx-click="unignore_selected">Clear Match Status</.button>
+              <.button variant="ghost" phx-click="deselect_all">Clear selection</.button>
             <% end %>
           </div>
+
+          <%!-- Table --%>
+          <.data_table id="host-range-hosts" rows={@hosts} row_id={&"host-#{&1.id}"}>
+            <:col :let={host}>
+              <input
+                type="checkbox"
+                checked={MapSet.member?(@selected_ids, host.id)}
+                phx-click="toggle_select"
+                phx-value-id={host.id}
+                aria-label={"Select #{host.name}"}
+                class="gf-checkbox align-middle"
+                disabled={@processing != nil}
+              />
+            </:col>
+            <:col :let={host} label="Host" grow>
+              <.link navigate={~p"/admin/taxonomy/#{host.id}"}>
+                <.taxon_name name={host.name} />
+              </.link>
+            </:col>
+            <:col :let={host} label="Family">
+              <span class="text-ink-2">{host.family_name || "—"}</span>
+            </:col>
+            <:col :let={host} label="Genus">
+              <span class="text-ink-2">{host.genus_name || "—"}</span>
+            </:col>
+            <:col :let={host} label="Range" numeric>
+              <span class="text-ink-2">{host.range_count}</span>
+            </:col>
+            <:col :let={host} label="WCVP">
+              <div class="flex items-center gap-1">
+                <.chip :for={{label, variant} <- wcvp_badges(host)} variant={variant} size="sm">
+                  {label}
+                </.chip>
+                <span :if={wcvp_badges(host) == []} class="text-muted">—</span>
+              </div>
+            </:col>
+            <:col :let={host} label="Last Synced">
+              <span class="text-ink-2">{format_synced_at(host.wcvp_synced_at)}</span>
+            </:col>
+            <:col :let={host} label="Status">
+              <.chip :if={host.range_confirmed} variant={:ok} size="sm">Confirmed</.chip>
+              <.chip :if={!host.range_confirmed} variant={:warn} size="sm">Needs Review</.chip>
+            </:col>
+            <:empty>
+              {cond do
+                @search != "" -> "No hosts match your search"
+                @wcvp_filter == :ignored -> "No ignored hosts found"
+                @filter == :unconfirmed -> "All host ranges confirmed!"
+                true -> "No hosts found"
+              end}
+            </:empty>
+            <:footer>
+              <%= if ceil(@total_count / @page_size) > 1 do %>
+                <.pagination
+                  page={@current_page}
+                  total_pages={ceil(@total_count / @page_size)}
+                  total_items={@total_count}
+                  page_size={@page_size}
+                  on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+                />
+              <% else %>
+                Showing {@total_count} host(s)
+              <% end %>
+            </:footer>
+          </.data_table>
         </div>
       </div>
 
-      <%!-- Confirmation modal --%>
-      <.modal
+      <%!-- Confirmation dialogs --%>
+      <.dialog
         :if={@confirm_action == :confirm}
         id="confirm-modal"
+        title="Confirm Host Ranges"
+        size={:sm}
         show
         on_cancel={JS.push("cancel_confirm")}
       >
-        <:header>Confirm Host Ranges</:header>
-        <:body>
-          <p class="text-gray-600">
-            Mark range as confirmed for <strong>{MapSet.size(@selected_ids)}</strong> host(s)?
-          </p>
-        </:body>
-        <:footer>
-          <.button type="button" variant="secondary" phx-click="cancel_confirm">Cancel</.button>
-          <.button type="button" variant="primary" phx-click="do_confirm_selected">
-            Confirm
-          </.button>
-        </:footer>
-      </.modal>
+        <p class="text-ink-2">
+          Mark range as confirmed for <strong>{MapSet.size(@selected_ids)}</strong> host(s)?
+        </p>
+        <:actions>
+          <.button phx-click="cancel_confirm">Cancel</.button>
+          <.button variant="primary" phx-click="do_confirm_selected">Confirm</.button>
+        </:actions>
+      </.dialog>
 
-      <.modal
+      <.dialog
         :if={@confirm_action == :sync}
         id="sync-confirm-modal"
+        title="Sync from WCVP"
+        size={:sm}
         show
         on_cancel={JS.push("cancel_confirm")}
       >
-        <:header>Sync from WCVP</:header>
-        <:body>
-          <p class="text-gray-600">
+        <div class="flex flex-col gap-2">
+          <p class="text-ink-2">
             Sync range data from WCVP for <strong>{MapSet.size(@selected_ids)}</strong> host(s)?
           </p>
-          <p class="text-sm text-gray-500 mt-2">
-            Hosts without a WCVP match will be skipped.
-          </p>
-        </:body>
-        <:footer>
-          <.button type="button" variant="secondary" phx-click="cancel_confirm">Cancel</.button>
-          <.button type="button" variant="primary" phx-click="do_sync_selected">
-            Sync
-          </.button>
-        </:footer>
-      </.modal>
+          <p class="text-meta text-muted">Hosts without a WCVP match will be skipped.</p>
+        </div>
+        <:actions>
+          <.button phx-click="cancel_confirm">Cancel</.button>
+          <.button variant="primary" phx-click="do_sync_selected">Sync</.button>
+        </:actions>
+      </.dialog>
 
-      <.modal
+      <.dialog
         :if={@confirm_action in [:match, :match_filtered]}
         id="match-confirm-modal"
+        title="Match to WCVP"
+        size={:sm}
         show
         on_cancel={JS.push("cancel_confirm")}
       >
-        <:header>Match to WCVP</:header>
-        <:body>
-          <p class="text-gray-600">
+        <div class="flex flex-col gap-2">
+          <p class="text-ink-2">
             Match {if @confirm_action == :match_filtered,
               do: "all currently filtered",
               else: "selected"} host(s) to WCVP for
@@ -823,17 +758,16 @@ defmodule GallformersWeb.Admin.HostRangeLive do
             </strong>
             host(s)?
           </p>
-          <p class="text-sm text-gray-500 mt-2">
+          <p class="text-meta text-muted">
             This only stores WCVP and POWO IDs. It does not sync range data.
           </p>
-          <p :if={@confirm_action == :match_filtered} class="text-sm text-gray-500 mt-2">
+          <p :if={@confirm_action == :match_filtered} class="text-meta text-muted">
             The current filters apply across all pages, not just the visible rows.
           </p>
-        </:body>
-        <:footer>
-          <.button type="button" variant="secondary" phx-click="cancel_confirm">Cancel</.button>
+        </div>
+        <:actions>
+          <.button phx-click="cancel_confirm">Cancel</.button>
           <.button
-            type="button"
             variant="primary"
             phx-click={
               if @confirm_action == :match_filtered,
@@ -843,102 +777,101 @@ defmodule GallformersWeb.Admin.HostRangeLive do
           >
             Match
           </.button>
-        </:footer>
-      </.modal>
+        </:actions>
+      </.dialog>
 
-      <%!-- Sync results modal --%>
-      <.modal
+      <%!-- Result dialogs --%>
+      <.dialog
         :if={@sync_results}
         id="sync-results-modal"
+        title="WCVP Sync Complete"
+        size={:sm}
         show
         on_cancel={JS.push("dismiss_sync_results")}
       >
-        <:header>WCVP Sync Complete</:header>
-        <:body>
-          <div class="space-y-3">
-            <div class="flex items-center gap-2 text-green-700">
-              <.icon name="ph-check-circle" class="h-5 w-5" />
-              <span><strong>{@sync_results.synced}</strong> host(s) synced</span>
-            </div>
-            <div :if={@sync_results.no_match != []} class="text-amber-700">
-              <div class="flex items-center gap-2">
-                <.icon name="ph-warning" class="h-5 w-5" />
-                <span><strong>{length(@sync_results.no_match)}</strong> not matched:</span>
-              </div>
-              <ul class="ml-7 mt-1 text-sm list-disc">
-                <li :for={name <- @sync_results.no_match}>
-                  <.taxon_name name={name} />
-                </li>
-              </ul>
-            </div>
-            <div :if={@sync_results.failed != []} class="text-red-700">
-              <div class="flex items-center gap-2">
-                <.icon name="ph-x-circle" class="h-5 w-5" />
-                <span><strong>{length(@sync_results.failed)}</strong> failed:</span>
-              </div>
-              <ul class="ml-7 mt-1 text-sm list-disc">
-                <li :for={name <- @sync_results.failed}>
-                  <.taxon_name name={name} />
-                </li>
-              </ul>
-            </div>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2 text-ok">
+            <.icon name="ph-check-circle" class="size-5" />
+            <span><strong>{@sync_results.synced}</strong> host(s) synced</span>
           </div>
-        </:body>
-        <:footer>
-          <.button type="button" variant="primary" phx-click="dismiss_sync_results">
-            Close
-          </.button>
-        </:footer>
-      </.modal>
+          <.result_names
+            :if={@sync_results.no_match != []}
+            kind={:warn}
+            names={@sync_results.no_match}
+            label="not matched"
+          />
+          <.result_names
+            :if={@sync_results.failed != []}
+            kind={:danger}
+            names={@sync_results.failed}
+            label="failed"
+          />
+        </div>
+        <:actions>
+          <.button variant="primary" phx-click="dismiss_sync_results">Close</.button>
+        </:actions>
+      </.dialog>
 
-      <.modal
+      <.dialog
         :if={@match_results}
         id="match-results-modal"
+        title="WCVP Match Complete"
+        size={:sm}
         show
         on_cancel={JS.push("dismiss_match_results")}
       >
-        <:header>WCVP Match Complete</:header>
-        <:body>
-          <div class="space-y-3">
-            <div :if={@match_results.linked > 0} class="flex items-center gap-2 text-green-700">
-              <.icon name="ph-check-circle" class="h-5 w-5" />
-              <span><strong>{@match_results.linked}</strong> host(s) linked</span>
-            </div>
-            <div :if={@match_results.already_linked > 0} class="flex items-center gap-2 text-blue-700">
-              <.icon name="ph-info" class="h-5 w-5" />
-              <span><strong>{@match_results.already_linked}</strong> already linked</span>
-            </div>
-            <div :if={@match_results.no_match != []} class="text-amber-700">
-              <div class="flex items-center gap-2">
-                <.icon name="ph-warning" class="h-5 w-5" />
-                <span><strong>{length(@match_results.no_match)}</strong> not matched:</span>
-              </div>
-              <ul class="ml-7 mt-1 text-sm list-disc">
-                <li :for={name <- @match_results.no_match}>
-                  <.taxon_name name={name} />
-                </li>
-              </ul>
-            </div>
-            <div :if={@match_results.failed != []} class="text-red-700">
-              <div class="flex items-center gap-2">
-                <.icon name="ph-x-circle" class="h-5 w-5" />
-                <span><strong>{length(@match_results.failed)}</strong> failed:</span>
-              </div>
-              <ul class="ml-7 mt-1 text-sm list-disc">
-                <li :for={name <- @match_results.failed}>
-                  <.taxon_name name={name} />
-                </li>
-              </ul>
-            </div>
+        <div class="flex flex-col gap-3">
+          <div :if={@match_results.linked > 0} class="flex items-center gap-2 text-ok">
+            <.icon name="ph-check-circle" class="size-5" />
+            <span><strong>{@match_results.linked}</strong> host(s) linked</span>
           </div>
-        </:body>
-        <:footer>
-          <.button type="button" variant="primary" phx-click="dismiss_match_results">
-            Close
-          </.button>
-        </:footer>
-      </.modal>
+          <div :if={@match_results.already_linked > 0} class="flex items-center gap-2 text-info">
+            <.icon name="ph-info" class="size-5" />
+            <span><strong>{@match_results.already_linked}</strong> already linked</span>
+          </div>
+          <.result_names
+            :if={@match_results.no_match != []}
+            kind={:warn}
+            names={@match_results.no_match}
+            label="not matched"
+          />
+          <.result_names
+            :if={@match_results.failed != []}
+            kind={:danger}
+            names={@match_results.failed}
+            label="failed"
+          />
+        </div>
+        <:actions>
+          <.button variant="primary" phx-click="dismiss_match_results">Close</.button>
+        </:actions>
+      </.dialog>
     </Layouts.admin>
+    """
+  end
+
+  # The hosts a sync or match left out, in a result dialog: a count line in
+  # the kind's color, then the names.
+  attr :kind, :atom, required: true, values: [:warn, :danger]
+  attr :names, :list, required: true
+  attr :label, :string, required: true
+
+  defp result_names(assigns) do
+    ~H"""
+    <div>
+      <div class={[
+        "flex items-center gap-2",
+        if(@kind == :warn, do: "text-warn", else: "text-danger")
+      ]}>
+        <.icon name={if @kind == :warn, do: "ph-warning", else: "ph-x-circle"} class="size-5" />
+        <span><strong>{length(@names)}</strong> {@label}:</span>
+      </div>
+      <ul class="ml-7 mt-1 list-disc text-meta text-ink-2">
+        <li :for={name <- @names}>
+          <.taxon_name name={name} />
+        </li>
+      </ul>
+    </div>
     """
   end
 end

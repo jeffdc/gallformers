@@ -206,23 +206,20 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       {:ok, view, _html} =
         live_isolated(conn, TestLive, session: %{"range_entries" => entries})
 
-      html = open_us(view)
+      open_us(view)
 
       # California should show as native (green indicator)
-      assert html =~ "bg-green-500"
-      assert html =~ "bg-green-50"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=native]")
     end
   end
 
   describe "tri-state subdivision indicators" do
     test "not-included subdivision shows empty indicator", %{conn: conn} do
       {:ok, view, _html} = live_isolated(conn, TestLive)
-      html = open_us(view)
+      open_us(view)
 
       # California is not in range — should have gray border indicator
-      assert html =~ "border-gray-300"
-      refute html =~ "bg-green-500"
-      refute html =~ "bg-amber-500"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=none]")
     end
 
     test "native subdivision shows green indicator", %{conn: conn} do
@@ -233,8 +230,7 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
 
       html = open_us(view)
 
-      assert html =~ "bg-green-500"
-      assert html =~ "bg-green-50"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=native]")
       refute html =~ "(introduced)"
     end
 
@@ -246,8 +242,7 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
 
       html = open_us(view)
 
-      assert html =~ "bg-amber-500"
-      assert html =~ "bg-amber-50"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=introduced]")
       assert html =~ "(introduced)"
     end
   end
@@ -267,11 +262,11 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       open_us(view)
 
       html = click_and_sync(view, "button[phx-value-code='US-CA']")
-      assert html =~ "bg-green-500"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=native]")
       refute html =~ "(introduced)"
 
-      html = click_and_sync(view, "button[phx-value-code='US-CA']")
-      assert html =~ "border-gray-300"
+      click_and_sync(view, "button[phx-value-code='US-CA']")
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=none]")
     end
 
     test "switching exact type converts subdivision in one click", %{conn: conn} do
@@ -281,11 +276,11 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
         live_isolated(conn, TestLive, session: %{"range_entries" => entries})
 
       open_us(view)
-      html = click_and_sync(view, "#exact-type-native-US")
-      assert html =~ "bg-green-100"
+      click_and_sync(view, "#exact-type-native-US")
+      assert has_element?(view, "#exact-type-native-US[aria-pressed=true]")
 
       html = click_and_sync(view, "button[phx-value-code='US-CA']")
-      assert html =~ "bg-green-500"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=native]")
       refute html =~ "(introduced)"
     end
   end
@@ -317,10 +312,10 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       {:ok, view, _html} = live_isolated(conn, TestLive)
       open_us(view)
 
-      html = click_and_sync(view, "#country-level-US")
+      click_and_sync(view, "#country-level-US")
 
       # California should show inherited style
-      assert html =~ "bg-emerald-50/50"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=inherited]")
     end
   end
 
@@ -340,8 +335,8 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       {:ok, view, _html} = live_isolated(conn, TestLive)
       open_us(view)
 
-      html = click_and_sync(view, "#exact-type-introduced-US")
-      assert html =~ "bg-amber-100"
+      click_and_sync(view, "#exact-type-introduced-US")
+      assert has_element?(view, "#exact-type-introduced-US[aria-pressed=true]")
 
       click_and_sync(view, "button[phx-value-code='US-CA']")
 
@@ -353,9 +348,9 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       {:ok, view, _html} = live_isolated(conn, TestLive)
       open_us(view)
 
-      html = click_and_sync(view, "#country-level-US")
+      click_and_sync(view, "#country-level-US")
 
-      assert html =~ "bg-green-100"
+      assert has_element?(view, "#country-type-native-US[aria-pressed=true]")
     end
 
     test "introduced pill is highlighted after switching", %{conn: conn} do
@@ -363,9 +358,9 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       open_us(view)
 
       click_and_sync(view, "#country-level-US")
-      html = click_and_sync(view, "#country-type-introduced-US")
+      click_and_sync(view, "#country-type-introduced-US")
 
-      assert html =~ "bg-amber-100"
+      assert has_element?(view, "#country-type-introduced-US[aria-pressed=true]")
     end
 
     test "replace baseline button sends replace_with_country_baseline", %{conn: conn} do
@@ -414,9 +409,9 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       {:ok, view, _html} = live_isolated(conn, TestLive)
       open_us(view)
 
-      html = click_and_sync(view, "button", "All native")
+      click_and_sync(view, "button", "All native")
 
-      assert html =~ "bg-green-500"
+      assert has_element?(view, "button[phx-value-code][data-state=native]")
     end
 
     test "clear all removes entries and shows empty indicators", %{conn: conn} do
@@ -427,10 +422,10 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
 
       open_us(view)
 
-      html = click_and_sync(view, "button", "Clear all")
+      click_and_sync(view, "button", "Clear all")
 
-      assert html =~ "border-gray-300"
-      refute html =~ "bg-green-500"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=none]")
+      refute has_element?(view, "button[phx-value-code][data-state=native]")
     end
 
     test "all introduced marks exact entries introduced", %{conn: conn} do
@@ -439,7 +434,7 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
 
       html = click_and_sync(view, "button", "All introduced")
 
-      assert html =~ "bg-amber-500"
+      assert has_element?(view, "button[phx-value-code][data-state=introduced]")
       assert html =~ "(introduced)"
     end
 
@@ -452,10 +447,10 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
       open_us(view)
       click_and_sync(view, "#country-level-US")
       click_and_sync(view, "#country-type-introduced-US")
-      html = click_and_sync(view, "button", "Replace subdivisions with Introduced baseline")
+      click_and_sync(view, "button", "Replace subdivisions with Introduced baseline")
 
-      assert html =~ "bg-emerald-50/50"
-      refute html =~ "bg-green-500"
+      assert has_element?(view, "button[phx-value-code='US-CA'][data-state=inherited]")
+      refute has_element?(view, "button[phx-value-code][data-state=native]")
     end
   end
 

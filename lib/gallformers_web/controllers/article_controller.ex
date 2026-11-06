@@ -9,7 +9,6 @@ defmodule GallformersWeb.ArticleController do
 
   alias Gallformers.Accounts
   alias Gallformers.Articles
-  alias Gallformers.Markdown
 
   def show(conn, %{"slug" => slug}) do
     current_user = conn.assigns.current_user
@@ -29,7 +28,6 @@ defmodule GallformersWeb.ArticleController do
 
   defp render_article(conn, article, is_admin) do
     related_articles = Articles.list_related_articles(article, limit: 5)
-    rendered_content = Markdown.render!(article.content)
     noindex = not article.is_published
 
     page_description =
@@ -46,7 +44,6 @@ defmodule GallformersWeb.ArticleController do
     |> assign(:page_json_ld, article_json_ld(article))
     |> assign(:page_noindex, noindex)
     |> assign(:article, article)
-    |> assign(:rendered_content, rendered_content)
     |> assign(:related_articles, related_articles)
     |> assign(:is_draft_preview, not article.is_published and is_admin)
     |> assign(:is_admin, is_admin)

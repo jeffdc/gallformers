@@ -11,6 +11,10 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
 
   import Phoenix.LiveViewTest
 
+  # The page's visible text: a name's italic and upright parts are separate
+  # elements, so assert on text rather than raw HTML.
+  defp page_text(html), do: html |> LazyHTML.from_document() |> LazyHTML.text()
+
   # Reading the seeds, converted, is most of what this module tests.
   # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
 
@@ -51,11 +55,11 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
         |> element(~s{button[phx-click="expand_all"]})
         |> render_click()
 
-      assert html =~ "Andricus seedii (agamic)"
-      assert html =~ "Andricus seedii (sexgen)"
+      assert page_text(html) =~ "Andricus seedii (agamic)"
+      assert page_text(html) =~ "Andricus seedii (sexgen)"
       assert has_element?(view, ~s{a[href="/gall/300"]})
       assert has_element?(view, ~s{a[href="/gall/301"]})
-      refute html =~ "Andricus quercuscalifornicus"
+      refute page_text(html) =~ "Andricus quercuscalifornicus"
     end
 
     test "search filters the tree", %{conn: conn} do
@@ -110,12 +114,39 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
     end
   end
 
+  describe "/galls cards" do
+    test "families sit in their plain-language groups, with the Browse tabs", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/galls")
+
+      assert has_element?(view, "#group-gall-wasps h2", "Gall wasps")
+      assert has_element?(view, "#group-gall-wasps [data-part=name]", "Cynipidae")
+
+      assert has_element?(
+               view,
+               ~s{nav[aria-label="Browse by"] a[aria-current=page]},
+               "By what causes them"
+             )
+
+      assert has_element?(view, ~s{nav[aria-label="Browse by"] a[href="/hosts"]})
+    end
+
+    test "a filter matching a family's name keeps all of its genera", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/galls")
+
+      view |> element("#galls-browse-search-form") |> render_change(%{"query" => "Cynipidae"})
+
+      html = view |> element("#family-#{family_key(30)}") |> render()
+      assert page_text(html) =~ "Andricus"
+      assert page_text(html) =~ "Neuroterus"
+    end
+  end
+
   describe "/galls undescribed toggle" do
     test "can switch to undescribed view", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/galls")
 
       view
-      |> element(~s{button[phx-click="toggle_undescribed"]})
+      |> element(~s{input[type=checkbox][phx-click="toggle_undescribed"]})
       |> render_click()
 
       assert has_element?(view, "[data-active-view=undescribed]")
@@ -127,7 +158,7 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
 
       # Gall 304's Inducer is the genus Andricus; 300's is a species
       assert html =~ "Andricus n-densiflorus-seed-gall"
-      refute html =~ "Andricus seedii (agamic)"
+      refute page_text(html) =~ "Andricus seedii (agamic)"
     end
 
     test "can switch back to described view", %{conn: conn} do
@@ -135,13 +166,13 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
 
       # Toggle to undescribed
       view
-      |> element(~s{button[phx-click="toggle_undescribed"]})
+      |> element(~s{input[type=checkbox][phx-click="toggle_undescribed"]})
       |> render_click()
 
       # Toggle back to described
       html =
         view
-        |> element(~s{button[phx-click="toggle_undescribed"]})
+        |> element(~s{input[type=checkbox][phx-click="toggle_undescribed"]})
         |> render_click()
 
       assert html =~ "Cynipidae"

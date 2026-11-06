@@ -38,22 +38,35 @@ defmodule GallformersWeb.IntermediateLiveTest do
     end
 
     test "shows children with their gall counts", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/subfamily/Cynipinae")
+      {:ok, view, _html} = live(conn, "/subfamily/Cynipinae?tab=within")
 
-      assert html =~ "Cynipini"
-      assert has_element?(view, "tbody tr", ~r/Cynipini\s+tribe\s+8\s+0/)
+      assert has_element?(view, "#children li", ~r/Cynipini\s+tribe\s+8 galls/)
     end
 
     test "shows genera as children of tribe", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/tribe/Cynipini")
+      {:ok, view, _html} = live(conn, "/tribe/Cynipini?tab=within")
 
-      assert html =~ "Andricus"
-      assert html =~ "Cynips"
-      assert has_element?(view, "tbody tr", ~r/Andricus\s+genus\s+4\s+0/)
+      assert has_element?(view, "#within h2", "Genera")
+      assert has_element?(view, "#children li", ~r/Andricus\s+4 galls/)
+      assert has_element?(view, "#children li", "Cynips")
+    end
+
+    test "the name filter and the sort apply to the taxa within", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/tribe/Cynipini?tab=within")
+
+      view |> element("#intermediate-search-form") |> render_change(%{"query" => "cynips"})
+      assert has_element?(view, "#children li", "Cynips")
+      refute has_element?(view, "#children li", "Andricus")
+
+      view |> element("#intermediate-search-form") |> render_change(%{"query" => ""})
+      view |> element("button[phx-click=sort][phx-value-field=gall_count]") |> render_click()
+
+      assert has_element?(view, "button[phx-value-field=gall_count][aria-pressed=true]")
+      assert view |> element("#children li:first-child") |> render() =~ "Andricus"
     end
 
     test "child URLs use names not IDs", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/subfamily/Cynipinae")
+      {:ok, view, _html} = live(conn, "/subfamily/Cynipinae?tab=within")
 
       assert has_element?(view, ~s{a[href="/tribe/Cynipini"]})
     end
@@ -62,23 +75,16 @@ defmodule GallformersWeb.IntermediateLiveTest do
       assert {:error, {:live_redirect, %{to: "/tribe/Cynipini"}}} = live(conn, "/tribe/32")
     end
 
-    test "returns not found when rank does not match", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/tribe/Cynipinae")
-
-      assert html =~ "Taxonomy not found"
+    test "a name of another rank is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/tribe/Cynipinae") end
     end
 
-    test "returns not found for nonexistent name", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/subfamily/Nonexistent")
-
-      assert html =~ "Taxonomy not found"
-      assert page_title(view) =~ "Not Found"
+    test "an unknown name is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/subfamily/Nonexistent") end
     end
 
-    test "returns not found for a rank the taxonomy no longer has", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/infratribe/Cynipini")
-
-      assert html =~ "Taxonomy not found"
+    test "a rank the taxonomy no longer has is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/infratribe/Cynipini") end
     end
   end
 end

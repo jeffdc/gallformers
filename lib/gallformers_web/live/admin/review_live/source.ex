@@ -315,16 +315,16 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
     assigns = assign(assigns, groups: groups, ticked: ticked)
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        <.link navigate={~p"/admin/review"} class="hover:underline">Sources to review</.link>
-        <span class="text-gray-400">›</span> <span>{@summary.title}</span>
-      </:page_title_html>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <.page_header>
+        <:crumb navigate={~p"/admin/review"}>Sources to review</:crumb>
+        <:title>{@summary.title}</:title>
+      </.page_header>
 
-      <div id="source-head" class="gf-card p-4 mt-2 grid gap-3">
+      <.panel id="source-head" class="mt-2 gap-3">
         <div class="flex flex-wrap items-start gap-3">
-          <div class="flex-1 min-w-[18rem]">
-            <p :if={@summary.citation} class="text-sm text-gray-500">{@summary.citation}</p>
+          <div class="flex-1 min-w-72">
+            <p :if={@summary.citation} class="text-meta text-muted">{@summary.citation}</p>
             <div class="mt-1.5 flex flex-wrap gap-1.5">
               <.review_tag>Gallformers' own notes</.review_tag>
             </div>
@@ -343,7 +343,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
             >
               {ticked_text(MapSet.size(@ticked), "notes")}
             </.button>
-            <p class="text-xs text-gray-500 md:text-right max-w-xs">
+            <p class="text-caption text-muted md:text-right max-w-xs">
               Approves the ticked notes in the Ready list. Each note is approved on its own.
             </p>
           </div>
@@ -370,23 +370,20 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
               id={"tab-#{tab}"}
               phx-click="tab"
               phx-value-tab={tab}
-              shape="pill"
               size="sm"
-              variant={if @tab == tab, do: "primary", else: "soft"}
+              variant={if @tab == tab, do: "primary", else: "secondary"}
               aria-pressed={to_string(@tab == tab)}
             >
               {label} ({n})
             </.button>
           </div>
           <span class="flex-1"></span>
-          <span class="text-sm text-gray-500">Grouped by what the note holds</span>
+          <span class="text-meta text-muted">Grouped by what the note holds</span>
         </div>
-      </div>
+      </.panel>
 
       <div id="notes">
-        <p :if={@groups == []} class="gf-card mt-4 px-4 py-3 text-gray-500">
-          {empty_tab_text(@tab)}
-        </p>
+        <.empty_state :if={@groups == []} title={empty_tab_text(@tab)} />
         <.review_section
           :for={g <- @groups}
           id={"note-group-#{g.group.id}"}
@@ -403,7 +400,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
               phx-click="approve_notes"
               phx-value-group={g.group.id}
               size="sm"
-              variant="soft"
+              variant="secondary"
             >
               {ticked_text(g.ticked, "here")}
             </.button>
@@ -433,11 +430,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
       )
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        <.link navigate={~p"/admin/review"} class="hover:underline">Sources to review</.link>
-        <span class="text-gray-400">›</span> <span>{@name}</span>
-      </:page_title_html>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <.page_header>
+        <:crumb navigate={~p"/admin/review"}>Sources to review</:crumb>
+        <:title>{@name}</:title>
+      </.page_header>
 
       <.review_source_head
         name={@name}
@@ -501,22 +498,25 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
         status={SourcePage.approval_text(@approval)}
       />
 
-      <.modal :if={@deny_form} id="deny-modal" show on_cancel={JS.push("cancel_deny")}>
-        <:header>Deny {@summary.title}</:header>
-        <:body>
-          <.form for={@deny_form} id="deny-form" phx-submit="deny" class="space-y-4">
-            <p class="text-sm text-gray-600">
-              Nothing of a denied Source is applied. The reason is kept with it and in the replay
-              log.
-            </p>
-            <.input field={@deny_form[:reason]} type="textarea" label="Reason" required />
-            <div class="flex justify-end gap-2">
-              <.button type="button" phx-click="cancel_deny">Cancel</.button>
-              <.button type="submit" variant="danger">Deny</.button>
-            </div>
-          </.form>
-        </:body>
-      </.modal>
+      <.dialog
+        :if={@deny_form}
+        id="deny-modal"
+        title={"Deny #{@summary.title}"}
+        show
+        on_cancel={JS.push("cancel_deny")}
+      >
+        <.form for={@deny_form} id="deny-form" phx-submit="deny" class="flex flex-col gap-block">
+          <p class="text-meta text-ink-2">
+            Nothing of a denied Source is applied. The reason is kept with it and in the replay
+            log.
+          </p>
+          <.input field={@deny_form[:reason]} type="textarea" label="Reason" required />
+        </.form>
+        <:actions>
+          <.button type="button" phx-click="cancel_deny">Cancel</.button>
+          <.button type="submit" form="deny-form" variant="danger">Deny</.button>
+        </:actions>
+      </.dialog>
     </Layouts.admin>
     """
   end
@@ -544,7 +544,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
   defp note_line(assigns) do
     ~H"""
     <div id={"note-#{@note.id}"}>
-      <div class="grid grid-cols-[1.5rem_1fr] md:grid-cols-[1.5rem_minmax(12rem,1.2fr)_minmax(10rem,2fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-2">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
         <%= case @note.state do %>
           <% :ready -> %>
             <input
@@ -557,35 +557,32 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
               aria-label={"Approve #{@note.name}"}
             />
           <% :approved -> %>
-            <.icon name="ph-check" class="size-4 text-green-700" />
+            <.icon name="ph-check" class="size-4 shrink-0 text-ok" />
           <% :needs -> %>
-            <.icon name="ph-warning" class="size-4 text-yellow-700" />
+            <.icon name="ph-warning" class="size-4 shrink-0 text-warn" />
         <% end %>
         <label
           for={@note.state == :ready && "tick-#{@note.id}"}
-          class="font-medium italic text-gray-900 break-words"
+          class="min-w-0 grow basis-48 font-medium italic text-ink break-words"
         >
           {@note.name}
         </label>
-        <.review_chips adds={@note.adds} aside={@note.aside} class="col-start-2 md:col-start-auto" />
-        <div class="col-start-2 md:col-start-auto flex flex-wrap items-center gap-2 md:justify-end">
-          <.badge :if={@note.state == :needs and @note.holding > 0} variant="warning">
+        <.review_chips adds={@note.adds} aside={@note.aside} class="min-w-0 grow-2 basis-64" />
+        <div class="ml-auto flex flex-wrap items-center gap-2 md:justify-end">
+          <.chip :if={@note.state == :needs and @note.holding > 0} variant={:warn}>
             {@note.holding} to decide
-          </.badge>
-          <.badge :if={@note.state == :needs and @note.holding == 0} variant="info">
+          </.chip>
+          <.chip :if={@note.state == :needs and @note.holding == 0} variant={:info}>
             Resolving
-          </.badge>
-          <.link
-            navigate={~p"/admin/review/packages/#{@note.id}"}
-            class="text-sm text-gf-maroon hover:underline"
-          >
+          </.chip>
+          <.link navigate={~p"/admin/review/packages/#{@note.id}"} class="text-meta">
             View the note
           </.link>
         </div>
       </div>
       <div
         :if={@note.entries != []}
-        class="border-t border-dashed border-gray-200 divide-y divide-gray-200"
+        class="border-t border-dashed border-line divide-y divide-line"
       >
         <.live_component
           :for={entry <- @note.entries}
