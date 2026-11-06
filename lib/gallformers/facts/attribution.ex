@@ -19,6 +19,10 @@ defmodule Gallformers.Facts.Attribution do
     * `status_as_written`, `authorship_as_written` — for taxonomic acts: the
       Source's own status words ("syn. nov.", "comb. nov.") and, for a name,
       its authorship ("(Ashmead, 1881)"), as written.
+    * `cites_as_written`, `cited_source_id` — for a Gallformers statement
+      made on another Source's word ("per Weld 1959", matter `ec2c`): that
+      Source as the curator named it, and the Source itself when Gallformers
+      holds it.
 
   Evidence (quotes), the taxa it names, and the Observations it cites are
   `Gallformers.Facts.Evidence`, `Gallformers.Facts.AttributionName` and
@@ -50,6 +54,8 @@ defmodule Gallformers.Facts.Attribution do
           stage_as_written: String.t() | nil,
           status_as_written: String.t() | nil,
           authorship_as_written: String.t() | nil,
+          cites_as_written: String.t() | nil,
+          cited_source_id: integer() | nil,
           evidence: [Evidence.t()] | Ecto.Association.NotLoaded.t(),
           names: [AttributionName.t()] | Ecto.Association.NotLoaded.t(),
           observations: [AttributionObservation.t()] | Ecto.Association.NotLoaded.t(),
@@ -67,7 +73,9 @@ defmodule Gallformers.Facts.Attribution do
     :when_as_written,
     :stage_as_written,
     :status_as_written,
-    :authorship_as_written
+    :authorship_as_written,
+    :cites_as_written,
+    :cited_source_id
   ]
 
   schema "attributions" do
@@ -82,6 +90,8 @@ defmodule Gallformers.Facts.Attribution do
     field :stage_as_written, :string
     field :status_as_written, :string
     field :authorship_as_written, :string
+    field :cites_as_written, :string
+    field :cited_source_id, :integer
 
     belongs_to :fact, Fact
     belongs_to :source, Source
@@ -98,7 +108,8 @@ defmodule Gallformers.Facts.Attribution do
 
   `attrs` takes `fact_id`, `stance`, `value_as_written`, `term`, `batch_id`,
   `statement_text`, `when_as_written`, `stage_as_written`,
-  `status_as_written`, `authorship_as_written` and `stated`. The
+  `status_as_written`, `authorship_as_written`, `cites_as_written`,
+  `cited_source_id` and `stated`. The
   Source comes from `source`, never from `attrs`.
 
   `stated` is a partial date (`"1897"`, `"1897-05"`, `"1897-05-14"`), or nil
@@ -118,6 +129,7 @@ defmodule Gallformers.Facts.Attribution do
     |> foreign_key_constraint(:fact_id)
     |> foreign_key_constraint(:source_id)
     |> foreign_key_constraint(:batch_id)
+    |> foreign_key_constraint(:cited_source_id)
     |> unique_constraint([:fact_id, :source_id])
     |> check_constraint(:stated, name: :attributions_stated_date_precision)
   end

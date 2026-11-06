@@ -51,6 +51,7 @@ defmodule Gallformers.Taxa do
       ReadModels.HostPage,
       Taxon,
       TaxonName,
+      TaxonNote,
       TreeBuilder
     ]
 
@@ -78,6 +79,7 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.ReadModels.Search
   alias Gallformers.Taxa.Taxon
   alias Gallformers.Taxa.TaxonName
+  alias Gallformers.Taxa.TaxonNote
   alias Gallformers.Taxa.Tree
 
   @type taxon_ref :: Taxon.t() | integer()
@@ -1017,6 +1019,31 @@ defmodule Gallformers.Taxa do
     Enum.filter(names, &MapSet.member?(found, normalized[&1]))
   end
 
+  @doc """
+  The taxa holding names, in one query: for every name (accepted or
+  synonym, any `sensu`) whose normalized form is one of `normalized`, or
+  that is a binomial whose second word is one of `epithets` (in any genus,
+  for 19th-century oak-gall names: `resolve_epithet/2`), its normalized
+  form to the IDs of the taxa holding it. Both lists are already
+  normalized (`Gallformers.Taxa.NameNormalizer`).
+  """
+  @spec names_held([String.t()], [String.t()]) :: %{String.t() => [integer()]}
+  def names_held([], []), do: %{}
+
+  def names_held(normalized, epithets) when is_list(normalized) and is_list(epithets) do
+    from(n in TaxonName,
+      where:
+        n.normalized_name in ^Enum.uniq(normalized) or
+          (fragment("split_part(?, ' ', 2)", n.normalized_name) in ^Enum.uniq(epithets) and
+             fragment("split_part(?, ' ', 3)", n.normalized_name) == ""),
+      distinct: true,
+      order_by: [n.normalized_name, n.taxon_id],
+      select: {n.normalized_name, n.taxon_id}
+    )
+    |> Repo.all()
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  end
+
   defp filter_rank(query, nil), do: query
   defp filter_rank(query, rank), do: where(query, [_n, t], t.rank == ^rank)
 
@@ -1028,6 +1055,34 @@ defmodule Gallformers.Taxa do
   defp filter_sensu(query, sensu) do
     wanted = sensu |> String.trim() |> String.downcase()
     where(query, [n], fragment("lower(trim(?))", n.sensu) == ^wanted)
+  end
+
+  # -- "based on" notes (matter `ec2c`) ------------------------------------------
+
+  @doc """
+  Records `actor`'s "based on" note on taxon `taxon`'s edit of `about`
+  (`"name"`, `"synonyms"` or `"range"`; `Gallformers.Taxa.TaxonNote`):
+  `text`, trimmed, not blank. `opts`: `:author_name`, the author when
+  replaying a note someone else wrote.
+  """
+  @spec add_taxon_note(Actor.t(), taxon_ref(), String.t(), String.t(), keyword()) ::
+          {:ok, TaxonNote.t()} | {:error, Changeset.t()}
+  def add_taxon_note(%Actor{} = actor, taxon, about, text, opts \\ []) do
+    Audit.transaction(actor, "taxa.add_taxon_note", fn ->
+      taxon
+      |> taxon_id()
+      |> TaxonNote.create_changeset(about, actor, text, opts)
+      |> Repo.insert()
+      |> unwrap_or_rollback()
+    end)
+  end
+
+  @doc "A taxon's \"based on\" notes, oldest first."
+  @spec list_taxon_notes(taxon_ref()) :: [TaxonNote.t()]
+  def list_taxon_notes(taxon) do
+    Repo.all(
+      from(n in TaxonNote, where: n.taxon_id == ^taxon_id(taxon), order_by: [n.inserted_at, n.id])
+    )
   end
 
   # -- helpers -----------------------------------------------------------------

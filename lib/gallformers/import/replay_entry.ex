@@ -12,7 +12,9 @@ defmodule Gallformers.Import.ReplayEntry do
   vocabulary backlog, replaced by the vocabulary page of `d213`: no longer
   written, kept so earlier entries load), `:fact_edit` and
   `:fact_edit_removed` (a curator's edits on a package's Facts,
-  `Gallformers.Import.FactEdits`). The log is ordered by `id`.
+  `Gallformers.Import.FactEdits`), `:fact_note` and `:taxon_note`
+  (curators' notes, `Gallformers.Import.CurationNotes`). The log is ordered
+  by `id`.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -31,7 +33,9 @@ defmodule Gallformers.Import.ReplayEntry do
     :trait_term_edit,
     :vocab_requests_decided,
     :fact_edit,
-    :fact_edit_removed
+    :fact_edit_removed,
+    :fact_note,
+    :taxon_note
   ]
 
   @type kind ::
@@ -49,6 +53,8 @@ defmodule Gallformers.Import.ReplayEntry do
           | :vocab_requests_decided
           | :fact_edit
           | :fact_edit_removed
+          | :fact_note
+          | :taxon_note
 
   @type t :: %__MODULE__{
           id: integer() | nil,

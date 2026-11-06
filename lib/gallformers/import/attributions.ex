@@ -14,12 +14,18 @@ defmodule Gallformers.Import.Attributions do
       rows: the attribution takes the statement's text and date
       (`statement_text`, `stated`). With several statements on one Fact,
       the newest decides the date and their texts are joined, newest first.
+      A statement's `cites` (the Source a curator follows) becomes
+      `cites_as_written` and `cited_source_id` — the newest citing
+      statement's, its Source ID kept only when Gallformers holds that
+      Source.
     * **Gallformers statements quoting a Gall's note** keep their quote
       evidence and take the note's date, with what they quote as their
       statement text (`with_note/2`).
     * Other Sources' attributions take the Source's authored date (no
       `stated`).
   """
+
+  alias Gallformers.Sources
 
   @type items :: %{String.t() => integer()}
 
@@ -76,10 +82,30 @@ defmodule Gallformers.Import.Attributions do
           statement_text: Enum.map_join(newest_first, "\n\n", & &1["text"]),
           stated: hd(newest_first)["stated_on"]
         }
+        |> Map.merge(cites(evidence))
     end
   end
 
   defp statement_attrs(_evidence, _source_kind), do: %{}
+
+  # The newest citing statement's `cites`, with its Source when Gallformers
+  # holds it.
+  defp cites(evidence) do
+    cited =
+      for(%{"statement" => %{} = s, "cites" => %{"as_written" => _} = c} <- evidence, do: {s, c})
+      |> Enum.sort_by(fn {s, _c} -> s["stated_on"] end, :desc)
+
+    case cited do
+      [] ->
+        # A newer statement states its whole content: no cite clears one.
+        %{cites_as_written: nil, cited_source_id: nil}
+
+      [{_s, c} | _] ->
+        source_id = c["source_id"]
+        held = is_integer(source_id) and Sources.get_source(source_id) != nil
+        %{cites_as_written: c["as_written"], cited_source_id: if(held, do: source_id)}
+    end
+  end
 
   @doc """
   `attrs` for a statement of a batch quoting a Gall's Gallformers note

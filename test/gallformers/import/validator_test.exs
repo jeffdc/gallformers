@@ -175,6 +175,31 @@ defmodule Gallformers.Import.ValidatorTest do
       assert errors_mention?(schema_errors(put(paper(), cites, %{})), ["cites"])
     end
 
+    test "cites on a Gallformers statement: as written, with an optional Source ID" do
+      cites = ["facts", 1, "evidence", 0, "cites"]
+      statement = example("gallformers-statement")
+
+      assert schema_errors(
+               put(statement, cites, %{"as_written" => "Weld 1959", "source_id" => 4})
+             ) ==
+               []
+
+      assert schema_errors(put(statement, cites, %{"as_written" => "Weld 1959"})) == []
+      assert errors_mention?(schema_errors(put(statement, cites, %{"source_id" => 4})), ["cites"])
+
+      assert errors_mention?(
+               schema_errors(put(statement, cites, %{"as_written" => "W", "source_id" => "4"})),
+               ["source_id"]
+             )
+
+      quote_cites = ["facts", 1, "evidence", 0, "cites"]
+
+      assert errors_mention?(
+               schema_errors(put(paper(), quote_cites, %{"as_written" => "K", "source_id" => 4})),
+               ["cites"]
+             )
+    end
+
     test "plant_part in identified_by tells two Galls of one Inducer apart" do
       part = ["galls", 0, "identified_by", "plant_part"]
       ok = %{"value" => "stem", "as_written" => "collar of the stem"}

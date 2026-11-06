@@ -52,6 +52,9 @@ defmodule Gallformers.Import.Replay do
       before approval, made again (or removed) on the package made ready
       as above (`Gallformers.Import.FactEdits`), before its batch is
       applied.
+    * `:fact_note` (`%{"gall", "fact"}`), `:taxon_note` (`%{"taxon",
+      "about"}`) — a curator's note on a Fact or on a plant's edit, written
+      again unless it is there (`Gallformers.Import.CurationNotes`).
     * `:vocab_requests_decided` — 6611's vocabulary backlog, replaced by
       the superadmin vocabulary page (`d213`); no longer written, and not
       replayed.
@@ -65,6 +68,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Audit.Actor
   alias Gallformers.Import
   alias Gallformers.Import.Batch
+  alias Gallformers.Import.CurationNotes
   alias Gallformers.Import.FactEdits
   alias Gallformers.Import.GallRenames
   alias Gallformers.Import.HostDecisions
@@ -253,6 +257,10 @@ defmodule Gallformers.Import.Replay do
     with {:ok, package} <- ensure_package(actor, key),
          do: FactEdits.replay(actor, package, kind, entry_key, payload)
   end
+
+  defp replay(actor, %{kind: kind, key: key, payload: payload})
+       when kind in [:fact_note, :taxon_note],
+       do: CurationNotes.replay(actor, kind, key, payload)
 
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
 

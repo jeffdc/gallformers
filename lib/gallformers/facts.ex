@@ -148,6 +148,8 @@ defmodule Gallformers.Facts do
     * `:value_as_written`, `:term` (a Trait's term), `:batch_id`, `:when_as_written`,
       `:stage_as_written`, `:status_as_written`, `:authorship_as_written`
     * `:statement_text` — required for the Gallformers Source
+    * `:cites_as_written`, `:cited_source_id` — the Source a Gallformers
+      statement follows, as named and as held
     * `:evidence` — a list of `%{document_item_id, quote}` or
       `%{document_item_id, whole_item: true}` (or a bare `quote` when the
       Source has no stored document), each with optional `page`, `url` and

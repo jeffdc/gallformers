@@ -96,6 +96,42 @@ defmodule Gallformers.Import.ResolverTest do
       assert length(s.candidate_ids) == 2
     end
 
+    test "a supplied gallformers_taxon_id picks among the taxa of its name" do
+      plant = plant_fixture(name: "Morus alba")
+      animal = taxon_fixture(name: "Morus alba", kingdom: "Animalia")
+      supplied = &taxon("t1", "Morus alba", "species", %{"gallformers_taxon_id" => &1})
+
+      %{"t1" => s} = resolve(gall_batch([supplied.(animal.id)]))
+      assert s.resolution == :resolved
+      assert s.method == "gallformers_taxon_id"
+      assert s.taxon_id == animal.id
+      assert s.candidate_ids == []
+
+      %{"t1" => s} = resolve(gall_batch([supplied.(plant.id)]))
+      assert s.taxon_id == plant.id
+    end
+
+    test "a supplied gallformers_taxon_id that is not the name's taxon is flagged" do
+      wasp = taxon_fixture(name: "Andricus fixturus")
+      other = taxon_fixture(name: "Andricus otherus")
+
+      batch =
+        gall_batch([
+          taxon("t1", "Andricus fixturus", "species", %{"gallformers_taxon_id" => other.id})
+        ])
+
+      %{"t1" => s} = resolve(batch)
+      assert s.resolution == :resolved
+      assert s.taxon_id == wasp.id
+      assert s.flags == ["supplied_id_disagrees"]
+
+      # Among several taxa of the name, an ID that is none of them decides nothing.
+      taxon_fixture(name: "Andricus fixturus", kingdom: "Plantae")
+      %{"t1" => s} = resolve(batch)
+      assert s.resolution == :ambiguous
+      assert "supplied_id_disagrees" in s.flags
+    end
+
     test "a sensu name resolves to the misapplied usage" do
       taxon_fixture(name: "Cynips strobilana")
       other = taxon_fixture(name: "Cynips other")

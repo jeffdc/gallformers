@@ -24,6 +24,10 @@ defmodule Gallformers.Import.Resolver do
 
   No fuzzy matching: it joined different species.
 
+  A supplied `gallformers_taxon_id` picks among the taxa the name matches
+  (method `"gallformers_taxon_id"`); an ID that is not the name's taxon is
+  flagged `"supplied_id_disagrees"` and decides nothing.
+
   Outcomes (`Gallformers.Import.BatchStatement`): `:resolved` (one taxon),
   `:ambiguous` (several, in `candidate_ids`), `:new` (no match, and the
   Source — the taxon itself or the package's taxonomy batch — presents it as
@@ -162,8 +166,13 @@ defmodule Gallformers.Import.Resolver do
   defp taxa(%{"taxa" => taxa}) when is_list(taxa), do: taxa
   defp taxa(_batch), do: []
 
-  # Genera written in full in the batches or the document, that the tree holds.
-  defp genera(declared, texts) do
+  @doc """
+  The genera written in full among `declared` (batch taxa, decoded) and
+  `texts` (capitalised words), that the tree holds, capitalised and sorted:
+  the genera an abbreviation ("Q. lobata") expands with.
+  """
+  @spec genera([map()], [String.t()]) :: [String.t()]
+  def genera(declared, texts) do
     from_batches =
       for t <- declared,
           t["common_name"] != true,
@@ -258,8 +267,34 @@ defmodule Gallformers.Import.Resolver do
       |> attempts(context)
       |> first_match(opts)
       |> outcome(statement, t, context, opts)
+      |> supplied_id(t["gallformers_taxon_id"])
     end
   end
+
+  # A supplied `gallformers_taxon_id` ("given only when known for certain;
+  # it must match the name") picks among the taxa the name matched; one the
+  # name did not match is flagged, deciding nothing.
+  defp supplied_id(statement, id) when is_integer(id) do
+    cond do
+      statement.resolution == :ambiguous and id in statement.candidate_ids ->
+        %{
+          statement
+          | resolution: :resolved,
+            method: "gallformers_taxon_id",
+            taxon_id: id,
+            candidate_ids: [],
+            detail: Map.drop(statement.detail, ["reason", "proposed"])
+        }
+
+      statement.resolution == :resolved and statement.taxon_id == id ->
+        statement
+
+      true ->
+        %{statement | flags: statement.flags ++ ["supplied_id_disagrees"]}
+    end
+  end
+
+  defp supplied_id(statement, _id), do: statement
 
   @common_name "a common name: it never resolves on its own, so a curator decides which plant"
 

@@ -932,6 +932,50 @@ defmodule Gallformers.Import.GallMatcherTest do
     end
   end
 
+  describe "a curator's Gallformers statement" do
+    test "a Gall given by gallformers_gall_id is that Gall, whatever matching would find",
+         %{source: source} do
+      wasp = taxon_fixture(name: "Andricus curatorius", kingdom: "Animalia")
+      one = gall_fixture(name: "Andricus curatorius stem gall")
+      two = gall_fixture(name: "Andricus curatorius leaf gall")
+      inducer!(wasp, one, source)
+      inducer!(wasp, two, source)
+
+      batch = %{
+        "batch_type" => "gall",
+        "source" => %{"gallformers" => true},
+        "galls" => [
+          gall("g1", %{"inducer" => "t1"}, %{"gallformers_gall_id" => two.id}),
+          # An ID Gallformers does not hold is matched as usual.
+          gall("g2", %{"inducer" => "t1"}, %{"gallformers_gall_id" => 999_999_999})
+        ],
+        "facts" => []
+      }
+
+      %{"g1" => s, "g2" => other} =
+        batch |> GallMatcher.match_galls([resolved("t1", wasp)]) |> by_ref()
+
+      assert %{resolution: :resolved, method: "gallformers_gall_id", gall_id: gall_id} = s
+      assert gall_id == two.id
+      assert other.resolution == :ambiguous
+    end
+
+    test "another Source's gallformers_gall_id is only checked", %{source: source} do
+      wasp = taxon_fixture(name: "Andricus publicus", kingdom: "Animalia")
+      one = gall_fixture(name: "Andricus publicus stem gall")
+      two = gall_fixture(name: "Andricus publicus leaf gall")
+      inducer!(wasp, one, source)
+      inducer!(wasp, two, source)
+
+      %{"g1" => s} =
+        match([gall("g1", %{"inducer" => "t1"}, %{"gallformers_gall_id" => two.id})], [
+          resolved("t1", wasp)
+        ])
+
+      assert s.resolution == :ambiguous
+    end
+  end
+
   describe "queue_items/1" do
     test "ambiguous Galls go to the queue; undescribed ones as candidates" do
       statements = [

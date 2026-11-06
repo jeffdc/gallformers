@@ -15,6 +15,7 @@ Operational runbooks for Gallformers.
 | [PostgreSQL Migration Cutover](./postgres-cutover.md) | Cutover procedures and post-migration cleanup |
 | [Incident Response](./incident-response.md) | Coordinate response to production incidents |
 | [Fly Operations](./fly-operations.md) | Fly.io infrastructure operations and safety rules |
+| [Source Intake](./source-intake.md) | Advice and gotchas for the backscan: what to run next, preparing a Source, reviewing it |
 | [WCVP](./wcvp.md) | WCVP secondary database operations |
 | [Map Tiles](./map-tiles.md) | Range map tile generation and deployment |
 | [OpenTofu Operations](./opentofu-operations.md) | AWS infrastructure management |

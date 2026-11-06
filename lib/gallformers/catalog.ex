@@ -56,6 +56,7 @@ defmodule Gallformers.Catalog do
       Facts.RelationshipFact,
       Facts.TraitFact,
       FactListener,
+      FactNote,
       Gall,
       GallName,
       LegacyCitation,
@@ -78,6 +79,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
   alias Gallformers.Catalog.Assert
+  alias Gallformers.Catalog.FactNote
   alias Gallformers.Catalog.Facts.AliasFact
   alias Gallformers.Catalog.Facts.DescriptionFact
   alias Gallformers.Catalog.Facts.OccurrenceFact
@@ -857,6 +859,105 @@ defmodule Gallformers.Catalog do
     with {:ok, detail} <- Assert.find(Map.fetch!(@fact_kinds, kind), key) do
       {:ok, detail && detail.fact_id}
     end
+  end
+
+  @typedoc """
+  What a Fact about a Gall says, as the Gall page keys its attributions
+  (`Gallformers.Catalog.ReadModels.GallPage`), plus recorded occurrences.
+  """
+  @type gall_fact_key ::
+          {:inducer | :host, integer()}
+          | {:trait, String.t(), String.t()}
+          | {:alias, String.t()}
+          | {:range, :exclude | :only, integer()}
+          | {:occurrence, integer()}
+
+  @doc """
+  Finds the Fact about Gall `gall_id` that `key` (`t:gall_fact_key/0`)
+  names, without writing: `{:ok, fact_id}`, `{:ok, nil}` when there is none
+  yet, `{:error, changeset}` when the key cannot name one (an unknown Trait
+  value, a Host that is not a plant), or `{:error, :unknown_key}`.
+  """
+  @spec find_gall_fact(integer(), gall_fact_key() | term()) ::
+          {:ok, integer() | nil} | {:error, Changeset.t() | :unknown_key}
+  def find_gall_fact(gall_id, key) when is_integer(gall_id) do
+    case gall_fact(gall_id, key) do
+      {kind, natural_key} -> find_fact(kind, natural_key)
+      nil -> {:error, :unknown_key}
+    end
+  end
+
+  @doc """
+  The Fact kind and natural key (`find_fact/2`, `assert_fact/4`) of the Fact
+  about Gall `gall_id` that `key` names, or nil for a key that names none.
+  """
+  @spec gall_fact(integer(), term()) :: {fact_kind(), map()} | nil
+  def gall_fact(gall_id, {role, taxon_id})
+      when role in [:inducer, :host] and is_integer(taxon_id),
+      do:
+        {:relationship,
+         %{type: "#{role}_of", subject_taxon_id: taxon_id, object_gall_id: gall_id}}
+
+  def gall_fact(gall_id, {:trait, trait, value}) when is_binary(trait) and is_binary(value),
+    do: {:trait, %{gall_id: gall_id, trait: trait, value: value}}
+
+  def gall_fact(gall_id, {:alias, name}) when is_binary(name),
+    do: {:alias, %{gall_id: gall_id, name: name}}
+
+  def gall_fact(gall_id, {:range, adjustment, place_id})
+      when adjustment in [:exclude, :only] and is_integer(place_id),
+      do: {:range, %{gall_id: gall_id, adjustment: adjustment, place_id: place_id}}
+
+  def gall_fact(gall_id, {:occurrence, place_id}) when is_integer(place_id),
+    do: {:occurrence, %{gall_id: gall_id, place_id: place_id}}
+
+  def gall_fact(_gall_id, _key), do: nil
+
+  @doc """
+  The slot the Fact about Gall `gall_id` that `key` names competes in
+  (`detachable`, a place's range adjustments), or nil: none, or a key that
+  names no Fact.
+  """
+  @spec gall_fact_slot(integer(), term()) :: String.t() | nil
+  def gall_fact_slot(gall_id, key) do
+    case gall_fact(gall_id, key) do
+      {kind, natural_key} ->
+        module = Map.fetch!(@fact_kinds, kind)
+        module.slot(struct(module, natural_key))
+
+      nil ->
+        nil
+    end
+  end
+
+  @doc """
+  Records `actor`'s note on Fact `fact_id` (`Gallformers.Catalog.FactNote`):
+  `text`, trimmed, not blank. A note is not a statement: the Fact's standing
+  is left as it is. `opts`: `:author_name`, the author when replaying a
+  note someone else wrote (no user ID is kept then).
+  """
+  @spec add_fact_note(Actor.t(), integer(), String.t(), keyword()) ::
+          {:ok, FactNote.t()} | {:error, Changeset.t()}
+  def add_fact_note(%Actor{} = actor, fact_id, text, opts \\ []) when is_integer(fact_id) do
+    Audit.transaction(actor, "catalog.add_fact_note", fn ->
+      fact_id
+      |> FactNote.create_changeset(actor, text, opts)
+      |> Repo.insert()
+      |> case do
+        {:ok, note} -> note
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc "The notes on the Facts among `fact_ids`, by Fact ID, oldest first."
+  @spec list_fact_notes([integer()]) :: %{integer() => [FactNote.t()]}
+  def list_fact_notes([]), do: %{}
+
+  def list_fact_notes(fact_ids) when is_list(fact_ids) do
+    from(n in FactNote, where: n.fact_id in ^fact_ids, order_by: [n.inserted_at, n.id])
+    |> Repo.all()
+    |> Enum.group_by(& &1.fact_id)
   end
 
   @doc "Whether a Gall already shows `name`, ignoring case (names shown are unique)."

@@ -78,7 +78,8 @@ defmodule Gallformers.Import do
   denials, edits on Facts before approval, and the Host-name step's and
   taxonomy admin's edits
   (`record_synonym_added/4`, `record_plant_added/2`,
-  `record_taxonomy_edit/2`, `record_wcvp_edit/2`).
+  `record_taxonomy_edit/2`, `record_wcvp_edit/2`), and curators' notes on
+  Facts and plant edits (`record_fact_note/5`, `record_taxon_note/5`).
   `Gallformers.Import.Replay` replays it after the cutover data migration:
   `export_replay_log/0` writes preview's log to the private bucket and
   `replay_exported/2` replays that file on production
@@ -114,7 +115,9 @@ defmodule Gallformers.Import do
       Batch,
       BatchStatement,
       BatchUnmapped,
+      Events,
       GallComparison,
+      GallformersFragment,
       Package,
       Passages,
       QueueItem,
@@ -124,6 +127,7 @@ defmodule Gallformers.Import do
       ReplayEntry,
       StatementEdit,
       TermCandidate,
+      UnusedNames,
       Validator,
       Validator.Problem,
       Vocab,
@@ -142,6 +146,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.Batch
   alias Gallformers.Import.BatchStatement
   alias Gallformers.Import.BatchUnmapped
+  alias Gallformers.Import.CurationNotes
   alias Gallformers.Import.Disputes
   alias Gallformers.Import.FactEdits
   alias Gallformers.Import.FactsView
@@ -2274,7 +2279,9 @@ defmodule Gallformers.Import do
 
   @doc """
   Takes in Gallformers' own statements written in a form (a curator's range
-  exclusion, say; `priv/import/GALLFORMERS_STATEMENTS.md`) as a package of
+  exclusion, the curation tray's Fact items;
+  `priv/import/GALLFORMERS_STATEMENTS.md`, built by
+  `Gallformers.Import.GallformersFragment`) as a package of
   their own: `batches` maps a batch file name (`"gall.json"`,
   `"taxonomy.json"`) to the decoded batch, its source `{"gallformers":
   true}`. Each batch is given a fresh producer `batch_id` (any it has is
@@ -2804,6 +2811,33 @@ defmodule Gallformers.Import do
 
   defp taxon_id(%Taxa.Taxon{id: id}), do: id
   defp taxon_id(id) when is_integer(id), do: id
+
+  # -- curators' notes (matter `ec2c`) --------------------------------------------
+
+  @doc """
+  Notes the Fact about Gall `gall_id` that `key` names (a Gall page key,
+  `Gallformers.Catalog.find_gall_fact/2`) and records it in the replay log,
+  in one transaction (`Gallformers.Import.CurationNotes`). `opts`:
+  `:author_name`, when replaying. `{:error, :no_fact}` when there is no such
+  Fact.
+  """
+  @spec record_fact_note(
+          Actor.t(),
+          integer(),
+          Catalog.gall_fact_key(),
+          String.t(),
+          keyword()
+        ) :: {:ok, Gallformers.Catalog.FactNote.t()} | {:error, term()}
+  defdelegate record_fact_note(actor, gall_id, key, text, opts \\ []), to: CurationNotes
+
+  @doc """
+  Records a "based on" note on taxon `taxon_id`'s edit of `about`
+  (`"name"`, `"synonyms"`, `"range"`; `Gallformers.Taxa.add_taxon_note/5`)
+  and logs it, in one transaction (`Gallformers.Import.CurationNotes`).
+  """
+  @spec record_taxon_note(Actor.t(), integer(), String.t(), String.t(), keyword()) ::
+          {:ok, Taxa.TaxonNote.t()} | {:error, term()}
+  defdelegate record_taxon_note(actor, taxon_id, about, text, opts \\ []), to: CurationNotes
 
   # -- the Source editor -------------------------------------------------------
 

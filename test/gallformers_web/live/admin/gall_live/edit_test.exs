@@ -384,6 +384,8 @@ defmodule GallformersWeb.Admin.GallLive.EditTest do
       plant = plant_fixture()
       :ok = host_range_fixture(plant, [{"US-CA", "exact"}])
       {genus, genus_name} = genus!()
+      # The Inducer's name is a plant genus's too: a question for an admin.
+      taxon_fixture(rank: :genus, name: genus_name, kingdom: "Plantae")
 
       gall =
         gall_fixture(name: "#{genus_name} zz-undescribed-gall", descriptor: "zz-undescribed-gall")

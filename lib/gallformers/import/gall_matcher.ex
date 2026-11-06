@@ -82,7 +82,9 @@ defmodule Gallformers.Import.GallMatcher do
   A supplied `gallformers_gall_id` that is not the match or among the
   candidates is flagged `"supplied_id_disagrees"` — except in a batch
   reading a Gall's note (`source.note`), whose Gall with the note's ID is
-  that Gall (method `"note"`), with no matching.
+  that Gall (method `"note"`), with no matching; and in a curator's own
+  Gallformers batch (no note, `Gallformers.Curation`), whose Gall with an ID
+  Gallformers holds is that Gall (method `"gallformers_gall_id"`).
   """
 
   alias Gallformers.Catalog
@@ -108,6 +110,7 @@ defmodule Gallformers.Import.GallMatcher do
   @stop_words ~w(gall galls the and of on in a an sp spp wasp unknown from with its this)
   @open [:unresolved, :ambiguous]
   @not_queued ["waits_on_inducer", "paired_with_gall"]
+  @supplied "gallformers_gall_id"
 
   @doc """
   Matches every Gall of `batch` (a decoded gall batch), given the batch's
@@ -119,14 +122,19 @@ defmodule Gallformers.Import.GallMatcher do
     taxa = Map.new(taxon_statements, &{&1.ref, &1})
     facts = List.wrap(batch["facts"])
     noted = noted_gall_id(batch["source"])
+    curated? = curated?(batch["source"])
 
     batch
     |> Map.get("galls", [])
     |> List.wrap()
     |> Enum.map(fn g ->
-      if noted && g["gallformers_gall_id"] == noted,
-        do: note_gall(g, noted),
-        else: match_gall(g, taxa, facts)
+      id = g["gallformers_gall_id"]
+
+      cond do
+        noted && id == noted -> note_gall(g, noted, "note")
+        curated? and is_integer(id) and Catalog.get_gall(id) != nil -> note_gall(g, id, @supplied)
+        true -> match_gall(g, taxa, facts)
+      end
     end)
     |> unshare_resolutions()
     |> unshare_proposals()
@@ -143,12 +151,17 @@ defmodule Gallformers.Import.GallMatcher do
 
   defp noted_gall_id(_source), do: nil
 
-  defp note_gall(g, gall_id) do
+  # A curator's own statement (Gallformers, no note), written from the
+  # Gall's page: the Gall it names by ID is that Gall.
+  defp curated?(%{"gallformers" => true} = source), do: not Map.has_key?(source, "note")
+  defp curated?(_source), do: false
+
+  defp note_gall(g, gall_id, method) do
     %{
       kind: :gall,
       ref: g["ref"],
       resolution: :resolved,
-      method: "note",
+      method: method,
       gall_id: gall_id,
       candidate_ids: [],
       flags: [],

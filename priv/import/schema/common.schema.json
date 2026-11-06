@@ -227,6 +227,16 @@
           },
           "additionalProperties": false
         },
+        "cites": {
+          "description": "Optional. The Source Gallformers follows for this statement (\"per Weld 1959\"): the statement is Gallformers' own, made on that Source's word. When that Source is brought in, its own statement joins the same Fact.",
+          "type": "object",
+          "required": ["as_written"],
+          "properties": {
+            "as_written": { "type": "string", "minLength": 1, "description": "The Source as the curator names it, e.g. 'Weld 1959'." },
+            "source_id": { "type": "integer", "minimum": 1, "description": "Optional: Gallformers' ID for that Source." }
+          },
+          "additionalProperties": false
+        },
         "observations": { "$ref": "#/$defs/observations" }
       },
       "additionalProperties": false

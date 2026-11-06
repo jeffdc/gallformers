@@ -15,7 +15,7 @@ The top-level matter for **taxogall**: what we're building, what's done, and the
 Gallformers today treats everything as a species. Taxogall replaces that, in place, on the `taxogall` branch:
 
 - **Galls** are catalog entries (two generations are two Galls). Everything known about them — Hosts and other relationships, Traits, range, recorded occurrences, common names, descriptions — is a **Fact**, attributed to the Sources that confirm or deny it. Gallformers is a Source too.
-- **Taxonomy is Facts too** (Jeff, 2026-11-06): names, authorship, placements, synonymies, ranks and splits are Facts, Gallformers' own positions included; the tree is whatever the current taxonomic Facts say. Editorial, not Facts: Gall naming (derived names, `86e7`) and plant data (names, synonymy, ranges; WCVP to ease input, curators edit freely; not a system of record for plants).
+- **Taxonomy is Facts too** (Jeff, 2026-11-06): names, authorship, placements, synonymies, ranks and splits are Facts credited to the Sources that make them (Gallformers only as a rare exception; `f923`); the tree is whatever the current taxonomic Facts say. Editorial, not Facts: Gall naming (derived names, `86e7`) and plant data (names, synonymy, ranges; WCVP to ease input, curators edit freely; not a system of record for plants).
 - **Every change goes through one Fact process:** Sources arrive as LLM-produced packages against a validated contract (`priv/import/`), curators settle questions and approve; Gallformers' own edits use the same process. Decisions are logged and replayed at cutover.
 - **The pipeline is the migration** for everything that lives in Sources: existing Sources are re-processed into the new model before release.
 
@@ -31,16 +31,16 @@ Key references: domain language `docs/domain/domain-model.md`; design and rules 
 
 ## Order to release (Jeff, 2026-11-06)
 
-1. **a) How the admin works** — Jeff and Claude. Gallformers curation (`ec2c`): every edit a Gallformers Fact through the intake's Fact process; inline edits on the pages, a ⌘K command palette for everyone, and making edits from a pasted iNat observation (typed prose commands held). Also open in `f14c`: fewer clicks per decision, layout and density.
+1. **a) How the admin works** — Jeff and Claude. Gallformers curation (`ec2c`): every edit through the intake's Fact process (taxonomy credited to the Source it follows); inline edits on the pages, a ⌘K command palette for everyone, and making edits from a pasted iNat observation (typed prose commands held). Also open in `f14c`: fewer clicks per decision, layout and density. Status (2026-11-06): palette and changes built (design-system worktree); the change-set back end built on taxogall (`Gallformers.Curation`, interface in ec2c); Edit mode and the tray UI next, in the design-system worktree.
    **b) Design system** — Jeff with another agent, applied to the app (`bc0d`); runs in parallel.
 2. **Merge the two branches.**
-3. **Phase 2 and the remaining gaps,** in the new design system:
-   - Phase 2: placements, accepted names and synonymies drive the tree from current Facts (`8567`). Today's direct tree edits become Gallformers Facts: the taxonomy admin's edits, and review decisions that change the tree (split or move a synonym, create a plant or taxon, a Source's name read in its own sense).
+3. **Phase 2 (`f923`, planned 2026-11-06) and the remaining gaps,** in the new design system:
+   - Phase 2: placements, accepted names and synonymies drive the tree from current Facts (`8567`). Today's direct tree edits become Facts credited to the Source the curator follows (`f923`): the taxonomy admin's edits, and review decisions that change the tree (split or move a synonym, create a plant or taxon, a Source's name read in its own sense).
    - The admin per 1a; Undo of a decided question (rule agreed, `f14c`); the admin corrections page for a Source's applied Facts (`f14c`); WCVP authorship for plants.
 4. **Gallformers notes** (`20e5`, "Current thinking" section): undescribed Galls keep current-data Facts and their notes as text; described notes' patterned statements by code; the judgement minority by chunked LLM or curator; notes split into Facts and commentary.
 5. **Process Sources into a copy of production** (Jeff and Adam, on the preview server, `f465`). Before scaling:
    - cost levers (about $9 a Source today; one checker instead of two ≈ −22%; a cheaper model for checking and responding);
-   - the missed-names check (names a Source prints that nothing uses; prototype in `d213`);
+   - the missed-names check (names a Source prints that nothing uses; back end built, `Import.UnusedNames`; showing it on the review Source page remains; `d213`);
    - reference answers rebuilt in format 4 from reviewed packages;
    - where the producer runs at scale (subscription, API account, or a server job);
    - curator onboarding: rewrite `docs/domain/admin-onboarding.md`; walk Adam through it.

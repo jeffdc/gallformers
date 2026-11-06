@@ -189,4 +189,27 @@ defmodule Gallformers.Taxa.NameResolutionTest do
       assert Taxa.genus_names([]) == []
     end
   end
+
+  describe "names_held/2" do
+    test "the taxa holding each name, by normalized name, through any of their names" do
+      foo = taxon_fixture(name: "Heldia foo")
+      {:ok, _} = Taxa.add_synonym(test_actor(), foo, "Heldia oldfoo")
+      bar = taxon_fixture(name: "Heldia heldbarus")
+      other = taxon_fixture(name: "Otheria heldbarus")
+
+      assert Taxa.names_held(["heldia foo", "heldia oldfoo", "heldia nothing"], []) == %{
+               "heldia foo" => [foo.id],
+               "heldia oldfoo" => [foo.id]
+             }
+
+      # A binomial whose epithet is one of `epithets`, in any genus.
+      assert Taxa.names_held(["heldia foo"], ["heldbarus"]) == %{
+               "heldia foo" => [foo.id],
+               "heldia heldbarus" => [bar.id],
+               "otheria heldbarus" => [other.id]
+             }
+
+      assert Taxa.names_held([], []) == %{}
+    end
+  end
 end

@@ -20,6 +20,7 @@ defmodule GallformersWeb.Admin.GallLive.RangeExclusions do
       excluded one by one.
   """
   alias Gallformers.Catalog
+  alias Gallformers.Import.GallformersFragment
   alias Gallformers.Places
 
   @typedoc "A current exclusion with the leaf places it stands for."
@@ -167,106 +168,37 @@ defmodule GallformersWeb.Admin.GallLive.RangeExclusions do
   `statement` (`%{text, stated_on}`), each place written with its name from
   `place_names` (code → name).
 
-  The Gall is named as an import names it (`identified_by`): by its
-  Inducer and generation, with its first Host as well when the Inducer is
-  above species rank or missing; `gallformers_gall_id` is checked against
-  that. `{:error, :unidentified}` for a Gall with neither Inducer nor Host.
+  The Gall is named as an import names it
+  (`Gallformers.Import.GallformersFragment.gall_batch/3`): by its Inducer
+  and generation, with its first Host as well when the Inducer is above
+  species rank or missing; `gallformers_gall_id` is checked against that.
+  `{:error, :unidentified}` for a Gall with neither Inducer nor Host.
   """
   @spec batch(map(), plan(), %{text: String.t(), stated_on: Date.t()}, %{String.t() => String.t()}) ::
           {:ok, map()} | {:error, :unidentified}
   def batch(summary, plan, statement, place_names) do
-    inducer = List.first(summary.inducers)
-    host = if described?(inducer), do: nil, else: List.first(summary.hosts)
+    evidence = [
+      %{
+        "statement" => %{
+          "text" => String.trim(statement.text),
+          "stated_on" => Date.to_iso8601(statement.stated_on)
+        }
+      }
+    ]
 
-    case Enum.reject([inducer, host], &is_nil/1) do
-      [] ->
-        {:error, :unidentified}
+    facts =
+      for {stance, code} <-
+            Enum.map(plan.exclude, &{"confirm", &1}) ++ Enum.map(plan.withdraw, &{"deny", &1}) do
+        %{
+          "stance" => stance,
+          "kind" => "range",
+          "gall" => :gall,
+          "adjustment" => "exclude",
+          "place" => %{"value" => code, "as_written" => Map.get(place_names, code, code)},
+          "evidence" => evidence
+        }
+      end
 
-      taxa ->
-        refs = taxa |> Enum.with_index(1) |> Enum.map(fn {taxon, i} -> {taxon, "t#{i}"} end)
-        ref_of = fn taxon -> refs |> List.keyfind(taxon, 0) |> elem(1) end
-
-        identified_by =
-          %{}
-          |> put_if("inducer", inducer && ref_of.(inducer))
-          |> put_if("host", host && ref_of.(host))
-          |> put_if(
-            "generation",
-            summary.generation &&
-              %{"value" => summary.generation, "as_written" => summary.generation}
-          )
-
-        evidence = [
-          %{
-            "statement" => %{
-              "text" => String.trim(statement.text),
-              "stated_on" => Date.to_iso8601(statement.stated_on)
-            }
-          }
-        ]
-
-        facts =
-          (Enum.map(plan.exclude, &{"confirm", &1}) ++ Enum.map(plan.withdraw, &{"deny", &1}))
-          |> Enum.with_index(1)
-          |> Enum.map(fn {{stance, code}, i} ->
-            %{
-              "id" => "f#{i}",
-              "stance" => stance,
-              "kind" => "range",
-              "gall" => "g1",
-              "adjustment" => "exclude",
-              "place" => %{"value" => code, "as_written" => Map.get(place_names, code, code)},
-              "evidence" => evidence
-            }
-          end)
-
-        {:ok,
-         %{
-           "format" => "gallformers-import",
-           "format_version" => 3,
-           "vocabulary_version" => vocabulary_version(),
-           "batch_type" => "gall",
-           "mode" => "add",
-           "produced_at" => DateTime.utc_now(:second) |> DateTime.to_iso8601(),
-           "producer" => %{"name" => "gallformers-admin", "version" => "1"},
-           "source" => %{"gallformers" => true},
-           "taxa" =>
-             Enum.map(refs, fn {taxon, ref} ->
-               %{
-                 "ref" => ref,
-                 "name_as_written" => taxon.name,
-                 "rank" => Atom.to_string(taxon.rank)
-               }
-             end),
-           "galls" => [
-             %{
-               "ref" => "g1",
-               "name_as_written" => summary.name,
-               "gallformers_gall_id" => summary.gall_id,
-               "identified_by" => identified_by
-             }
-           ],
-           "facts" => facts
-         }}
-    end
+    GallformersFragment.gall_batch(summary, facts)
   end
-
-  @species_ranks [:species, :subspecies, :variety, :form]
-
-  defp described?(%{rank: rank}), do: rank in @species_ranks
-  defp described?(nil), do: false
-
-  defp put_if(map, _key, nil), do: map
-  defp put_if(map, key, value), do: Map.put(map, key, value)
-
-  # The vocabulary the admin writes with: the Trait vocabulary's date
-  # (`priv/import/vocab/traits.json`).
-  @traits Path.expand("../../../../../priv/import/vocab/traits.json", __DIR__)
-  @external_resource @traits
-  @vocabulary_version @traits
-                      |> File.read!()
-                      |> JSON.decode!()
-                      |> Map.fetch!("vocabulary_version")
-
-  defp vocabulary_version, do: @vocabulary_version
 end

@@ -51,6 +51,10 @@ private           vocab_requests
 private           trait_term_candidates
 private           replay_log
 
+# Curation: curators' change sets (the tray), drafts until applied (ec2c).
+private           change_sets
+private           change_set_items
+
 # Places and vocabularies.
 public            abundance
 public            place
@@ -113,6 +117,8 @@ public            synonymy_facts
 public            split_facts
 public            split_fact_daughters
 public            common_name_facts
+# "Based on" notes on plants' editorial edits, shown on the plant page (ec2c).
+public            taxon_notes
 
 # The gall catalog.
 public            galls
@@ -129,6 +135,8 @@ public            range_facts
 public            occurrence_facts
 public            alias_facts
 public            description_facts
+# Curators' notes on Facts, shown with the Fact on the Gall page (ec2c).
+public            fact_notes
 # Sources' Trait terms waiting on a question, shown on the Gall page (d213).
 public            pending_trait_terms
 # Old gall IDs excluded as non-galls, for their URLs' redirect.

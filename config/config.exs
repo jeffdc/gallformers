@@ -125,6 +125,12 @@ config :gallformers, Gallformers.Taxa.Events,
 # Facts never references its listeners.
 config :gallformers, Gallformers.Facts.Events, listeners: [Gallformers.Catalog.FactListener]
 
+# "Package advanced" listeners, called by the import job after each step it
+# takes a package. Registered here so Import never references them: the
+# curation tray's items learn the outcome of the package they were
+# submitted in (matter ec2c).
+config :gallformers, Gallformers.Import.Events, listeners: [Gallformers.Curation.PackageListener]
+
 # Configure Ueberauth for Auth0 authentication
 # Client ID and secret are set in runtime.exs from environment variables
 config :ueberauth, Ueberauth,

@@ -9,7 +9,8 @@ defmodule Gallformers.Import.Worker do
   Runs on the `import` queue, one job at a time, and unique per package
   while waiting: enqueueing again replaces the waiting job's actor. The
   actor (who delivered or approved the package) travels in the args, so
-  the audit trail names them.
+  the audit trail names them. After each step the package's listeners are
+  told (`Gallformers.Import.Events`).
   """
   use Oban.Worker,
     queue: :import,
@@ -22,11 +23,12 @@ defmodule Gallformers.Import.Worker do
 
   alias Gallformers.Audit.Actor
   alias Gallformers.Import
+  alias Gallformers.Import.Events
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"package_id" => package_id, "actor" => actor}}) do
     case Import.advance_package(actor(actor), package_id) do
-      {:ok, _package} -> :ok
+      {:ok, package} -> Events.dispatch(package)
       {:error, reason} -> {:error, reason}
     end
   end

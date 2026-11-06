@@ -450,3 +450,32 @@ def test_a_common_name_takes_no_scientific_claims(paper, schema_errors, field, v
     del paper["taxa"][2]["common_name"]
     paper["taxa"][2]["rank"] = "species"
     assert schema_errors(paper) == []
+
+
+# -- 2026-11-06: a Gallformers statement citing a Source (curation, ec2c) -----------
+
+
+def statement_example():
+    return example("gallformers-statement")
+
+
+def test_cites_on_statement_evidence(schema_errors):
+    batch = statement_example()
+    evidence = batch["facts"][1]["evidence"][0]
+    evidence["cites"] = {"as_written": "Weld 1959", "source_id": 42}
+    assert schema_errors(batch) == []
+    evidence["cites"] = {"as_written": "Weld 1959"}
+    assert schema_errors(batch) == []
+
+
+def test_cites_on_statement_evidence_needs_as_written(schema_errors):
+    batch = statement_example()
+    batch["facts"][1]["evidence"][0]["cites"] = {"source_id": 42}
+    assert errors_mention(schema_errors(batch), "cites")
+    batch["facts"][1]["evidence"][0]["cites"] = {"as_written": "Weld 1959", "source_id": "42"}
+    assert errors_mention(schema_errors(batch), "source_id")
+
+
+def test_cites_on_quote_evidence_takes_no_source_id(paper, schema_errors):
+    paper["facts"][1]["evidence"][0]["cites"] = {"as_written": "Kinsey 1923", "source_id": 42}
+    assert errors_mention(schema_errors(paper), "cites")

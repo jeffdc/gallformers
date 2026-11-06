@@ -432,6 +432,68 @@ defmodule Gallformers.Import.ReviewTest do
       assert %{entries: [_]} = Import.list_packages(status: :approved)
     end
 
+    test "a statement citing a Source records that Source on its attribution", ctx do
+      weld = source_fixture("Weld", "1959")
+
+      fragment =
+        update_in(
+          exclusion(ctx.gall),
+          ["facts", Access.at(0), "evidence", Access.at(0)],
+          &Map.put(&1, "cites", %{"as_written" => "Weld 1959", "source_id" => weld.id})
+        )
+
+      assert {:ok, %Package{status: :approved} = package} =
+               Import.submit_gallformers_fragment(test_actor(), %{"gall.json" => fragment})
+
+      assert [attribution] = Facts.list_attributions(fact_id(package, "f1"))
+      assert attribution.source_id == ctx.gallformers.id
+      assert attribution.cites_as_written == "Weld 1959"
+      assert attribution.cited_source_id == weld.id
+    end
+
+    test "a later statement without a cite clears the earlier one's", ctx do
+      weld = source_fixture("Weld", "1959")
+
+      citing =
+        update_in(
+          exclusion(ctx.gall),
+          ["facts", Access.at(0), "evidence", Access.at(0)],
+          &Map.put(&1, "cites", %{"as_written" => "Weld 1959", "source_id" => weld.id})
+        )
+
+      {:ok, first} = Import.submit_gallformers_fragment(test_actor(), %{"gall.json" => citing})
+
+      plain =
+        put_in(
+          exclusion(ctx.gall),
+          ["facts", Access.at(0), "evidence", Access.at(0), "statement", "stated_on"],
+          "2026-10-28"
+        )
+
+      {:ok, _} = Import.submit_gallformers_fragment(test_actor(), %{"gall.json" => plain})
+
+      assert [attribution] = Facts.list_attributions(fact_id(first, "f1"))
+      assert attribution.stated_on == ~D[2026-10-28]
+      assert attribution.cites_as_written == nil
+      assert attribution.cited_source_id == nil
+    end
+
+    test "a cited Source Gallformers does not hold is kept as written", ctx do
+      fragment =
+        update_in(
+          exclusion(ctx.gall),
+          ["facts", Access.at(0), "evidence", Access.at(0)],
+          &Map.put(&1, "cites", %{"as_written" => "Weld 1959", "source_id" => 999_999_999})
+        )
+
+      assert {:ok, %Package{status: :approved} = package} =
+               Import.submit_gallformers_fragment(test_actor(), %{"gall.json" => fragment})
+
+      assert [attribution] = Facts.list_attributions(fact_id(package, "f1"))
+      assert attribution.cites_as_written == "Weld 1959"
+      assert attribution.cited_source_id == nil
+    end
+
     test "each fragment gets its own batch_id and package", ctx do
       {:ok, first} =
         Import.submit_gallformers_fragment(test_actor(), %{"gall.json" => exclusion(ctx.gall)})
