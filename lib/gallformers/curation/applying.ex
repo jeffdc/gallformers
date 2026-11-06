@@ -18,8 +18,10 @@ defmodule Gallformers.Curation.Applying do
       by ID, submitted as a package of its own
       (`Gallformers.Import.submit_gallformers_fragment/2`) for the import
       job to apply. The items wait in the tray for its outcome
-      (`settle/1`). A Fact item that is held already is a no-op: it leaves
-      the tray with nothing submitted.
+      (`settle/1`). A Fact item Gallformers itself states already, with
+      the same Observations, is a no-op: it leaves the tray with nothing
+      submitted. A newer Gallformers statement keeps the Observations its
+      earlier one cited.
 
   `dry_run/2` applies an editorial item or note in a transaction that is
   always rolled back, so Review sees every check the apply makes.
@@ -30,6 +32,7 @@ defmodule Gallformers.Curation.Applying do
   alias Gallformers.Audit.Actor
   alias Gallformers.Catalog
   alias Gallformers.Curation.Item
+  alias Gallformers.Curation.Review
   alias Gallformers.Curation.Spec
   alias Gallformers.Curation.Statements
   alias Gallformers.Import
@@ -195,7 +198,7 @@ defmodule Gallformers.Curation.Applying do
       |> Enum.map(fn {gall_id, entries} ->
         statements =
           for {item, evidence} <- entries,
-              do: {item, Statements.for_item(item.spec, evidence, today)}
+              do: {item, Statements.for_item(item.spec, keep_observations(item, evidence), today)}
 
         {gall_id, statements}
       end)
@@ -215,6 +218,26 @@ defmodule Gallformers.Curation.Applying do
           do: {item, "the Gall has neither an Inducer nor a Host, so a statement cannot name it"}
 
     {submitted(actor, named), held}
+  end
+
+  # Gallformers' newer statement replaces its earlier one on the same Fact,
+  # so it carries the Observations the earlier one cited as well.
+  defp keep_observations(item, evidence) do
+    case Review.kept_observations(item.spec) do
+      [] ->
+        evidence
+
+      kept ->
+        evidence = evidence || %{}
+        new = evidence[:observations] || []
+        seen = MapSet.new(new, &{to_string(&1.provider), to_string(&1.id)})
+
+        Map.put(
+          evidence,
+          :observations,
+          new ++ Enum.reject(kept, &MapSet.member?(seen, {&1.provider, &1.id}))
+        )
+    end
   end
 
   defp submitted(_actor, []), do: nil

@@ -81,6 +81,20 @@ defmodule Gallformers.CurationTest do
     }
   end
 
+  # Gallformers' own confirming statement of `fact`, citing one observation.
+  defp gallformers_states!(ctx, fact, observation_id) do
+    {:ok, _} =
+      Facts.attribute(
+        ctx.ada,
+        confirm(ctx.gallformers, %{
+          fact_id: fact.id,
+          statement_text: "Seen on iNaturalist.",
+          stated_on: ~D[2025-06-01],
+          observations: [%{provider: :inaturalist, external_id: observation_id}]
+        })
+      )
+  end
+
   defp add!(actor, spec) do
     {:ok, item} = Curation.add_item(actor, spec)
     item
@@ -338,11 +352,12 @@ defmodule Gallformers.CurationTest do
 
       {_rubra, new} = new_host!(ctx)
 
-      assert [%{kind: :held, flag: {:held, [%{id: weld_id}]}, text: text}] =
+      assert [%{kind: :held, flag: {:held, [%{id: weld_id}]}, text: text} | _] =
                flags(ctx.ada, held.id)
 
       assert weld_id == ctx.weld.id
       assert text =~ "Already held: Weld 1959"
+      assert [%{kind: :held}, %{kind: :adds_statement}] = flags(ctx.ada, held.id)
       assert [%{kind: :new, text: "New"}] = flags(ctx.ada, new.id)
     end
 
@@ -668,10 +683,51 @@ defmodule Gallformers.CurationTest do
       assert [%Item{id: ^id, state: :in_tray}] = Curation.open_set(ctx.ada).items
     end
 
-    test "a Fact already held is a no-op, applied without a package", ctx do
+    test "a Fact a Source holds gains Gallformers' statement, so it survives a retraction", ctx do
       item =
         add!(ctx.ada, %{kind: :fact, gall_id: ctx.gall.id, action: :add, key: {:host, ctx.oak.id}})
 
+      {:ok, _} =
+        Curation.set_evidence(ctx.ada, %{observations: [%{provider: "inaturalist", id: "601"}]})
+
+      assert {:ok, %{submitted: [id]}} = Curation.apply(ctx.ada)
+      assert id == item.id
+
+      gallformers =
+        Enum.find(Facts.list_attributions(ctx.host.id), &(&1.source_id == ctx.gallformers.id))
+
+      assert [%{external_id: "601"}] = gallformers.observations
+    end
+
+    test "a repeat observation adds to Gallformers' statement and keeps the earlier ones", ctx do
+      gallformers_states!(ctx, ctx.host, "601")
+
+      item =
+        add!(ctx.ada, %{kind: :fact, gall_id: ctx.gall.id, action: :add, key: {:host, ctx.oak.id}})
+
+      {:ok, _} =
+        Curation.set_evidence(ctx.ada, %{observations: [%{provider: "inaturalist", id: "602"}]})
+
+      assert [%{kind: :held}, %{kind: :adds_statement}] = flags(ctx.ada, item.id)
+      assert {:ok, %{submitted: [_]}} = Curation.apply(ctx.ada)
+
+      gallformers =
+        Enum.find(Facts.list_attributions(ctx.host.id), &(&1.source_id == ctx.gallformers.id))
+
+      assert gallformers.observations |> Enum.map(& &1.external_id) |> Enum.sort() ==
+               ["601", "602"]
+    end
+
+    test "what Gallformers already states with the same evidence is a no-op", ctx do
+      gallformers_states!(ctx, ctx.host, "601")
+
+      item =
+        add!(ctx.ada, %{kind: :fact, gall_id: ctx.gall.id, action: :add, key: {:host, ctx.oak.id}})
+
+      {:ok, _} =
+        Curation.set_evidence(ctx.ada, %{observations: [%{provider: "inaturalist", id: "601"}]})
+
+      assert [%{kind: :held}] = flags(ctx.ada, item.id)
       assert {:ok, %{applied: [id], submitted: []}} = Curation.apply(ctx.ada)
       assert id == item.id
       assert %{total: 0} = Import.list_packages()

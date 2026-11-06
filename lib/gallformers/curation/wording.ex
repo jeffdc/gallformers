@@ -131,6 +131,10 @@ defmodule Gallformers.Curation.Wording do
   def flag_text(:needs_confirmation),
     do: "Needs confirmation: it changes how the Gall is named or linked from outside"
 
+  def flag_text(:adds_statement),
+    do:
+      "Adds Gallformers' statement, so the Fact keeps Gallformers' support if a Source is retracted"
+
   def flag_text(:editorial), do: "Editorial: no evidence needed"
 
   def flag_text(:needs_reason),

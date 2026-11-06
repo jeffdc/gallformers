@@ -89,10 +89,11 @@ defmodule Gallformers.Curation do
         }
 
   @typedoc """
-  A preview flag: `kind` (`:new`, `:held`, `:supersedes`, `:changed_since`,
-  `:needs_confirmation`, `:editorial`, `:needs_reason`, `:blocked`), `text`
-  (its words) and `flag`, the contract's term: `:new`, `{:held, sources}`,
-  `{:supersedes, statements}`, `{:changed_since, user, at}`,
+  A preview flag: `kind` (`:new`, `:held`, `:adds_statement`, `:supersedes`,
+  `:changed_since`, `:needs_confirmation`, `:editorial`, `:needs_reason`,
+  `:blocked`), `text` (its words) and `flag`, the contract's term: `:new`,
+  `{:held, sources}`, `:adds_statement` (a held Fact gains Gallformers'
+  statement), `{:supersedes, statements}`, `{:changed_since, user, at}`,
   `:needs_confirmation`, `:editorial`, `:needs_reason`, `{:blocked, reason}`.
   """
   @type flag :: %{kind: atom(), text: String.t(), flag: term()}
@@ -451,7 +452,9 @@ defmodule Gallformers.Curation do
   or name parts) and have it.
 
     * editorial items and notes apply at once (`applied`);
-    * a Fact item already held is a no-op (`applied`, nothing written);
+    * a Fact item Gallformers itself states already, with the same
+      Observations, is a no-op (`applied`, nothing written); one only other
+      Sources hold is submitted, adding Gallformers' statement;
     * the other Fact items become one Gallformers package (`submitted`):
       they wait in the tray for its outcome, broadcast per item;
     * an item that is blocked, needs a reason or needs confirmation it was
@@ -552,7 +555,7 @@ defmodule Gallformers.Curation do
       item.kind != :fact ->
         :now
 
-      Map.has_key?(flags, :held) ->
+      Map.has_key?(flags, :held) and not Map.has_key?(flags, :adds_statement) ->
         :noop
 
       true ->

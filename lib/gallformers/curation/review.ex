@@ -5,7 +5,10 @@ defmodule Gallformers.Curation.Review do
   (`Gallformers.Import.Preview`):
 
     * a confirmation of a Fact Gallformers holds current is `{:held,
-      sources}` (applying it changes nothing); of one it holds withdrawn,
+      sources}` (its standing doesn't change), with `:adds_statement` unless
+      Gallformers itself states it already with the same Observations
+      (applying then adds Gallformers' statement, keeping any Observations
+      it cited before); of one it holds withdrawn,
       or one whose slot holds another value current, or another current
       Inducer of the Gall, `{:supersedes, statements}` — the Sources'
       statements it replaces, with their words and dates; else `:new`;
@@ -68,6 +71,7 @@ defmodule Gallformers.Curation.Review do
         status = status(parts)
 
         [status] ++
+          adds_statement(status, item.spec, evidence) ++
           needs_reason(status, evidence) ++
           changed(actor, item, {:facts, existing_ids(parts)}) ++ unnamed(item, evidence)
 
@@ -101,16 +105,71 @@ defmodule Gallformers.Curation.Review do
 
   # -- Facts ---------------------------------------------------------------------
 
-  # Each statement's {stance, Fact}: the Fact its key names now (nil: none).
-  defp fact_parts(%{gall_id: gall_id, action: action, key: key} = spec) do
-    stances =
-      case action do
-        :add -> [{:confirm, key}]
-        :withdraw -> [{:deny, key}]
-        :correct -> [{:deny, key}, {:confirm, spec.to}]
-      end
+  # An item's statements: {stance, key}.
+  defp stances(%{action: :add, key: key}), do: [{:confirm, key}]
+  defp stances(%{action: :withdraw, key: key}), do: [{:deny, key}]
+  defp stances(%{action: :correct, key: key, to: to}), do: [{:deny, key}, {:confirm, to}]
 
-    Enum.reduce_while(stances, {:ok, []}, fn {stance, key}, {:ok, acc} ->
+  # A Fact held already still gains Gallformers' own statement, so it keeps
+  # Gallformers' support if its Sources are retracted (Jeff, 2026-11-06).
+  defp adds_statement({:held, _sources}, spec, evidence) do
+    if adds_statement?(spec, evidence), do: [:adds_statement], else: []
+  end
+
+  defp adds_statement(_status, _spec, _evidence), do: []
+
+  @doc """
+  Whether applying a Fact item's `spec` with `evidence` adds to Gallformers'
+  own statements: true unless the Gallformers Source already states each of
+  its Facts with the same stance, citing every Observation the evidence
+  cites.
+  """
+  @spec adds_statement?(map(), map() | nil) :: boolean()
+  def adds_statement?(spec, evidence) do
+    wanted = observation_keys((evidence || %{})[:observations] || [])
+
+    Enum.any?(stances(spec), fn {stance, key} ->
+      case gallformers_statement(spec.gall_id, key, stance) do
+        nil -> true
+        attribution -> not MapSet.subset?(wanted, observation_keys(attribution.observations))
+      end
+    end)
+  end
+
+  @doc """
+  The Observations Gallformers' own statements of a Fact item's Facts cite
+  already, as evidence observations (`%{provider, id}`), so a newer
+  statement replacing them keeps them.
+  """
+  @spec kept_observations(map()) :: [%{provider: String.t(), id: String.t()}]
+  def kept_observations(spec) do
+    for {stance, key} <- stances(spec),
+        attribution = gallformers_statement(spec.gall_id, key, stance),
+        observation <- attribution.observations,
+        uniq: true,
+        do: %{provider: to_string(observation.provider), id: to_string(observation.external_id)}
+  end
+
+  defp gallformers_statement(gall_id, key, stance) do
+    with %{id: source_id} <- Sources.get_gallformers_source(),
+         {:ok, fact_id} when is_integer(fact_id) <- Catalog.find_gall_fact(gall_id, key) do
+      fact_id
+      |> Facts.list_attributions()
+      |> Enum.find(&(&1.source_id == source_id and &1.stance == stance))
+    else
+      _ -> nil
+    end
+  end
+
+  defp observation_keys(observations) do
+    MapSet.new(observations, fn o ->
+      {to_string(o.provider), to_string(Map.get(o, :external_id) || Map.get(o, :id))}
+    end)
+  end
+
+  # Each statement's {stance, Fact}: the Fact its key names now (nil: none).
+  defp fact_parts(%{gall_id: gall_id} = spec) do
+    Enum.reduce_while(stances(spec), {:ok, []}, fn {stance, key}, {:ok, acc} ->
       case Catalog.find_gall_fact(gall_id, key) do
         {:ok, nil} -> {:cont, {:ok, acc ++ [{stance, key, nil}]}}
         {:ok, id} -> {:cont, {:ok, acc ++ [{stance, key, Facts.get_fact!(id)}]}}
