@@ -448,6 +448,66 @@ defmodule Gallformers.Import.Merge do
     has_children ++ act_blockers ++ groups
   end
 
+  # -- a lump's absorbed taxon (`f923`) --------------------------------------------
+
+  @doc """
+  Moves what the Catalog and the import tables hold of taxon `absorbed_id`
+  onto `survivor_id`, inside `Gallformers.Taxa.merge/3`'s transaction (a
+  lump; `Gallformers.Import.TaxonMerges` calls it on the `:merge` event):
+  the gall Facts naming it (its Inducer Facts above all) move as a plant
+  merge's do, keeping their attributions and `name_as_written` and
+  combining with the survivor's same Fact; same-date ties that brings
+  about become curator questions; the import rows naming it or its Facts
+  (`act_fact_map`: its taxonomic-act Facts to the survivor's) are
+  re-pointed; its images move over.
+
+  `{:error, {:blocked, blockers}}` when an open question or a package
+  under review names it (`Gallformers.Import.RecordRefs`): nothing is moved.
+  """
+  @spec repoint_lumped_taxon(Actor.t(), integer(), integer(), map(), map()) ::
+          :ok | {:error, {:blocked, [Deletion.blocker()]}}
+  def repoint_lumped_taxon(%Actor{} = actor, absorbed_id, survivor_id, act_fact_map, names) do
+    rows = Catalog.facts_naming_taxa([absorbed_id])
+    fact_ids = Enum.map(rows, & &1.fact_id) ++ Map.keys(act_fact_map)
+    refs = RecordRefs.find([absorbed_id], fact_ids, [], for: :merge)
+
+    case RecordRefs.blockers(refs, {:taxon, absorbed_id}, names.absorbed) do
+      [] -> move_lumped(actor, refs, {absorbed_id, survivor_id}, act_fact_map, names)
+      blockers -> {:error, {:blocked, blockers}}
+    end
+  end
+
+  defp move_lumped(actor, refs, {absorbed_id, survivor_id}, act_fact_map, names) do
+    {:ok, %{moves: moves, conflicts: conflicts}} =
+      Catalog.move_taxon_facts(actor, absorbed_id, survivor_id)
+
+    fact_map = moves |> Map.new(&{&1.from, &1.to}) |> Map.merge(act_fact_map)
+    :ok = RecordRefs.repoint(refs, %{absorbed_id => survivor_id}, fact_map)
+    {:ok, _} = Catalog.delete_gall_facts(actor, Enum.map(moves, & &1.from))
+    _images = Images.move_images({:taxon, absorbed_id}, {:taxon, survivor_id})
+
+    after_rows = Catalog.facts_naming_taxa([survivor_id])
+    merge_info = %{"type" => "lump", "absorbed_id" => absorbed_id, "survivor_id" => survivor_id}
+
+    conflicts
+    |> live_conflicts(after_rows)
+    |> queue(after_rows, gall_of(after_rows), merge_info, names.absorbed, names.survivor)
+
+    :ok
+  end
+
+  # The Gall each Fact among `rows` is about, by Fact ID (nil for none).
+  defp gall_of(rows) do
+    about = Map.new(rows, &{&1.fact_id, &1.about})
+
+    fn fact_id ->
+      case about[fact_id] do
+        {:gall, id} -> id
+        _ -> nil
+      end
+    end
+  end
+
   # -- shared ----------------------------------------------------------------------
 
   defp with_sources(moves) do

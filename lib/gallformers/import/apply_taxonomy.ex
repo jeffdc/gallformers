@@ -328,8 +328,19 @@ defmodule Gallformers.Import.ApplyTaxonomy do
     with {:ok, taxon_id} <- taxon(refs, a["taxon"]) do
       declared = refs.declared[a["taxon"]]
 
-      {:ok, :name, %{taxon_id: taxon_id, name: declared_name(declared), rank: declared["rank"]},
-       %{authorship_as_written: get_in(a, ["authorship", "as_written"])}
+      authorship = get_in(a, ["authorship", "as_written"])
+
+      # Sensu and authorship are part of the name Fact (`f923`): "(Ashmead,
+      # 1881)" and "Ashmead, 1881" are two statements.
+      {:ok, :name,
+       %{
+         taxon_id: taxon_id,
+         name: declared_name(declared),
+         rank: declared["rank"],
+         sensu: declared["sensu"],
+         authorship: authorship
+       },
+       %{authorship_as_written: authorship}
        |> Map.reject(fn {_k, v} -> is_nil(v) end)
        |> Map.put(:names, names(refs, [{a["taxon"], "taxon"}]))}
     end

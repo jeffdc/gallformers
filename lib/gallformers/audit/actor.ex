@@ -36,6 +36,11 @@ defmodule Gallformers.Audit.Actor do
   def to_meta(%__MODULE__{type: :system, name: name}),
     do: %{"type" => "system", "name" => name}
 
+  @doc false
+  @spec from_meta(map()) :: t()
+  def from_meta(%{"type" => "user", "id" => id, "name" => name}), do: user(id, name)
+  def from_meta(%{"type" => "system", "name" => name}), do: system(name)
+
   defp present!(name) do
     case String.trim(name) do
       "" -> raise ArgumentError, "an audit actor needs a name"

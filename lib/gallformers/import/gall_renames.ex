@@ -2,7 +2,8 @@ defmodule Gallformers.Import.GallRenames do
   @moduledoc """
   Rename proposals (`86e7` §3): a taxonomy change that would change a
   Gall's derived name — its Inducer renamed or moved, an "Unknown (Family)"
-  Gall's family changing, its Host qualifier renamed — queues a
+  Gall's family changing, its Host qualifier renamed, its Inducer's rank
+  changed or merged into another (a lump, `f923`) — queues a
   `:gall_rename` item in the admin queue (`Gallformers.Import.QueueItem`)
   instead of renaming the Gall. The Gall keeps its name until a curator
   decides.
@@ -57,7 +58,7 @@ defmodule Gallformers.Import.GallRenames do
   # -- proposals ---------------------------------------------------------------
 
   @impl true
-  def taxon_changed(%Event{type: type} = event) when type in [:move, :rename] do
+  def taxon_changed(%Event{type: type} = event) when type in [:move, :rename, :rank, :merge] do
     {unchanged, changed} =
       event |> Catalog.gall_name_changes() |> Enum.split_with(&(&1.from == &1.to))
 
@@ -104,6 +105,12 @@ defmodule Gallformers.Import.GallRenames do
 
   defp reason(%Event{type: :rename, old_name: old, new_name: new}),
     do: "#{old} was renamed #{new}."
+
+  defp reason(%Event{type: :merge, old_name: old, new_name: new}),
+    do: "#{old} was merged into #{new}."
+
+  defp reason(%Event{type: :rank, taxon_id: taxon_id, new_rank: rank}),
+    do: "#{Taxa.accepted_name(taxon_id)} is now ranked #{rank}."
 
   defp reason(%Event{type: :move, taxon_id: taxon_id, to_parent_id: nil}),
     do: "#{Taxa.accepted_name(taxon_id)} was made a root of the tree."

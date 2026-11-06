@@ -75,6 +75,9 @@ defmodule Gallformers.Taxa.ActFacts.SplitFact do
   end
 
   @impl true
+  def key(%__MODULE__{} = s), do: %{taxon_id: s.taxon_id, into_taxon_ids: s.into_taxon_ids}
+
+  @impl true
   def slot(_split), do: nil
 
   @impl true

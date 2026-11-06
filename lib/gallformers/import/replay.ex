@@ -61,6 +61,11 @@ defmodule Gallformers.Import.Replay do
       (`Gallformers.Import.Deletion`, `Gallformers.Import.Merge`). A
       same-date conflict a merge brought about (no package) is decided
       again by its Gall and statement ref (`"merge" => true`).
+    * `:taxonomic_decision` (`%{"op", "source", "kind", "fact"}`) — a
+      Source's taxonomic statement accepted, declined (the payload's
+      `"reason"`) or reopened, found by the Source's title and the act's
+      natural key by stable references, and decided again unless it is in
+      that state already (`Gallformers.Import.TaxonomicDecisions`).
     * `:vocab_requests_decided` — 6611's vocabulary backlog, replaced by
       the superadmin vocabulary page (`d213`); no longer written, and not
       replayed.
@@ -86,6 +91,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.StableRef
   alias Gallformers.Import.SynonymDecisions
+  alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Import.TaxonomyEdits
   alias Gallformers.Import.VocabEdits
 
@@ -306,6 +312,9 @@ defmodule Gallformers.Import.Replay do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp replay(actor, %{kind: :taxonomic_decision, key: key, payload: payload}),
+    do: TaxonomicDecisions.replay(actor, key, payload)
 
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
 

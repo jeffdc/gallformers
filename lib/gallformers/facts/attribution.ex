@@ -23,6 +23,12 @@ defmodule Gallformers.Facts.Attribution do
       made on another Source's word ("per Weld 1959", matter `ec2c`): that
       Source as the curator named it, and the Source itself when Gallformers
       holds it.
+    * `accepted_at` / `accepted_by_user_id`, `declined_at` /
+      `declined_by_user_id` / `decline_reason` — a curator's acceptance or
+      decline of a Source's taxonomic statement (`f923`): only an accepted
+      one counts (`Gallformers.Facts.accept/3`). Set only by
+      `Gallformers.Facts`, never cast from attrs; a change of stance clears
+      them.
 
   Evidence (quotes), the taxa it names, and the Observations it cites are
   `Gallformers.Facts.Evidence`, `Gallformers.Facts.AttributionName` and
@@ -56,6 +62,11 @@ defmodule Gallformers.Facts.Attribution do
           authorship_as_written: String.t() | nil,
           cites_as_written: String.t() | nil,
           cited_source_id: integer() | nil,
+          accepted_at: DateTime.t() | nil,
+          accepted_by_user_id: integer() | nil,
+          declined_at: DateTime.t() | nil,
+          declined_by_user_id: integer() | nil,
+          decline_reason: String.t() | nil,
           evidence: [Evidence.t()] | Ecto.Association.NotLoaded.t(),
           names: [AttributionName.t()] | Ecto.Association.NotLoaded.t(),
           observations: [AttributionObservation.t()] | Ecto.Association.NotLoaded.t(),
@@ -78,6 +89,14 @@ defmodule Gallformers.Facts.Attribution do
     :cited_source_id
   ]
 
+  @decision_cleared [
+    accepted_at: nil,
+    accepted_by_user_id: nil,
+    declined_at: nil,
+    declined_by_user_id: nil,
+    decline_reason: nil
+  ]
+
   schema "attributions" do
     field :stance, Ecto.Enum, values: [:confirm, :deny]
     field :stated_on, :date
@@ -92,6 +111,11 @@ defmodule Gallformers.Facts.Attribution do
     field :authorship_as_written, :string
     field :cites_as_written, :string
     field :cited_source_id, :integer
+    field :accepted_at, :utc_datetime
+    field :accepted_by_user_id, :integer
+    field :declined_at, :utc_datetime
+    field :declined_by_user_id, :integer
+    field :decline_reason, :string
 
     belongs_to :fact, Fact
     belongs_to :source, Source
@@ -124,6 +148,7 @@ defmodule Gallformers.Facts.Attribution do
     |> cast(attrs, @fields)
     |> put_change(:source_id, source.id)
     |> put_stated(attrs, source)
+    |> clear_decision_on_new_stance()
     |> validate_required([:fact_id, :source_id, :stance])
     |> validate_statement_text(source)
     |> foreign_key_constraint(:fact_id)
@@ -132,6 +157,30 @@ defmodule Gallformers.Facts.Attribution do
     |> foreign_key_constraint(:cited_source_id)
     |> unique_constraint([:fact_id, :source_id])
     |> check_constraint(:stated, name: :attributions_stated_date_precision)
+  end
+
+  # A curator decided on the statement as it was: a changed stance is
+  # another statement, awaiting a decision of its own.
+  defp clear_decision_on_new_stance(%Ecto.Changeset{data: %{id: nil}} = changeset), do: changeset
+
+  defp clear_decision_on_new_stance(changeset) do
+    if changed?(changeset, :stance), do: change(changeset, @decision_cleared), else: changeset
+  end
+
+  @doc "The decision fields, cleared: neither accepted nor declined."
+  @spec decision_cleared() :: keyword()
+  def decision_cleared, do: @decision_cleared
+
+  @doc """
+  A changeset setting the decision fields (`decision_cleared/0`'s keys) of
+  an attribution, as `Gallformers.Facts` records an acceptance or decline.
+  """
+  @spec decision_changeset(t(), keyword()) :: Ecto.Changeset.t()
+  def decision_changeset(attribution, fields) do
+    attribution
+    |> change(Keyword.merge(@decision_cleared, fields))
+    |> check_constraint(:declined_at, name: :attributions_accepted_or_declined)
+    |> check_constraint(:decline_reason, name: :attributions_decline_reason)
   end
 
   defp put_stated(changeset, attrs, source) do

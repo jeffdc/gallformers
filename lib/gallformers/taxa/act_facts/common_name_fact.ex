@@ -46,6 +46,9 @@ defmodule Gallformers.Taxa.ActFacts.CommonNameFact do
   end
 
   @impl true
+  def key(%__MODULE__{} = c), do: %{taxon_id: c.taxon_id, common_name: c.common_name}
+
+  @impl true
   def slot(_common_name), do: nil
 
   @impl true

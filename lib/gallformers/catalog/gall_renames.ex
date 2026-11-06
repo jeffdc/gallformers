@@ -19,7 +19,11 @@ defmodule Gallformers.Catalog.GallRenames do
       Galls whose Host qualifier is the taxon;
     * a **move** touches the Galls with a descriptor whose current Inducer
       is in the moved subtree (an "Unknown (Family)" Gall whose family
-      changes; a subgenus or section carried to another genus).
+      changes; a subgenus or section carried to another genus);
+    * a **rank** change touches what a rename of the taxon does (a genus
+      made a subgenus is no longer its species' genus);
+    * a **merge** (a lump, `f923`) touches what a rename of the survivor
+      does, once the absorbed taxon's Inducer Facts are the survivor's.
 
   Of those, Galls with a name override (their name shown doesn't change)
   and Galls whose parts give no name are left out; the rest are listed
@@ -79,6 +83,14 @@ defmodule Gallformers.Catalog.GallRenames do
       }
     end
   end
+
+  # A lump's Galls are the survivor's by now (`Gallformers.Import.TaxonMerges`
+  # runs first), and a rank change reaches the same Galls as a rename.
+  def name_changes(%Event{type: :merge, into_taxon_id: id}),
+    do: name_changes(%Event{type: :rename, taxon_id: id})
+
+  def name_changes(%Event{type: :rank, taxon_id: id}),
+    do: name_changes(%Event{type: :rename, taxon_id: id})
 
   def name_changes(%Event{}), do: []
 

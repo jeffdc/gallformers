@@ -60,6 +60,9 @@ defmodule Gallformers.Taxa.ActFacts.SynonymyFact do
   end
 
   @impl true
+  def key(%__MODULE__{} = s), do: %{name: s.name, accepted_taxon_id: s.accepted_taxon_id}
+
+  @impl true
   def slot(_synonymy), do: nil
 
   @impl true

@@ -27,7 +27,8 @@ defmodule Gallformers.Facts.StandingTest do
       stance: stance,
       stated_on: date,
       stated_precision: precision,
-      retracted: Keyword.get(opts, :retracted, false)
+      retracted: Keyword.get(opts, :retracted, false),
+      counts: Keyword.get(opts, :counts, true)
     }
   end
 
@@ -37,6 +38,25 @@ defmodule Gallformers.Facts.StandingTest do
   defp standing_of(fact) do
     {%{} = standings, conflicts} = Standing.resolve(fact)
     {Map.fetch!(standings, fact.id), conflicts}
+  end
+
+  describe "statements that do not count (awaiting a curator, or declined)" do
+    test "are ignored; a Fact with none that count is unsupported" do
+      f = fact(1, [stmt(:a, :confirm, "1990", counts: false)], :current)
+      assert standing_of(f) == {:unsupported, []}
+    end
+
+    test "a newer one does not outrank an older one that counts" do
+      f = fact(1, [stmt(:a, :confirm, "1890"), stmt(:b, :deny, "1990", counts: false)])
+      assert standing_of(f) == {:current, []}
+    end
+
+    test "in a slot, a newer Fact whose statements do not count does not win" do
+      old = fact(1, [stmt(:a, :confirm, nil)], :current)
+      new = fact(2, [stmt(:b, :confirm, "1990", counts: false)])
+
+      assert Standing.resolve_slot([old, new]) == {%{1 => :current, 2 => :unsupported}, []}
+    end
   end
 
   describe "resolve/1 for one Fact" do

@@ -39,7 +39,9 @@ defmodule Gallformers.Import.IntakeTest do
 
   defp changes_for(table, id) do
     Repo.all(
-      from c in Carbonite.Change, where: c.table_name == ^table and c.table_pk == ^["#{id}"]
+      from c in Carbonite.Change,
+        where: c.table_name == ^table and c.table_pk == ^["#{id}"],
+        order_by: c.id
     )
   end
 

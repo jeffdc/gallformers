@@ -4,13 +4,20 @@ defmodule Gallformers.Release do
   installed.
   """
   use Boundary,
-    deps: [Gallformers.Audit, Gallformers.CatalogMigration, Gallformers.Import, Gallformers.Repo],
+    deps: [
+      Gallformers.Audit,
+      Gallformers.CatalogMigration,
+      Gallformers.Import,
+      Gallformers.Repo,
+      Gallformers.Taxa
+    ],
     exports: :all
 
   alias Gallformers.Audit.Actor
   alias Gallformers.CatalogMigration
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.Import
+  alias Gallformers.Taxa.Sync
 
   @app :gallformers
 
@@ -99,6 +106,26 @@ defmodule Gallformers.Release do
       {:error, reason} ->
         raise "Replay stopped: #{inspect(reason)}"
     end
+  end
+
+  @doc """
+  Checks that the tree follows the taxonomic Facts (`f923`;
+  `Gallformers.Taxa.Sync.check/0`) and prints each tree row that differs.
+  Reads only:
+
+      bin/gallformers eval "Gallformers.Release.check_taxa_sync()"
+
+  Returns the differences.
+  """
+  @spec check_taxa_sync() :: [Gallformers.Taxa.Sync.difference()]
+  def check_taxa_sync do
+    load_app()
+
+    {:ok, differences, _apps} =
+      Ecto.Migrator.with_repo(Gallformers.Repo, fn _repo -> Sync.check() end, pool_size: 2)
+
+    differences |> Sync.format() |> Enum.each(&IO.puts/1)
+    differences
   end
 
   # Runs `fun` with the repo and the S3 client started (not the endpoint,
