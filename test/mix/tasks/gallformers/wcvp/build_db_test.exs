@@ -1,24 +1,28 @@
 defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
   use ExUnit.Case, async: false
 
+  alias Gallformers.Repo
   alias Mix.Tasks.Gallformers.Wcvp.BuildDb
 
   @names_path "test/support/fixtures/wcvp_names_sample.csv"
   @dist_path "test/support/fixtures/wcvp_distributions_sample.csv"
 
   setup do
-    # Connect to wcvp_test database for verification queries
+    # This checkout's WCVP test database (config/test_db_names.exs), for
+    # verification queries
+    database = Repo.WCVP.config()[:database]
+
     conn_opts = [
-      database: "wcvp_test",
+      database: database,
       username: System.get_env("PGUSER") || System.get_env("USER"),
       password: System.get_env("PGPASSWORD"),
       hostname: System.get_env("PGHOST") || "localhost"
     ]
 
     on_exit(fn ->
-      # Restore fixture state for other tests that query wcvp_test directly
+      # Restore fixture state for other tests that query the WCVP test database directly
       # (e.g., host_range_live_test calls Wcvp.Lookup.built_at() which hits the real DB)
-      System.cmd("psql", ["-d", "wcvp_test", "-f", "priv/repo/wcvp_test_setup.sql", "--quiet"],
+      System.cmd("psql", ["-d", database, "-f", "priv/repo/wcvp_test_setup.sql", "--quiet"],
         stderr_to_stdout: true
       )
     end)

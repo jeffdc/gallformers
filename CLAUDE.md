@@ -18,7 +18,7 @@ Use `Oban` for durable, retryable, or scheduled background work. Reserve plain `
 
 ### Test Database
 
-Tests use a **separate PostgreSQL test database** (`gallformers_test`) that is:
+Tests use a **separate PostgreSQL test database** (`gallformers_test`; in a git worktree `gallformers_test_<worktree>`, and likewise `wcvp_test_<worktree>`, so checkouts never share one: `config/test_db_names.exs`) that is:
 - **Schema-only**: Created via Ecto migrations (no production data)
 - **Minimal seed data**: Loaded from `priv/repo/test_seeds.sql` with just enough data for tests. The seeds fill the old tables; the catalog migration (`mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3`) then converts them into the new tables (Galls, taxa, Facts), so both exist. Add a test case by adding old-style seed rows; their curated decisions go in `test/support/fixtures/catalog_migration/`.
 - **Rebuilt fresh**: `make test` rebuilds the test DB before each run (CI runs the same steps)

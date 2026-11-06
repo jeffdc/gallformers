@@ -10,10 +10,15 @@ config :gallformers, tiles_url: "/data/boundaries.pmtiles"
 # Run async tasks synchronously to avoid sandbox connection issues
 config :gallformers, async_tasks: false
 
+# This checkout's test databases (config/test_db_names.exs): a worktree gets
+# its own, so it never shares one with another checkout.
+{test_db_names, _binding} = Code.eval_file(Path.join(__DIR__, "test_db_names.exs"))
+test_dbs = test_db_names.(Path.expand("..", __DIR__))
+
 # Configure your database
 # Use a schema-only test database (no production data)
 config :gallformers, Gallformers.Repo,
-  database: "gallformers_test",
+  database: test_dbs.app,
   username: System.get_env("PGUSER", System.get_env("USER")),
   password: System.get_env("PGPASSWORD"),
   hostname: System.get_env("PGHOST", "localhost"),
@@ -39,7 +44,7 @@ config :gallformers, Gallformers.INaturalist,
 # Fixture data is loaded once by `make test-db` (via wcvp_test_setup.sql).
 # Tests read concurrently without write isolation.
 config :gallformers, Gallformers.Repo.WCVP,
-  database: "wcvp_test",
+  database: test_dbs.wcvp,
   username: System.get_env("PGUSER", System.get_env("USER")),
   password: System.get_env("PGPASSWORD"),
   hostname: System.get_env("PGHOST", "localhost"),
