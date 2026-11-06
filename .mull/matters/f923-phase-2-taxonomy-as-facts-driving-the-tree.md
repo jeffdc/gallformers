@@ -93,3 +93,22 @@ Phase 2 (50ff step 3, before release): the tree is driven by current taxonomic F
 **Testing:** applied Source lists its acts with marks; declined reason shown.
 
 **Order:** 1 → 2 → 3 → 4 → 5 → 6 → (7, 8, 10 in parallel) → 9 before cutover. 50ff step 3; curation (ec2c change set) first.
+
+
+## Build status (2026-11-06)
+
+Tasks 1–5 built and merged (`55ed22b7`, merge `49a08c51`; precommit 3,817 tests clean). Tasks 6–10 remain (they need screens).
+
+- **Task 1:** columns on `attributions` (`accepted_at`, `accepted_by_user_id`, `declined_at`, `declined_by_user_id`, `decline_reason`; checks: not both, a decline needs a reason); `Facts.accept/3`, `decline/4`, `reopen/2`, `counts?/3`, `needs_acceptance?/2`; `taxon_*` statements count only when accepted or from Gallformers' own Sources; replay kind `taxonomic_decision` (`Import.TaxonomicDecisions`). `Facts.Events` listeners may refuse a write (`{:rejected, listener, reason}`). A Fact whose statements all await or are declined is `:unsupported`. A re-import that changes a statement's stance clears its acceptance; restating it unchanged keeps it.
+- **Task 2:** root placements at any rank (today's tree has family-rank roots); `name_facts` gain `sensu`, `authorship`, `normalized_authorship` (`NameNormalizer.normalize_authorship/1`: case, spacing, punctuation, "&"/"and" ignored; authors, year, parentheses count).
+- **Task 3:** `CatalogMigration.LegacyTaxonomy` writes today's non-plant tree as undated legacy statements (placement, accepted name with rank/authorship/sensu, synonyms, common names); idempotent.
+- **Task 4:** `Taxa.set_rank/3`, `set_authorship/3`, `set_sensu/3`, `merge/3` (`Taxa.Lump`), `split/3`; synonym add/remove emit events. A lump moves B's Galls and their Facts to A with their attributions (`Import.TaxonMerges`), re-points generation groups, proposes renames; B's real-Source statements are declined ("B was merged into A") and kept, Gallformers' removed; B is redirected and deleted. Refused for a B with children, plants, or an open question naming B.
+- **Task 5:** `Taxa.Sync` follows slot winners in the same transaction (placement, rank, name, authorship, sensu, synonyms, common names, split events); a cycle, rank inversion or lump of a taxon with children refuses the acceptance. `Sync.check/0`, `mix gallformers.taxa.check_sync`, `Release.check_taxa_sync/0`; a test asserts the built test DB is clean.
+
+**For Tasks 6–10:**
+- An open queue item naming B blocks B's lump, so an acceptance item carrying B's taxon id would block its own lump: exempt the item being decided.
+- A name statement with authorship and one without are different Facts, so a paper that only adds authorship competes in the slot: don't raise a question for it (accept as compatible, or compare without authorship first).
+- Until Tasks 6 and 8, the drift check lists taxa that imports create as new and non-plant taxonomy-admin edits (no current Facts yet).
+- A Gallformers-Source taxonomy batch counts without acceptance and moves the tree (consistent with Gallformers' own statements); keep it the rare exception.
+- Retracting a lump's paper removes the synonym but leaves B's Galls on A; splitting back is curator work.
+
