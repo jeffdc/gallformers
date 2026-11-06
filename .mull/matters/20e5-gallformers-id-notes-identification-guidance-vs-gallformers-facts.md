@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-11
-updated: 2026-10-30
+updated: 2026-11-06
 epic: taxonomy
 relates: [294c, a856, 6611]
 ---
@@ -96,3 +96,39 @@ Next: Jeff reads a sample of notes to see what else they hold (`docs/plans/2026-
 - **Undescribed Galls (Jeff: yes):** the catalog migration now confirms every legacy Fact of an undescribed Gall (`gall_traits.undescribed`) as the Gallformers Source's own, dated the run's day (`:stated_on`; at cutover, the cutover date), with the legacy attribution kept (`CatalogMigration.UndescribedGalls`). Not in the local rehearsal database until the migration is run again (which empties the import tables).
 - **Trial (Jeff authorised):** 10 notes (described 1114, 1518, 4005, 3378, 775; undescribed 2309, 2612, 5194, 2290, 5099) through phases 3–6: **$12.83, about $1.28 a note.** All 10 validate; one finding disputed (5194: whether a comparison sentence is the note's description). Submitted locally as packages 6–15; after the note-Gall matcher fix only that dispute is open. At this rate all ~1,325 notes would be about $1,700, the 544 described ones about $700. Output: `services/import-producer/output/notes-trial-2026-10-30/` (local).
 - **Found by the trial:** an undescribed note's Gall was matched by guessing and one proposed a new (duplicate) Gall; a note batch's Gall is now resolved by the note's ID.
+
+
+## Rethinking how the notes are processed (Jeff, 2026-11-05)
+
+Running all ~1,300 notes through the LLM pipeline one by one (≈$700–1,700) is not the approach. Per the earlier category work, sort the notes with code and handle what code can, deterministically, leaving only a minority for a real LLM pass; or at least batch them (e.g. all undescribed notes together). For undescribed Galls, Jeff leans to their Facts coming from the current data, not the notes, since notes were never required to support Facts. (That crediting is already built: the catalog migration confirms every legacy Fact of an undescribed Gall as Gallformers'.) This replaces "processed through the normal pipeline, not a bespoke tool" (2026-10-28) for the bulk; to discuss further.
+
+
+## Pattern analysis of the notes (2026-11-05, read-only, no cost)
+
+1,299 notes (775 on undescribed Galls, 524 on described). Each note split into sentences and labelled by simple patterns (scratch script `notes_patterns.py`): Facts code can write (a Host "added … as a host", "observed in <place> in <month>", an undescribed Gall's description), commentary that stays text (comparisons, references such as Joyce Gross' gall types, remarks on the inducer), and sentences needing judgement (taxonomy: synonymy, "described as", "treated as"; rulings and hedges: "however", "suggests", "may be").
+
+| | Undescribed (775) | Described (524) |
+|---|---|---|
+| Every sentence handled by code | 255 | 124 |
+| Some sentences | 408 | 227 |
+| None | 112 | 173 |
+| Has a taxonomy or ruling sentence | 160 | 206 |
+
+Sentences: undescribed — 545 "observed in", 398 descriptions, 20 Hosts added, 209 taxonomy/ruling, 1,045 unlabelled; described — 157 Hosts added, 109 "observed in", 359 taxonomy/ruling, 1,120 unlabelled. The patterns are crude: many unlabelled sentences are descriptions or Host confirmations they miss ("Rhus aromatica is confirmed as a host based on Russo 2021"), so the code share would rise with work.
+
+Reading: if undescribed Galls take their Facts from the current data (already credited to Gallformers) and keep the note as text, they need no extraction at all. Among the described, Hosts added and occurrences are code; the ~200 notes with taxonomy or ruling sentences need judgement (an LLM in batches of ~20 notes, or a curator); the rest is commentary that stays text.
+
+
+## Current thinking, consolidated (2026-11-06) — start here for step 4
+
+Order: notes come after phase 2 and the admin (50ff "Order to release", step 4). This section supersedes the earlier "processed through the normal pipeline, one note at a time" plan.
+
+- **What a note is:** each Gall's note is Gallformers' document for that Gall, shown whole on the Gall page ("Notes on ID and Taxonomy"). Facts are drawn from it where it states them; commentary stays text.
+- **Undescribed Galls (775 notes):** their Facts come from the current data, already credited to the Gallformers Source by the catalog migration (`UndescribedGalls`), dated about now. The notes stay as text, with no LLM extraction. Open: whether their "observed in <place> in <month>" sentences also become occurrence Facts by code (the range rule adds those automatically).
+- **Described Galls (524 notes):** code writes the patterned statements — "<plant> added (tentatively) as a host based on [observation]" (157) as Host Facts with the observation as evidence; "observed in <place> in <month>" (109) as occurrence Facts, place matched to our places (month is when it was seen, not a season Fact). Notes with taxonomy or ruling sentences (~200) need judgement: an LLM in chunks, or a curator queue (open). Comparisons, references (Joyce Gross' gall types, links), remarks on the inducer and the state of knowledge stay text.
+- **If the LLM is used:** chunk ~50–100 notes per run, one text block per note, each Gall declared by its Gallformers ID (contract change: today a note package quotes one note and one Gall). Each chunk costs about a paper (~$8–12, estimate); all 524 described ≈ $60–90, against $700–1,700 one note at a time. Each group as a single Source fails: the output (thousands of Facts) overwhelms one session. Run one trial chunk (~50 notes, ~$6–10) before the rest.
+- **Taxonomic remarks in notes** (synonymy opinions, "treated as", name changes suggested): under the 2026-10-17 decision these are commentary and stay text; with taxonomy as Facts (8567, 2026-11-06), a note that states Gallformers' own taxonomic position could instead be a Gallformers taxonomic Fact — decide at step 4.
+- **Splitting notes apart:** separate the Fact-bearing statements from the commentary so the note text that remains is the ID guidance and commentary (Jeff's "split apart"); how the remaining text is stored and edited is part of the curation design (f14c).
+- **Dates and conflicts:** note Facts are dated about now; a note Fact that would supersede or withdraw a Fact from the literature goes to a curator (option c), except a recorded occurrence outside the Gall's range, which is added automatically.
+- **Numbers:** 1,299 notes in the dev data (775 undescribed, 524 described); ~257k and ~262k characters of text; pattern analysis above (2026-11-05); scratch scripts `notes_patterns.py` (patterns) and the notes export.
+

@@ -1,0 +1,44 @@
+---
+status: raw
+created: 2026-11-06
+updated: 2026-11-06
+epic: taxogall
+---
+
+# Gallformers curation: inline edits, command palette, iNat observation intake
+
+How Gallformers curation works once the system is live (50ff step 1a): Gallformers' own statements of Fact, made by curators. Not how the current notes get in (that's 20e5).
+
+## Invariant (Jeff, 2026-11-06)
+
+Every Gallformers edit goes through the same Fact process as Source intake: statements credited to the Gallformers Source → resolve names → questions where ambiguous → preview of the Facts it changes → apply (audited, replayed). Taxonomy included: placements, names, synonymies of non-plant taxa are Facts (8567, 2026-11-06); editorial, not Facts: Gall naming and plant data. The UI may differ from intake; the back end may not.
+
+Core to build once: a **change set** — a small Gallformers batch (statements, evidence, author) that is drafted, resolved, previewed with the Facts view, and applied. Front ends fill it.
+
+## Decided (Jeff, 2026-11-06)
+- **Inline edits on the pages, not bespoke edit screens.** A curator turns on **Edit** on a page; off, it's the public page as anyone sees it. On, each Fact gets its actions (withdraw, correct, note) and each category an "add" with the existing pickers. One page serves visitors and curators.
+- **Change tray.** Edits collect in a tray that follows the curator across pages ("3 changes … Review and apply"). Review opens the Facts preview for just those changes (new / already held / in conflict). Evidence is asked once per change set: an observation, a Source, or "my judgement" with a reason. A single obvious edit can be applied straight from the tray.
+- **Conflicts with a Source:** the curator's edit wins, with a reason required. The preview names what it supersedes ("This supersedes Weld 1959's 'spring'"); an observation link or a citation counts as a reason, "my judgement" alone doesn't. No second-curator sign-off.
+- **Add from observation:** paste an iNat observation (on a Gall page, or into ⌘K); proposed edits go into the tray, the observation as their evidence.
+  - Automatically: a recorded occurrence for its place (iNat's state/province → our place), dated as seen (never a season Fact); the Gall is the page's Gall, or chosen among the Inducer's Galls.
+  - The Host: read the "Host Plant ID" observation field, and plant names in the observation's note (description), matched through the same plant resolution as intake and offered to confirm. Neither → the curator provides it.
+  - Photos: the existing iNat image import (`GallformersWeb.Admin.InatImportComponent`) offered as a choice — take the observation's images or not. Images stay editorial.
+- **⌘K command palette for everyone.** Replaces the header's search box; a visible search field in the header opens it (phones too). Everyone: search across Galls, Hosts, taxa, Sources, places and articles, keyboard-navigable; shortcuts into the ID tool ("Galls on Quercus alba", "… in Virginia"). Signed-in curators also: "Edit this page", "Add from observation…", "Review: <Source>", "Sources to review", "Facts for this Source".
+- **Held:** typed prose commands turned into a change set by a small LLM — neat; revisit only if inline editing proves harder than expected (cost would be tiny; the preview guards against a wrong parse).
+- **Everything about a Gall is editable on its page** (Jeff, 2026-11-06): its Facts (through the change set) and its editorial fields (name override, abundance, completeness, images, the Gallformers note text, default Source, and the rest).
+- **Editorial edits go in the same tray** (Jeff, 2026-11-06): listed beside Fact edits as "editorial: no evidence needed", applied with the same Review and apply (audited, no Facts preview). Curators needn't know which fields are Facts. Exception: changing a Gall's **Gallformers code** asks for confirmation (it anchors iNat links and outside references), as Gall renames do.
+- **Plant pages are editorial** (Jeff, 2026-11-06; 8567): name, synonyms and range edited in place as editorial edits in the tray, not Facts; no Facts preview or evidence. Inducer and other non-plant taxon pages edit their taxonomy (placement, accepted name, synonyms with authorship, rank, common names) as Gallformers Facts with a reason; their Galls are edited on the Galls' own pages.
+- **"Based on" note on plant edits** (Jeff, 2026-11-06): an edit that departs from WCVP (a synonym WCVP lacks, a range from a regional flora) may carry an optional "based on" note ("per Flora of North America", "iNat treats these as one species"), kept in the audit history and shown on the plant's page so the next curator knows why it differs from WCVP. Not evidence in the Fact sense; offered only on edits that depart from WCVP.
+- **Roles** (Jeff, 2026-11-06): **admin** (curator) does everything designed here, including deleting Galls and taxa; **superadmin** adds only trait categories (the vocabulary) and users. Changing a Gallformers code without confirmation is never possible, for anyone.
+- **Deleting a Gall or taxon (any admin) MUST keep the hard-won safeguards** (Jeff): show the impact first, apply the rules that can block a delete, and make the admin really sure. On `main` that is `Gallformers.Taxonomy.get_deletion_impact/1` (`lib/gallformers/taxonomy/reclassification.ex`: per rank — family and genus cascade, intermediate, a section that can't be deleted until its species are reclassified), the cascade-delete modal in `lib/gallformers_web/components/form_components.ex` (~line 1090–1200: what will be deleted, what blocks it), the taxonomy admin's delete flow (`taxonomy_live/form.ex`, `index.ex`), and the Gall form's type-to-confirm delete (`gall_live/form.ex`: deletes uploaded images from storage; "deleted by another user"). Taxogall's taxonomy edit page has a type-to-confirm modal; check it against main's impact and blocking rules and port what's missing, adapted to the new model (a Gall's or taxon's Facts and the Sources behind them, Galls named after a taxon, child taxa, images).
+- **Restating Gallformers' position** (Jeff, 2026-11-06): where a newer Source's statement has replaced Gallformers' (recency wins: Gallformers' positions dated when made, the old data at cutover), a curator can **Restate Gallformers' position** — a new Gallformers statement dated now, reason required (same rule as any conflicting edit); readers see both and the reason. Offered on the review Facts page (conflict rows, before approval), on Gall and taxon pages with Edit on (a Fact shows the earlier Gallformers statement it replaced), and in the Names step's "Where the Source and the tree differ" ("Keep Gallformers' position").
+- **What a newer Source may change without a curator** (Jeff, 2026-11-06): ordinary Facts (Hosts, Traits, range…) follow recency when its package is approved — the Facts page has shown each conflict, so approving accepts them. **Taxonomic changes always need a curator's yes:** a newer Source's placement, synonymy or name change stays a question ("Follow the Source" applies it; "Keep Gallformers' position" restates), so the tree never moves just because a long package was approved.
+- **Tray persistence and concurrency** (Jeff, 2026-11-06, agreed): the tray is saved with the curator's account (survives sessions and devices), private to its author until applied, with a reminder when it's been left a while. No locks: Review recalculates the preview against current data and flags anything another curator changed since ("Adam changed this Gall's Hosts since you started: review again"); editorial fields get the same check; a page with Edit on may show "Adam has unapplied changes here".
+- **Persistent chrome for outstanding changes** (Jeff): while a curator has unapplied changes, a persistent indicator shows on every page (public pages included when signed in) with the count and Review / Discard.
+- **Review edits vs the tray** (agreed): edits on the review Facts page correct what the Source says (package edits, applied with approval); anything Gallformers itself states goes into the tray, even when started from the review page.
+- **One change set per curator** (Jeff, 2026-11-06): the tray is the change set; every edit adds to it; no second set while one is open. A quick unrelated fix is handled inside it: any single item can be reviewed and applied alone, and its evidence set per item (evidence is asked once per set but can differ for any item). Discard clears the tray, after a confirmation.
+
+## Open
+
+- Taxon pages beyond the basics: splits and merges of non-plant taxa as Gallformers Facts (phase 2), and how the delete-impact rules adapt to the new model (check taxogall's current delete against `main`'s).
+- Inline editing of the Gallformers note text once notes are split into Facts and commentary (`20e5`).

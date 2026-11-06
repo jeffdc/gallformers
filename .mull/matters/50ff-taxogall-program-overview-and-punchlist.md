@@ -1,83 +1,55 @@
 ---
 status: raw
 created: 2026-10-24
-updated: 2026-10-27
+updated: 2026-11-06
 epic: taxonomy
-relates: [8567, 9449, 3272, 803b, a856, 2c8c]
+relates: [8567, 9449, 3272, 803b, a856, 2c8c, d213, f14c, 20e5, bc0d]
 ---
 
 # Taxogall: program overview and punchlist
 
-The top-level matter for **taxogall**: what we are building, which matters hold the parts, and the ordered punchlist to production. Detail lives in the linked matters; this one holds the picture and the order.
+The top-level matter for **taxogall**: what we're building, what's done, and the order to release. Read this first; follow a link only for detail.
 
 ## The picture
 
-Gallformers today treats everything as a species: a gall, its inducer and its host are all `species` rows, and data hangs off them with Sources linked per page. Taxogall replaces that with:
+Gallformers today treats everything as a species. Taxogall replaces that, in place, on the `taxogall` branch:
 
-- **A gall system:** Galls are catalog entries (two generations are two Galls). What we know about them — Hosts and other Relationships, Traits, range adjustments, recorded occurrences, common names, descriptions — are **Facts**, each attributed to Sources that confirm or deny it. The newest Source wins; Gallformers is a Source too.
-- **An owned taxonomy:** taxa referenced by stable IDs; phase 1 builds new taxonomy storage filled from today's data, phase 2 adds sourced names, authorship and acts.
-- **A new back-end, built whole on `taxogall`**, replacing the old one in place (no facade, nothing run side by side). The domain core is new; infrastructure (auth, Oban, storage and images, plant ranges, places and maps, search, deploy) is reused. Public pages are re-pointed in place; most of today's admin is replaced by batches and a few new screens (`8567` *Build approach*).
-- **Every write is a batch:** producers (an LLM pipeline, curator notes, forms) deliver JSON packages against a validated contract; humans approve batches. **The pipeline is the migration** for everything that lives in Sources: every existing Source is backscanned, and the site is released after the backscan.
+- **Galls** are catalog entries (two generations are two Galls). Everything known about them — Hosts and other relationships, Traits, range, recorded occurrences, common names, descriptions — is a **Fact**, attributed to the Sources that confirm or deny it. Gallformers is a Source too.
+- **Taxonomy is Facts too** (Jeff, 2026-11-06): names, authorship, placements, synonymies, ranks and splits are Facts, Gallformers' own positions included; the tree is whatever the current taxonomic Facts say. Editorial, not Facts: Gall naming (derived names, `86e7`) and plant data (names, synonymy, ranges; WCVP to ease input, curators edit freely; not a system of record for plants).
+- **Every change goes through one Fact process:** Sources arrive as LLM-produced packages against a validated contract (`priv/import/`), curators settle questions and approve; Gallformers' own edits use the same process. Decisions are logged and replayed at cutover.
+- **The pipeline is the migration** for everything that lives in Sources: existing Sources are re-processed into the new model before release.
 
-Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migration plan (M0–M8): `b5bd`. Import contract: `294c` and `priv/import/`, with decisions in `docs/import/producer-guide-background.md`.
+Key references: domain language `docs/domain/domain-model.md`; design and rules `8567`; back-end schema `9449`; migration plan (M0–M8) `b5bd`; import contract `294c` + `priv/import/` + `docs/import/producer-guide-background.md`.
 
-## Matters
+## Done (all committed on `taxogall`, not merged)
 
-**Core**
+- **Import contract and producer** (`294c`): JSON schemas, validator (Python and Elixir), producer and checker guides, the `services/import-producer` pipeline (phases 2–6), golden regression set of five Sources. Contract now carries common-name Hosts, hedge topics, one-sentence dispute positions.
+- **New back-end, phase 1** (`9449`): Sources–Facts with standing, audit (Carbonite), taxonomy storage (tree editorial in phase 1; Sources' taxonomic acts already recorded as Facts), gall system, importer (Oban, private bucket, Host names before the gall batch, replay log), data migration rehearsed on a production copy.
+- **Public pages and API on the new back-end** (`803b`), and the derived Gall names (`86e7`).
+- **Admin, review and vocabulary** (`a856`, `6611`, `d213`, `f14c`): Source review by steps (Names, Galls, Disputes, Traits, Hedges) with a step bar and Approve; questions with recommendations, follow-ups and notes; the Source's passage and full text beside the questions; trait vocabulary in the database (`leaf` a real value; terms under one or several values; agreement rules); Gall comparison with conflicts; common-name Hosts with sections; synonym split/move; grouped disputes; a **Facts page** previewing what approval writes, with edits; Source ingested/updated dates; public Source page lists the Source's Facts; taxonomy admin, Gall page and Source editor.
+- **Trial data:** five Sources re-run with the current guides ($44.86) and delivered locally; 10 trial notes.
 
-| Matter | Role |
-|---|---|
-| `8567` | Software design and rules (architecture, Sources–Facts, generation groups, phases) |
-| `9449` | Back-end schema: contexts, tables, standing mechanics, import and replay, migration mapping, acceptance tests |
-| `b5bd` | Migration plan: decisions, data migration, application surface, backscan, rehearsal, cutover, after release |
-| `294c` | Import contract and validator (built; remaining items below) |
-| `8546` | Pipeline trial: go (done, archived) |
-| `e381` | Gallformers-side importer, admin queue, intake |
-| `d585` | Host names resolved before the gall batch |
-| `20e5` | Gallformers ID Notes: Facts vs commentary; conversion |
-| `803b` | Step 9: public pages and API on the new back-end (design, inventory) |
-| `86e7` | Gall name builder (derived names with generation / Host / form qualifiers) |
-| `ede2` | Audit trail (shared building block; to rewrite for the new tables) |
-| `f465` | Preview environment with production-like data (backscan staging, rehearsal timing) |
+## Order to release (Jeff, 2026-11-06)
 
-**After release** (wait for the new model): `1832` organism taxon pages, `3e8c` gall merges, `e1d2` iNat taxon IDs, `439a` phenology (fed by recorded occurrences), `7cde` completeness scoring, `4389` notifications, `29dc` interoperability, `1374` DNA barcodes, `8ba0` iNat integration, `eb47` GallOnt vocabulary, `67c9` host-family filter, `74de` API v2, `32a5` mobile ID tool, `3272` gall records outside the Hosts' ranges become Host-range proposals. Phase 2 work (no matters; superseded designs dropped 2026-10-24): authorship for curated taxa (plant authorship from WCVP), arbitrary-depth infrageneric ranks, taxon merges and splits with history, plant synonymy from POWO.
+1. **a) How the admin works** — Jeff and Claude. Gallformers curation (`ec2c`): every edit a Gallformers Fact through the intake's Fact process; inline edits on the pages, a ⌘K command palette for everyone, and making edits from a pasted iNat observation (typed prose commands held). Also open in `f14c`: fewer clicks per decision, layout and density.
+   **b) Design system** — Jeff with another agent, applied to the app (`bc0d`); runs in parallel.
+2. **Merge the two branches.**
+3. **Phase 2 and the remaining gaps,** in the new design system:
+   - Phase 2: placements, accepted names and synonymies drive the tree from current Facts (`8567`). Today's direct tree edits become Gallformers Facts: the taxonomy admin's edits, and review decisions that change the tree (split or move a synonym, create a plant or taxon, a Source's name read in its own sense).
+   - The admin per 1a; Undo of a decided question (rule agreed, `f14c`); the admin corrections page for a Source's applied Facts (`f14c`); WCVP authorship for plants.
+4. **Gallformers notes** (`20e5`, "Current thinking" section): undescribed Galls keep current-data Facts and their notes as text; described notes' patterned statements by code; the judgement minority by chunked LLM or curator; notes split into Facts and commentary.
+5. **Process Sources into a copy of production** (Jeff and Adam, on the preview server, `f465`). Before scaling:
+   - cost levers (about $9 a Source today; one checker instead of two ≈ −22%; a cheaper model for checking and responding);
+   - the missed-names check (names a Source prints that nothing uses; prototype in `d213`);
+   - reference answers rebuilt in format 4 from reviewed packages;
+   - where the producer runs at scale (subscription, API account, or a server job);
+   - curator onboarding: rewrite `docs/domain/admin-onboarding.md`; walk Adam through it.
+6. **Cut over and retire the old system** (`b5bd` M5–M6): rehearse until boring, including timing on preview and the replay log (all decision kinds, Fact and term edits, tree edits as Facts); re-run the catalog migration against production data; rollback rehearsal.
 
-## Punchlist (in order)
+**After release** (`b5bd` M7): drop the old tables; replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md` and runbooks; review items left with no Facts for removal (old genus Hosts included); fix wrong Host ranges on the Host. Deferred features: search and API over Source terms, the PDF page view. Later matters: `1832` taxon pages, `3e8c` gall merges, `e1d2` iNat taxon IDs, `439a` phenology, `7cde` completeness, `4389` notifications, `29dc` interoperability, `1374` DNA barcodes, `8ba0` iNat integration, `eb47` GallOnt, `67c9` host-family filter, `74de` API v2, `32a5` mobile ID, `3272` out-of-range records as Host-range proposals.
 
-1. **Housekeeping** — done 2026-10-24:
-   - ~~Close superseded and done matters~~ (2026-10-24: dropped `0a58`, `2cb2`, `5c56`, `f49a`, `bf97`, `9005`, `d108`, `e2cb`, `91cf`, `53cb`, `eff3`; done `4dcd`, `8546`).
-   - `b5bd`: fix stale references — M1 "`8567` step 2" → step 4; "`e381` v2" → `294c` format v3; M4 `7fda`/`db6f` → `services/import-producer/`; drop the `9737`/`2a27` mentions in M3.
-   - `e381`: remove the stale "Retire the old source-ingestion system" item (done as `47ae`).
-   - `86e7`: replace the `1121` pointer; align it with `8567` rules 6, 9 and 12 (derived names, no label-builder UI).
-   - Metadata: unlink `ede2 needs ec68` (audit must not wait on roles).
-   - `8567`: point its *Work ordering* at this punchlist.
-2. ~~Record the `8546` go/no-go~~ — go (2026-10-24).
-3. **Finish the contract (`294c`):** vocabulary generator (mix task); schema-description wording pass; golden regression set of the five trial packages; generation groups into `traits.json`, the guide and the `generation` enum once the groups settle. **Done 2026-10-27.** The generation group mappings, Pucciniales and the *Besbicus* placement are in the catalog migration. The first golden run cost $41.70 and scored 177 of 195 present (`294c` *First golden run*). Questions it raised are in `294c` *Open*: unverified sections, off-hand intro Galls, and identifying Galls whose identifying fields are equal.
-4. ~~Taxonomy facade (`36ca`)~~ — dropped 2026-10-24 (`8567` *Build approach*).
-
-**New back-end** (schema: `9449`; built whole on `taxogall`; old domain code removed as each piece replaces it; the new test seeds in `priv/repo/test_seeds.sql` grow with it). **Steps 5–8 built 2026-10-25** (all 17 tasks of `9449`'s plan; see its *Status*). **Step 8 done 2026-10-26:** rehearsed on a production copy, every curated decision made, strict run clean (`9449` *First rehearsal*). The prod-data test targets move to step 9.
-
-5. **Sources–Facts and audit** (`8567` step 4, `ede2`): acceptance tests first (two Sources confirming one Host; a denial in both orders; a superseded placement; a retraction; re-import dropping a Fact; a qualifier denied while its Relationship stands; a Gallformers override citing Observations; placements from different Sources that would form a cycle or rank inversion).
-6. **Taxonomy storage and gall system** (`8567` step 5): new taxonomy tables (taxa, rank, placement, names and synonyms, today's IDs) and crosswalk; ancestry read model; Galls separate from taxa; Traits, Relationships, qualifiers, aliases, range adjustments and recorded occurrences as Facts; generation groups schema; taxonomy-change listener; read models for ID tool, search, pages and API; `boundary` exports from the start.
-7. **Importer (`e381`, `d585`):** bucket + Oban import; Host-name resolution step before the gall batch; admin queue; batch approve/deny; dispute intake; retraction entry; "no silent merges" test; storage release gate.
-8. **Data migration scripts (`b5bd` M2):** refresh the inventory; gall skeletons, taxonomy skeleton and Inducer taxa (agamic/sexgen merge), Hosts and placeholders, range exceptions, Sources as records, keys, editorial carry-over; name-suffix mapping and the 47 curated names; hand-review the 120 non-galls; convert the ID Notes (`20e5`). Adapt the prod-data test targets.
-
-**Front-end:**
-
-9. **Public pages re-pointed in place (`b5bd` M3; design in `803b`):** Gall, Host, taxon ranks, Source, place, browse; ID tool parity (season filter wording to "forms and grows"); search; name builder (`86e7`); minimal API; redirects and the gall-lookalikes Article; sitemap. **Built and committed 2026-10-27 (67378c93; e2e fix 2b3dd12d), except the name builder (`86e7`, not in `803b`'s plan) — **built 2026-10-27, uncommitted: 18 overrides left of 1,323; see `86e7` Status**; see `803b` Status.** The e2e browser suite's Playwright breakage (pre-existing since #593) is fixed on `taxogall`: Elixir test libraries and npm Playwright upgraded together.
-10. **New minimal admin (`b5bd` M3, `8567` rule 12; inventory and design in `a856` — review queue and batch screens are part of this step). Built 2026-10-27 (uncommitted): review queue, Gall page, taxonomy admin with the Host range editor carried over, Source editor; old screens and old domain modules deleted; see `a856` Status.** taxonomy admin, images, a note editor for each Gall's Gallformers note (`20e5`), and only what else proves unavoidable; retire the old Gall/Host/gall–host/range/Source forms.
-
-**Release:**
-
-11. **Backscan (`b5bd` M4)** on the preview environment (`f465`): trial batches end to end, including the kinds the trial didn't test (a long scanned catalogue such as Gagné 2008; a key such as Felt 1917, which may exceed one batch), then every existing Source, including the Gallformers ID Notes (changed 2026-10-28: processed before release, undescribed Galls first; needs the `294c` contract change; `20e5`); curators approve; track coverage; legacy Facts the backscan doesn't confirm stay, marked unconfirmed (M0, decided 2026-10-27).
-12. **Rehearsal (`b5bd` M5)** until boring, including timing on the preview environment (`f465`) and a rollback rehearsal.
-13. **Cutover (`b5bd` M6).**
-14. **After release (`b5bd` M7):** drop the old tables; replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, onboarding and runbooks; reconcile the after-release matters above. (Processing the Gallformers notes moved to the backscan, step 11, on 2026-10-28.) **Fix wrong Host ranges on the Host** (curator, editorial): stored gall ranges become no Facts (`b5bd` M0, option A), so cases where a curator widened a gall's range instead of its Host's now surface as Galls missing from regions — fix the Host.
-15. **Phase 2 (`b5bd` M8):** the taxonomy system, its own plan.
-
-## Open decisions
-
+## Open
 
 - Scope of the curated taxonomy; Traits that vary by Host (`8567`).
-
-Decided 2026-10-27 (Jeff): legacy Facts the backscan doesn't confirm are marked unconfirmed (`b5bd` M0); undated Gallformers statements carry the cutover date, while the legacy-data Source stays undated (`8567` Sources–Facts point 7); generation groups settled (`8567`); gall renames from taxon renames are reviewed (B), to protect Gallformers codes and the iNat link (`8567`, `86e7`). Deferred: coordinates on recorded occurrences (`294c`).
+- Notes: whether undescribed notes' "observed in…" become occurrence Facts; the judgement notes by LLM or curator; whether a note's taxonomic position becomes a Gallformers taxonomic Fact (`20e5`).
+- Production bugs found along the way (on `main`, fixed on their own branches): `2c8c`.

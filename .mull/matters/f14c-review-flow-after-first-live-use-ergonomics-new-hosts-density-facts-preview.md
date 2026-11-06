@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 epic: taxogall
 relates: [bc0d]
 ---
@@ -65,4 +65,15 @@ Proposal (to settle with Jeff):
 - Done (2026-11-04): the review Facts page (`/admin/review/sources/:id/facts`, also per package): readiness line linking to the steps that hold approval; filter chips (new / held / conflict / waiting / dropped); taxonomy changes, then Galls with their Facts by category in two columns; each Fact a dense row with its status, quote and passage on demand, and edits (drop, Host, values, note) with Undo; recomputed in the background after each edit. "Facts · optional" in the step bar and a link on the overview. The public Source page gains a read-only "What this Source says" in the same component (`facts_components.ex`). Current step label in the step bar fixed (the global link colour beat `text-white`). Precommit clean at 3,260 tests.
 - Finding: the genus Rubus Host of Aphis rubifolii's Gall comes from the "Gallformers legacy data" Source (933), not from InfluentialPoints; InfluentialPoints states only species and variety Hosts. The correction belongs to the legacy data (the admin corrections page, later).
 - Noise to chase: Postgrex "client exited" errors logged (not failing) in names_step_test and trait_terms_test, from database work outliving the test.
+
+
+## Other decisions (Jeff, 2026-11-05)
+
+- Genus-level Hosts in the old data: nothing now. Once most Sources are processed, what is left with no Facts gets reviewed for removal.
+- Missing authority: plants get authorship from WCVP (we hold the data); Gallformers' own taxa are updated as Sources come in (when a Source gives a species' name and authority, the record is updated).
+- Undo of a decided question: instinct is yes, but the hard cases (a change lands, someone changes something related, then an undo) need thought before any design.
+- Confirmed: a "lower leaf AND upper leaf" search also finds a leaf-only Gall; in Gall comparisons bud vs stem is a conflict and petiole is not leaf; a passage runs to the next heading.
+- Housekeeping: drop the unused `vocab_requests` table (after Jeff's design-system work lands, to avoid clashing with it). Recorded, not now: the API and site search don't use Source terms; the PDF page view.
+
+- Undo rule (Jeff, 2026-11-05: acceptable): Undo of a decided question is allowed only while nothing depends on it: the Source isn't approved yet, and nothing the decision changed (a synonym added, a plant created, a name split) has been edited since, per the audit log. Otherwise Undo says why ("… was edited by … since") and points to the taxonomy admin. Not yet built.
 

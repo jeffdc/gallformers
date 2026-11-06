@@ -1,7 +1,7 @@
 ---
 status: planned
 created: 2026-11-02
-updated: 2026-11-03
+updated: 2026-11-05
 epic: gall-traits
 relates: [eb47, e381, 294c, 6611]
 ---
@@ -389,4 +389,11 @@ New rules took: Ashmead's 13 common-name Hosts are declared by their words (no g
 Golden set, possible regressions (19, against 12 in v4): Ashmead 1 (f260 season Fall, as before); Osten Sacken 6 (C. Q. inanis name act not declared; f26 walls "shell thick" left blank; f44 walls thin; f62 description 0.58; f79 color "rusty" left blank; f127 oak apple as before); Floate 7 (Populus nigra var. italica not attached as Host for three Galls though declared and used for six; f10 form pocket; f44 walls ostiole; f51 season Summer; f110 description 0.56); Nastasi & Davis 3 (f58 "round" left blank, now a question; f269 cells; f366 color red); Aphis 2 (as before). Blank categories are the new guide's "null unless the words plainly mean one value" (placed later if the checkers agree); the rest look like run-to-run variation in what the producer picks up, not a rule the guides broke.
 
 Also built after "Just run them all": common-name Host questions offer the genus's sections first (Quercus sect. Lobatae "Red Oaks", sect. Quercus…), the genus last; keeping a disputed genus Host, or a Gall's genus Host, "as another plant" sets that plant for those statements only (`host_taxon_id`), never a package-wide reading (a reading of a genus name is refused). `mix precommit` clean at 3,203 tests.
+
+
+## Cost correction (2026-11-05)
+
+The cost script missed phase 5 (the checkers record their cost in `phase5.record.json`, not `run.json`). True costs: v5 re-run **$44.86** (not $30.33: Ashmead $10.92, Osten Sacken $9.63, Floate $9.35, Nastasi & Davis $12.44, Aphis $2.51); v4 re-run **$45.85** (not $32.44). Split of v5: phase 3 (Galls) $16.66, phase 5 Opus checker $9.71, phase 6 (responding) $7.54, phase 2 (taxonomy) $6.13, phase 5 Sonnet checker $4.82. Caching already works (almost all input is cache reads); the cost is Opus output and the doubled checking. About $9 a Source on these; levers to weigh for 1,000+ Sources: one checker (−22%), a cheaper model for phases 5–6, several short Sources per run.
+
+Missed-names check (prototype, no cost; scratch `missed_names2.py`): names Gallformers' tree knows that a Source prints but no batch declares — 2 to 10 per Source, a list a curator can scan; it would have caught Osten Sacken's missing "Cynips quercus inanis". A per-Gall variant (names in a Gall's cited passages it doesn't use) is noisy, since old papers name other species in comparisons; Floate's missed italica Hosts sit in passages those Galls don't cite, so neither variant catches that kind.
 

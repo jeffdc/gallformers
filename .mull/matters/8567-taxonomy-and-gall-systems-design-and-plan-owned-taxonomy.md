@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-03
-updated: 2026-10-27
+updated: 2026-11-06
 epic: taxonomy
 relates: [b5bd, e381, 294c, 50ff, 9449, a856]
 ---
@@ -176,3 +176,15 @@ Script: `docs/plans/coupling_inventory.py` (local). **The taxonomy facade is sma
 - **A phylogeny view** — Gallformers' editorial opinion of how phylogeny is shaping up may be shown someday, possibly outside the app; durable taxon and Gall IDs keep the door open.
 
 Earlier design-draft material (concept diagram, 28-rule list): snapshot `docs/plans/domain-model-v1-2026-10-04.md` (local). Redraw the design diagram from the domain model when design resumes.
+
+
+## Taxonomy is Facts; phase 2 before release (Jeff, 2026-11-06)
+
+- The tree is whatever the current taxonomic Facts say. Every taxonomic statement is a Fact — names, authorship, placements, synonymies, ranks, splits — including Gallformers' own positions, credited to the Gallformers Source. Only Gall naming is editorial.
+- Every curator change to the tree is a Gallformers Fact, through the same Fact process as intake. Today's direct tree edits become Gallformers Facts: the taxonomy admin's place / rename / create / remove-synonym, and review decisions that change the tree (split a synonym into its own species, move a synonym, create a plant or taxon from a question, a Source's name read in its own sense).
+- Phase 2 (placement and accepted name, synonymy driving the tree from current Facts) happens **before release**, not after (replaces 50ff item 15's "after release").
+
+- **Plants are the exception** (Jeff, 2026-11-06): plant data is not tied to the Fact system; Gallformers is not a system of record for plants. WCVP eases getting plant data in; where WCVP doesn't give what we want (it and iNat don't always align), curators edit it editorially, on whatever basis. The plant data that matters: name, synonymy (so alternate names are searchable), and range. "Taxonomy is Facts" (and phase 2) covers the non-plant taxa. Host relationships (host_of) remain Facts.
+
+- **Phase 2: a Source's taxonomic act never moves the tree by itself** (Jeff, 2026-11-06): recency decides the current value of ordinary Facts on approval, but a newer Source's placement, synonymy or name change is always a curator question (follow it, or restate Gallformers' position with a reason). See `ec2c`.
+
