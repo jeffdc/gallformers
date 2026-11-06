@@ -39,7 +39,7 @@ private           content_images
 private           source_documents
 private           document_items
 
-# Import: packages, batches, the admin queue and its notes, edits on Facts before approval, disputes, vocabulary requests, the replay log.
+# Import: packages, batches, the admin queue and its notes, edits on Facts before approval, disputes, the replay log.
 private           import_packages
 private           import_batches
 private           batch_statements
@@ -47,7 +47,6 @@ private           batch_unmapped
 private           queue_items
 private           queue_item_notes
 private           package_statement_edits
-private           vocab_requests
 private           trait_term_candidates
 private           replay_log
 

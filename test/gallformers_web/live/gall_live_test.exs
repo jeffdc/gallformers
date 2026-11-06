@@ -19,6 +19,18 @@ defmodule GallformersWeb.GallLiveTest do
   alias Gallformers.Catalog
   alias Gallformers.DataCase
 
+  # A Gall merged away (`Gallformers.Import.record_merge/2`) leaves a redirect.
+  defp redirect_gall!(from_id, from_code, to_id) do
+    {:ok, _} =
+      Gallformers.Audit.transaction(DataCase.test_actor(), "test.redirect", fn ->
+        Gallformers.Repo.insert!(%Gallformers.Catalog.GallRedirect{
+          from_gall_id: from_id,
+          from_code: from_code,
+          gall_id: to_id
+        })
+      end)
+  end
+
   describe "Gall page rendering" do
     test "renders the Gall's name, its generation split off", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/gall/300")
@@ -46,6 +58,23 @@ defmodule GallformersWeb.GallLiveTest do
       conn = get(conn, "/gall/990250")
 
       assert redirected_to(conn, 301) == "/articles/gall-lookalikes"
+    end
+
+    test "a merged Gall's old ID and code redirect (301) to the Gall it became", %{conn: conn} do
+      redirect_gall!(990_300, "MRGD990300", 300)
+
+      assert redirected_to(get(conn, "/gall/990300"), 301) == "/gall/300"
+      assert redirected_to(get(build_conn(), "/gall/mrgd990300"), 301) == "/gall/300"
+      assert_error_sent 404, fn -> get(build_conn(), "/gall/NOPE990300") end
+    end
+
+    test "live navigation to a merged Gall's old ID goes to the Gall it became", %{conn: conn} do
+      redirect_gall!(990_301, "MRGD990301", 300)
+
+      {:ok, view, _html} = live(conn, ~p"/gall/301")
+
+      assert {:error, {:live_redirect, %{to: "/gall/300"}}} =
+               live_redirect(view, to: "/gall/990301")
     end
 
     test "shows the Inducer's taxonomy as a breadcrumb", %{conn: conn} do

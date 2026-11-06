@@ -1,33 +1,63 @@
 defmodule GallformersWeb.Admin.DashboardLive do
   @moduledoc """
   The admin dashboard (design system, matter bc0d): the Sources to review
-  first (the review index's rows, `ReviewLive.Loader`), then the curators'
-  recent changes (`Gallformers.Catalog.changes/1`, the same `change_entry`
-  as the Changes page). The rail: Find and Create, and Site for a
-  superadmin.
+  first (the review index's rows, `ReviewLive.Loader`, with the Gall rename
+  proposals and the questions merges left), then Your changes (the
+  curator's tray, `Gallformers.Curation`, kept up to date), then the
+  curators' recent changes (`Gallformers.Catalog.changes/1`, the same
+  `change_entry` as the Changes page). The rail: Create, and Site for a
+  superadmin. (Find is gone: the command palette finds anything, and Galls
+  and plants are edited on their pages.)
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Accounts, Catalog, Sources, Taxa}
+  alias Gallformers.{Accounts, Catalog, Curation}
   alias GallformersWeb.Admin.ReviewLive.Loader
+  alias GallformersWeb.Live.UserAuth
 
   @recent 8
 
   @impl true
   def mount(_params, session, socket) do
+    curator = UserAuth.curator(session["current_user"])
+    if curator && connected?(socket), do: Curation.subscribe(curator)
+
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
+       curator: curator,
        page_title: "Dashboard",
        current_user: session["current_user"],
        waiting:
-         List.wrap(Loader.renames_row()) ++ Enum.sort_by(Loader.sources(), & &1.to_decide, :desc),
-       changes: Catalog.changes(limit: 60) |> Enum.take(@recent),
-       stats: %{
-         galls: Catalog.count_galls(),
-         hosts: Taxa.count_plants(),
-         sources: Sources.count_sources()
-       }
-     )}
+         List.wrap(Loader.renames_row()) ++
+           List.wrap(Loader.merge_conflicts_row()) ++
+           Enum.sort_by(Loader.sources(), & &1.to_decide, :desc),
+       changes: Catalog.changes(limit: 60) |> Enum.take(@recent)
+     )
+     |> load_tray()}
+  end
+
+  @impl true
+  def handle_info({:change_set, _change}, socket), do: {:noreply, load_tray(socket)}
+
+  defp load_tray(socket) do
+    items =
+      case socket.assigns.curator && Curation.open_set(socket.assigns.curator) do
+        nil -> []
+        set -> set.items
+      end
+
+    assign(socket, tray: items)
+  end
+
+  defp subject_path({:gall, id}), do: "/gall/#{id}?edit"
+  defp subject_path({:plant, id}), do: "/host/#{id}?edit"
+
+  defp state_chip(assigns) do
+    ~H"""
+    <.chip :if={@item.state == :in_tray} variant={:info} size="sm">In your tray</.chip>
+    <.chip :if={@item.state == :waiting} variant={:warn} size="sm">Waiting to apply</.chip>
+    """
   end
 
   @impl true
@@ -76,6 +106,22 @@ defmodule GallformersWeb.Admin.DashboardLive do
               </.data_table>
             </.section>
 
+            <.section id="your-changes-section" title="Your changes" count={length(@tray)}>
+              <:aside :if={@tray != []}>
+                Review and apply from the tray at the foot of the screen
+              </:aside>
+              <.data_table id="your-changes" rows={@tray} row_id={&"your-change-#{&1.id}"}>
+                <:col :let={i} label="Change" grow wrap>{i.text}</:col>
+                <:col :let={i} label="On">
+                  <.link href={subject_path(i.subject)}><.taxon_name name={i.subject_name} /></.link>
+                </:col>
+                <:col :let={i} label="State"><.state_chip item={i} /></:col>
+                <:empty>
+                  Your tray is empty. Turn on Edit on a Gall's or a plant's page to make a change.
+                </:empty>
+              </.data_table>
+            </.section>
+
             <.section id="recent-changes-section" title="Recent changes">
               <:aside><.link href="/admin/changes">All changes</.link></:aside>
               <p :if={@changes == []} class="text-ui text-muted">No changes yet.</p>
@@ -86,22 +132,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
           </div>
 
           <.rail width={:narrow}>
-            <.panel id="find" title="Find">
-              <div class="flex flex-col gap-2">
-                <.link_tile href="/galls" icon="gf-gall" name="Galls">
-                  {format_number(@stats.galls)}
-                </.link_tile>
-                <.link_tile href="/admin/sources" icon="gf-source" name="Sources">
-                  {format_number(@stats.sources)}
-                </.link_tile>
-                <.link_tile href="/admin/taxonomy" icon="gf-taxon" name="Taxonomy">
-                  {format_number(@stats.hosts)} host plants
-                </.link_tile>
-                <.link_tile href="/admin/host-range" icon="ph-map-trifold" name="Host ranges">
-                  Where hosts grow
-                </.link_tile>
-              </div>
-            </.panel>
             <.panel id="create" title="Create">
               <ul class="flex flex-col gap-1.5 text-ui">
                 <li><.link href="/admin/taxonomy/new">New taxon</.link></li>

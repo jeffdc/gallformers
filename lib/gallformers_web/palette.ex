@@ -4,14 +4,16 @@ defmodule GallformersWeb.Palette do
   groups of rows, each row a place to go.
 
   With nothing typed: the fixed Go to list, and for a curator their
-  commands. For a query: Go to shortcuts into the ID tool ("Galls on
-  *Quercus alba*", "… in Virginia", "Galls in Virginia"), then the
-  matches by kind (`Gallformers.Search.global_search/2`, and published
-  articles by title), and last, every result on the search page.
+  commands (Edit this page, Add from observation…, Sources to review,
+  Changes). For a query: Go to shortcuts into the ID tool ("Galls on
+  *Quercus alba*", "… in Virginia", "Galls in Virginia"), for a curator
+  "Review: <Source>" for each Source found that has an import under review,
+  then the matches by kind (`Gallformers.Search.global_search/2`, and
+  published articles by title), and last, every result on the search page.
 
   Rows are numbered (`index`) across the groups, for the keyboard.
   """
-  alias Gallformers.{Articles, Search}
+  alias Gallformers.{Articles, Import, Search}
   alias GallformersWeb.TaxonomyURL
 
   @type row :: %{
@@ -37,7 +39,7 @@ defmodule GallformersWeb.Palette do
 
     case String.trim(query) do
       "" -> start(admin?)
-      q -> results(q)
+      q -> results(q, admin?)
     end
     |> Enum.reject(&(&1.rows == []))
     |> number()
@@ -68,6 +70,12 @@ defmodule GallformersWeb.Palette do
           if(admin?,
             do: [
               row("ph-pencil-simple", "Edit this page", "?edit", "Turn on Edit here"),
+              row(
+                "ph-eye",
+                "Add from observation…",
+                "/admin/observation",
+                "An iNaturalist observation into your tray"
+              ),
               row("ph-check-circle", "Sources to review", "/admin/review"),
               row("ph-list", "Changes", "/admin/changes", "What curators changed")
             ],
@@ -77,7 +85,10 @@ defmodule GallformersWeb.Palette do
     ]
   end
 
-  defp results(q) do
+  # A package still being reviewed (`GallformersWeb.Admin.ReviewLive.Loader`'s).
+  @reviewable [:validated, :resolving, :awaiting_review]
+
+  defp results(q, admin?) do
     found = Search.global_search(q)
 
     groups =
@@ -93,6 +104,7 @@ defmodule GallformersWeb.Palette do
       end
 
     [%{title: "Go to", rows: shortcuts(List.first(found.hosts), List.first(found.places))}] ++
+      [%{title: "Review", rows: if(admin?, do: review_rows(found.sources), else: [])}] ++
       groups ++
       [
         %{title: "Articles", rows: Enum.map(Articles.search_published(q, 2), &article_row/1)},
@@ -113,6 +125,23 @@ defmodule GallformersWeb.Palette do
     do: row("gf-entry", e.name, "/glossary##{String.downcase(e.name)}", e[:definition])
 
   defp article_row(a), do: row("ph-article", a.title, "/articles/#{a.slug}", a.author)
+
+  # "Review: <Source>" for the Sources found with an import under review.
+  defp review_rows([]), do: []
+
+  defp review_rows(sources) do
+    reviewing =
+      Import.list_packages(status: @reviewable).entries |> MapSet.new(& &1.source_id)
+
+    for s <- sources, MapSet.member?(reviewing, s.id) do
+      row(
+        "ph-check-circle",
+        "Review: #{s.name}",
+        "/admin/review/sources/#{s.id}",
+        "Sources to review"
+      )
+    end
+  end
 
   defp every_result(q),
     do:

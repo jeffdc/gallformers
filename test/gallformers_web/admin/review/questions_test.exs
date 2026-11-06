@@ -1683,6 +1683,32 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert_plain(q)
   end
 
+  test "a same-date conflict a merge left names the Gall, the Facts and the merge" do
+    item = %QueueItem{
+      kind: :same_date_conflict,
+      statement_ref: "merge:detachable: detachable | detachable: integral",
+      subject: %{
+        "type" => "trait",
+        "fact_id" => 7,
+        "fact_ids" => [7, 8],
+        "gall_id" => 501,
+        "merge" => %{"type" => "gall", "absorbed_id" => 9, "survivor_id" => 501}
+      },
+      reason:
+        "Merging Andricus foo into Callirhytis morrisoni (sexgen): Sources with the same date disagree"
+    }
+
+    q = present(item)
+
+    assert q.section.id == :same_date
+
+    assert q.written ==
+             "Callirhytis morrisoni (sexgen): detachable: detachable · detachable: integral"
+
+    assert q.question =~ "Merging Andricus foo into Callirhytis morrisoni (sexgen)"
+    assert labels(q) == ["Acknowledge"]
+  end
+
   test "a generation outside its group names the Gall, Inducer and generation" do
     item = %QueueItem{
       kind: :generation_outside_group,

@@ -1184,6 +1184,32 @@ defmodule GallformersWeb.Admin.Review.Questions do
     }
   end
 
+  # One a merge left (`Gallformers.Import.Merge`): of no Source; the Gall
+  # (or plant) kept, the Facts that tie, and the merge in its reason.
+  defp build(:same_date, %QueueItem{subject: %{"merge" => _}} = item, ctx) do
+    facts =
+      item.statement_ref
+      |> String.replace_prefix("merge:", "")
+      |> String.split(" | ")
+      |> Enum.join(" · ")
+
+    written =
+      case item.subject["gall_id"] do
+        nil -> facts
+        id -> "#{name(ctx, :galls, id)}: #{facts}"
+      end
+
+    %{
+      written: written,
+      question: "#{item.reason}. Acknowledge it for a curator to follow up?",
+      proposal: nil,
+      undecided: acknowledged(),
+      choices: [
+        acknowledge("The Fact keeps its standing until a dated Gallformers statement settles it.")
+      ]
+    }
+  end
+
   defp build(:same_date, item, ctx) do
     what = describe_statement(item, ctx) || "this #{humanize(item.subject["type"] || "Fact")}"
 

@@ -1,8 +1,9 @@
 defmodule GallformersWeb.Admin.TaxonomyLive.PublicLinksTest do
   @moduledoc """
-  The public Host and rank pages link admins to the taxon's page in the
-  taxonomy admin (matter a856, Task 9), whether or not the old admin
-  screens are enabled; other visitors see no link.
+  The public rank pages link admins to the taxon's page in the taxonomy
+  admin (matter a856, Task 9), whether or not the old admin screens are
+  enabled; other visitors see no link. (A plant's page has Edit mode
+  instead, which links it: `GallformersWeb.HostLiveEditTest`.)
   """
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
@@ -21,10 +22,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.PublicLinksTest do
     genus = taxon_fixture(rank: :genus, name: "Linkgenus#{uniq()}", parent: tribe)
     plant_genus = plant_fixture(rank: :genus, name: "Linkplantgenus#{uniq()}")
     section = plant_fixture(rank: :section, name: "Linksection#{uniq()}", parent: plant_genus)
-    plant = plant_fixture(name: "Linkplantgenus#{uniq()} alba", parent: plant_genus)
 
     pages = [
-      {"/host/#{plant.id}", plant},
       {"/family/#{Gallformers.Taxa.accepted_name(family)}", family},
       {"/tribe/#{Gallformers.Taxa.accepted_name(tribe)}", tribe},
       {"/genus/#{Gallformers.Taxa.accepted_name(genus)}", genus},

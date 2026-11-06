@@ -958,6 +958,26 @@ defmodule Gallformers.Import do
   @spec list_gall_renames(keyword()) :: [QueueItem.t()]
   def list_gall_renames(opts \\ []), do: GallRenames.list(opts)
 
+  @doc """
+  The questions merges leave (`:same_date_conflict` queue items of no
+  package: a merge brought two same-date Sources into disagreement on one
+  Fact; `record_merge/2`), oldest first. Options: `:status` (default
+  `:open`; `:all` for every one).
+  """
+  @spec list_merge_conflicts(keyword()) :: [QueueItem.t()]
+  def list_merge_conflicts(opts \\ []) do
+    query =
+      from(q in QueueItem,
+        where: q.kind == :same_date_conflict and is_nil(q.package_id),
+        order_by: q.id
+      )
+
+    case Keyword.get(opts, :status, :open) do
+      :all -> Repo.all(query)
+      status -> Repo.all(from(q in query, where: q.status == ^status))
+    end
+  end
+
   @typedoc "A candidate of a name several taxa hold, for comparison (`candidate_comparison/1`)."
   @type candidate :: %{
           taxon_id: integer(),

@@ -31,11 +31,13 @@ defmodule GallformersWeb.PaletteTest do
 
       assert labels(group(groups, "Curators")) == [
                "Edit this page",
+               "Add from observation…",
                "Sources to review",
                "Changes"
              ]
 
-      assert hrefs(group(groups, "Curators")) == ~w(?edit /admin/review /admin/changes)
+      assert hrefs(group(groups, "Curators")) ==
+               ~w(?edit /admin/observation /admin/review /admin/changes)
     end
   end
 
@@ -70,6 +72,27 @@ defmodule GallformersWeb.PaletteTest do
 
       assert hrefs(group(Palette.groups("palette rearing", admin?: false), "Articles")) ==
                ["/articles/palette-rearing"]
+    end
+
+    test "a curator: a Source under review, to review" do
+      audit_test_metadata(%{})
+      source = source_fixture("Paletteweld", "1959")
+
+      Gallformers.AuditFixtures.package_for(source)
+      |> Ecto.Changeset.change(status: :awaiting_review)
+      |> Repo.update!()
+
+      [row] = group(Palette.groups("Paletteweld", admin?: true), "Review").rows
+
+      assert row.label =~ "Review: "
+      assert row.label =~ "Paletteweld"
+      assert row.href == "/admin/review/sources/#{source.id}"
+      assert group(Palette.groups("Paletteweld", admin?: false), "Review") == nil
+    end
+
+    test "a Source not under review has no Review row" do
+      source_fixture("Palettequiet", "1960")
+      assert group(Palette.groups("Palettequiet", admin?: true), "Review") == nil
     end
 
     test "the last row: every result, on the search page" do

@@ -10,7 +10,9 @@ defmodule GallformersWeb.GallLive.Editor do
     * a Host: Withdraw; Correct… (another plant in its place); Note…;
     * the Inducer: Note… (correcting it is taxonomy, phase 2);
     * a Trait value: ✕ withdraws it; a Trait's Add adds one;
-    * Add a host, found by name.
+    * Add a host, found by name;
+    * Add from observation… (`GallformersWeb.ObservationIntake`, this Gall
+      given).
 
   What is already in the tray is marked on the page (`pending_for/2`). The
   page refreshes this component when the tray changes elsewhere
@@ -50,6 +52,7 @@ defmodule GallformersWeb.GallLive.Editor do
        code_dialog: nil,
        note_dialog: nil,
        name_dialog: nil,
+       observation_open: false,
        qualifier_query: "",
        qualifier_results: [],
        abundances: Catalog.list_abundances(),
@@ -197,6 +200,13 @@ defmodule GallformersWeb.GallLive.Editor do
     do: {:noreply, push_patch(socket, to: "/gall/#{socket.assigns.gall.id}?edit")}
 
   def handle_event("open_note", _params, socket), do: {:noreply, load_notes(socket)}
+
+  # Add from observation (`GallformersWeb.ObservationIntake`), this Gall given.
+  def handle_event("open_observation", _params, socket),
+    do: {:noreply, assign(socket, observation_open: true)}
+
+  def handle_event("close_observation", _params, socket),
+    do: {:noreply, assign(socket, observation_open: false)}
 
   def handle_event("close_note", _params, socket),
     do: {:noreply, assign(socket, note_dialog: nil)}
@@ -604,6 +614,15 @@ defmodule GallformersWeb.GallLive.Editor do
           <.button size="sm" variant="secondary" icon="ph-map-trifold" phx-click="open_range">
             Range exclusions…
           </.button>
+          <.button
+            size="sm"
+            variant="secondary"
+            icon="ph-eye"
+            phx-click="open_observation"
+            phx-target={@myself}
+          >
+            Add from observation…
+          </.button>
         </div>
       </.panel>
 
@@ -773,6 +792,32 @@ defmodule GallformersWeb.GallLive.Editor do
           </div>
         </dl>
       </.section>
+
+      <.dialog
+        :if={@observation_open}
+        id="observation-dialog"
+        title="Add from observation"
+        size={:lg}
+        show
+        on_cancel={JS.push("close_observation", target: @myself)}
+      >
+        <.live_component
+          module={GallformersWeb.ObservationIntake}
+          id="observation-intake"
+          curator={@curator}
+          gall={%{id: @gall.id, name: @gall.name}}
+        />
+        <:actions>
+          <.button
+            type="button"
+            variant="secondary"
+            phx-click="close_observation"
+            phx-target={@myself}
+          >
+            Done
+          </.button>
+        </:actions>
+      </.dialog>
 
       <.dialog
         :if={@note_dialog}

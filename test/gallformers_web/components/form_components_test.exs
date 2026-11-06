@@ -494,6 +494,29 @@ defmodule GallformersWeb.FormComponentsTest do
     end
   end
 
+  describe "dangerous_delete_modal/1 in a LiveComponent" do
+    test "target sends its events to the component" do
+      html =
+        render_component(&FormComponents.dangerous_delete_modal/1,
+          show: true,
+          item_type: "Gall",
+          item_name: "Andricus testus",
+          consequences: ["It goes."],
+          target: %Phoenix.LiveComponent.CID{cid: 7}
+        )
+
+      assert attr(html, "#dangerous-delete-modal-form", "phx-target") == ["7"]
+      assert attr(html, "#dangerous-delete-confirmation", "data-target") == ["7"]
+
+      assert attr(
+               html,
+               "#dangerous-delete-modal [data-part=actions] button[type=button]",
+               "phx-target"
+             ) ==
+               ["7"]
+    end
+  end
+
   describe "typeahead with no results" do
     test "shows no matches message when query is present but results are empty", %{conn: conn} do
       {:ok, _view, html} = live_isolated(conn, EmptyTypeaheadTestLive)

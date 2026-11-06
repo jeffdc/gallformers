@@ -6,7 +6,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Sources do
   questions are left, how many have a proposed answer, what holds
   approval and its status. Each opens the Source's page. While any Gall
   rename proposal is open, a row for them (`Loader.renames_row/0`) opens
-  their page, `/admin/review/renames`.
+  their page, `/admin/review/renames`; while a question a merge left is
+  open, a row for them (`Loader.merge_conflicts_row/0`) opens
+  `/admin/review/merges`.
 
   The filter (`filter`: `work`, needs decisions — the default; `ready`,
   ready to approve; `all`) and the sort (`sort`: `close`, closest to done —
@@ -24,7 +26,10 @@ defmodule GallformersWeb.Admin.ReviewLive.Sources do
 
   @impl true
   def mount(_params, _session, socket) do
-    sources = List.wrap(Loader.renames_row()) ++ Loader.sources()
+    sources =
+      List.wrap(Loader.renames_row()) ++
+        List.wrap(Loader.merge_conflicts_row()) ++ Loader.sources()
+
     {:ok, assign(socket, page_title: "Sources to review", sources: sources)}
   end
 

@@ -129,7 +129,9 @@ defmodule GallformersWeb.Router do
       # Source-down review of import packages, and Gall rename proposals (6611)
       live "/review", Admin.ReviewLive.Sources, :index
       live "/review/renames", Admin.ReviewLive.Renames, :index
+      live "/review/merges", Admin.ReviewLive.Merges, :index
       live "/changes", Admin.ChangesLive, :index
+      live "/observation", Admin.ObservationLive, :index
       live "/review/sources/:id", Admin.ReviewLive.Source, :source
       live "/review/packages/:package_id", Admin.ReviewLive.Source, :package
       # A Source's Facts: what approving writes, with edits (f14c, item 4)

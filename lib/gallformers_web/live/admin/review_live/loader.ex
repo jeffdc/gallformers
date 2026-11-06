@@ -17,6 +17,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
     * `renames/1` and `renames_row/0` — the Gall rename proposals, which
       belong to no package (`6611` Task 8), and their row on the Sources
       list.
+    * `merge_conflicts/1` and `merge_conflicts_row/0` — the questions merges
+      leave (same-date ties, of no package; matter `ec2c`), and their row.
     * `entries/3` — each item of a page as the curator reads it
       (`GallformersWeb.Admin.Review.Questions.present/2`), with the quotes
       it rests on. On a step's page (`step:`), the step's open questions
@@ -262,6 +264,49 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
           to_decide: length(entries),
           set_aside: 0,
           proposed: Enum.count(entries, & &1.proposable),
+          holding: [],
+          ready: false,
+          status: "Awaiting a decision"
+        }
+    end
+  end
+
+  @doc """
+  The questions merges leave (`Gallformers.Import.list_merge_conflicts/1`,
+  from no package) as `t:entry/0`s, oldest first: the open ones, or with
+  `status: :all` the decided ones too.
+  """
+  @spec merge_conflicts(keyword()) :: [entry()]
+  def merge_conflicts(opts \\ []) do
+    items = Import.list_merge_conflicts(status: Keyword.get(opts, :status, :open))
+    entries([%{items: items, batches: [], statements: %{}}], nil)
+  end
+
+  @doc """
+  The Sources list's row for the open questions merges left (shaped as
+  `sources/0`'s rows), or nil when none is open.
+  """
+  @spec merge_conflicts_row() :: map() | nil
+  def merge_conflicts_row do
+    case Import.list_merge_conflicts() do
+      [] ->
+        nil
+
+      items ->
+        %{
+          id: "merge-conflicts",
+          source_id: nil,
+          path: "/admin/review/merges",
+          title: "Questions from merges",
+          citation:
+            "Merging two records brought Sources of the same date into disagreement. They come from no Source.",
+          kind: nil,
+          year: nil,
+          notes: false,
+          packages: 0,
+          to_decide: length(items),
+          set_aside: 0,
+          proposed: 0,
           holding: [],
           ready: false,
           status: "Awaiting a decision"

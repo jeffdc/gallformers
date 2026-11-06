@@ -58,6 +58,8 @@ defmodule Gallformers.Audit.ChangeLog do
     "import.record_plant_added" => "Added a plant",
     "import.record_wcvp_edit" => "Edited a plant's WCVP record",
     "import.record_source_edit" => "Edited a Source",
+    "import.record_deletion" => "Deleted a record",
+    "import.record_merge" => "Merged two records",
     "catalog.create_gall" => "Created a Gall",
     "catalog.update_gall_editorial" => "Edited a Gall",
     "catalog.update_name_parts" => "Changed a Gall's name",
@@ -366,21 +368,12 @@ defmodule Gallformers.Audit.ChangeLog do
       coalesce(tf.gall_id, rf.object_gall_id, rf.subject_gall_id, raf.gall_id, oc.gall_id, df.gall_id, af.gall_id),
       coalesce(tg.name, rg.name, rag.name, og.name, dg.name, ag.name),
       cf.taxon_id, cn.name, ct.rank::text, ct.kingdom::text,
-      CASE f.kind
-        WHEN 'gall_trait' THEN replace(tv.trait, '_', ' ') || ': ' || tv.value
-        WHEN 'gall_relationship' THEN
-          CASE rf.type::text
-            WHEN 'host_of' THEN 'host: ' || coalesce(subj.name, '?')
-            WHEN 'inducer_of' THEN 'inducer: ' || coalesce(subj.name, '?')
-            ELSE replace(rf.type::text, '_', ' ') || ' ' || coalesce(obj.name, objg.name, '?')
-          END
-        WHEN 'gall_range' THEN 'range ' || raf.adjustment || ': ' || p1.name
-        WHEN 'gall_occurrence' THEN 'recorded in ' || p2.name
-        WHEN 'gall_description' THEN 'a description'
-        WHEN 'gall_alias' THEN 'also known as ' || af.name
-        WHEN 'taxon_common_name' THEN 'common name "' || cf.common_name || '"'
-        ELSE f.kind::text
-      END
+      f.kind::text, tv.trait, tv.value, rf.type::text,
+      CASE rf.type::text
+        WHEN 'host_of' THEN subj.name WHEN 'inducer_of' THEN subj.name
+        ELSE coalesce(obj.name, objg.name)
+      END,
+      raf.adjustment, coalesce(p1.name, p2.name), af.name, cf.common_name
     FROM facts f
     LEFT JOIN trait_facts tf ON tf.fact_id = f.id
     LEFT JOIN trait_values tv ON tv.id = tf.trait_value_id
@@ -408,14 +401,57 @@ defmodule Gallformers.Audit.ChangeLog do
 
     %{rows: rows} = Repo.query!(sql, [fact_ids])
 
-    Map.new(rows, fn [id, gall_id, gall, taxon_id, taxon, rank, kingdom, what] ->
+    Map.new(rows, fn [id, gall_id, gall, taxon_id, taxon, rank, kingdom | words] ->
       {id,
        %{
          id: id,
-         what: what,
+         what: words |> fact_of() |> fact_words(),
          gall: gall_id && %{id: gall_id, name: gall},
          taxon: taxon_id && %{id: taxon_id, name: taxon, rank: rank, kingdom: kingdom}
        }}
     end)
   end
+
+  defp fact_of(["gall_trait", trait, value | _]), do: {:trait, trait, value}
+  defp fact_of(["gall_relationship", _, _, type, name | _]), do: {:relationship, type, name}
+  defp fact_of(["gall_range", _, _, _, _, adjustment, place | _]), do: {:range, adjustment, place}
+  defp fact_of(["gall_occurrence", _, _, _, _, _, place | _]), do: {:occurrence, place}
+  defp fact_of(["gall_description" | _]), do: :description
+  defp fact_of(["gall_alias", _, _, _, _, _, _, name, _]), do: {:alias, name}
+  defp fact_of(["taxon_common_name", _, _, _, _, _, _, _, name]), do: {:common_name, name}
+  defp fact_of([kind | _]), do: {:other, kind}
+
+  @doc """
+  A Fact in the change log's words: "host: Quercus alba", "season:
+  Spring", "range exclude: Europe", "recorded in Virginia", "also known
+  as oak apple". Names are given already looked up; a missing one reads
+  as "?". The change tray (`Gallformers.Curation`) words its Facts with
+  this, so the tray reads like the changes page.
+  """
+  @spec fact_words(
+          {:trait, String.t(), String.t()}
+          | {:relationship, String.t(), String.t() | nil}
+          | {:range, String.t(), String.t() | nil}
+          | {:occurrence, String.t() | nil}
+          | :description
+          | {:alias, String.t()}
+          | {:common_name, String.t()}
+          | {:other, String.t()}
+        ) :: String.t()
+  def fact_words({:trait, trait, value}), do: "#{String.replace(trait, "_", " ")}: #{value}"
+  def fact_words({:relationship, "host_of", name}), do: "host: " <> named(name)
+  def fact_words({:relationship, "inducer_of", name}), do: "inducer: " <> named(name)
+
+  def fact_words({:relationship, type, name}),
+    do: "#{String.replace(type, "_", " ")} #{named(name)}"
+
+  def fact_words({:range, adjustment, place}), do: "range #{adjustment}: #{named(place)}"
+  def fact_words({:occurrence, place}), do: "recorded in " <> named(place)
+  def fact_words(:description), do: "a description"
+  def fact_words({:alias, name}), do: "also known as " <> named(name)
+  def fact_words({:common_name, name}), do: ~s(common name "#{name}")
+  def fact_words({:other, kind}), do: kind
+
+  defp named(nil), do: "?"
+  defp named(name), do: name
 end

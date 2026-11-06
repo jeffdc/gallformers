@@ -17,10 +17,12 @@ defmodule GallformersWeb.Admin.ReviewLive.SourceTest do
   import Gallformers.TaxaFixtures
   import GallformersWeb.AdminLiveHelpers
 
+  alias Gallformers.DoclingFixtures
   alias Gallformers.Import
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
   alias Gallformers.Repo
+  alias Gallformers.Storage.Private
 
   # A batch-local ref (t24, g1, f5, a2) as a word.
   @ref ~r/\b[tgfa]\d+\b/
@@ -259,6 +261,39 @@ defmodule GallformersWeb.Admin.ReviewLive.SourceTest do
 
       assert %Package{status: :denied, denied_reason: "Duplicate delivery."} =
                Import.get_package!(package.id)
+    end
+  end
+
+  describe "names no batch declares" do
+    # The fixture document, one of its texts printing a name the tree holds.
+    defp print!(package, text) do
+      doc =
+        DoclingFixtures.document()
+        |> update_in(["texts"], &List.update_at(&1, 3, fn t -> Map.put(t, "text", text) end))
+
+      :ok = Private.put(package.s3_prefix <> "document.json", Jason.encode!(doc))
+    end
+
+    test "the names the Source prints that the tree holds and no batch declares", %{conn: conn} do
+      %{package: package} = awaiting!()
+      taxon_fixture(name: "Xenogallus missedus", kingdom: "Animalia")
+      print!(package, "Reared from galls of Xenogallus missedus on the same oak.")
+
+      {:ok, view, _html} = page(conn, package)
+      render_async(view)
+
+      assert has_element?(view, "#unused-names [data-part=name]", "Xenogallus missedus")
+      assert has_element?(view, "#unused-names [data-part=name]", "p. 1")
+    end
+
+    test "with none, says so", %{conn: conn} do
+      %{package: package} = awaiting!()
+      print!(package, "Nothing named here.")
+
+      {:ok, view, _html} = page(conn, package)
+      render_async(view)
+
+      assert has_element?(view, "#unused-names", "Every name the Source prints")
     end
   end
 end

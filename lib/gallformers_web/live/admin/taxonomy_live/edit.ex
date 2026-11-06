@@ -15,8 +15,10 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
       (`GallformersWeb.Admin.TaxonomyLive.RangeEditor`), saved on Save;
     * a plant's WCVP link: match, sync, ignore;
     * the taxon's images (`GallformersWeb.Admin.ImagesComponent`);
-    * delete, only when nothing refers to it (decision 8), with typed-name
-      confirmation; otherwise what refers to it is listed.
+    * delete, with its impact or what blocks it, and (a plant) merge into
+      another plant (`GallformersWeb.RecordRemoval`, on
+      `Gallformers.Import.deletion_impact/1` and `record_deletion/2`;
+      matter `ec2c`, "Deletes").
 
   Every write goes through `Gallformers.Import` as the signed-in admin (the
   `:admin` live session's actor), so it is audited and in the replay log.
@@ -49,7 +51,6 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
        |> assign(:abundances, Taxa.abundance_options())
        |> assign(parent_query: "", parent_results: [], selected_parent: nil)
        |> assign(member_query: "", member_results: [])
-       |> assign(show_delete_modal: false, delete_confirmation: "")
        |> load_taxon(taxon)
        |> load_range()}
     else
@@ -79,7 +80,6 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
     |> assign(:public_path, public_path(taxon, name, plant?))
     |> assign(:synonyms, Taxa.list_synonyms(taxon))
     |> assign(:common_names, Taxa.list_common_names(taxon))
-    |> assign(:references, Taxa.references(taxon))
     |> assign(:rename_form, to_form(%{"name" => name}, as: :rename))
     |> assign(:synonym_form, to_form(%{"name" => "", "sensu" => ""}, as: :synonym))
     |> assign(:common_name_form, to_form(%{"name" => ""}, as: :common_name))
@@ -314,41 +314,6 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
   def handle_event("wcvp_clear_status", _params, socket),
     do: {:noreply, wcvp_edit(socket, {:clear_match_status, [socket.assigns.taxon.id]})}
 
-  # -- delete ------------------------------------------------------------------
-
-  def handle_event("delete", _params, socket) do
-    {:noreply, assign(socket, show_delete_modal: true, delete_confirmation: "")}
-  end
-
-  def handle_event("update_delete_confirmation", %{"value" => value}, socket),
-    do: {:noreply, assign(socket, :delete_confirmation, value)}
-
-  def handle_event("cancel_delete", _params, socket),
-    do: {:noreply, assign(socket, show_delete_modal: false, delete_confirmation: "")}
-
-  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
-    %{actor: actor, taxon: taxon, name: name} = socket.assigns
-
-    if confirmation != name do
-      {:noreply, put_flash(socket, :error, "Name does not match. Type the exact name.")}
-    else
-      case Import.record_taxonomy_edit(actor, {:delete_taxon, taxon}) do
-        {:ok, _} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Deleted #{name}")
-           |> push_navigate(to: ~p"/admin/taxonomy")}
-
-        {:error, reason} ->
-          {:noreply,
-           socket
-           |> reload()
-           |> assign(:show_delete_modal, false)
-           |> put_flash(:error, "Could not delete #{name}: #{Errors.text(reason)}")}
-      end
-    end
-  end
-
   def handle_event(event, params, socket)
       when event in ~w(request_cancel cancel_discard confirm_discard) do
     handle_form_event(event, params, socket)
@@ -452,12 +417,6 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
 
   defp public_path(taxon, name, false),
     do: TaxonomyURL.public_path(%{rank: taxon.rank, name: name})
-
-  defp reference_text(%{table: "taxa", column: "parent_id", count: count}),
-    do: "#{count} child #{if count == 1, do: "taxon", else: "taxa"}"
-
-  defp reference_text(%{table: table, column: column, count: count}),
-    do: "#{count} #{if count == 1, do: "row", else: "rows"} of #{table} (#{column})"
 
   defp format_synced_at(nil), do: nil
   defp format_synced_at(at), do: format_date(at, :short)
@@ -836,36 +795,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
               </.fact_list>
             </.panel>
 
-            <.panel id="danger" variant={:danger} title="Delete">
-              <%= if @references == [] do %>
-                <p class="mb-3 text-ui text-ink-2">
-                  Nothing refers to this taxon, so it can be deleted. You'll be asked to type its name.
-                </p>
-                <.button id="delete-button" variant="danger" phx-click="delete">Delete…</.button>
-              <% else %>
-                <p class="mb-2 text-ui text-ink-2">
-                  This taxon can't be deleted while something refers to it:
-                </p>
-                <ul id="taxon-references" class="list-disc pl-5 text-ui text-ink-2">
-                  <li :for={reference <- @references}>{reference_text(reference)}</li>
-                </ul>
-              <% end %>
-            </.panel>
+            <.live_component
+              module={GallformersWeb.RecordRemoval}
+              id="record-removal"
+              subject={{:taxon, @taxon.id}}
+              name={@name}
+              actor={@actor}
+              merge={if @plant?, do: :plant}
+              deleted_path={~p"/admin/taxonomy"}
+              merged_path={&"/admin/taxonomy/#{&1}"}
+            />
           </.rail>
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
-
-        <.dangerous_delete_modal
-          show={@show_delete_modal}
-          item_type="taxon"
-          item_name={@name}
-          consequences={[
-            "Its names, common names and WCVP link are deleted with it.",
-            "The deletion is recorded in the replay log."
-          ]}
-          confirmation_value={@delete_confirmation}
-        />
       </div>
     </Layouts.admin>
     """

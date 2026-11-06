@@ -2,24 +2,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.EditTest do
   @moduledoc """
   A taxon's page in the taxonomy admin (matter a856, Task 9): rename,
   move, synonyms and common names, section membership, a plant's flags and
-  WCVP link, images, and delete when nothing refers to it. Every write is
+  WCVP link, images (delete and merge: `RecordRemovalTest`). Every write is
   the signed-in admin's, through `Gallformers.Import`, and in the replay
   log. (The Host range editor is `RangeEditorTest`.)
   """
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
-  import Ecto.Query, only: [from: 2]
   import Gallformers.CatalogFixtures
-  import Gallformers.DataCase, only: [test_audit_changes: 0]
   import GallformersWeb.AdminLiveHelpers
 
   alias Gallformers.Audit.Actor
   alias Gallformers.Import
   alias Gallformers.Ranges.Wcvp
-  alias Gallformers.Repo
   alias Gallformers.Taxa
-  alias Gallformers.Taxa.Taxon
 
   setup %{conn: conn} do
     {conn, user} = log_in_admin(conn, "Tess Taxa")
@@ -331,39 +327,5 @@ defmodule GallformersWeb.Admin.TaxonomyLive.EditTest do
     end
   end
 
-  describe "deleting" do
-    test "a taxon nothing refers to is deleted after typing its name", %{conn: conn} do
-      name = "Lonely#{uniq()} alba"
-      plant = plant_fixture(name: name)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/#{plant.id}")
-      view |> element("#delete-button") |> render_click()
-      assert has_element?(view, "#dangerous-delete-modal", name)
-
-      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong"})
-      assert html =~ "Name does not match"
-      assert %Taxon{} = Taxa.get_taxon(plant.id)
-
-      render_submit(view, "confirm_delete", %{"confirmation" => name})
-
-      assert_redirect(view, "/admin/taxonomy")
-      assert is_nil(Taxa.get_taxon(plant.id))
-      assert [_] = taxonomy_edits("delete_taxon")
-
-      deletes =
-        from(c in test_audit_changes(), where: c.table_name == "taxa" and c.op == :delete)
-
-      assert Repo.aggregate(deletes, :count) == 1
-    end
-
-    test "a referenced taxon shows what refers to it and has no delete", %{conn: conn} do
-      genus = genus()
-      _child = plant_fixture(name: "#{Taxa.accepted_name(genus)} kid", parent: genus)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/#{genus.id}")
-
-      refute has_element?(view, "#delete-button")
-      assert has_element?(view, "#taxon-references", "1 child taxon")
-    end
-  end
+  # Delete and merge: GallformersWeb.RecordRemovalTest.
 end

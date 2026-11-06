@@ -11,8 +11,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
   bar, where Approve appears once nothing holds approval
   (`GallformersWeb.Admin.ReviewLive.SourcePage.approval/3`) and asks to
   confirm; "Which Source this is" as a banner (with any question no step
-  shows); and where it stands in each step, with "Continue" to the first
-  step with work left. The head links to the Source in Gallformers
+  shows); where it stands in each step, with "Continue" to the first
+  step with work left; and the names the Source prints that Gallformers
+  holds but no batch declares (`Gallformers.Import.UnusedNames.for_package/1`,
+  read after the page loads), for a curator to scan for a taxon the
+  producer left out. The head links to the Source in Gallformers
   (`/admin/sources/:id`) once there is one.
 
   The Gallformers Source's page (`6611` Task 7, screen 4 of the design)
@@ -38,6 +41,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
   import GallformersWeb.ReviewComponents
 
   alias Gallformers.Import
+  alias Gallformers.Import.UnusedNames
   alias GallformersWeb.Admin.Review.Steps
   alias GallformersWeb.Admin.ReviewLive.ItemRow
   alias GallformersWeb.Admin.ReviewLive.Loader
@@ -74,7 +78,29 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
        tab: "ready",
        unticked: MapSet.new()
      )
-     |> load()}
+     |> load()
+     |> unused_names()}
+  end
+
+  # The names its text prints that no batch declares, from every package
+  # (read once, after the page loads: it reads each package's document).
+  defp unused_names(%{assigns: %{notes?: true}} = socket), do: socket
+
+  defp unused_names(socket) do
+    packages = Enum.map(socket.assigns.packages, & &1.package)
+
+    assign_async(socket, :unused_names, fn ->
+      names = packages |> Enum.flat_map(&package_unused_names/1) |> Enum.uniq_by(& &1.normalized)
+      {:ok, %{unused_names: names}}
+    end)
+  end
+
+  # A package with no text to read has none.
+  defp package_unused_names(package) do
+    case UnusedNames.for_package(package) do
+      {:ok, names} -> names
+      {:error, _reason} -> []
+    end
   end
 
   @impl true
@@ -497,6 +523,38 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
         next={@next}
         status={SourcePage.approval_text(@approval)}
       />
+
+      <.section
+        id="unused-names"
+        title="Names no batch declares"
+        count={@unused_names.ok? && length(@unused_names.result)}
+        class="mt-section"
+      >
+        <p class="mb-2 text-meta text-ink-2">
+          The Source prints these names, which Gallformers holds, but none of its batches declares them. Scan them for a taxon the producer left out.
+        </p>
+        <.async_result :let={names} assign={@unused_names}>
+          <:loading>
+            <p class="text-ui text-muted">Reading the Source's text…</p>
+          </:loading>
+          <:failed>
+            <p class="text-ui text-muted">The Source's text couldn't be read.</p>
+          </:failed>
+          <p :if={names == []} class="text-ui text-muted">
+            Every name the Source prints that Gallformers holds is declared by a batch.
+          </p>
+          <.name_list :if={names != []} items={names} columns={3}>
+            <:item :let={n}>
+              <span data-part="name">
+                <.taxon_name name={n.name} />
+                <span :if={n.pages != []} class="text-meta text-muted">
+                  p. {Enum.join(n.pages, ", ")}
+                </span>
+              </span>
+            </:item>
+          </.name_list>
+        </.async_result>
+      </.section>
 
       <.dialog
         :if={@deny_form}

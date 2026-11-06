@@ -155,8 +155,42 @@ defmodule Gallformers.Audit.ChangeLogTest do
     assert id == ctx.oak.id
   end
 
+  test "deletes and merges are worded", ctx do
+    tx("Adam", "import.record_deletion", 6, [{"galls", "delete", %{id: ctx.gall.id}}])
+    tx("Jeff", "import.record_merge", 5, [{"galls", "update", %{id: ctx.gall.id}}])
+
+    assert [%{title: "Merged two records"}, %{title: "Deleted a record"}] =
+             ChangeLog.groups(limit: 10)
+  end
+
   test "an operation without its own wording still reads as a change" do
     tx("Adam", "facts.attribute", 5, [{"attributions", "insert", %{id: 1}}])
     assert [%{title: "Made a change"}] = ChangeLog.groups(limit: 10)
+  end
+
+  describe "fact_words/1: a Fact in the change log's words" do
+    test "each kind of Fact" do
+      assert ChangeLog.fact_words({:trait, "plant_part", "leaf midrib"}) ==
+               "plant part: leaf midrib"
+
+      assert ChangeLog.fact_words({:relationship, "host_of", "Quercus alba"}) ==
+               "host: Quercus alba"
+
+      assert ChangeLog.fact_words({:relationship, "inducer_of", "Andricus foo"}) ==
+               "inducer: Andricus foo"
+
+      assert ChangeLog.fact_words({:relationship, "alternate_generation_of", "Andricus bar"}) ==
+               "alternate generation of Andricus bar"
+
+      assert ChangeLog.fact_words({:range, "exclude", "Europe"}) == "range exclude: Europe"
+      assert ChangeLog.fact_words({:occurrence, "Virginia"}) == "recorded in Virginia"
+      assert ChangeLog.fact_words(:description) == "a description"
+      assert ChangeLog.fact_words({:alias, "oak apple"}) == "also known as oak apple"
+      assert ChangeLog.fact_words({:common_name, "white oak"}) == ~s(common name "white oak")
+    end
+
+    test "a missing name reads as ?" do
+      assert ChangeLog.fact_words({:relationship, "host_of", nil}) == "host: ?"
+    end
   end
 end

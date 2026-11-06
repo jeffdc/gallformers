@@ -17,6 +17,7 @@ defmodule GallformersWeb.GallLive do
     Curation,
     Galls,
     Glossaries,
+    Import,
     Markdown,
     Places
   }
@@ -41,27 +42,47 @@ defmodule GallformersWeb.GallLive do
   def mount(%{"id" => id}, _session, socket) do
     case Integer.parse(id) do
       {gall_id, ""} ->
-        {:ok, socket} = load_gall(socket, gall_id)
-        curator = socket.assigns[:curator]
-
-        # A curator keeps up with their tray and others' (Edit mode, ec2c).
-        if curator && connected?(socket) do
-          Curation.subscribe(curator)
-          Curation.subscribe_subject({:gall, gall_id})
-        end
-
-        {:ok,
-         assign(socket,
-           editing: false,
-           photos_open: false,
-           others_pending: [],
-           range_edit: nil,
-           range_bounds_edit: nil
-         )}
+        mount_gall(socket, gall_id)
 
       _ ->
-        raise GallformersWeb.NotFoundError, "No gall #{id}"
+        mount_code(socket, id)
     end
+  end
+
+  # A Gall merged into another (live navigation; the HTTP request is
+  # redirected by `GallformersWeb.Plugs.LegacyEntityRedirect`).
+  defp mount_code(socket, code) do
+    case Catalog.gall_redirect(code) do
+      nil -> raise GallformersWeb.NotFoundError, "No gall #{code}"
+      to -> {:ok, push_navigate(socket, to: ~p"/gall/#{to}")}
+    end
+  end
+
+  defp mount_gall(socket, gall_id) do
+    case load_gall(socket, gall_id) do
+      {:ok, socket} -> mount_loaded(socket, gall_id)
+      {:redirect, to} -> {:ok, push_navigate(socket, to: ~p"/gall/#{to}")}
+    end
+  end
+
+  defp mount_loaded(socket, gall_id) do
+    curator = socket.assigns[:curator]
+
+    # A curator keeps up with their tray and others' (Edit mode, ec2c).
+    if curator && connected?(socket) do
+      Curation.subscribe(curator)
+      Curation.subscribe_subject({:gall, gall_id})
+      Import.subscribe_records()
+    end
+
+    {:ok,
+     assign(socket,
+       editing: false,
+       photos_open: false,
+       others_pending: [],
+       range_edit: nil,
+       range_bounds_edit: nil
+     )}
   end
 
   @impl true
@@ -109,6 +130,41 @@ defmodule GallformersWeb.GallLive do
   def handle_info({PlaceDrillDown, :zoom_out}, socket),
     do: {:noreply, push_event(socket, "range-zoom-out", %{})}
 
+  # Another curator deleted or merged this Gall (`Gallformers.Import`'s
+  # records topic): go where it went. The curator's own delete or merge
+  # navigates from `GallformersWeb.RecordRemoval`.
+  def handle_info({event, %{by: by}}, %{assigns: %{curator: %{name: by}}} = socket)
+      when event in [:records_merged, :records_deleted],
+      do: {:noreply, socket}
+
+  def handle_info(
+        {:records_merged, %{type: :gall, absorbed_id: id, survivor_id: to, by: by}},
+        socket
+      )
+      when id == socket.assigns.gall.id do
+    {:noreply,
+     socket
+     |> put_flash(:info, "#{by} merged this Gall into another; here it is.")
+     |> push_navigate(
+       to: if(socket.assigns.editing, do: ~p"/gall/#{to}?edit", else: ~p"/gall/#{to}")
+     )}
+  end
+
+  def handle_info({:records_deleted, %{galls: ids, by: by}}, socket) do
+    if socket.assigns.gall.id in ids do
+      {:noreply,
+       socket |> put_flash(:info, "#{by} deleted this Gall.") |> push_navigate(to: ~p"/galls")}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({event, _payload}, socket) when event in [:records_merged, :records_deleted],
+    do: {:noreply, socket}
+
+  # Photos imported from an observation (Add from observation).
+  def handle_info({:inat_import_complete, _owner}, socket), do: {:noreply, reload_gall(socket)}
+
   def handle_info({:change_set, _change}, socket) do
     # The Editor's marks change even when the Gall's data doesn't.
     if socket.assigns.editing,
@@ -130,14 +186,19 @@ defmodule GallformersWeb.GallLive do
         :map_open
       ])
 
-    {:ok, reloaded} = load_gall(socket, socket.assigns.gall.id)
-    assign(reloaded, keep)
+    case load_gall(socket, socket.assigns.gall.id) do
+      {:ok, reloaded} -> assign(reloaded, keep)
+      {:redirect, to} -> push_navigate(socket, to: ~p"/gall/#{to}")
+    end
   end
 
   defp load_gall(socket, gall_id) do
     case Catalog.gall_page(gall_id) do
       :not_found ->
-        raise GallformersWeb.NotFoundError, "No gall #{gall_id}"
+        case Catalog.gall_redirect(gall_id) do
+          nil -> raise GallformersWeb.NotFoundError, "No gall #{gall_id}"
+          to -> {:redirect, to}
+        end
 
       {:ok, %GallPage{} = gall} ->
         images = format_images(gall.images)
@@ -843,6 +904,18 @@ defmodule GallformersWeb.GallLive do
             <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed?} />
 
             <.record_metadata inserted_at={@gall.inserted_at} updated_at={@gall.updated_at} />
+
+            <.live_component
+              :if={@editing}
+              module={GallformersWeb.RecordRemoval}
+              id="record-removal"
+              subject={{:gall, @gall.id}}
+              name={@gall.name}
+              actor={@curator}
+              merge={:gall}
+              deleted_path={~p"/galls"}
+              merged_path={&"/gall/#{&1}?edit"}
+            />
           </.rail>
         </div>
       </div>

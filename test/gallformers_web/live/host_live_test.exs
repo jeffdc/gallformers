@@ -186,6 +186,22 @@ defmodule GallformersWeb.HostLiveTest do
       assert redirected_to(conn, 301) == "/genus/Fixturplaceholdera"
     end
 
+    test "a merged plant's old ID redirects (301) to the plant it became", %{conn: conn} do
+      survivor = plant_fixture(name: "Fixturquercus mergedi")
+      {:ok, _} = Taxa.add_taxon_redirect(test_actor(), 990_012, survivor.id)
+
+      assert redirected_to(get(conn, "/host/990012"), 301) == "/host/#{survivor.id}"
+    end
+
+    test "live navigation to a merged plant's old ID goes to the plant it became", %{conn: conn} do
+      survivor = plant_fixture(name: "Fixturquercus mergedii")
+      {:ok, _} = Taxa.add_taxon_redirect(test_actor(), 990_013, survivor.id)
+
+      {:ok, view, _html} = live(conn, ~p"/host/1")
+      to = "/host/#{survivor.id}"
+      assert {:error, {:live_redirect, %{to: ^to}}} = live_redirect(view, to: "/host/990013")
+    end
+
     test "a plant's own page is not redirected", %{conn: conn} do
       conn = get(conn, "/host/1")
 

@@ -2,12 +2,15 @@ defmodule Gallformers.Curation.Wording do
   @moduledoc """
   The tray in words (matter `ec2c`, "Wording"): each item's display text
   and each preview flag's, so the tray reads like the changes page. A Fact
-  is worded as the change log words it (`Gallformers.Audit.ChangeLog` on
-  the design-system branch): "host: Quercus alba", "inducer: …",
-  "season: Spring", "range exclude: Europe", "recorded in Virginia", "also
-  known as …"; the item says what it does to it ("Add host: Quercus
-  alba", "Withdraw …", "Correct season: Spring → Summer", "Note on …").
+  is worded by the change log itself (`Gallformers.Audit.ChangeLog.fact_words/1`):
+  "host: Quercus alba", "inducer: …", "season: Spring", "range exclude:
+  Europe", "recorded in Virginia", "also known as …"; the item says what
+  it does to it ("Add host: Quercus alba", "Withdraw …", "Correct season:
+  Spring → Summer", "Note on …"). The flags, the editorial fields and a
+  correction's "old → new" are the tray's own: the change log has no
+  words for them.
   """
+  alias Gallformers.Audit.ChangeLog
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Gall
   alias Gallformers.Places
@@ -15,14 +18,22 @@ defmodule Gallformers.Curation.Wording do
   alias Gallformers.Sources.Source
   alias Gallformers.Taxa
 
-  @doc "What a Fact key says, in the change log's words."
+  @doc """
+  What a Fact key says, in the change log's words
+  (`Gallformers.Audit.ChangeLog.fact_words/1`), its ids looked up.
+  """
   @spec what(term()) :: String.t()
-  def what({:inducer, taxon_id}), do: "inducer: " <> taxon_name(taxon_id)
-  def what({:host, taxon_id}), do: "host: " <> taxon_name(taxon_id)
-  def what({:trait, trait, value}), do: "#{String.replace(trait, "_", " ")}: #{value}"
-  def what({:alias, name}), do: "also known as " <> name
-  def what({:range, adjustment, place_id}), do: "range #{adjustment}: #{place_name(place_id)}"
-  def what({:occurrence, place_id}), do: "recorded in " <> place_name(place_id)
+  def what(key), do: key |> fact() |> ChangeLog.fact_words()
+
+  defp fact({:inducer, taxon_id}), do: {:relationship, "inducer_of", taxon_name(taxon_id)}
+  defp fact({:host, taxon_id}), do: {:relationship, "host_of", taxon_name(taxon_id)}
+  defp fact({:trait, trait, value}), do: {:trait, trait, value}
+  defp fact({:alias, name}), do: {:alias, name}
+
+  defp fact({:range, adjustment, place_id}),
+    do: {:range, to_string(adjustment), place_name(place_id)}
+
+  defp fact({:occurrence, place_id}), do: {:occurrence, place_name(place_id)}
 
   @doc "An item's display text, from its decoded spec."
   @spec item_text(map()) :: String.t()

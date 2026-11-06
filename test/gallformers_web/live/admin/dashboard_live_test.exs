@@ -1,9 +1,10 @@
 defmodule GallformersWeb.Admin.DashboardLiveTest do
   @moduledoc """
   The admin dashboard (`/admin`, design system matter bc0d): the Sources to
-  review first, then the curators' recent changes (the same `change_entry`
-  as the Changes page, with View and Edit); Find, Create and, for a
-  superadmin, Site in the rail.
+  review first, then the curator's own changes (their tray), then the
+  curators' recent changes (the same `change_entry` as the Changes page,
+  with View and Edit); Create and, for a superadmin, Site in the rail (the
+  command palette and Edit mode replaced Find).
 
   Not async: admin access reads the site settings (persistent_term), and
   review packages create Sources and load the vocabularies.
@@ -17,9 +18,12 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
   import Gallformers.ImportFixtures
   import GallformersWeb.AdminLiveHelpers
 
+  alias Gallformers.Audit.Actor
+  alias Gallformers.Curation
+
   setup %{conn: conn} do
-    {conn, _user} = log_in_admin(conn, "Rita Reviewer")
-    %{conn: conn}
+    {conn, user} = log_in_admin(conn, "Rita Reviewer")
+    %{conn: conn, actor: Actor.user(user.id, "Rita Reviewer")}
   end
 
   setup :audit_test_metadata
@@ -99,13 +103,44 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
     end
   end
 
-  describe "the rail" do
-    test "Find and Create link the admin's lists and forms", %{conn: conn} do
+  describe "Your changes" do
+    test "the curator's tray: each change, linked to its page in Edit mode",
+         %{conn: conn} = ctx do
+      gall = gall_fixture(name: "Andricus traydashi gall")
+
+      {:ok, _} =
+        Curation.add_item(ctx.actor, %{
+          kind: :editorial,
+          subject: {:gall, gall.id},
+          field: :completeness,
+          value: true
+        })
+
       {:ok, view, _html} = live(conn, ~p"/admin")
 
-      for href <- ~w(/galls /admin/sources /admin/taxonomy /admin/host-range) do
-        assert has_element?(view, "#find a[href='#{href}']"), "Find: #{href}"
-      end
+      assert has_element?(view, "#your-changes-section", "Completeness: complete")
+
+      assert has_element?(
+               view,
+               "#your-changes a[href='/gall/#{gall.id}?edit']",
+               "Andricus traydashi gall"
+             )
+
+      assert has_element?(view, "#your-changes", "In your tray")
+    end
+
+    test "with an empty tray, it says how to make one", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#your-changes-section", "Your tray is empty")
+    end
+  end
+
+  describe "the rail" do
+    test "Create links the admin's forms; Find is gone (the palette and Edit mode find)",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      refute has_element?(view, "#find")
 
       for href <- ~w(/admin/taxonomy/new /admin/articles/new /admin/keys/new /admin/glossary/new) do
         assert has_element?(view, "#create a[href='#{href}']"), "Create: #{href}"

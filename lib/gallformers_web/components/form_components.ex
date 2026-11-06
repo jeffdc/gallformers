@@ -1152,9 +1152,9 @@ defmodule GallformersWeb.FormComponents do
   Renders a high-friction confirmation modal for destructive admin deletes.
 
   The record is not deletable until the admin types its exact name. The parent
-  LiveView must handle `update_delete_confirmation`, `confirm_delete`, and
-  `cancel_delete`, and must validate the submitted confirmation again before
-  deleting.
+  LiveView (or the LiveComponent given as `target`) must handle
+  `update_delete_confirmation`, `confirm_delete`, and `cancel_delete`, and
+  must validate the submitted confirmation again before deleting.
   """
   attr :show, :boolean, required: true, doc: "whether to show the modal"
   attr :item_type, :string, required: true, doc: "human-readable record type"
@@ -1162,6 +1162,7 @@ defmodule GallformersWeb.FormComponents do
   attr :consequences, :list, required: true, doc: "descriptions of data affected by deletion"
   attr :confirmation_value, :string, default: "", doc: "current confirmation input value"
   attr :id, :string, default: "dangerous-delete-modal", doc: "modal DOM id"
+  attr :target, :any, default: nil, doc: "phx-target for its events (a LiveComponent's @myself)"
 
   def dangerous_delete_modal(assigns) do
     ~H"""
@@ -1171,7 +1172,7 @@ defmodule GallformersWeb.FormComponents do
       title={"Permanently delete this #{@item_type}?"}
       size={:sm}
       show
-      on_cancel={JS.push("cancel_delete")}
+      on_cancel={JS.push("cancel_delete", target: @target)}
     >
       <div class="flex flex-col gap-block">
         <.notice kind={:danger} title="This cannot be undone.">
@@ -1182,7 +1183,7 @@ defmodule GallformersWeb.FormComponents do
           </ul>
         </.notice>
 
-        <form id={"#{@id}-form"} phx-submit="confirm_delete">
+        <form id={"#{@id}-form"} phx-submit="confirm_delete" phx-target={@target}>
           <label for="dangerous-delete-confirmation" class="gf-label">
             Type <strong>{@item_name}</strong> to confirm:
           </label>
@@ -1193,6 +1194,7 @@ defmodule GallformersWeb.FormComponents do
             value={@confirmation_value}
             phx-hook="InputEvent"
             data-event="update_delete_confirmation"
+            data-target={@target && @target.cid}
             autocomplete="off"
             autocapitalize="off"
             spellcheck="false"
@@ -1202,7 +1204,9 @@ defmodule GallformersWeb.FormComponents do
         </form>
       </div>
       <:actions>
-        <.button type="button" variant="ghost" phx-click="cancel_delete">Cancel</.button>
+        <.button type="button" variant="ghost" phx-click="cancel_delete" phx-target={@target}>
+          Cancel
+        </.button>
         <.button
           id="dangerous-delete-submit"
           type="submit"

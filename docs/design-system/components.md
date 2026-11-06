@@ -62,7 +62,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `chip_nav` | PageComponents | Navigation | Built | the Articles list's tag pills |
 | `link_tile` | PageComponents | Navigation | Built | — |
 | `change_entry` | DomainComponents | Domain | Built | — |
-| `edit_toggle`, `edit_scope`, `fact_row`, `fact_chip` | CurationComponents | Editing | Built (Gall page: Inducer, Hosts, Traits) | the admin's Gall and taxon edit screens, in time |
+| `edit_toggle`, `edit_scope`, `fact_row`, `fact_chip` | CurationComponents | Editing | Built (Gall page: Inducer, Hosts, Traits; plant page: Edit mode) | the admin's Gall and taxon edit screens, in time |
 | `change_tray`, `review_apply` | CurationComponents | Editing | Built (`GallformersWeb.TrayLive`, on every page) | — |
 | `key_couplet` | KeyComponents | Domain | Built | `couplet`, `lead`, `destination_badge`, `lead_images` |
 | `key_path` | KeyComponents | Domain | Built | `path_tracker` |
@@ -92,7 +92,7 @@ The admin frame.
 
 ### `command_palette`
 
-Search and go anywhere, on every page, public and admin (`GallformersWeb.PaletteLive`, rendered once from the root layout; the Palette hook). Opened by a `palette_trigger` (the header's, the admin top bar's) or the keys `/` and `s` while not typing in a field (not ⌘K: browsers bind it). With nothing typed, the fixed Go to list (Identify a gall, Browse galls / host plants / places, Articles, Identification keys, Glossary) and, for a curator, their commands (Edit this page, Sources to review, Changes). Typing searches (`GallformersWeb.Palette`: `Search.global_search/2` and `Articles.search_published/2`): Go to shortcuts into the ID tool ("Galls on *Quercus alba*", "… in Virginia", "Galls in Virginia"), then Galls, Host plants, Groups, Places, Sources, Glossary, Articles, and last "See every result" (the search page). ↑ ↓ move the selection, Enter follows it, Esc or a click outside closes; following a row closes the palette. A panel near the top of the screen (`gf-palette`); full screen on phones. Keys are shown with `gf-kbd`. Commands still to come with their targets (ec2c): Add from observation…, Review: <Source>.
+Search and go anywhere, on every page, public and admin (`GallformersWeb.PaletteLive`, rendered once from the root layout; the Palette hook). Opened by a `palette_trigger` (the header's, the admin top bar's) or the keys `/` and `s` while not typing in a field (not ⌘K: browsers bind it). With nothing typed, the fixed Go to list (Identify a gall, Browse galls / host plants / places, Articles, Identification keys, Glossary) and, for a curator, their commands (Edit this page, Add from observation… (`/admin/observation`), Sources to review, Changes). Typing searches (`GallformersWeb.Palette`: `Search.global_search/2` and `Articles.search_published/2`): Go to shortcuts into the ID tool ("Galls on *Quercus alba*", "… in Virginia", "Galls in Virginia"), for a curator "Review: <Source>" for each Source found with an import under review, then Galls, Host plants, Groups, Places, Sources, Glossary, Articles, and last "See every result" (the search page). ↑ ↓ move the selection, Enter follows it, Esc or a click outside closes; following a row closes the palette. A panel near the top of the screen (`gf-palette`); full screen on phones. Keys are shown with `gf-kbd`.
 
 ## Page structure
 
@@ -300,7 +300,7 @@ Attributes: `label`, `for` (the control's id), `help`, `errors`, `layout`, `requ
 - `input`'s label is `gf-label`, its required mark and errors `text-danger`; a checkbox sits beside its label with a gap.
 - `toggle` is a checkbox with `role="switch"` drawn as a track (`.gf-toggle-track`). With no visible `label`, give it an `aria-label`; `phx-click` and `phx-value-*` go on the checkbox.
 - A file input takes `.gf-file`: its button drawn like a secondary button, the chosen file's name beside it.
-- `dangerous_delete_modal` (typed-name delete) keeps its API and events and renders as a `dialog` with a `:danger` notice.
+- `dangerous_delete_modal` (typed-name delete) keeps its API and events and renders as a `dialog` with a `:danger` notice. `target` (a LiveComponent's `@myself`) sends its events to that component.
 
 ### `search_field`
 
