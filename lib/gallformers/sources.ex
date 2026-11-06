@@ -530,6 +530,88 @@ defmodule Gallformers.Sources do
     |> Repo.all()
   end
 
+  @doc "The text of Gall `gall_id`'s newest Gallformers note version (`list_gall_notes/1`), or nil."
+  @spec gall_note_text(integer()) :: String.t() | nil
+  def gall_note_text(gall_id) when is_integer(gall_id) do
+    case list_gall_notes(gall_id) do
+      [] -> nil
+      [newest | _] -> newest |> list_document_items() |> Enum.map_join("\n\n", & &1.text)
+    end
+  end
+
+  @doc """
+  Deletes Galls `gall_ids`' note documents (every version, with its items),
+  as when the Galls are deleted; their texts stay in the private bucket.
+  Returns how many documents were deleted.
+  """
+  @spec delete_gall_notes(Actor.t(), [integer()]) :: {:ok, non_neg_integer()}
+  def delete_gall_notes(%Actor{} = actor, gall_ids) when is_list(gall_ids) do
+    Audit.transaction(actor, "sources.delete_gall_notes", fn ->
+      {count, _} =
+        from(d in SourceDocument, where: d.kind == :note and d.gall_id in ^gall_ids)
+        |> Repo.delete_all()
+
+      count
+    end)
+  end
+
+  @typedoc """
+  What moving a merged Gall's notes did: how many versions `moved`, and
+  each version the survivor already held with the same text (`duplicates`:
+  the absorbed version's ID and its items' IDs mapped to the survivor's),
+  which stays behind for the caller to re-point its quotes and delete
+  (`delete_note_documents/2`).
+  """
+  @type moved_notes :: %{
+          moved: non_neg_integer(),
+          duplicates: [%{document_id: integer(), items: %{integer() => integer()}}]
+        }
+
+  @doc """
+  Moves Gall `from_id`'s note versions to Gall `to_id` (a Gall merge), but
+  those whose text `to_id` holds already (see `t:moved_notes/0`).
+  """
+  @spec move_gall_notes(Actor.t(), integer(), integer()) :: {:ok, moved_notes()}
+  def move_gall_notes(%Actor{} = actor, from_id, to_id)
+      when is_integer(from_id) and is_integer(to_id) do
+    Audit.transaction(actor, "sources.move_gall_notes", fn ->
+      held = Map.new(list_gall_notes(to_id), &{{&1.source_id, &1.sha256}, &1})
+
+      {duplicates, moving} =
+        from_id
+        |> list_gall_notes()
+        |> Enum.split_with(&Map.has_key?(held, {&1.source_id, &1.sha256}))
+
+      Enum.each(moving, &(&1 |> Ecto.Changeset.change(gall_id: to_id) |> Repo.update!()))
+
+      %{
+        moved: length(moving),
+        duplicates:
+          for doc <- duplicates do
+            twin = Map.fetch!(held, {doc.source_id, doc.sha256})
+            twin_items = Map.new(list_document_items(twin), &{&1.ref, &1.id})
+
+            %{
+              document_id: doc.id,
+              items: Map.new(list_document_items(doc), &{&1.id, Map.fetch!(twin_items, &1.ref)})
+            }
+          end
+      }
+    end)
+  end
+
+  @doc "Deletes note documents `document_ids` (with their items). Returns how many."
+  @spec delete_note_documents(Actor.t(), [integer()]) :: {:ok, non_neg_integer()}
+  def delete_note_documents(%Actor{} = actor, document_ids) when is_list(document_ids) do
+    Audit.transaction(actor, "sources.delete_note_documents", fn ->
+      {count, _} =
+        from(d in SourceDocument, where: d.kind == :note and d.id in ^document_ids)
+        |> Repo.delete_all()
+
+      count
+    end)
+  end
+
   @doc """
   The IDs of the Galls with a note of Source `source_id` (Gallformers notes
   are the Gallformers Source's), by ID.

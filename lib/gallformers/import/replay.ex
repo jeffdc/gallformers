@@ -55,6 +55,12 @@ defmodule Gallformers.Import.Replay do
     * `:fact_note` (`%{"gall", "fact"}`), `:taxon_note` (`%{"taxon",
       "about"}`) — a curator's note on a Fact or on a plant's edit, written
       again unless it is there (`Gallformers.Import.CurationNotes`).
+    * `:deletion` (`%{"type", "gall" | "taxon"}`), `:merge` (`%{"type",
+      "absorbed", "survivor"}`) — a Gall or taxon deleted, a Gall or plant
+      merged, done again unless the record is gone already
+      (`Gallformers.Import.Deletion`, `Gallformers.Import.Merge`). A
+      same-date conflict a merge brought about (no package) is decided
+      again by its Gall and statement ref (`"merge" => true`).
     * `:vocab_requests_decided` — 6611's vocabulary backlog, replaced by
       the superadmin vocabulary page (`d213`); no longer written, and not
       replayed.
@@ -69,9 +75,11 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import
   alias Gallformers.Import.Batch
   alias Gallformers.Import.CurationNotes
+  alias Gallformers.Import.Deletion
   alias Gallformers.Import.FactEdits
   alias Gallformers.Import.GallRenames
   alias Gallformers.Import.HostDecisions
+  alias Gallformers.Import.Merge
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.ReplayEntry
@@ -137,6 +145,27 @@ defmodule Gallformers.Import.Replay do
        }) do
     with {:ok, gall_id} <- StableRef.resolve_gall(key["gall"]) do
       case GallRenames.find(gall_id, key["to"]) do
+        nil ->
+          {:error, {:no_queue_item, key}}
+
+        %QueueItem{status: :decided} ->
+          :ok
+
+        item ->
+          with {:ok, decision} <- StableRef.decode_decision(decision) do
+            ok(Import.decide_queue_item(actor, item, decision))
+          end
+      end
+    end
+  end
+
+  defp replay(actor, %{
+         kind: :queue_decision,
+         key: %{"kind" => "same_date_conflict", "merge" => true} = key,
+         payload: %{"decision" => decision}
+       }) do
+    with {:ok, gall_id} <- optional_gall(key["gall"]) do
+      case Merge.find_conflict(gall_id, key["statement_ref"]) do
         nil ->
           {:error, {:no_queue_item, key}}
 
@@ -262,6 +291,22 @@ defmodule Gallformers.Import.Replay do
        when kind in [:fact_note, :taxon_note],
        do: CurationNotes.replay(actor, kind, key, payload)
 
+  defp replay(actor, %{kind: :deletion, key: key}) do
+    case Deletion.decode(key) do
+      {:ok, subject} -> ok(Import.record_deletion(actor, subject))
+      :done -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp replay(actor, %{kind: :merge, key: key}) do
+    case Merge.decode(key) do
+      {:ok, spec} -> ok(Import.record_merge(actor, spec))
+      :done -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
 
   defp edit(%{"op" => "place", "taxon" => taxon}, payload) do
@@ -303,6 +348,9 @@ defmodule Gallformers.Import.Replay do
 
   defp optional_taxon(nil), do: {:ok, nil}
   defp optional_taxon(ref), do: StableRef.resolve_taxon(ref)
+
+  defp optional_gall(nil), do: {:ok, nil}
+  defp optional_gall(ref), do: StableRef.resolve_gall(ref)
 
   # -- packages and queue items ------------------------------------------------
 

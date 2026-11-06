@@ -59,6 +59,7 @@ defmodule Gallformers.Catalog do
       FactNote,
       Gall,
       GallName,
+      GallRedirect,
       LegacyCitation,
       LegacyTraitIds,
       PendingTraitTerm,
@@ -103,6 +104,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Catalog.ReadModels.GallSummary
   alias Gallformers.Catalog.ReadModels.PotentialRange
+  alias Gallformers.Catalog.Records
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Catalog.Vocab.Loader
@@ -726,6 +728,75 @@ defmodule Gallformers.Catalog do
   @doc "Whether `id` is an old gall ID excluded as a non-gall (its URL goes to the lookalikes Article)."
   @spec non_gall?(integer()) :: boolean()
   defdelegate non_gall?(id), to: NonGallRedirect
+
+  # -- deletes and merges (matter `ec2c`; `Gallformers.Catalog.Records`) --------
+
+  @doc """
+  The gall Facts resting on Galls `gall_ids` (their own Facts, the
+  Relationships they are in, and those Relationships' qualifiers), each as
+  `%{fact_id, kind, about, rests_on, text}` (`Gallformers.Catalog.Records`).
+  """
+  @spec facts_about_galls([integer()]) :: [Records.fact_row()]
+  defdelegate facts_about_galls(gall_ids), to: Records
+
+  @doc "The gall Facts naming taxa `taxon_ids` (Relationships and their qualifiers), as `facts_about_galls/1`."
+  @spec facts_naming_taxa([integer()]) :: [Records.fact_row()]
+  defdelegate facts_naming_taxa(taxon_ids), to: Records
+
+  @doc "The Galls an Inducer Fact (whatever its standing) names after one of `taxon_ids`."
+  @spec galls_named_after([integer()]) :: [integer()]
+  defdelegate galls_named_after(taxon_ids), to: Records
+
+  @doc "The Galls whose name one of plants `taxon_ids` qualifies: `%{id, name, taxon_id}`."
+  @spec galls_qualified_by([integer()]) :: [
+          %{id: integer(), name: String.t(), taxon_id: integer()}
+        ]
+  defdelegate galls_qualified_by(taxon_ids), to: Records
+
+  @doc "The generation groups listing one of `taxon_ids`: `%{group, taxon_id}`."
+  @spec generation_groups_naming([integer()]) :: [%{group: String.t(), taxon_id: integer()}]
+  defdelegate generation_groups_naming(taxon_ids), to: Records
+
+  @doc "Galls' legacy citations and Trait terms waiting on a question (`Gallformers.Catalog.Records.gall_records/1`)."
+  @spec gall_records([integer()]) :: map()
+  defdelegate gall_records(gall_ids), to: Records
+
+  @doc "Deletes gall Facts with their details, qualifiers, attributions and notes (`Gallformers.Catalog.Records.delete_facts/2`)."
+  @spec delete_gall_facts(Actor.t(), [integer()]) :: {:ok, non_neg_integer()}
+  defdelegate delete_gall_facts(actor, fact_ids), to: Records, as: :delete_facts
+
+  @doc "What refers to a Gall and keeps it from being deleted (`Gallformers.Catalog.Records.references/1`)."
+  @spec gall_references(integer()) :: [map()]
+  defdelegate gall_references(gall_id), to: Records, as: :references
+
+  @doc "Deletes Galls whose Facts, images and notes are gone (`Gallformers.Catalog.Records.delete_galls/2`)."
+  @spec delete_galls(Actor.t(), [integer()]) :: {:ok, non_neg_integer()} | {:error, term()}
+  defdelegate delete_galls(actor, gall_ids), to: Records
+
+  @doc "Moves a merged Gall's Facts onto the survivor (`Gallformers.Catalog.Records.move_gall_facts/3`)."
+  @spec move_gall_facts(Actor.t(), integer(), integer()) :: {:ok, Records.moves()}
+  defdelegate move_gall_facts(actor, from_id, to_id), to: Records
+
+  @doc "Moves the gall Facts naming a merged plant onto the survivor (`Gallformers.Catalog.Records.move_taxon_facts/3`)."
+  @spec move_taxon_facts(Actor.t(), integer(), integer()) :: {:ok, Records.moves()}
+  defdelegate move_taxon_facts(actor, from_id, to_id), to: Records
+
+  @doc "Finishes a Gall merge: alias, citations, waiting terms, redirect, delete (`Gallformers.Catalog.Records.absorb_gall/3`)."
+  @spec absorb_gall(Actor.t(), integer(), integer()) ::
+          {:ok, Records.absorbed()} | {:error, term()}
+  defdelegate absorb_gall(actor, absorbed_id, survivor_id), to: Records
+
+  @doc "Re-qualifies the Galls a merged plant qualified (`Gallformers.Catalog.Records.requalify_galls/3`)."
+  @spec requalify_galls(Actor.t(), integer(), integer()) :: {:ok, [integer()]} | {:error, term()}
+  defdelegate requalify_galls(actor, from_id, to_id), to: Records
+
+  @doc """
+  The Gall a merged-away Gall ID, or Gallformers code (ignoring case),
+  redirects to, or nil (`Gallformers.Catalog.GallRedirect`): for the web's
+  old Gall URLs and code lookups.
+  """
+  @spec gall_redirect(integer() | String.t()) :: integer() | nil
+  defdelegate gall_redirect(id_or_code), to: Records
 
   # -- gall Facts --------------------------------------------------------------
   #

@@ -215,8 +215,9 @@ defmodule Gallformers.Facts do
   Observations) onto Fact `to_fact_id`, as when a Source's Trait term is
   moved to another category (`d213`), then recomputes the standings of
   both Facts and their slot siblings. When the Source already attributes
-  the target Fact, that attribution stands and the moved one is removed
-  (one attribution per Fact and Source).
+  the target Fact, that attribution stands (its stance and date) and gains
+  the moved one's evidence, names and Observations it lacks, so no quote is
+  lost; the moved one is removed (one attribution per Fact and Source).
 
   Returns `%{moved: true | false, conflicts}` (`moved` false when the
   target's own attribution stood), or `{:error, :not_found}`.
@@ -236,11 +237,14 @@ defmodule Gallformers.Facts do
             from_fact_id == to_fact_id ->
               false
 
-            Repo.exists?(
-              from(a in Attribution,
-                where: a.fact_id == ^to_fact_id and a.source_id == ^attribution.source_id
-              )
-            ) ->
+            existing =
+                Repo.one(
+                  from(a in Attribution,
+                    where: a.fact_id == ^to_fact_id and a.source_id == ^attribution.source_id,
+                    select: a.id
+                  )
+                ) ->
+              combine_children(attribution.id, existing)
               Repo.delete!(attribution)
               false
 
@@ -254,6 +258,30 @@ defmodule Gallformers.Facts do
         nil -> Repo.rollback(:not_found)
       end
     end)
+  end
+
+  # Moves attribution `from_id`'s evidence, names and Observations to
+  # attribution `to_id`, leaving out those it holds already, so a Source's
+  # quotes are kept when its statements of two Facts become one.
+  defp combine_children(from_id, to_id) do
+    for {_assoc, module} <- @children do
+      fields = module.content_fields()
+      content = &Map.take(&1, fields)
+
+      held =
+        from(c in module, where: c.attribution_id == ^to_id)
+        |> Repo.all()
+        |> MapSet.new(content)
+
+      ids =
+        from(c in module, where: c.attribution_id == ^from_id)
+        |> Repo.all()
+        |> Enum.reject(&MapSet.member?(held, content.(&1)))
+        |> Enum.uniq_by(content)
+        |> Enum.map(& &1.id)
+
+      Repo.update_all(from(c in module, where: c.id in ^ids), set: [attribution_id: to_id])
+    end
   end
 
   @doc """
@@ -323,6 +351,126 @@ defmodule Gallformers.Facts do
       {:error, _changeset} ->
         false
     end
+  end
+
+  @doc """
+  The Sources attributing each of `fact_ids`, by Fact ID, each list in
+  Source ID order. A Fact nothing attributes is absent.
+  """
+  @spec source_ids_by_fact([integer()]) :: %{integer() => [integer()]}
+  def source_ids_by_fact([]), do: %{}
+
+  def source_ids_by_fact(fact_ids) when is_list(fact_ids) do
+    from(a in Attribution,
+      where: a.fact_id in ^fact_ids,
+      order_by: [a.fact_id, a.source_id],
+      select: {a.fact_id, a.source_id}
+    )
+    |> Repo.all()
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  end
+
+  # -- deleting and moving (matter `ec2c`, "Deletes") --------------------------
+
+  @doc """
+  Deletes Facts `fact_ids` with their attributions (and the attributions'
+  evidence, names and Observations), as when the Gall or taxon they are
+  about is deleted; then recomputes the standings of the slot siblings
+  that remain. The typed details of each Fact (owned by `Catalog` and
+  `Taxa`) must be deleted first; audit keeps what was removed.
+
+  Returns the conflicts found among the siblings.
+  """
+  @spec delete_facts(Actor.t(), [integer()]) :: {:ok, [Conflict.t()]}
+  def delete_facts(%Actor{} = actor, fact_ids) when is_list(fact_ids) do
+    Audit.transaction(actor, "facts.delete_facts", fn ->
+      ids = Enum.uniq(fact_ids)
+      locked = lock_facts(ids)
+      siblings = for f <- locked, f.id not in ids, do: f.id
+
+      Repo.delete_all(from(a in Attribution, where: a.fact_id in ^ids))
+      Repo.delete_all(from(f in Fact, where: f.id in ^ids))
+
+      recompute(siblings)
+    end)
+  end
+
+  @typedoc "An attribution's name of a taxon (`Gallformers.Facts.AttributionName`), with its Fact and Source."
+  @type taxon_name_use :: %{
+          id: integer(),
+          attribution_id: integer(),
+          fact_id: integer(),
+          source_id: integer(),
+          taxon_id: integer()
+        }
+
+  @doc "The attributions' names of the taxa among `taxon_ids` (a Source naming them as written)."
+  @spec names_of_taxa([integer()]) :: [taxon_name_use()]
+  def names_of_taxa([]), do: []
+
+  def names_of_taxa(taxon_ids) when is_list(taxon_ids) do
+    from(n in AttributionName,
+      join: a in Attribution,
+      on: a.id == n.attribution_id,
+      where: n.taxon_id in ^taxon_ids,
+      order_by: n.id,
+      select: %{
+        id: n.id,
+        attribution_id: a.id,
+        fact_id: a.fact_id,
+        source_id: a.source_id,
+        taxon_id: n.taxon_id
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Deletes the attribution names `name_ids` (`names_of_taxa/1`): a Gall or
+  taxon deleted takes the names its own Sources' statements gave it.
+  Returns how many were deleted.
+  """
+  @spec delete_attribution_names(Actor.t(), [integer()]) :: {:ok, non_neg_integer()}
+  def delete_attribution_names(%Actor{} = actor, name_ids) when is_list(name_ids) do
+    Audit.transaction(actor, "facts.delete_attribution_names", fn ->
+      {count, _} = Repo.delete_all(from(n in AttributionName, where: n.id in ^name_ids))
+      count
+    end)
+  end
+
+  @doc """
+  Makes every attribution name of taxon `from_taxon_id` name `to_taxon_id`
+  instead, as when one plant is merged into another. Returns how many
+  changed.
+  """
+  @spec repoint_attribution_names(Actor.t(), integer(), integer()) :: {:ok, non_neg_integer()}
+  def repoint_attribution_names(%Actor{} = actor, from_taxon_id, to_taxon_id)
+      when is_integer(from_taxon_id) and is_integer(to_taxon_id) do
+    Audit.transaction(actor, "facts.repoint_attribution_names", fn ->
+      {count, _} =
+        from(n in AttributionName, where: n.taxon_id == ^from_taxon_id)
+        |> Repo.update_all(set: [taxon_id: to_taxon_id])
+
+      count
+    end)
+  end
+
+  @doc """
+  Makes evidence quoting document item `from` quote `to` instead, by
+  `%{from => to}` (two copies of one stored text, as when a merged Gall's
+  note duplicates the survivor's). Returns how many changed.
+  """
+  @spec repoint_evidence_items(Actor.t(), %{integer() => integer()}) :: {:ok, non_neg_integer()}
+  def repoint_evidence_items(%Actor{} = actor, item_map) when is_map(item_map) do
+    Audit.transaction(actor, "facts.repoint_evidence_items", fn ->
+      Enum.reduce(item_map, 0, fn {from, to}, count ->
+        {n, _} =
+          from(e in Evidence, where: e.document_item_id == ^from)
+          |> Repo.update_all(set: [document_item_id: to])
+
+        count + n
+      end)
+    end)
   end
 
   @doc """

@@ -78,8 +78,10 @@ defmodule Gallformers.Import do
   denials, edits on Facts before approval, and the Host-name step's and
   taxonomy admin's edits
   (`record_synonym_added/4`, `record_plant_added/2`,
-  `record_taxonomy_edit/2`, `record_wcvp_edit/2`), and curators' notes on
-  Facts and plant edits (`record_fact_note/5`, `record_taxon_note/5`).
+  `record_taxonomy_edit/2`, `record_wcvp_edit/2`), curators' notes on
+  Facts and plant edits (`record_fact_note/5`, `record_taxon_note/5`), and
+  deletes and merges of Galls, taxa and plants (`record_deletion/2`,
+  `record_merge/2`).
   `Gallformers.Import.Replay` replays it after the cutover data migration:
   `export_replay_log/0` writes preview's log to the private bucket and
   `replay_exported/2` replays that file on production
@@ -101,6 +103,8 @@ defmodule Gallformers.Import do
       Gallformers.Audit,
       Gallformers.Catalog,
       Gallformers.Facts,
+      # Deletes and merges delete and move images (`Gallformers.Import.Deletion`).
+      Gallformers.Images,
       Gallformers.Licenses,
       Gallformers.Places,
       Gallformers.Ranges,
@@ -147,6 +151,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.BatchStatement
   alias Gallformers.Import.BatchUnmapped
   alias Gallformers.Import.CurationNotes
+  alias Gallformers.Import.Deletion
   alias Gallformers.Import.Disputes
   alias Gallformers.Import.FactEdits
   alias Gallformers.Import.FactsView
@@ -154,6 +159,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.GallMatcher
   alias Gallformers.Import.GallRenames
   alias Gallformers.Import.HostDecisions
+  alias Gallformers.Import.Merge
   alias Gallformers.Import.Package
   alias Gallformers.Import.Preview
   alias Gallformers.Import.Proposals
@@ -1757,6 +1763,23 @@ defmodule Gallformers.Import do
     })
   end
 
+  # A same-date conflict a merge brought about comes from no package
+  # (`Gallformers.Import.Merge`): found again by its Gall and statement ref.
+  defp log_decision(%QueueItem{kind: :same_date_conflict, package_id: nil} = item) do
+    gall_id = item.subject["gall_id"]
+
+    ReplayLog.append!(
+      :queue_decision,
+      %{
+        "kind" => "same_date_conflict",
+        "merge" => true,
+        "gall" => gall_id && StableRef.gall(gall_id),
+        "statement_ref" => item.statement_ref
+      },
+      %{"decision" => StableRef.encode_decision(item.decision)}
+    )
+  end
+
   defp log_decision(%QueueItem{} = item) do
     package = get_package!(item.package_id)
     batch = item.batch_id && get_batch!(item.batch_id)
@@ -2869,6 +2892,104 @@ defmodule Gallformers.Import do
   @spec record_taxon_note(Actor.t(), integer(), String.t(), String.t(), keyword()) ::
           {:ok, Taxa.TaxonNote.t()} | {:error, term()}
   defdelegate record_taxon_note(actor, taxon_id, about, text, opts \\ []), to: CurationNotes
+
+  # -- deletes and merges (matter `ec2c`, "Deletes") ------------------------------
+
+  @doc """
+  What deleting a Gall or taxon would do and what blocks it
+  (`Gallformers.Import.Deletion`), for the screen that asks to be sure:
+
+      %{
+        subject: %{type: :gall | :taxon, id, name},  # a taxon's also :rank, :kingdom
+        operation: :delete | :cascade | :collapse | :blocked,
+        deletable: boolean,
+        galls: [%{id, name}],                        # the Galls deleted
+        taxa: [%{id, name, rank}],                   # the taxa deleted, the subject first
+        children: [%{id, name, rank}],               # a taxon's direct children
+        parent: %{id, name, rank} | nil,             # where a collapse re-places them
+        facts: [%{fact_id, kind, about, rests_on, text, sources: [%{id, title, name}]}],
+        sources: [%{id, title, name, own, facts}],   # the Facts' Sources, with counts
+        images: [%{id, path, owner}],
+        notes: [%{gall_id, versions}],               # Gallformers note versions
+        legacy_citations: [%{gall_id, source}],
+        cleanup: [%{kind, count, text}],             # import rows cleaned up with it
+        blockers: [%{kind, record, record_name, source, count, text, action}]
+      }
+
+  `about`, `rests_on`, `owner` and `record` are `{:gall, id}` or `{:taxon,
+  id}`. `{:error, :not_found}` when there is no such record.
+  """
+  @spec deletion_impact(Deletion.subject()) :: {:ok, Deletion.impact()} | {:error, :not_found}
+  defdelegate deletion_impact(subject), to: Deletion, as: :impact
+
+  @doc """
+  Deletes a Gall or taxon (`Gallformers.Import.Deletion`): rechecked under
+  the tree lock, audited, logged for replay (`:deletion`), the images'
+  stored files removed after the commit and `{:records_deleted, %{galls,
+  taxa, by}}` broadcast on `records_topic/0`. Returns the impact as carried
+  out and the files that could not be removed.
+
+  `{:error, :not_found}` when it is gone (deleted by another user);
+  `{:error, {:blocked, blockers}}` when something blocks it now.
+  """
+  @spec record_deletion(Actor.t(), Deletion.subject()) ::
+          {:ok, %{impact: Deletion.impact(), storage_errors: [{String.t(), term()}]}}
+          | {:error, :not_found | {:blocked, [Deletion.blocker()]} | term()}
+  defdelegate record_deletion(actor, subject), to: Deletion, as: :record
+
+  @doc """
+  What merging Gall (`{:gall, absorbed_id, survivor_id}`) or plant
+  (`{:plant, absorbed_id, survivor_id}`) would do, writing nothing
+  (`Gallformers.Import.Merge`). A Gall merge:
+
+      %{
+        type: :gall,
+        absorbed: %{id, name, code}, survivor: %{id, name, code},
+        facts: [%{from, to, kind, text, outcome, with_gall,
+                  sources: [%{id, title, name, outcome}]}],
+        standings: [%{fact_id, text, from, to}],  # the survivor's Facts recency changed
+        conflicts: [%{type, fact_ids, text}],     # same-date ties: curator questions
+        queued: [queue_item_id],                  # record_merge/2 only
+        alias: String.t() | nil,                  # the absorbed name, as an alias
+        redirects: %{id, code},
+        images: non_neg_integer(),                # moved over
+        note: :appended | :moved | :kept | :none,
+        repointed: [%{gall_id, text}],            # other Galls now pointing at the survivor
+        cleanup: [%{kind, count, text}],
+        blockers: [blocker]
+      }
+
+  A Fact's `outcome` is `:moved`, `:combined` (the survivor held it) or
+  `:dropped` (it joined the two Galls); a Source's `:moved`,
+  `:already_held` or `:dropped`. A plant merge has `type: :plant`,
+  `absorbed`/`survivor` `%{id, name, rank}`, `synonyms` and `common_names`
+  (moved over), `facts`, `standings`, `conflicts`, `queued`,
+  `galls_requalified` (IDs), `images`, `range: %{dropped}`, `redirects:
+  %{id}`, `cleanup`, `blockers`.
+
+  Errors: `:not_found`, `:same_record`, `:not_a_plant` (a plant merge of
+  anything but two plants at species rank or below). `actor` is whom the
+  rolled-back transaction is audited as (by default a system actor).
+  """
+  @spec merge_preview(Merge.spec(), Actor.t()) :: {:ok, Merge.result()} | {:error, term()}
+  defdelegate merge_preview(spec, actor \\ Actor.system("merge preview")), to: Merge, as: :preview
+
+  @doc """
+  Merges (`merge_preview/1` for the result): audited, logged for replay
+  (`:merge`), `{:records_merged, %{type, absorbed_id, survivor_id, by}}`
+  broadcast on `records_topic/0`. `{:error, {:blocked, blockers}}` when
+  something blocks it; nothing changes then.
+  """
+  @spec record_merge(Actor.t(), Merge.spec()) :: {:ok, Merge.result()} | {:error, term()}
+  defdelegate record_merge(actor, spec), to: Merge, as: :record
+
+  @doc ~S|The PubSub topic deletes and merges are broadcast on: `"catalog:records"`.|
+  @spec records_topic() :: String.t()
+  defdelegate records_topic(), to: Deletion, as: :topic
+
+  @doc "Subscribes the caller to `records_topic/0`."
+  @spec subscribe_records() :: :ok | {:error, term()}
+  def subscribe_records, do: Phoenix.PubSub.subscribe(Gallformers.PubSub, Deletion.topic())
 
   # -- the Source editor -------------------------------------------------------
 

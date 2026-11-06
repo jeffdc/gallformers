@@ -438,6 +438,63 @@ defmodule Gallformers.FactsTest do
     end
   end
 
+  describe "move_attribution/3" do
+    test "onto a Fact the Source already states, its quotes and Observations join that attribution" do
+      from_fact = fact_fixture()
+      to_fact = fact_fixture()
+      source = source_fixture("States both #{System.unique_integer()}", "1923")
+
+      attribute!(from_fact, source, %{
+        stance: :confirm,
+        evidence: [%{quote: "the galls are round"}, %{quote: "on white oak"}],
+        observations: [%{provider: :other, external_id: "a"}]
+      })
+
+      attribute!(to_fact, source, %{
+        stance: :confirm,
+        evidence: [%{quote: "on white oak"}],
+        observations: [%{provider: :other, external_id: "b"}]
+      })
+
+      [moving] = Facts.list_attributions(from_fact)
+      assert {:ok, %{moved: false}} = Facts.move_attribution(test_actor(), moving.id, to_fact.id)
+
+      assert Facts.list_attributions(from_fact) == []
+      [kept] = Facts.list_attributions(to_fact)
+
+      assert kept.evidence |> Enum.map(& &1.quote) |> Enum.sort() == [
+               "on white oak",
+               "the galls are round"
+             ]
+
+      assert kept.observations |> Enum.map(& &1.external_id) |> Enum.sort() == ["a", "b"]
+    end
+  end
+
+  describe "delete_facts/2" do
+    test "deletes the Facts with their attributions and settles their slot siblings again" do
+      slot = "gall:#{System.unique_integer([:positive])}:detachable"
+      older = fact_fixture(%{slot: slot})
+      newer = fact_fixture(%{slot: slot})
+
+      attribute!(older, source_fixture("Older #{System.unique_integer()}", "1900"), %{
+        stance: :confirm
+      })
+
+      newer_source = source_fixture("Newer #{System.unique_integer()}", "1950")
+      attribute!(newer, newer_source, %{stance: :confirm})
+      assert standing(newer) == :current
+      refute standing(older) == :current
+
+      assert {:ok, []} = Facts.delete_facts(test_actor(), [newer.id])
+
+      assert Repo.get(Fact, newer.id) == nil
+      assert Repo.all(from a in Attribution, where: a.fact_id == ^newer.id) == []
+      assert standing(older) == :current
+      assert Facts.source_ids_by_fact([newer.id, older.id]) |> Map.keys() == [older.id]
+    end
+  end
+
   describe "recompute_for_source/2" do
     test "retracting a Source and recomputing flips its Facts" do
       only_retracted = fact_fixture()

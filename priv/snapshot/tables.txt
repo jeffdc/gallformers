@@ -119,6 +119,8 @@ public            split_fact_daughters
 public            common_name_facts
 # "Based on" notes on plants' editorial edits, shown on the plant page (ec2c).
 public            taxon_notes
+# A merged plant's old ID, redirecting to the plant it was merged into (ec2c).
+public            taxon_redirects
 
 # The gall catalog.
 public            galls
@@ -141,6 +143,8 @@ public            fact_notes
 public            pending_trait_terms
 # Old gall IDs excluded as non-galls, for their URLs' redirect.
 public            non_gall_redirects
+# A merged Gall's old ID and code, redirecting to the Gall it was merged into (ec2c).
+public            gall_redirects
 # The ID tool's per-Gall lookup table (a read model of the public tables).
 public            gall_index
 

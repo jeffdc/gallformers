@@ -272,6 +272,70 @@ defmodule Gallformers.Images do
   end
 
   @doc """
+  Deletes the image rows of `owners` (Galls and taxa being deleted) in the
+  caller's transaction, leaving their stored files: returns the deleted
+  images, whose files the caller removes once the deletion has committed
+  (`delete_files/1`), so a rolled-back delete keeps them.
+  """
+  @spec delete_owner_images([ImageSchema.owner()]) :: [ImageSchema.t()]
+  def delete_owner_images([]), do: []
+
+  def delete_owner_images(owners) when is_list(owners) do
+    gall_ids = for {:gall, id} <- owners, do: id
+    taxon_ids = for {:taxon, id} <- owners, do: id
+
+    {_count, deleted} =
+      from(i in ImageSchema,
+        where: i.gall_id in ^gall_ids or i.taxon_id in ^taxon_ids,
+        select: i
+      )
+      |> Repo.delete_all()
+
+    Enum.sort_by(deleted, & &1.id)
+  end
+
+  @doc """
+  Removes stored image files (every size variant) by path, as
+  `delete_image/1` does for one. Returns the paths that could not be
+  removed, with why.
+  """
+  @spec delete_files([String.t()]) :: [{String.t(), term()}]
+  def delete_files(paths) when is_list(paths) do
+    for path <- paths,
+        result = ImageStorage.delete_content_image(path, species_variant_names()),
+        result != :ok do
+      {:error, reason} = result
+      Logger.error("Failed to delete image files for #{path}: #{inspect(reason)}")
+      {path, reason}
+    end
+  end
+
+  @doc """
+  Gives `from`'s images to `to` (a merge), after `to`'s own in their
+  order. Returns how many moved.
+  """
+  @spec move_images(ImageSchema.owner(), ImageSchema.owner()) :: non_neg_integer()
+  def move_images(from, to) do
+    last =
+      from(i in ImageSchema, where: ^owner_where(to), select: max(i.sort_order)) |> Repo.one()
+
+    moving = list_images(from)
+
+    moving
+    |> Enum.with_index((last || -1) + 1)
+    |> Enum.each(fn {image, sort_order} ->
+      image
+      |> Ecto.Changeset.change(Map.merge(blank_owner(), ImageSchema.owner_attrs(to)))
+      |> Ecto.Changeset.put_change(:sort_order, sort_order)
+      |> Repo.update!()
+    end)
+
+    length(moving)
+  end
+
+  defp blank_owner, do: %{gall_id: nil, taxon_id: nil}
+
+  @doc """
   Reorders an owner's images.
 
   Takes a list of image IDs in the desired order. Persists the sort_order

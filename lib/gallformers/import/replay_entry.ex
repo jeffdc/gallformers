@@ -13,8 +13,10 @@ defmodule Gallformers.Import.ReplayEntry do
   written, kept so earlier entries load), `:fact_edit` and
   `:fact_edit_removed` (a curator's edits on a package's Facts,
   `Gallformers.Import.FactEdits`), `:fact_note` and `:taxon_note`
-  (curators' notes, `Gallformers.Import.CurationNotes`). The log is ordered
-  by `id`.
+  (curators' notes, `Gallformers.Import.CurationNotes`), `:deletion` and
+  `:merge` (a Gall or taxon deleted, a Gall or plant merged:
+  `Gallformers.Import.Deletion`, `Gallformers.Import.Merge`). The log is
+  ordered by `id`.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -35,7 +37,9 @@ defmodule Gallformers.Import.ReplayEntry do
     :fact_edit,
     :fact_edit_removed,
     :fact_note,
-    :taxon_note
+    :taxon_note,
+    :deletion,
+    :merge
   ]
 
   @type kind ::
@@ -55,6 +59,8 @@ defmodule Gallformers.Import.ReplayEntry do
           | :fact_edit_removed
           | :fact_note
           | :taxon_note
+          | :deletion
+          | :merge
 
   @type t :: %__MODULE__{
           id: integer() | nil,

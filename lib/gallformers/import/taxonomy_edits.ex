@@ -17,7 +17,12 @@ defmodule Gallformers.Import.TaxonomyEdits do
       the synonym's name, payload its `"sensu"`
     * `{:remove_common_name, name}` — `"remove_common_name"`, keyed by the
       taxon and the name
-    * `{:delete_taxon, taxon}` — `"delete_taxon"`
+    * `{:delete_taxon, taxon}` — `"delete_taxon"`; besides what
+      `Gallformers.Taxa.references/1` finds, an open queue item or an edit
+      on a package under review naming the taxon in JSON refuses it
+      (`{:referenced, references}`), and decided ones are cleaned up with
+      it (`Gallformers.Import.RecordRefs`). The rule-based delete, with its
+      cascades, is `Gallformers.Import.record_deletion/2`.
     * `{:set_host_range, taxon, entries}` — `"set_host_range"`, payload
       `"places"`: each place's code, precision and distribution (place
       codes are kept by the data migration)
@@ -39,6 +44,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
 
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
+  alias Gallformers.Import.RecordRefs
   alias Gallformers.Import.ReplayLog
   alias Gallformers.Import.StableRef
   alias Gallformers.Ranges
@@ -117,7 +123,21 @@ defmodule Gallformers.Import.TaxonomyEdits do
 
   def run(actor, {:remove_synonym, name}), do: Taxa.remove_synonym(actor, name)
   def run(actor, {:remove_common_name, name}), do: Taxa.remove_common_name(actor, name)
-  def run(actor, {:delete_taxon, taxon}), do: Taxa.delete_taxon(actor, taxon)
+
+  def run(actor, {:delete_taxon, taxon}) do
+    id = taxon_id(taxon)
+    %{blocking: blocking, history: history} = RecordRefs.find([id], [])
+
+    case json_references(blocking) do
+      [] ->
+        # Batch statements refer to the taxon by foreign key: `Taxa.delete_taxon/2` checks them.
+        :ok = RecordRefs.clean_up(%{history: %{history | statements: []}}, [id], [])
+        Taxa.delete_taxon(actor, taxon)
+
+      json ->
+        {:error, {:referenced, json ++ Taxa.references(id)}}
+    end
+  end
 
   def run(actor, {:set_host_range, taxon, entries}),
     do: Ranges.update_taxon_places(actor, taxon, entries)
@@ -181,6 +201,17 @@ defmodule Gallformers.Import.TaxonomyEdits do
   end
 
   def decode(_key, _payload), do: :unknown
+
+  # What still being decided names a taxon only in JSON (`Gallformers.Import.RecordRefs`),
+  # as `Gallformers.Taxa.references/1` gives foreign keys.
+  defp json_references(%{items: items, edits: edits}) do
+    [
+      {"queue_items", "subject, proposal, decision", length(items)},
+      {"package_statement_edits", "value", length(edits)}
+    ]
+    |> Enum.filter(fn {_table, _column, n} -> n > 0 end)
+    |> Enum.map(fn {table, column, n} -> %{table: table, column: column, count: n} end)
+  end
 
   defp editorial_field("datacomplete"), do: :datacomplete
   defp editorial_field("abundance_id"), do: :abundance_id

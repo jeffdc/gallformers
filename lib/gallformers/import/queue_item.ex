@@ -14,6 +14,11 @@ defmodule Gallformers.Import.QueueItem do
       the Source describes (one proposed, or several offered)
     * `:dispute` — a phase 6 finding the producer disputes
     * `:same_date_conflict` — opposite stances on one Fact with the same date
+      (or several current Facts of one slot tied for the newest). One a
+      merge brought about (`Gallformers.Import.Merge`) comes from no
+      package: its `subject` names the Facts (`"fact_ids"`), the Gall they
+      are about (`"gall_id"`) and the merge (`"merge"`), its
+      `statement_ref` is `"merge:"` and the Facts' words
     * `:taxonomy_disagreement` — a taxonomic act, or a name held valid, that
       disagrees with the tree
     * `:generation_outside_group` — a generation outside its Inducer's groups
@@ -158,7 +163,7 @@ defmodule Gallformers.Import.QueueItem do
 
   @doc """
   A changeset for a new (open) queue item. Every kind but `:gall_rename`
-  needs its package.
+  needs its package, but a `:same_date_conflict` a merge brought about.
   """
   @spec create_changeset(t(), map()) :: Ecto.Changeset.t()
   def create_changeset(item, attrs) do
@@ -174,8 +179,15 @@ defmodule Gallformers.Import.QueueItem do
   end
 
   defp validate_package(changeset) do
-    if get_field(changeset, :kind) == :gall_rename,
-      do: validate_change(changeset, :package_id, fn _, _ -> [package_id: "must be empty"] end),
-      else: validate_required(changeset, [:package_id])
+    case get_field(changeset, :kind) do
+      :gall_rename ->
+        validate_change(changeset, :package_id, fn _, _ -> [package_id: "must be empty"] end)
+
+      :same_date_conflict ->
+        changeset
+
+      _kind ->
+        validate_required(changeset, [:package_id])
+    end
   end
 end

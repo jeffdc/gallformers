@@ -52,6 +52,7 @@ defmodule Gallformers.Taxa do
       Taxon,
       TaxonName,
       TaxonNote,
+      TaxonRedirect,
       TreeBuilder
     ]
 
@@ -77,9 +78,11 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.ReadModels.Browse
   alias Gallformers.Taxa.ReadModels.HostPage
   alias Gallformers.Taxa.ReadModels.Search
+  alias Gallformers.Taxa.Records
   alias Gallformers.Taxa.Taxon
   alias Gallformers.Taxa.TaxonName
   alias Gallformers.Taxa.TaxonNote
+  alias Gallformers.Taxa.TaxonRedirect
   alias Gallformers.Taxa.Tree
 
   @type taxon_ref :: Taxon.t() | integer()
@@ -438,6 +441,50 @@ defmodule Gallformers.Taxa do
       end
     end)
   end
+
+  @doc """
+  Takes the editorial tree's lock (a transaction-scoped advisory lock, as
+  every tree edit does) inside the caller's transaction, so a delete or
+  merge can recheck what refers to its taxa with no tree edit in between.
+  """
+  @spec lock_tree() :: :ok
+  def lock_tree, do: Tree.lock()
+
+  @doc """
+  The taxonomic-act Facts naming any of `taxon_ids`, each once
+  (`Gallformers.Taxa.Records.act_facts/1`): `%{fact_id, kind, taxon_id,
+  text}`, `taxon_id` the one of `taxon_ids` it names.
+  """
+  @spec act_facts_naming([integer()]) :: [Records.act_fact()]
+  defdelegate act_facts_naming(taxon_ids), to: Records, as: :act_facts
+
+  @doc """
+  Deletes the taxonomic-act Facts among `fact_ids`, with their details and
+  attributions (`Gallformers.Taxa.Records.delete_act_facts/2`).
+  """
+  @spec delete_act_facts(Actor.t(), [integer()]) :: {:ok, non_neg_integer()}
+  defdelegate delete_act_facts(actor, fact_ids), to: Records
+
+  @doc """
+  Moves plant `absorbed_id`'s names, common names, crosswalk entries and
+  notes onto `survivor_id` (a plant merge; `Gallformers.Taxa.Records.merge_names/3`).
+  """
+  @spec merge_names(Actor.t(), integer(), integer()) :: {:ok, Records.merged_names()}
+  defdelegate merge_names(actor, absorbed_id, survivor_id), to: Records
+
+  @doc """
+  Records that merged-away taxon `from_id` is now `to_id`
+  (`Gallformers.Taxa.TaxonRedirect`), re-pointing redirects to `from_id`.
+  """
+  @spec add_taxon_redirect(Actor.t(), integer(), integer()) :: {:ok, TaxonRedirect.t()}
+  defdelegate add_taxon_redirect(actor, from_id, to_id), to: Records, as: :add_redirect
+
+  @doc """
+  The taxon a merged-away taxon ID redirects to, or nil
+  (`Gallformers.Taxa.TaxonRedirect`): for the web's old plant URLs.
+  """
+  @spec taxon_redirect(integer()) :: integer() | nil
+  defdelegate taxon_redirect(id), to: Records, as: :redirect
 
   # -- legacy crosswalk --------------------------------------------------------
 
