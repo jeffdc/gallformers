@@ -48,6 +48,7 @@ defmodule Gallformers.Curation do
       Gallformers.Catalog,
       Gallformers.Facts,
       Gallformers.Import,
+      Gallformers.INaturalist,
       Gallformers.Places,
       Gallformers.Repo,
       Gallformers.Sources,
@@ -61,6 +62,7 @@ defmodule Gallformers.Curation do
   alias Gallformers.Catalog
   alias Gallformers.Curation.Applying
   alias Gallformers.Curation.ChangeSet
+  alias Gallformers.Curation.FromObservation
   alias Gallformers.Curation.Item
   alias Gallformers.Curation.Key
   alias Gallformers.Curation.Review
@@ -265,6 +267,76 @@ defmodule Gallformers.Curation do
       {:ok, decorate(item)}
     end
   end
+
+  # -- add from observation ------------------------------------------------------
+
+  @typedoc """
+  An item `from_observation/3` proposes: `spec` as `add_item/2` takes it
+  (`gall_id` nil until the curator chooses the Gall), its display text,
+  `why` it was proposed, and whether it is pre-`selected`.
+  """
+  @type proposed_item :: %{
+          role: :occurrence | :host,
+          spec: map(),
+          text: String.t(),
+          why: String.t(),
+          selected: boolean()
+        }
+
+  @typedoc "What `from_observation/3` proposes from one iNaturalist observation."
+  @type observation_proposal :: %{
+          observation: %{
+            id: integer(),
+            url: String.t(),
+            taxon_name: String.t() | nil,
+            observed_on: Date.t() | nil,
+            place_guess: String.t() | nil,
+            observer: String.t()
+          },
+          inat_observation: Gallformers.INaturalist.Observation.t(),
+          evidence: evidence(),
+          gall: %{
+            gall_id: integer() | nil,
+            candidates: [%{id: integer(), name: String.t(), datacomplete: boolean()}],
+            why: String.t() | nil
+          },
+          items: [proposed_item()],
+          needs: [%{kind: :gall | :place | :host, text: String.t()}],
+          photos: [Gallformers.INaturalist.Photo.t()]
+        }
+
+  @doc """
+  Add from observation: reads one iNaturalist observation (`url_or_id`, a
+  URL or bare ID) and proposes tray items for the curator to confirm. It
+  adds nothing to the tray: the curator adds the items they keep with
+  `add_item/2` (each `spec`, its `gall_id` set to the Gall chosen), and
+  sets `evidence` — the observation — on them (`set_item_evidence/3`) or
+  on the set (`set_evidence/2`).
+
+    * `items`: a recorded occurrence `{:occurrence, place_id}` for the
+      observation's state or province, `when` its observed date (never a
+      season Fact); a Host `{:host, taxon_id}` for each plant the "Host
+      Plant ID" field and the description name, matched as intake matches
+      a Host. Several readings of one name are all offered, the proposed
+      one (if any) `selected`.
+    * `gall`: `gall_id` given; otherwise the Galls of the observation's
+      taxon as Inducer (`candidates`), `gall_id` pre-selected when there
+      is only one or the "Gallformers Code" field names one, else nil.
+    * `needs`: what the curator must give (`:gall`, `:place`, `:host`),
+      in words.
+    * `photos` and `inat_observation`: for the iNaturalist image import
+      (`GallformersWeb.Admin.InatImportComponent`, whose `fetch_result`
+      takes `{:ok, inat_observation}`).
+
+  Errors: `:invalid_input` (not an observation URL or ID), `:not_found`
+  (no such observation), `:unavailable` (iNaturalist could not be reached
+  or answered with an error), `:no_such_gall`.
+  """
+  @spec from_observation(Actor.t(), String.t() | integer(), integer() | nil) ::
+          {:ok, observation_proposal()}
+          | {:error, :invalid_input | :not_found | :unavailable | :no_such_gall}
+  def from_observation(%Actor{type: :user}, url_or_id, gall_id),
+    do: FromObservation.propose(url_or_id, gall_id)
 
   # -- reading -------------------------------------------------------------------
 

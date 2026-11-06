@@ -780,6 +780,37 @@ defmodule Gallformers.Import do
     Repo.insert_all(QueueItem, rows, on_conflict: :nothing)
   end
 
+  @doc """
+  Resolves plant names that come from outside a package (an iNaturalist
+  observation's Host) as a gall batch's Hosts are resolved
+  (`Gallformers.Import.Resolver`): accepted names and synonyms of plants,
+  abbreviations expanded with the genera the names and `:document_texts`
+  write in full, and for a name that matches nothing, Host suggestions from
+  the tree and WCVP. One statement per name, in order (`ref` `"h1"`,
+  `"h2"`, …). Options: `:document_texts`, `:wcvp` (the WCVP lookup).
+  """
+  @spec resolve_host_names([String.t()], keyword()) :: [Resolver.statement()]
+  def resolve_host_names(names, opts \\ []) when is_list(names) do
+    taxa =
+      for {name, i} <- Enum.with_index(names, 1),
+          do: %{"ref" => "h#{i}", "name_as_written" => name}
+
+    batch = %{
+      "batch_type" => "gall",
+      "taxa" => taxa,
+      "facts" =>
+        for(
+          t <- taxa,
+          do: %{"kind" => "relationship", "type" => "host_of", "subject" => t["ref"]}
+        )
+    }
+
+    Resolver.resolve_taxa(
+      batch,
+      Resolver.context(batch, Keyword.take(opts, [:document_texts, :wcvp]))
+    )
+  end
+
   @doc "A batch's statements with their resolutions: taxa, then Galls, each in batch order."
   @spec list_statements(Batch.t()) :: [BatchStatement.t()]
   def list_statements(%Batch{id: batch_id}) do

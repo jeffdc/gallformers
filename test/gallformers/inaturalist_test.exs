@@ -129,6 +129,65 @@ defmodule Gallformers.INaturalistTest do
     end
   end
 
+  describe "an observation's date, place, description and fields" do
+    test "are parsed, a taxon field giving its taxon's name" do
+      json = %{
+        "results" => [
+          %{
+            "id" => 7,
+            "user" => %{"login" => "someone"},
+            "observed_on" => "2025-07-14",
+            "place_guess" => "Berkeley, CA, USA",
+            "place_ids" => [1, 14],
+            "description" => "On a white oak.",
+            "ofvs" => [
+              %{
+                "name" => "Host Plant ID",
+                "value" => 54_779,
+                "taxon" => %{"id" => 54_779, "name" => "Quercus alba"}
+              },
+              %{"name" => "Gallformers Code", "value" => "abc-1"}
+            ],
+            "photos" => []
+          }
+        ]
+      }
+
+      assert {:ok, obs} = INaturalist.parse_observation_response(json)
+      assert obs.observed_on == ~D[2025-07-14]
+      assert obs.place_ids == [1, 14]
+      assert obs.place_guess == "Berkeley, CA, USA"
+      assert obs.description == "On a white oak."
+      assert INaturalist.field_value(obs, "host plant id") == "Quercus alba"
+      assert INaturalist.field_value(obs, "Gallformers Code") == "abc-1"
+      assert INaturalist.field_value(obs, "Other") == nil
+    end
+  end
+
+  describe "fetch_places/1" do
+    test "each place's name and admin level" do
+      Req.Test.stub(INaturalist, fn conn ->
+        assert conn.request_path == "/v1/places/1,14"
+
+        Req.Test.json(conn, %{
+          "results" => [
+            %{"id" => 1, "name" => "United States", "admin_level" => 0},
+            %{"id" => 14, "name" => "California", "admin_level" => 10}
+          ]
+        })
+      end)
+
+      assert {:ok, [%{id: 1, admin_level: 0}, %{id: 14, name: "California", admin_level: 10}]} =
+               INaturalist.fetch_places([1, 14])
+    end
+
+    @tag :capture_log
+    test "a failed request" do
+      Req.Test.stub(INaturalist, &Req.Test.transport_error(&1, :timeout))
+      assert {:error, %Req.TransportError{reason: :timeout}} = INaturalist.fetch_places([1])
+    end
+  end
+
   describe "format_creator/2" do
     test "formats login and name" do
       assert INaturalist.format_creator("janedoe", "Jane Doe") == "janedoe - Jane Doe"

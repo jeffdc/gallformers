@@ -260,6 +260,55 @@ defmodule Gallformers.Places do
   end
 
   @doc """
+  The places a state or province named by another service (iNaturalist)
+  may be: `name` within the country named `country` (or anywhere, with no
+  country), among the selectable places (`list_places/0`). Names compare
+  ignoring case and accents ("Québec" is Quebec); a place whose name goes
+  on past it ("Yukon" is "Yukon Territory") counts only when none is the
+  name exactly. With no `name`, the country itself when it is selectable
+  (it has no subdivisions: the Bahamas). Best first; empty when none.
+  """
+  @spec match_subdivision(String.t() | nil, String.t() | nil) :: [Place.t()]
+  def match_subdivision(nil, nil), do: []
+
+  def match_subdivision(nil, country) do
+    wanted = fold(country)
+    Enum.filter(list_places(), &(&1.type == "country" and fold(&1.name) == wanted))
+  end
+
+  def match_subdivision(name, country) do
+    wanted = fold(name)
+    places = list_places() |> in_country(country) |> Enum.reject(&(&1.type == "country"))
+
+    case Enum.filter(places, &(fold(&1.name) == wanted)) do
+      [] -> Enum.filter(places, &String.starts_with?(fold(&1.name), wanted <> " "))
+      exact -> exact
+    end
+  end
+
+  defp in_country(places, nil), do: places
+
+  defp in_country(places, country) do
+    wanted = fold(country)
+
+    codes =
+      for c <- Repo.all(from(p in Place, where: p.type == "country")),
+          fold(c.name) == wanted,
+          do: c.code <> "-"
+
+    if codes == [], do: places, else: Enum.filter(places, &String.starts_with?(&1.code, codes))
+  end
+
+  defp fold(text) do
+    text
+    |> String.normalize(:nfd)
+    |> String.replace(~r/\p{Mn}/u, "")
+    |> String.downcase()
+    |> String.split()
+    |> Enum.join(" ")
+  end
+
+  @doc """
   Returns all places ordered by type then name.
   """
   @spec list_all_places() :: [Place.t()]

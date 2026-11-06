@@ -30,6 +30,11 @@ config :gallformers, Gallformers.Repo,
 # Use stub instead of real WCVP database for WCVP lookups in most tests
 config :gallformers, wcvp_lookup: Gallformers.Wcvp.LookupStub
 
+# iNaturalist requests go to a Req.Test stub (`Req.Test.stub(Gallformers.INaturalist, …)`),
+# never the network.
+config :gallformers, Gallformers.INaturalist,
+  req_options: [plug: {Req.Test, Gallformers.INaturalist}, retry: false]
+
 # No `pool: Ecto.Adapters.SQL.Sandbox` — WCVP is read-only reference data.
 # Fixture data is loaded once by `make test-db` (via wcvp_test_setup.sql).
 # Tests read concurrently without write isolation.

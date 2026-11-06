@@ -6,7 +6,8 @@ defmodule Gallformers.Curation.Spec do
 
     * **Fact item:** `%{kind: :fact, gall_id, action: :add | :withdraw |
       :correct, key, to}` — `to` (a key of the same kind) only for
-      `:correct`. The key must name a Fact the Gall could have
+      `:correct`; `when` (text: when it was seen, "2025-07-14") only on
+      adding a recorded occurrence. The key must name a Fact the Gall could have
       (`Gallformers.Catalog.find_gall_fact/2`): a taxon, plant and place
       that exist, a Trait value the vocabulary holds.
     * **Note:** `%{kind: :note, gall_id, key, text}` — on a Fact the Gall
@@ -55,13 +56,16 @@ defmodule Gallformers.Curation.Spec do
 
     with :ok <- gall(gall_id),
          :ok <- fact_key(gall_id, key),
-         :ok <- correction(action, key, to) do
+         :ok <- correction(action, key, to),
+         {:ok, seen_when} <- seen_when(action, key, Map.get(spec, :when)) do
       {:ok,
        %{
          kind: :fact,
          subject: {:gall, gall_id},
          key: key,
-         stored: %{"action" => Atom.to_string(action), "to" => to && Key.encode(to)}
+         stored:
+           %{"action" => Atom.to_string(action), "to" => to && Key.encode(to)}
+           |> put_present("when", seen_when)
        }}
     end
   end
@@ -152,6 +156,22 @@ defmodule Gallformers.Curation.Spec do
   defp correction(_action, _key, nil), do: :ok
   defp correction(_action, _key, _to), do: {:error, :invalid_spec}
 
+  # When a recorded occurrence was seen, as written ("2025-07-14", "July
+  # 1961"): only on adding one.
+  defp seen_when(_action, _key, nil), do: {:ok, nil}
+
+  defp seen_when(:add, {:occurrence, _place_id}, text) when is_binary(text) do
+    case blank_nil(text) do
+      nil -> {:error, :invalid_spec}
+      trimmed -> {:ok, trimmed}
+    end
+  end
+
+  defp seen_when(_action, _key, _when), do: {:error, :invalid_spec}
+
+  defp put_present(map, _key, nil), do: map
+  defp put_present(map, key, value), do: Map.put(map, key, value)
+
   defp value(:completeness, value) when is_boolean(value), do: {:ok, value}
   defp value(field, nil) when field in [:abundance, :code, :default_source_id], do: {:ok, nil}
 
@@ -233,6 +253,7 @@ defmodule Gallformers.Curation.Spec do
       key: key,
       to: to
     }
+    |> put_present(:when, stored["when"])
   end
 
   def decode(:note, {:gall, gall_id}, key, stored),

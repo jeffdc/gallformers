@@ -543,6 +543,52 @@ defmodule Gallformers.CurationTest do
       assert Curation.open_set(ctx.ada) == nil
     end
 
+    test "a recorded occurrence carries when it was seen", ctx do
+      california = place_id("US-CA")
+
+      item =
+        add!(ctx.ada, %{
+          kind: :fact,
+          gall_id: ctx.gall.id,
+          action: :add,
+          key: {:occurrence, california},
+          when: "2025-07-14"
+        })
+
+      assert item.spec.when == "2025-07-14"
+      assert item.text == "Add recorded in California (2025-07-14)"
+
+      {:ok, _} =
+        Curation.set_item_evidence(ctx.ada, item.id, %{
+          observations: [%{provider: "inaturalist", id: "4242"}]
+        })
+
+      assert {:ok, %{submitted: [_]}} = Curation.apply(ctx.ada)
+      assert {:ok, fact_id} = Catalog.find_gall_fact(ctx.gall.id, {:occurrence, california})
+      assert [attribution] = Facts.list_attributions(fact_id)
+      assert attribution.when_as_written == "2025-07-14"
+    end
+
+    test "only a recorded occurrence added takes a when", ctx do
+      assert {:error, :invalid_spec} =
+               Curation.add_item(ctx.ada, %{
+                 kind: :fact,
+                 gall_id: ctx.gall.id,
+                 action: :add,
+                 key: {:host, ctx.oak.id},
+                 when: "2025-07-14"
+               })
+
+      assert {:error, :invalid_spec} =
+               Curation.add_item(ctx.ada, %{
+                 kind: :fact,
+                 gall_id: ctx.gall.id,
+                 action: :add,
+                 key: {:occurrence, place_id("US-CA")},
+                 when: ""
+               })
+    end
+
     test "a Source as evidence is cited by Gallformers' statement", ctx do
       item =
         add!(ctx.ada, %{

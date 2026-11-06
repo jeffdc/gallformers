@@ -40,7 +40,7 @@ Core to build once: a **change set** — a small Gallformers batch (statements, 
 
 ## Open
 
-- Taxon pages beyond the basics: splits and merges of non-plant taxa as Facts credited to the Source they follow (phase 2, f923), and how the delete-impact rules adapt to the new model (check taxogall's current delete against `main`'s).
+- Taxon pages beyond the basics: splits and merges of non-plant taxa as Facts credited to the Source they follow (phase 2, f923). (Deletes: settled below.)
 - Inline editing of the Gallformers note text once notes are split into Facts and commentary (`20e5`).
 
 
@@ -49,8 +49,20 @@ Core to build once: a **change set** — a small Gallformers batch (statements, 
 - **main:** taxa delete with an itemised impact preview and cascades (family and genus delete everything under them, S3 images included; an intermediate collapses into its parent; a section with species is blocked); Galls and Hosts delete too (type-to-confirm, images removed from storage, orphaned aliases cleaned, "already deleted" and "deleted by another user" handled, deletions broadcast to other admin screens).
 - **taxogall today:** a taxon deletes only when nothing refers to it — any child taxon, Fact, attribution name, Gall relationship or Host qualifier, generation group, batch statement, image or range row blocks it (`Taxa.references/1` reads every non-cascading FK to `taxa`); rechecked under a tree lock; type-to-confirm; audited and replayed. **Galls can't be deleted at all.** No impact preview (the block lists "N rows of <table> (<column>)", not the Galls/Facts/Sources); no cascade or collapse; no "already deleted" / "deleted by another user"; no broadcast; no delete from the taxonomy list.
 - **Gaps:** taxon IDs held only in JSON (queue item subject/proposal/decision, package statement edits) aren't checked, so a taxon referenced only there can be deleted.
-- **For the design (with phase 2):** in the Facts model a delete can't simply cascade — Facts carry Sources' attributions. What "delete a Gall/taxon" means (withdraw its Facts as Gallformers? re-point to another? only when it holds no sourced Facts?) needs deciding, then main's impact preview and confirmation port onto that.
+- **For the design (with phase 2):** settled in "Deletes" below (Jeff, 2026-11-06).
 
+
+## Deletes (Jeff, 2026-11-06)
+
+- **Delete and merge are separate operations.** **Delete** is for a record that should never have existed (a test entry, a duplicate typed by mistake, a misspelled genus, an empty placeholder): allowed only when nothing from a real Source rests on it (only legacy-data Facts and Gallformers statements). Main's impact preview and type-to-confirm carry over; audited, replayed, restorable (`runbooks/restore-deleted-gall.md`). **Merge** is for the same thing recorded twice (two Galls found to be one, an undescribed Gall that is a known one, a duplicate plant): every Fact with its Sources' attributions moves to the surviving record; the old name becomes an alias; the old id and Gallformers code redirect (iNat links and outside references keep working).
+- A blocked delete says why and what to do instead ("3 Facts from Weld 1959 rest on this Gall: merge it into the right Gall, or correct where Weld's statements were attached").
+- **Cascades are all or nothing.** Deleting a family or genus deletes everything under it (species, their Galls, images) only if every record passes the delete rule; the impact preview lists everything; any blocker blocks the whole delete, named with what to do ("Andricus foo has 4 Facts from Weld 1959: merge it or move it first").
+- **Collapses re-place the children.** Deleting an intermediate rank (subfamily, tribe, subgenus) moves its children to its parent; for non-plant taxa that placement is recorded as a Gallformers statement with the delete's reason (correcting Gallformers' own entry error, one of the rare exceptions); an accepted paper placing a child elsewhere still wins.
+- **Main's other safeguards carry over:** a plant section with species can't be deleted until they're moved; images are removed from storage; "already deleted" and "deleted by another user" are handled; other admin screens are told of the deletion.
+- **References held in JSON count.** Taxon (and Gall) ids held only in queue items or package statement edits are references: a decided item's reference is cleaned up with the delete, an open item's blocks it.
+- **What a Gall merge does** (the curator picks the survivor): Facts move with their attributions; the same Fact on both combines its Sources; a single-valued disagreement follows recency, a same-date tie is a curator question. Editorial: name, code, completeness, abundance, default Source are the survivor's (the absorbed name becomes an alias, its code redirects); all images move over (removable after); if both have a Gallformers note, the absorbed one is appended under a heading ("From the merged X gall") as a new version; other Galls pointing at the absorbed one (an alternate generation) are re-pointed. A merge preview shows all of it first; type-to-confirm, as for delete.
+- **Plant merges** follow the same shape editorially: synonyms combine, Host Facts move over, the range is the survivor's unless the curator edits it.
+- Non-plant taxa: a merge is a synonymy, a Source's act a curator accepts (phase 2, f923); a hand merge is the rare Gallformers exception. Plants merge editorially. Gall merges are editorial (Gall identity is Gallformers').
 
 ## UI design and build (design-system worktree, 2026-11-06)
 
@@ -120,7 +132,14 @@ Split agreed with Jeff: **the ingestion agent builds the change-set back end** (
 - Notes: `Catalog.FactNote` (`fact_notes`) and plant "based on" notes in `taxon_notes`, both audited, replayed and public in the snapshot; drafts private (`priv/snapshot/tables.txt`). A cited Source is stored on the attribution (`cites_as_written`, `cited_source_id`).
 - Imports now honour `gallformers_taxon_id` (picked among the taxa the name matches; a mismatch is flagged `supplied_id_disagrees`) and, in a Gallformers batch without a note, `gallformers_gall_id`.
 
-**Later calls:** `from_observation(actor, url, gall_id | nil)` → proposed items (occurrence, Host from the "Host Plant ID" field and the note's plant names, through intake's plant resolution) for the curator to confirm into the tray; reads the observation from iNaturalist.
+**Add from observation (built 2026-11-06):** `from_observation(actor, url_or_id, gall_id | nil)` → `{:ok, proposal}` or `{:error, :invalid_input | :not_found | :unavailable | :no_such_gall}`. It proposes; it adds nothing to the tray.
+- `proposal`: `%{observation: %{id, url, taxon_name, observed_on, place_guess, observer}, inat_observation: %INaturalist.Observation{}, evidence: %{text: nil, observations: [%{provider: "inaturalist", id: id}], source_id: nil}, gall: %{gall_id: id | nil, candidates: [%{id, name, datacomplete}], why: text | nil}, items: [%{role: :occurrence | :host, spec: <add_item spec>, text, why, selected: boolean}], needs: [%{kind: :gall | :place | :host, text}], photos: [%INaturalist.Photo{}]}`.
+- Occurrence spec `%{kind: :fact, gall_id: id | nil, action: :add, key: {:occurrence, place_id}, when: "2025-07-14"}` (`when` omitted with no date); Host spec `%{kind: :fact, gall_id: id | nil, action: :add, key: {:host, taxon_id}}`. With `gall_id: nil` the curator chooses among `gall.candidates` and the UI sets `gall_id` on each spec before `add_item/2`. A Gall is pre-selected when the Inducer has one Gall or the observation's "Gallformers Code" field names one.
+- After `add_item/2`, attach `proposal.evidence` with `set_item_evidence/3` or `set_evidence/2`.
+- Several readings of a name are separate items, only the resolver's proposal `selected`; a Host Plant ID name the tree doesn't hold offers suggestions, none selected. `needs`: at most one per kind, worded for the curator.
+- Photos: pass `{:ok, proposal.inat_observation}` to `InatImportComponent` as its `fetch_result`.
+- **Contract addition:** optional `when` (text) on Fact items, accepted only on `:add` of an `{:occurrence, _}` key (else `{:error, :invalid_spec}`); stored as `when_as_written` on the statement; the item reads "Add recorded in California (2025-07-14)".
+- Behind it: `INaturalist` extended (observation fields, `fetch_places/1`; tests stub iNat with `Req.Test`), `Places.match_subdivision/2`, `Import.resolve_host_names/2` (intake's Host resolution).
 
 **Behaviours already settled** (above): one change set per curator; any single item can be reviewed and applied alone; no locks (Review recalculates and flags others' changes); a conflicting edit wins with a reason, no second-curator sign-off; edits on the review Facts page correct what a Source says (package edits), while anything Gallformers itself states goes in the tray.
 

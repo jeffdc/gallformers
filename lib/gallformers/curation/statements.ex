@@ -6,6 +6,7 @@ defmodule Gallformers.Curation.Statements do
   confirms `to`'s. Each statement is dated today, with the item's evidence
   (its own, or the set's): its text, its Observations, and the Source it
   follows as `cites` — Gallformers' statement made on that Source's word.
+  A recorded occurrence's `when` is its `when_as_written`.
 
   Evidence with no text is worded from what it has ("Seen in iNaturalist
   observation 123.", "As Weld 1959 states.") or, with nothing, from the
@@ -32,7 +33,10 @@ defmodule Gallformers.Curation.Statements do
       end
 
     for {stance, key} <- stances do
-      key |> fact() |> Map.merge(%{"stance" => stance, "evidence" => [evidence]})
+      key
+      |> fact()
+      |> Map.merge(%{"stance" => stance, "evidence" => [evidence]})
+      |> put_if("when_as_written", stance == "confirm" && spec[:when])
     end
   end
 

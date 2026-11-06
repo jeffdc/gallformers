@@ -26,6 +26,9 @@ defmodule Gallformers.Curation.Wording do
 
   @doc "An item's display text, from its decoded spec."
   @spec item_text(map()) :: String.t()
+  def item_text(%{kind: :fact, action: :add, key: key, when: seen}) when is_binary(seen),
+    do: "Add #{what(key)} (#{seen})"
+
   def item_text(%{kind: :fact, action: :add, key: key}), do: "Add " <> what(key)
   def item_text(%{kind: :fact, action: :withdraw, key: key}), do: "Withdraw " <> what(key)
 

@@ -319,4 +319,26 @@ defmodule Gallformers.PlacesTest do
       refute Map.has_key?(bahamas, :nodes)
     end
   end
+
+  describe "match_subdivision/2" do
+    test "a state by name within its country" do
+      assert [%{code: "US-CA"}] = Places.match_subdivision("California", "United States")
+      assert [] = Places.match_subdivision("California", "Canada")
+    end
+
+    test "ignoring case and accents, and a longer name only when none is exact" do
+      Repo.insert!(%Places.Place{name: "Quebec", code: "CA-QC", type: "province"})
+      Repo.insert!(%Places.Place{name: "Yukon Territory", code: "CA-YT", type: "province"})
+
+      assert [%{code: "CA-QC"}] = Places.match_subdivision("québec", "Canada")
+      assert [%{code: "CA-YT"}] = Places.match_subdivision("Yukon", "Canada")
+    end
+
+    test "with no country, anywhere; with no state, a country without subdivisions" do
+      assert [%{code: "CA-AB"}] = Places.match_subdivision("Alberta", nil)
+      assert [%{code: "BS"}] = Places.match_subdivision(nil, "Bahamas")
+      assert [] = Places.match_subdivision(nil, "United States")
+      assert [] = Places.match_subdivision("Atlantis", "United States")
+    end
+  end
 end
