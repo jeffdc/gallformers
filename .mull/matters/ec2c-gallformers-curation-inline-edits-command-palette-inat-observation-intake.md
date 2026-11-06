@@ -125,6 +125,7 @@ Split agreed with Jeff: **the ingestion agent builds the change-set back end** (
 - Each preview flag is `%{kind: atom, text: text, flag: <the tuple above>}`; each preview entry is `%{id, kind, text, subject, subject_name, key, state, flags, item}`.
 - Items: `id, kind, key, subject, subject_name, text, spec, evidence, status (:draft | :submitted | :in_review), state (:in_tray | :waiting), outcome, inserted_at`. Outcomes: `:applied`, `{:waiting_review, package_id}`, `{:held, reason}`.
 - `pending_for/2` returns key → list of items (a key can have a Fact item and a note). `others_pending(subject, except_user \\ nil)` leaves out the viewing curator when given.
+- `:needs_reason` only when an item supersedes **another** Source's statement: replacing or withdrawing only Gallformers' own statements (the Gallformers Source, and the legacy data the migration credits) needs no reason (Jeff, 2026-11-06); the `:supersedes` flag still shows what it replaces. Possessives follow the name ("Gallformers' statement").
 - `:name_parts` needs confirmation, like `:code`. A Fact item already held leaves the tray as applied, submitting nothing. Plant `:synonyms` and `:range` values are the full desired list.
 - `add_item/2` errors: `:no_such_gall`, `:no_such_plant`, `:no_such_taxon`, `:no_such_place`, `:invalid_key`, `:no_fact`, `:unknown_field`, `:invalid_value`, `:invalid_spec`, `:waiting`.
 - Subscriptions: `subscribe(actor)`, `subscribe_subject(subject)`.

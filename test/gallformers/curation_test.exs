@@ -21,9 +21,11 @@ defmodule Gallformers.CurationTest do
   alias Gallformers.Curation.ChangeSet
   alias Gallformers.Curation.Item
   alias Gallformers.Curation.PackageListener
+  alias Gallformers.Curation.Wording
   alias Gallformers.Facts
   alias Gallformers.Import
   alias Gallformers.Import.Package
+  alias Gallformers.Sources
   alias Gallformers.Taxa
 
   defp user!(name) do
@@ -364,6 +366,43 @@ defmodule Gallformers.CurationTest do
 
       {:ok, _} = Curation.set_evidence(ctx.ada, %{text: "Galls form in summer here."})
       assert kinds(flags(ctx.ada, item.id)) == [:supersedes]
+    end
+
+    test "withdrawing a Fact only Gallformers states needs no reason", ctx do
+      ash = plant_fixture(name: "Fraxinus curata")
+      legacy = Sources.get_legacy_data_source()
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          ctx.ada,
+          %{type: "host_of", subject_taxon_id: ash.id, object_gall_id: ctx.gall.id},
+          confirm(legacy)
+        )
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          ctx.ada,
+          %{type: "host_of", subject_taxon_id: ash.id, object_gall_id: ctx.gall.id},
+          confirm(ctx.gallformers, %{statement_text: "On ash.", stated_on: ~D[2024-05-01]})
+        )
+
+      item =
+        add!(ctx.ada, %{
+          kind: :fact,
+          gall_id: ctx.gall.id,
+          action: :withdraw,
+          key: {:host, ash.id}
+        })
+
+      assert kinds(flags(ctx.ada, item.id)) == [:supersedes]
+    end
+
+    test "a Source whose name ends in s takes an apostrophe alone" do
+      assert Wording.flag_text({:supersedes, [%{source: "Gallformers", words: nil}]}) ==
+               "Supersedes Gallformers' statement"
+
+      assert Wording.flag_text({:supersedes, [%{source: "Gallformers", words: "spring"}]}) ==
+               "Supersedes Gallformers' 'spring'"
     end
 
     test "a correction in a single-valued slot supersedes the value held", ctx do

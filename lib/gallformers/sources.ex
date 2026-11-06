@@ -294,6 +294,34 @@ defmodule Gallformers.Sources do
   @spec get_gallformers_source() :: Source.t() | nil
   def get_gallformers_source, do: Repo.get_by(Source, kind: :gallformers)
 
+  @legacy_data_title "Gallformers legacy data"
+
+  @doc """
+  The title of the undated Source the catalog migration credits the old
+  data to (`Gallformers.CatalogMigration.LegacyFacts`).
+  """
+  @spec legacy_data_title() :: String.t()
+  def legacy_data_title, do: @legacy_data_title
+
+  @doc "The \"Gallformers legacy data\" Source, or nil before the catalog migration."
+  @spec get_legacy_data_source() :: Source.t() | nil
+  def get_legacy_data_source,
+    do: Repo.get_by(Source, title: @legacy_data_title, kind: :database)
+
+  @doc """
+  The ids of Gallformers' own Sources: the Gallformers Source and the
+  legacy data Source, whichever exist.
+  """
+  @spec own_source_ids() :: [integer()]
+  def own_source_ids do
+    Repo.all(
+      from(s in Source,
+        where: s.kind == :gallformers or (s.kind == :database and s.title == @legacy_data_title),
+        select: s.id
+      )
+    )
+  end
+
   @doc """
   Finds the Sources an import package's Source block may be (`9449` Task 13),
   by a conservative rule; the caller sends anything but one clear match to a

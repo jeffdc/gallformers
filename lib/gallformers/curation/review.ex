@@ -13,8 +13,10 @@ defmodule Gallformers.Curation.Review do
       held withdrawn is held; else `:new`;
     * a correction is its denial and confirmation together: held when both
       are, superseding all either supersedes;
-    * `:needs_reason` when it supersedes something and the evidence has
-      neither text, an Observation nor a Source;
+    * `:needs_reason` when it supersedes another Source's statement and
+      the evidence has neither text, an Observation nor a Source (replacing
+      only Gallformers' own statements, the legacy data's included, needs
+      none);
     * notes and editorial items are `:editorial`; a Gall's code and name
       parts `:needs_confirmation`;
     * `{:changed_since, user, at}` from the audit trail
@@ -233,14 +235,17 @@ defmodule Gallformers.Curation.Review do
       Enum.find_value(a.evidence, & &1.quote)
   end
 
-  defp needs_reason({:supersedes, _statements}, evidence) do
+  defp needs_reason({:supersedes, statements}, evidence) do
     evidence = evidence || %{}
+    own = Sources.own_source_ids()
 
     reason? =
       is_binary(evidence[:text]) or (evidence[:observations] || []) != [] or
         is_integer(evidence[:source_id])
 
-    if reason?, do: [], else: [:needs_reason]
+    if reason? or Enum.all?(statements, &(&1.source_id in own)),
+      do: [],
+      else: [:needs_reason]
   end
 
   defp needs_reason(_status, _evidence), do: []

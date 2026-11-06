@@ -43,7 +43,6 @@ defmodule Gallformers.CatalogMigration.LegacyFacts do
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.Sources
 
-  @title "Gallformers legacy data"
   @chunk 500
 
   @trait_tables [
@@ -72,7 +71,7 @@ defmodule Gallformers.CatalogMigration.LegacyFacts do
 
   @doc "The legacy Source's title."
   @spec title() :: String.t()
-  def title, do: @title
+  def title, do: Sources.legacy_data_title()
 
   @doc """
   Finds or creates the legacy Source and works out the legacy Facts of the
@@ -126,7 +125,7 @@ defmodule Gallformers.CatalogMigration.LegacyFacts do
     gallformers = Sources.get_gallformers_source()
 
     attrs = %{
-      title: @title,
+      title: Sources.legacy_data_title(),
       author: "Gallformers",
       authors: ["Gallformers"],
       pubyear: "",

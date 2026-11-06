@@ -135,12 +135,16 @@ defmodule Gallformers.Curation.Wording do
 
   def flag_text(:needs_reason),
     do:
-      "A reason is needed: it supersedes a Source's statement (give text, an Observation or a Source)"
+      "A reason is needed: it supersedes another Source's statement (give text, an Observation or a Source)"
 
   def flag_text({:blocked, reason}), do: "Can't apply: " <> reason
 
-  defp statement_words(%{source: source, words: nil}), do: "#{source}'s statement"
-  defp statement_words(%{source: source, words: words}), do: "#{source}'s '#{words}'"
+  defp statement_words(%{source: source, words: nil}), do: "#{possessive(source)} statement"
+  defp statement_words(%{source: source, words: words}), do: "#{possessive(source)} '#{words}'"
+
+  defp possessive(name) do
+    if String.ends_with?(name, "s"), do: name <> "'", else: name <> "'s"
+  end
 
   defp taxon_name(id) do
     case Taxa.get_taxon(id) do
