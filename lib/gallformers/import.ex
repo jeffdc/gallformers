@@ -177,6 +177,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.StableRef
   alias Gallformers.Import.StatementEdit
   alias Gallformers.Import.SynonymDecisions
+  alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Import.TaxonomyAdmin
   alias Gallformers.Import.TaxonomyEdits
   alias Gallformers.Import.TermCandidate
@@ -2982,6 +2983,38 @@ defmodule Gallformers.Import do
   """
   @spec record_merge(Actor.t(), Merge.spec()) :: {:ok, Merge.result()} | {:error, term()}
   defdelegate record_merge(actor, spec), to: Merge, as: :record
+
+  # -- taxonomic statements (matter `f923`) -----------------------------------
+
+  @doc """
+  Accepts a Source's taxonomic statement (attribution `attribution_id`), so
+  it counts and the tree follows it where it wins
+  (`Gallformers.Facts.accept/3`), and logs it for replay
+  (`Gallformers.Import.TaxonomicDecisions`).
+  """
+  @spec accept_taxonomic_statement(Actor.t(), integer()) ::
+          {:ok, Gallformers.Facts.attribute_result()} | {:error, term()}
+  def accept_taxonomic_statement(%Actor{} = actor, attribution_id),
+    do: TaxonomicDecisions.decide(actor, :accept, attribution_id)
+
+  @doc """
+  Declines a Source's taxonomic statement with `reason` (required), so it
+  never counts until reopened (`Gallformers.Facts.decline/4`); logged for
+  replay.
+  """
+  @spec decline_taxonomic_statement(Actor.t(), integer(), String.t()) ::
+          {:ok, Gallformers.Facts.attribute_result()} | {:error, term()}
+  def decline_taxonomic_statement(%Actor{} = actor, attribution_id, reason),
+    do: TaxonomicDecisions.decide(actor, :decline, attribution_id, reason)
+
+  @doc """
+  Reopens a Source's taxonomic statement, clearing its acceptance or
+  decline (`Gallformers.Facts.reopen/2`); logged for replay.
+  """
+  @spec reopen_taxonomic_statement(Actor.t(), integer()) ::
+          {:ok, Gallformers.Facts.attribute_result()} | {:error, term()}
+  def reopen_taxonomic_statement(%Actor{} = actor, attribution_id),
+    do: TaxonomicDecisions.decide(actor, :reopen, attribution_id)
 
   @doc ~S|The PubSub topic deletes and merges are broadcast on: `"catalog:records"`.|
   @spec records_topic() :: String.t()

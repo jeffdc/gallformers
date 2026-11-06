@@ -116,14 +116,22 @@ config :gallformers, :private_storage, bucket: "gallformers-private"
 # "Taxon changed" listeners (`8567` rule 6), called inside each taxonomy
 # change's transaction. Registered here so Taxa never references its
 # listeners. Rename proposals for the Galls whose derived names change
-# (`86e7` §3) are admin queue items, so Import listens too, after the Catalog.
+# (`86e7` §3) are admin queue items, so Import listens too, after the Catalog;
+# before them, Import moves what a lump's absorbed taxon held (`f923`).
 config :gallformers, Gallformers.Taxa.Events,
-  listeners: [Gallformers.Catalog.TaxonListener, Gallformers.Import.GallRenames]
+  listeners: [
+    Gallformers.Catalog.TaxonListener,
+    Gallformers.Import.TaxonMerges,
+    Gallformers.Import.GallRenames
+  ]
 
 # "Facts changed" listeners, called inside each attribution write's
 # transaction with the Facts whose standing changed. Registered here so
 # Facts never references its listeners.
-config :gallformers, Gallformers.Facts.Events, listeners: [Gallformers.Catalog.FactListener]
+# The tree follows the current taxonomic Facts (`f923`): `Gallformers.Taxa.Sync`
+# rewrites the tree rows a changed slot's winner gives.
+config :gallformers, Gallformers.Facts.Events,
+  listeners: [Gallformers.Catalog.FactListener, Gallformers.Taxa.Sync]
 
 # "Package advanced" listeners, called by the import job after each step it
 # takes a package. Registered here so Import never references them: the

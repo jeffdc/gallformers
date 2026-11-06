@@ -36,6 +36,30 @@ defmodule Gallformers.Taxa.NameNormalizer do
     |> Enum.map_join(" ", &marker/1)
   end
 
+  @doc """
+  The normalized form of an authorship ("(Ashmead, 1881)"), under which two
+  Sources' authorships of a name are the same (`f923`): case, spacing,
+  punctuation other than parentheses, and "&" or "and" are ignored; the
+  authors, the year and the parentheses (the name was first described in
+  another genus) count. Nil or blank is `""`.
+  """
+  @spec normalize_authorship(String.t() | nil) :: String.t()
+  def normalize_authorship(nil), do: ""
+
+  def normalize_authorship(authorship) when is_binary(authorship) do
+    authorship
+    |> String.normalize(:nfkc)
+    |> String.downcase()
+    |> String.replace(~r/[^\p{L}\p{N}()\s]+/u, " ")
+    |> String.replace(~r/\(/u, " ( ")
+    |> String.replace(~r/\)/u, " ) ")
+    |> String.split()
+    |> Enum.reject(&(&1 == "and"))
+    |> Enum.join(" ")
+    |> String.replace("( ", "(")
+    |> String.replace(" )", ")")
+  end
+
   defp drop_hybrid_markers([first | rest]), do: [first | Enum.reject(rest, &(&1 == "x"))]
   defp drop_hybrid_markers([]), do: []
 

@@ -83,6 +83,32 @@ defmodule Gallformers.Audit do
     end
   end
 
+  @doc """
+  The actor the current database transaction is audited as, or `:error`
+  outside an audited transaction. For code called back inside another
+  context's audited write (an event listener) that writes in turn, as the
+  same actor.
+  """
+  @spec current_actor() :: {:ok, Actor.t()} | :error
+  def current_actor do
+    import Ecto.Query, only: [from: 2]
+
+    if Repo.in_transaction?() do
+      from(t in Carbonite.Transaction,
+        where: t.xact_id == fragment("pg_current_xact_id()"),
+        select: t.meta
+      )
+      |> Ecto.Query.put_query_prefix(Carbonite.default_prefix())
+      |> Repo.one()
+      |> case do
+        %{"actor" => actor} -> {:ok, Actor.from_meta(actor)}
+        _ -> :error
+      end
+    else
+      :error
+    end
+  end
+
   defp meta!(actor, operation) when is_binary(operation) do
     case String.trim(operation) do
       "" -> raise ArgumentError, "an audited operation needs a name"

@@ -1,7 +1,8 @@
 defmodule Gallformers.Taxa.ActFacts.PlacementFact do
   @moduledoc """
-  A placement Fact's details: the taxon sits under the parent. Natural key
-  taxon + parent; a taxon's placement Facts compete in the slot
+  A placement Fact's details: the taxon sits under the parent, or at the
+  root of the tree (`parent_id` nil). Natural key taxon + parent (the root
+  one value); a taxon's placement Facts compete in the slot
   `"taxon:<id>:placement"`, so the newest current one wins. Recorded only in
   phase 1: the editorial tree (`taxa.parent_id`) does not follow it.
   """
@@ -37,11 +38,11 @@ defmodule Gallformers.Taxa.ActFacts.PlacementFact do
   def changeset(placement, attrs) do
     placement
     |> cast(attrs, [:taxon_id, :parent_id])
-    |> validate_required([:taxon_id, :parent_id])
+    |> validate_required([:taxon_id])
     |> validate_not_own_parent()
     |> foreign_key_constraint(:taxon_id)
     |> foreign_key_constraint(:parent_id)
-    |> unique_constraint([:taxon_id, :parent_id])
+    |> unique_constraint([:taxon_id, :parent_id], name: :placement_facts_natural_key_index)
   end
 
   defp validate_not_own_parent(changeset) do
@@ -53,6 +54,9 @@ defmodule Gallformers.Taxa.ActFacts.PlacementFact do
   end
 
   @impl true
+  def key(%__MODULE__{} = p), do: %{taxon_id: p.taxon_id, parent_id: p.parent_id}
+
+  @impl true
   def slot(%__MODULE__{taxon_id: taxon_id}), do: "taxon:#{taxon_id}:placement"
 
   @impl true
@@ -60,6 +64,10 @@ defmodule Gallformers.Taxa.ActFacts.PlacementFact do
     do: {taxon_id, parent_id}
 
   @impl true
+  def existing_query(%__MODULE__{taxon_id: taxon_id, parent_id: nil}) do
+    from(p in __MODULE__, where: p.taxon_id == ^taxon_id and is_nil(p.parent_id))
+  end
+
   def existing_query(%__MODULE__{taxon_id: taxon_id, parent_id: parent_id}) do
     from(p in __MODULE__, where: p.taxon_id == ^taxon_id and p.parent_id == ^parent_id)
   end

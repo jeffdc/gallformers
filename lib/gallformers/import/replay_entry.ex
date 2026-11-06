@@ -15,7 +15,9 @@ defmodule Gallformers.Import.ReplayEntry do
   `Gallformers.Import.FactEdits`), `:fact_note` and `:taxon_note`
   (curators' notes, `Gallformers.Import.CurationNotes`), `:deletion` and
   `:merge` (a Gall or taxon deleted, a Gall or plant merged:
-  `Gallformers.Import.Deletion`, `Gallformers.Import.Merge`). The log is
+  `Gallformers.Import.Deletion`, `Gallformers.Import.Merge`), and
+  `:taxonomic_decision` (a Source's taxonomic statement accepted, declined
+  or reopened: `Gallformers.Import.TaxonomicDecisions`). The log is
   ordered by `id`.
   """
   use Ecto.Schema
@@ -39,7 +41,8 @@ defmodule Gallformers.Import.ReplayEntry do
     :fact_note,
     :taxon_note,
     :deletion,
-    :merge
+    :merge,
+    :taxonomic_decision
   ]
 
   @type kind ::
@@ -61,6 +64,7 @@ defmodule Gallformers.Import.ReplayEntry do
           | :taxon_note
           | :deletion
           | :merge
+          | :taxonomic_decision
 
   @type t :: %__MODULE__{
           id: integer() | nil,

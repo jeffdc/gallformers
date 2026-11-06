@@ -33,6 +33,11 @@ defmodule Gallformers.TestDbNamesTest do
            }
   end
 
+  test "an agent's worktree (under .claude/worktrees) gets its own too" do
+    assert names("/Users/jeff/dev/gallformers/.claude/worktrees/agent-a31").app ==
+             "gallformers_test_agent_a31"
+  end
+
   test "a worktree name is made safe for a database name" do
     assert names("/x/.worktrees/Fix.Range-2").app == "gallformers_test_fix_range_2"
   end

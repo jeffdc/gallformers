@@ -30,8 +30,12 @@ defmodule Gallformers.Catalog.TaxonListener do
       (`Gallformers.Ranges.update_taxon_places/3`): the Galls whose current
       Host is the plant, or a genus or section above it (whose range is its
       subtree's), get a refresh enqueued.
-    * `:merge`, `:split` — not emitted in phase 1; re-pointing Relationship
-      endpoints and curator tasks come with the operations that emit them.
+    * `:rank` — the same refresh as a rename (lineages carry ranks).
+    * `:merge` (a lump, `f923`) — the generation groups listing the absorbed
+      taxon list the survivor, and both get a rename's refresh. Its gall
+      Facts are moved by `Gallformers.Import.TaxonMerges`, registered next.
+    * `:split` — nothing yet: the curator questions about the split
+      taxon's Galls are `f923` Task 7.
   """
   @behaviour Gallformers.Taxa.Events
 
@@ -39,13 +43,24 @@ defmodule Gallformers.Catalog.TaxonListener do
 
   alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.ReadModels.GallIndex
+  alias Gallformers.Catalog.Vocab.GenerationGroupTaxon
   alias Gallformers.Repo
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Event
 
   @impl true
+  def taxon_changed(%Event{type: :merge, taxon_id: absorbed, into_taxon_id: survivor}) do
+    repoint_generation_groups(absorbed, survivor)
+
+    for id <- [absorbed, survivor] do
+      :ok = taxon_changed(%Event{type: :rename, taxon_id: id})
+    end
+
+    :ok
+  end
+
   def taxon_changed(%Event{type: type, taxon_id: taxon_id} = event)
-      when type in [:move, :rename] do
+      when type in [:move, :rename, :rank] do
     subtree = taxon_id |> List.wrap() |> Taxa.subtree_ids() |> Map.get(taxon_id, [taxon_id])
     hosts = subtree ++ range_hosts(event)
 
@@ -78,6 +93,25 @@ defmodule Gallformers.Catalog.TaxonListener do
   end
 
   def taxon_changed(%Event{}), do: :ok
+
+  # The generation groups listing a lump's absorbed taxon list the survivor
+  # instead (once).
+  defp repoint_generation_groups(absorbed, survivor) do
+    held =
+      Repo.all(
+        from(g in GenerationGroupTaxon, where: g.taxon_id == ^survivor, select: g.group_id)
+      )
+
+    Repo.delete_all(
+      from(g in GenerationGroupTaxon, where: g.taxon_id == ^absorbed and g.group_id in ^held)
+    )
+
+    Repo.update_all(from(g in GenerationGroupTaxon, where: g.taxon_id == ^absorbed),
+      set: [taxon_id: survivor]
+    )
+
+    :ok
+  end
 
   # A move changes the range of every Host above the moved taxon, before and
   # after: a genus Host's range is its subtree's

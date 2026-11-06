@@ -50,6 +50,9 @@ defmodule Gallformers.Taxa.ActFacts do
   @doc "Casts and validates the details that make up the natural key."
   @callback changeset(detail(), map()) :: Changeset.t()
 
+  @doc "The natural key, as the attrs `changeset/2` takes (and `assert/4` is given)."
+  @callback key(detail()) :: map()
+
   @doc "The slot the Fact competes in, or nil."
   @callback slot(detail()) :: String.t() | nil
 
@@ -98,6 +101,30 @@ defmodule Gallformers.Taxa.ActFacts do
   end
 
   @doc """
+  Finds the act Fact of kind `module` with the natural key in `key_attrs`,
+  or creates it with no attributions (`:unsupported`), as a merge does to
+  move a Source's statements onto it. Returns `{:ok, detail, created?}`.
+  """
+  @spec find_or_create(module(), Actor.t(), map()) ::
+          {:ok, detail(), boolean()} | {:error, Changeset.t()}
+  def find_or_create(module, %Actor{} = actor, key_attrs) when is_map(key_attrs) do
+    Audit.transaction(actor, "taxa.find_or_create_#{module.kind()}", fn ->
+      changeset = module.changeset(struct(module), key_attrs)
+      key = changeset |> Changeset.apply_action(:insert) |> ok_or_rollback()
+      lock(module.kind(), module.natural_key(key))
+
+      case Repo.one(module.existing_query(key)) do
+        nil -> {create(module, actor, changeset, key), true}
+        detail -> {detail, false}
+      end
+    end)
+    |> case do
+      {:ok, {detail, created?}} -> {:ok, detail, created?}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
+  @doc """
   Finds the details of the act Fact of kind `module` with the natural key in
   `key_attrs`, without writing anything: `{:ok, detail}`, `{:ok, nil}` when
   there is none yet, or `{:error, changeset}` when the key is invalid.
@@ -108,6 +135,26 @@ defmodule Gallformers.Taxa.ActFacts do
            module |> struct() |> module.changeset(key_attrs) |> Changeset.apply_action(:insert) do
       {:ok, Repo.one(module.existing_query(key))}
     end
+  end
+
+  @modules [
+    __MODULE__.PlacementFact,
+    __MODULE__.NameFact,
+    __MODULE__.SynonymyFact,
+    __MODULE__.SplitFact,
+    __MODULE__.CommonNameFact
+  ]
+
+  @doc "The details schemas, one per act kind."
+  @spec modules() :: [module()]
+  def modules, do: @modules
+
+  @doc "The details of act Fact `fact_id`, of whichever kind, or nil."
+  @spec get_detail(integer()) :: detail() | nil
+  def get_detail(fact_id) when is_integer(fact_id) do
+    Enum.find_value(@modules, fn module ->
+      Repo.one(from(d in module, where: d.fact_id == ^fact_id))
+    end)
   end
 
   @doc "A taxon's placement Facts, with their Facts, oldest first."

@@ -89,7 +89,9 @@ defmodule Gallformers.Import.ApplyTest do
 
   defp changes_for(table, id) do
     Repo.all(
-      from c in Carbonite.Change, where: c.table_name == ^table and c.table_pk == ^["#{id}"]
+      from c in Carbonite.Change,
+        where: c.table_name == ^table and c.table_pk == ^["#{id}"],
+        order_by: c.id
     )
   end
 
@@ -725,8 +727,9 @@ defmodule Gallformers.Import.ApplyTest do
       package =
         package(gall: nil, taxonomy: taxonomy) |> with_review() |> deliver!() |> approve!()
 
+      # Recorded, awaiting a curator's acceptance before it counts (`f923`).
       act = fact_statement(package, "taxonomy.json", "a1")
-      assert Facts.get_fact!(act.fact_id).standing == :current
+      assert Facts.get_fact!(act.fact_id).standing == :unsupported
 
       assert [%QueueItem{statement_ref: "a1", status: :open}] =
                Import.list_queue_items(package, kind: :taxonomy_disagreement)

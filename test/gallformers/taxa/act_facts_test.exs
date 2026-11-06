@@ -2,8 +2,8 @@ defmodule Gallformers.Taxa.ActFactsTest do
   @moduledoc """
   Taxonomic-act Facts (`9449` §3, Task 7): the contract's five act kinds
   recorded as Facts with natural keys, attributed to Sources. Placement and
-  accepted name compete in slots. In phase 1 they are recorded only: they
-  never move the editorial tree.
+  accepted name compete in slots. A Source's statement counts only once a
+  curator accepts it (`f923` Task 1); the tree follows what counts (Task 5).
   """
   use Gallformers.DataCase, async: true
 
@@ -44,6 +44,12 @@ defmodule Gallformers.Taxa.ActFactsTest do
 
   defp standing(fact_id), do: Facts.get_fact!(fact_id).standing
 
+  # A curator accepts the statement, so it counts (`f923`).
+  defp accepted({:ok, %{attribution: attribution}} = result) do
+    {:ok, _} = Facts.accept(test_actor(), attribution.id)
+    result
+  end
+
   defp changes_for(table) do
     Repo.all(from c in test_audit_changes(), where: c.table_name == ^table, order_by: c.id)
   end
@@ -58,16 +64,15 @@ defmodule Gallformers.Taxa.ActFactsTest do
   end
 
   describe "acceptance: a placement is superseded" do
-    test "the newer Source's placement is current, the older superseded, and the tree is unchanged",
+    test "the newer accepted placement is current, the older superseded; the tree follows it",
          ctx do
-      ancestors_before = Taxa.ancestors(ctx.species)
-
       {:ok, older} =
         Taxa.assert_placement(
           test_actor(),
           %{taxon_id: ctx.genus.id, parent_id: ctx.cynipidae.id},
           confirm(source_fixture("Kinsey", "1930"))
         )
+        |> accepted()
 
       {:ok, newer} =
         Taxa.assert_placement(
@@ -75,13 +80,15 @@ defmodule Gallformers.Taxa.ActFactsTest do
           %{taxon_id: ctx.genus.id, parent_id: ctx.figitidae.id},
           confirm(source_fixture("Revision", "1990"))
         )
+        |> accepted()
 
       assert newer.fact.id != older.fact.id
       assert standing(newer.fact.id) == :current
       assert standing(older.fact.id) == :superseded
 
-      assert Taxa.get_taxon!(ctx.genus.id).parent_id == ctx.cynipidae.id
-      assert Taxa.ancestors(ctx.species) == ancestors_before
+      # The tree follows the current placement (`f923` Task 5).
+      assert Taxa.get_taxon!(ctx.genus.id).parent_id == ctx.figitidae.id
+      assert ctx.figitidae.id in Enum.map(Taxa.ancestors(ctx.species), & &1.id)
     end
 
     test "the order the Sources arrive in does not matter", ctx do
@@ -91,6 +98,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
           %{taxon_id: ctx.genus.id, parent_id: ctx.figitidae.id},
           confirm(source_fixture("Revision", "1990"))
         )
+        |> accepted()
 
       {:ok, older} =
         Taxa.assert_placement(
@@ -98,10 +106,11 @@ defmodule Gallformers.Taxa.ActFactsTest do
           %{taxon_id: ctx.genus.id, parent_id: ctx.cynipidae.id},
           confirm(source_fixture("Kinsey", "1930"))
         )
+        |> accepted()
 
       assert standing(newer.fact.id) == :current
       assert standing(older.fact.id) == :superseded
-      assert Taxa.get_taxon!(ctx.genus.id).parent_id == ctx.cynipidae.id
+      assert Taxa.get_taxon!(ctx.genus.id).parent_id == ctx.figitidae.id
     end
   end
 
@@ -111,9 +120,13 @@ defmodule Gallformers.Taxa.ActFactsTest do
 
       {:ok, first} =
         Taxa.assert_placement(test_actor(), key, confirm(source_fixture("A", "1900")))
+        |> accepted()
 
       {:ok, second} =
         Taxa.assert_placement(test_actor(), key, confirm(source_fixture("B", "1910")))
+        |> accepted()
+
+      second = %{second | fact: Facts.get_fact!(second.fact.id)}
 
       assert first.fact.id == second.fact.id
       assert %Fact{kind: "taxon_placement", standing: :current} = second.fact
@@ -130,6 +143,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
           %{taxon_id: ctx.genus.id, parent_id: ctx.cynipidae.id},
           confirm(source_fixture("A", "1900"))
         )
+        |> accepted()
 
       assert [%PlacementFact{fact: %Fact{standing: :current}}] =
                Taxa.list_placement_facts(ctx.genus)
@@ -150,6 +164,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
 
     test "a failed attribution leaves no Fact behind", ctx do
       facts_before = Repo.aggregate(Fact, :count)
+      placements_before = Repo.aggregate(PlacementFact, :count)
 
       assert {:error, changeset} =
                Taxa.assert_placement(
@@ -160,7 +175,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
 
       assert %{source_id: ["does not exist"]} = errors_on(changeset)
       assert Repo.aggregate(Fact, :count) == facts_before
-      assert Repo.aggregate(PlacementFact, :count) == 0
+      assert Repo.aggregate(PlacementFact, :count) == placements_before
     end
 
     test "is audited", ctx do
@@ -215,6 +230,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
           %{taxon_id: ctx.species.id, name: "Cynips foo", rank: :species},
           confirm(source_fixture("A", "1881"))
         )
+        |> accepted()
 
       {:ok, new} =
         Taxa.assert_name(
@@ -222,10 +238,103 @@ defmodule Gallformers.Taxa.ActFactsTest do
           %{taxon_id: ctx.species.id, name: "Andricus foo", rank: :species},
           confirm(source_fixture("B", "1950"))
         )
+        |> accepted()
 
       assert standing(new.fact.id) == :current
       assert standing(old.fact.id) == :superseded
       assert Taxa.accepted_name(ctx.species) == "Andricus foo"
+    end
+  end
+
+  describe "a root placement (f923 Task 2)" do
+    test "a taxon placed at the root is one Fact, in its placement slot", ctx do
+      key = %{taxon_id: ctx.cynipidae.id, parent_id: nil}
+
+      {:ok, first} =
+        Taxa.assert_placement(test_actor(), key, confirm(source_fixture("A", "1900")))
+
+      {:ok, same} = Taxa.assert_placement(test_actor(), key, confirm(source_fixture("B", "1910")))
+
+      assert same.fact.id == first.fact.id
+      assert first.fact.slot == "taxon:#{ctx.cynipidae.id}:placement"
+      assert %PlacementFact{parent_id: nil} = first.detail
+      assert Taxa.find_act_fact(:placement, key) == {:ok, first.fact.id}
+    end
+
+    test "competes with a placement under a parent", ctx do
+      {:ok, root} =
+        Taxa.assert_placement(
+          test_actor(),
+          %{taxon_id: ctx.genus.id, parent_id: nil},
+          confirm(source_fixture("A", "1900"))
+        )
+
+      {:ok, placed} =
+        Taxa.assert_placement(
+          test_actor(),
+          %{taxon_id: ctx.genus.id, parent_id: ctx.cynipidae.id},
+          confirm(source_fixture("B", "1910"))
+        )
+
+      assert root.fact.id != placed.fact.id
+      assert root.fact.slot == placed.fact.slot
+    end
+  end
+
+  describe "a name's sensu and authorship (f923 Task 2)" do
+    defp name!(ctx, extra, source \\ nil) do
+      key = Map.merge(%{taxon_id: ctx.species.id, name: "Andricus foo", rank: :species}, extra)
+
+      {:ok, result} =
+        Taxa.assert_name(
+          test_actor(),
+          key,
+          confirm(source || source_fixture("S #{System.unique_integer([:positive])}", "1900"))
+        )
+
+      result
+    end
+
+    test "a sensu is part of the natural key, ignoring case", ctx do
+      plain = name!(ctx, %{})
+      weld = name!(ctx, %{sensu: "Weld 1959"})
+      same = name!(ctx, %{sensu: "weld 1959"})
+
+      assert weld.fact.id != plain.fact.id
+      assert same.fact.id == weld.fact.id
+      assert %NameFact{sensu: "Weld 1959"} = weld.detail
+    end
+
+    test "authorship formatting variants are one Fact", ctx do
+      first = name!(ctx, %{authorship: "(Ashmead, 1881)"})
+
+      for variant <- ["(Ashmead 1881)", "( Ashmead , 1881 )", "(ASHMEAD, 1881.)"] do
+        assert name!(ctx, %{authorship: variant}).fact.id == first.fact.id, variant
+      end
+
+      pair = name!(ctx, %{authorship: "Ashmead & Bassett, 1881"})
+      assert name!(ctx, %{authorship: "Ashmead and Bassett 1881"}).fact.id == pair.fact.id
+      assert %NameFact{authorship: "(Ashmead, 1881)"} = first.detail
+    end
+
+    test "a different author, year or parentheses is another Fact", ctx do
+      first = name!(ctx, %{authorship: "(Ashmead, 1881)"})
+
+      for other <- ["Ashmead, 1881", "(Ashmead, 1885)", "(Bassett, 1881)"] do
+        assert name!(ctx, %{authorship: other}).fact.id != first.fact.id, other
+      end
+    end
+
+    test "no authorship is not the same Fact as a stated one", ctx do
+      assert name!(ctx, %{}).fact.id != name!(ctx, %{authorship: "Ashmead, 1881"}).fact.id
+    end
+
+    test "the normalized authorship" do
+      assert Taxa.NameNormalizer.normalize_authorship("( Ashmead &  Bassett , 1881 )") ==
+               "(ashmead bassett 1881)"
+
+      assert Taxa.NameNormalizer.normalize_authorship(nil) == ""
+      assert Taxa.NameNormalizer.normalize_authorship("  ") == ""
     end
   end
 
@@ -256,7 +365,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
       assert %Fact{kind: "taxon_synonymy", slot: nil} = first.fact
       assert %SynonymyFact{name: "Cynips foo"} = same.detail
 
-      # Recorded only: the tree's names are untouched.
+      # Not accepted, so it does not count: the tree's names are untouched.
       assert Taxa.resolve_name("Cynips foo") == :none
     end
   end
@@ -350,7 +459,7 @@ defmodule Gallformers.Taxa.ActFactsTest do
       assert %Fact{kind: "taxon_common_name", slot: nil} = first.fact
       assert %CommonNameFact{common_name: "Woolly oak gall wasp"} = same.detail
 
-      # Recorded only: the taxon's editorial common names are untouched.
+      # Not accepted, so it does not count: the common names are untouched.
       assert Taxa.list_common_names(ctx.species) == []
     end
   end

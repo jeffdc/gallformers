@@ -29,6 +29,17 @@ defmodule Gallformers.Facts do
   (`Gallformers.Facts.Events`), inside its transaction: how the Catalog's
   read models hear about changes without Facts depending on the Catalog.
 
+  ## Taxonomic statements need a curator's acceptance
+
+  A Source's statement of a taxonomic Fact (`acceptance_kinds/0`) counts
+  only once a curator has accepted it (`accept/3`); until then it is
+  recorded but ignored by the standings, and a declined one (`decline/4`)
+  is ignored until reopened (`reopen/2`). Statements of Gallformers' own
+  Sources (`Gallformers.Sources.own_source_ids/0`: the Gallformers Source
+  and the undated legacy data Source) need none. Matter `f923`: the
+  literature is the authority, gated by a curator. Which kinds are gated
+  is data here, not a call to the context that owns them.
+
   ## Concurrency
 
   Attribution writes lock the Facts they recompute (the Fact and its slot
@@ -74,6 +85,19 @@ defmodule Gallformers.Facts do
 
   @type attribute_result :: %{attribution: Attribution.t(), conflicts: [Conflict.t()]}
 
+  # Kinds whose statements count only once a curator accepts them (`f923`).
+  @acceptance_kinds ~w(taxon_placement taxon_name taxon_synonymy taxon_split taxon_common_name)
+
+  @typedoc "Why a curator's decision on a statement was refused."
+  @type decision_error :: :not_found | :not_taxonomic | :own_source | :reason_required
+
+  @doc """
+  The Fact kinds whose statements count only once a curator accepts them:
+  the taxonomic ones (placement, name, synonymy, split, common name).
+  """
+  @spec acceptance_kinds() :: [String.t()]
+  def acceptance_kinds, do: @acceptance_kinds
+
   # -- Facts -------------------------------------------------------------------
 
   @doc """
@@ -111,6 +135,15 @@ defmodule Gallformers.Facts do
     )
     |> Repo.all()
   end
+
+  @doc "Source `source_id`'s attribution of Fact `fact_id`, or nil."
+  @spec get_attribution(integer(), integer()) :: Attribution.t() | nil
+  def get_attribution(fact_id, source_id) when is_integer(fact_id) and is_integer(source_id),
+    do: Repo.get_by(Attribution, fact_id: fact_id, source_id: source_id)
+
+  @doc "Attribution `id`, or nil."
+  @spec get_attribution(integer()) :: Attribution.t() | nil
+  def get_attribution(id) when is_integer(id), do: Repo.get(Attribution, id)
 
   @doc """
   The attributions of the Facts among `fact_ids`, by Fact ID, each oldest
@@ -370,6 +403,132 @@ defmodule Gallformers.Facts do
     |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
   end
 
+  # -- acceptance (matter `f923`) ------------------------------------------------
+
+  @doc """
+  Accepts attribution `attribution_id`, a Source's taxonomic statement
+  (`acceptance_kinds/0`), so it counts: records who (`accepted_by_user_id`,
+  for a person) and when, clears any decline, and recomputes the standings
+  of its Fact and slot siblings. Accepting an accepted statement changes
+  nothing. Options: `:at` (the time to record; default now).
+
+  `{:error, :not_found}`, `{:error, :not_taxonomic}` for a gall Fact's
+  statement, `{:error, :own_source}` for Gallformers' own (which counts
+  without one). A "Facts changed" listener's refusal (the tree refusing a
+  cycle, say) rolls it back: `{:error, {:rejected, listener, reason}}`.
+  """
+  @spec accept(Actor.t(), integer(), keyword()) ::
+          {:ok, attribute_result()} | {:error, decision_error() | Events.rejection()}
+  def accept(%Actor{} = actor, attribution_id, opts \\ []) when is_integer(attribution_id) do
+    at = Keyword.get_lazy(opts, :at, fn -> DateTime.utc_now(:second) end)
+
+    decide(actor, "facts.accept", attribution_id, fn
+      %Attribution{accepted_at: %DateTime{}} -> :unchanged
+      _attribution -> [accepted_at: at, accepted_by_user_id: user_id(actor)]
+    end)
+  end
+
+  @doc """
+  Declines attribution `attribution_id`, a Source's taxonomic statement a
+  curator does not follow, with `reason` (required): it never counts until
+  reopened. Records who and when, clears any acceptance, and recomputes the
+  standings. Options: `:at`. Errors as `accept/3`, and
+  `{:error, :reason_required}` for a blank reason.
+  """
+  @spec decline(Actor.t(), integer(), String.t(), keyword()) ::
+          {:ok, attribute_result()} | {:error, decision_error() | Events.rejection()}
+  def decline(%Actor{} = actor, attribution_id, reason, opts \\ [])
+      when is_integer(attribution_id) and is_binary(reason) do
+    at = Keyword.get_lazy(opts, :at, fn -> DateTime.utc_now(:second) end)
+
+    case String.trim(reason) do
+      "" ->
+        {:error, :reason_required}
+
+      reason ->
+        decide(actor, "facts.decline", attribution_id, fn _attribution ->
+          [declined_at: at, declined_by_user_id: user_id(actor), decline_reason: reason]
+        end)
+    end
+  end
+
+  @doc """
+  Reopens attribution `attribution_id`: clears its acceptance or decline,
+  so it awaits a curator again (and does not count), and recomputes the
+  standings. Errors as `accept/3`.
+  """
+  @spec reopen(Actor.t(), integer()) ::
+          {:ok, attribute_result()} | {:error, decision_error() | Events.rejection()}
+  def reopen(%Actor{} = actor, attribution_id) when is_integer(attribution_id) do
+    decide(actor, "facts.reopen", attribution_id, fn _attribution -> [] end)
+  end
+
+  @doc """
+  Whether an attribution (its `source_id`, `accepted_at` and `declined_at`)
+  of a Fact of `kind` counts towards the Fact's standing: a gall Fact's
+  always; a taxonomic statement's (`acceptance_kinds/0`) when accepted, or
+  when its Source is among Gallformers' own, `own_source_ids`.
+  """
+  @spec counts?(String.t(), map(), [integer()]) :: boolean()
+  def counts?(kind, attribution, own_source_ids) do
+    kind not in @acceptance_kinds or attribution.source_id in own_source_ids or
+      (attribution.accepted_at != nil and attribution.declined_at == nil)
+  end
+
+  @doc """
+  Whether Source `source_id`'s statement of a Fact of `kind` counts only
+  once a curator accepts it: a taxonomic kind, and not Gallformers' own
+  Source.
+  """
+  @spec needs_acceptance?(String.t(), integer()) :: boolean()
+  def needs_acceptance?(kind, source_id) when is_binary(kind) and is_integer(source_id),
+    do: kind in @acceptance_kinds and source_id not in Sources.own_source_ids()
+
+  # Sets the decision fields `fields_of.(attribution)` gives (`:unchanged`
+  # for none) and recomputes the standings.
+  defp decide(actor, operation, attribution_id, fields_of) do
+    Audit.transaction(actor, operation, fn ->
+      with %Attribution{fact_id: fact_id} <- Repo.get(Attribution, attribution_id),
+           _locked = lock_facts([fact_id]),
+           %Attribution{} = attribution <- Repo.get(Attribution, attribution_id),
+           :ok <- decidable(attribution) do
+        attribution =
+          case fields_of.(attribution) do
+            :unchanged -> attribution
+            fields -> update_decision(attribution, fields)
+          end
+
+        %{
+          attribution: Repo.preload(attribution, Keyword.keys(@children)),
+          conflicts: recompute([attribution.fact_id])
+        }
+      else
+        nil -> Repo.rollback(:not_found)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  defp update_decision(attribution, fields) do
+    case attribution |> Attribution.decision_changeset(fields) |> Repo.update() do
+      {:ok, updated} -> updated
+      {:error, changeset} -> Repo.rollback(changeset)
+    end
+  end
+
+  defp decidable(%Attribution{fact_id: fact_id, source_id: source_id}) do
+    kind = Repo.one!(from(f in Fact, where: f.id == ^fact_id, select: f.kind))
+
+    cond do
+      kind not in @acceptance_kinds -> {:error, :not_taxonomic}
+      source_id in Sources.own_source_ids() -> {:error, :own_source}
+      true -> :ok
+    end
+  end
+
+  defp user_id(%Actor{type: :user, id: id}), do: id
+  defp user_id(%Actor{}), do: nil
+
   # -- deleting and moving (matter `ec2c`, "Deletes") --------------------------
 
   @doc """
@@ -586,9 +745,26 @@ defmodule Gallformers.Facts do
     attributions =
       from(a in Attribution,
         where: a.fact_id in ^ids,
-        select: map(a, [:id, :fact_id, :source_id, :stance, :stated_on, :stated_precision])
+        select:
+          map(a, [
+            :id,
+            :fact_id,
+            :source_id,
+            :stance,
+            :stated_on,
+            :stated_precision,
+            :accepted_at,
+            :declined_at
+          ])
       )
       |> Repo.all()
+
+    kinds = Map.new(facts, &{&1.id, &1.kind})
+
+    own =
+      if Enum.any?(facts, &(&1.kind in @acceptance_kinds)),
+        do: Sources.own_source_ids(),
+        else: []
 
     retracted =
       attributions
@@ -599,7 +775,10 @@ defmodule Gallformers.Facts do
 
     by_fact =
       Enum.group_by(attributions, & &1.fact_id, fn a ->
-        Map.put(a, :retracted, Map.has_key?(retracted, a.source_id))
+        a
+        |> Map.put(:retracted, Map.has_key?(retracted, a.source_id))
+        |> Map.put(:counts, counts?(Map.fetch!(kinds, a.fact_id), a, own))
+        |> Map.drop([:accepted_at, :declined_at])
       end)
 
     {standings, conflicts} =

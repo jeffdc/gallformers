@@ -68,6 +68,10 @@ defmodule Gallformers.CatalogMigration do
         dated `:stated_on`.
     11. `Gallformers.CatalogMigration.Keys` — key couplets re-targeted
         (`keys.csv`).
+    11a. `Gallformers.CatalogMigration.LegacyTaxonomy` — the non-plant
+        tree (placements, accepted names, synonyms, common names) as
+        undated statements of the legacy data Source (`f923`), made with
+        the legacy Facts once the tree is built; plants get none.
     12. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
         rebuilt from all of the above. During the run no lookup-table
         refresh is enqueued (`Gallformers.Catalog.without_gall_index_refresh/1`):
@@ -121,6 +125,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Keys
   alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.LegacyFacts
+  alias Gallformers.CatalogMigration.LegacyTaxonomy
   alias Gallformers.CatalogMigration.LookalikesArticle
   alias Gallformers.CatalogMigration.NameSuffixes
   alias Gallformers.CatalogMigration.NonGalls
@@ -235,6 +240,8 @@ defmodule Gallformers.CatalogMigration do
            end) do
       :ok = LegacyFacts.assert_all(actor, plan)
       :ok = LegacyFacts.assert_all(actor, %{plan | assertions: curated_facts})
+      taxonomy = LegacyTaxonomy.plan(plan.source_id)
+      :ok = LegacyTaxonomy.assert_all(actor, taxonomy)
 
       transaction(actor, "catalog_migration.finish", fn ->
         advance_sequence!("species", "galls", "taxa")
@@ -247,6 +254,7 @@ defmodule Gallformers.CatalogMigration do
         |> then(&LegacyFacts.reconcile(%{plan | assertions: plan.assertions ++ by_legacy}, &1))
         |> then(&Ranges.reconcile(curated_facts, &1))
         |> then(&Aliases.reconcile(curated_facts, &1))
+        |> then(&LegacyTaxonomy.reconcile(taxonomy, plan.source_id, &1))
         |> rebuild_gall_index()
       end)
     end

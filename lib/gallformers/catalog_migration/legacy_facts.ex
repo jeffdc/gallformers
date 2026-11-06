@@ -111,7 +111,15 @@ defmodule Gallformers.CatalogMigration.LegacyFacts do
   @doc "Reconciles the plan with the attributions the legacy Source now holds."
   @spec reconcile(plan(), Report.t()) :: Report.t()
   def reconcile(%{source_id: source_id, assertions: assertions}, report) do
-    held = Old.count("SELECT count(*) FROM attributions WHERE source_id = $1", [source_id])
+    # Its taxonomic statements are `Gallformers.CatalogMigration.LegacyTaxonomy`'s.
+    held =
+      Old.count(
+        """
+        SELECT count(*) FROM attributions a JOIN facts f ON f.id = a.fact_id
+        WHERE a.source_id = $1 AND f.kind NOT LIKE 'taxon\\_%'
+        """,
+        [source_id]
+      )
 
     Report.reconcile(
       report,

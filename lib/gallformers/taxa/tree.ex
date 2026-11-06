@@ -46,6 +46,40 @@ defmodule Gallformers.Taxa.Tree do
     end
   end
 
+  @doc """
+  Validates a rank change in `changeset` (a `Gallformers.Taxa.Taxon`
+  changeset): the new rank must be below the parent's and above every
+  child's. The error goes on `:rank` with `validation: :rank_inversion`.
+  """
+  @spec validate_rank(Ecto.Changeset.t()) :: Ecto.Changeset.t()
+  def validate_rank(%Ecto.Changeset{valid?: false} = changeset), do: changeset
+
+  def validate_rank(%Ecto.Changeset{} = changeset) do
+    import Ecto.Query, only: [from: 2]
+
+    rank = get_field(changeset, :rank)
+    id = get_field(changeset, :id)
+    parent = (pid = get_field(changeset, :parent_id)) && Repo.get(Taxon, pid)
+
+    child_ranks =
+      Repo.all(from(t in Taxon, where: t.parent_id == ^id, distinct: true, select: t.rank))
+
+    cond do
+      parent != nil and not Rank.below?(rank, parent.rank) ->
+        add_error(changeset, :rank, "must be below the parent's rank (#{parent.rank})",
+          validation: :rank_inversion
+        )
+
+      bad = Enum.find(child_ranks, &(not Rank.below?(&1, rank))) ->
+        add_error(changeset, :rank, "must be above every child's rank (one is #{bad})",
+          validation: :rank_inversion
+        )
+
+      true ->
+        changeset
+    end
+  end
+
   defp validate_against(changeset, parent_id) do
     taxon_id = get_field(changeset, :id)
 

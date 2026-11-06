@@ -53,7 +53,9 @@ defmodule Gallformers.Taxa do
       TaxonName,
       TaxonNote,
       TaxonRedirect,
-      TreeBuilder
+      TreeBuilder,
+      # The tree follows the Facts (`f923`): a Facts listener, and the check.
+      Sync
     ]
 
   import Ecto.Query
@@ -73,6 +75,7 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.Event
   alias Gallformers.Taxa.Events
   alias Gallformers.Taxa.LegacyId
+  alias Gallformers.Taxa.Lump
   alias Gallformers.Taxa.NameNormalizer
   alias Gallformers.Taxa.Rank
   alias Gallformers.Taxa.ReadModels.Browse
@@ -188,21 +191,80 @@ defmodule Gallformers.Taxa do
   @doc """
   Adds a synonym to a taxon. `opts`: `:sensu` (for a misapplied name, the
   usage meant, as written) and `:authorship`.
+
+  Calls the "taxon changed" listeners with an `:add_synonym` event; a
+  listener's error rolls it back.
   """
   @spec add_synonym(Actor.t(), taxon_ref(), String.t(), keyword()) ::
-          {:ok, TaxonName.t()} | {:error, Changeset.t()}
+          {:ok, TaxonName.t()} | {:error, Changeset.t() | Events.rejection()}
   def add_synonym(%Actor{} = actor, taxon, name, opts \\ []) when is_binary(name) do
     Audit.transaction(actor, "taxa.add_synonym", fn ->
-      %TaxonName{}
-      |> TaxonName.changeset(%{
-        taxon_id: taxon_id(taxon),
-        status: :synonym,
-        name: name,
-        sensu: opts[:sensu],
-        authorship: opts[:authorship]
-      })
-      |> Repo.insert()
-      |> unwrap_or_rollback()
+      synonym =
+        %TaxonName{}
+        |> TaxonName.changeset(%{
+          taxon_id: taxon_id(taxon),
+          status: :synonym,
+          name: name,
+          sensu: opts[:sensu],
+          authorship: opts[:authorship]
+        })
+        |> Repo.insert()
+        |> unwrap_or_rollback()
+
+      :ok =
+        Events.dispatch(%Event{
+          type: :add_synonym,
+          taxon_id: synonym.taxon_id,
+          new_name: synonym.name
+        })
+
+      synonym
+    end)
+  end
+
+  @doc """
+  Sets the authorship of a taxon's accepted name ("(Ashmead, 1881)"; nil or
+  blank for none). A Gall's name carries no authorship (`86e7`), so this
+  calls no listener.
+  """
+  @spec set_authorship(Actor.t(), taxon_ref(), String.t() | nil) ::
+          {:ok, TaxonName.t()} | {:error, Changeset.t()}
+  def set_authorship(%Actor{} = actor, taxon, authorship),
+    do: set_accepted_field(actor, "taxa.set_authorship", taxon, :authorship, authorship)
+
+  @doc """
+  Sets the sensu of a taxon's accepted name (a name in a Source's sense, as
+  written; nil or blank for none). Calls no listener.
+  """
+  @spec set_sensu(Actor.t(), taxon_ref(), String.t() | nil) ::
+          {:ok, TaxonName.t()} | {:error, Changeset.t()}
+  def set_sensu(%Actor{} = actor, taxon, sensu),
+    do: set_accepted_field(actor, "taxa.set_sensu", taxon, :sensu, sensu)
+
+  defp set_accepted_field(actor, operation, taxon, field, value) do
+    value = if is_binary(value) and String.trim(value) != "", do: String.trim(value)
+
+    Audit.transaction(actor, operation, fn ->
+      accepted =
+        Repo.one!(
+          from(n in TaxonName,
+            where: n.taxon_id == ^taxon_id(taxon) and n.status == :accepted,
+            lock: "FOR UPDATE"
+          )
+        )
+
+      if Map.fetch!(accepted, field) == value do
+        accepted
+      else
+        accepted
+        |> Changeset.change([{field, value}])
+        |> Changeset.unique_constraint(:name,
+          name: :taxon_names_taxon_id_normalized_name_sensu_index,
+          message: "is already a name of this taxon"
+        )
+        |> Repo.update()
+        |> unwrap_or_rollback()
+      end
     end)
   end
 
@@ -306,16 +368,31 @@ defmodule Gallformers.Taxa do
   Removes a synonym (a `Gallformers.Taxa.TaxonName` or its ID): the name no
   longer resolves to the taxon. `{:error, :accepted_name}` for the accepted
   name (rename the taxon instead), `{:error, :not_found}` when there is no
-  such name.
+  such name. Calls the listeners with a `:remove_synonym` event.
   """
   @spec remove_synonym(Actor.t(), TaxonName.t() | integer()) ::
-          {:ok, TaxonName.t()} | {:error, :accepted_name | :not_found | Changeset.t()}
+          {:ok, TaxonName.t()}
+          | {:error, :accepted_name | :not_found | Changeset.t() | Events.rejection()}
   def remove_synonym(%Actor{} = actor, name) do
     Audit.transaction(actor, "taxa.remove_synonym", fn ->
       case Repo.get(TaxonName, row_id(name)) do
-        %TaxonName{status: :synonym} = synonym -> synonym |> Repo.delete() |> unwrap_or_rollback()
-        %TaxonName{status: :accepted} -> Repo.rollback(:accepted_name)
-        nil -> Repo.rollback(:not_found)
+        %TaxonName{status: :synonym} = synonym ->
+          removed = synonym |> Repo.delete() |> unwrap_or_rollback()
+
+          :ok =
+            Events.dispatch(%Event{
+              type: :remove_synonym,
+              taxon_id: removed.taxon_id,
+              old_name: removed.name
+            })
+
+          removed
+
+        %TaxonName{status: :accepted} ->
+          Repo.rollback(:accepted_name)
+
+        nil ->
+          Repo.rollback(:not_found)
       end
     end)
   end
@@ -564,6 +641,99 @@ defmodule Gallformers.Taxa do
             })
 
           moved
+      end
+    end)
+  end
+
+  @doc """
+  Gives `taxon` another rank, checked against the tree: below its
+  parent's and above every child's (`{:error, changeset}` with the error
+  on `:rank`, `validation: :rank_inversion`). Calls the listeners with a
+  `:rank` event (a Gall's derived name may follow its Inducer's genus);
+  the same rank changes nothing and calls none.
+  """
+  @spec set_rank(Actor.t(), taxon_ref(), Rank.t() | String.t()) ::
+          {:ok, Taxon.t()} | {:error, Changeset.t() | Events.rejection()}
+  def set_rank(%Actor{} = actor, taxon, rank) do
+    Audit.transaction(actor, "taxa.set_rank", fn ->
+      Tree.lock()
+
+      current = Repo.one!(from(t in Taxon, where: t.id == ^taxon_id(taxon), lock: "FOR UPDATE"))
+      changeset = current |> Taxon.rank_changeset(rank) |> Tree.validate_rank()
+
+      cond do
+        not changeset.valid? ->
+          Repo.rollback(changeset)
+
+        Changeset.get_field(changeset, :rank) == current.rank ->
+          current
+
+        true ->
+          updated = changeset |> Repo.update() |> unwrap_or_rollback()
+
+          :ok =
+            Events.dispatch(%Event{
+              type: :rank,
+              taxon_id: updated.id,
+              old_rank: current.rank,
+              new_rank: updated.rank
+            })
+
+          updated
+      end
+    end)
+  end
+
+  @doc """
+  Whether `set_rank/3` would accept giving `taxon` the rank `rank`: `:ok`,
+  or the `{:error, changeset}` it would give. Writes nothing.
+  """
+  @spec check_rank(taxon_ref(), Rank.t() | String.t()) :: :ok | {:error, Changeset.t()}
+  def check_rank(taxon, rank) do
+    changeset =
+      Taxon |> Repo.get!(taxon_id(taxon)) |> Taxon.rank_changeset(rank) |> Tree.validate_rank()
+
+    if changeset.valid?, do: :ok, else: {:error, changeset}
+  end
+
+  @doc """
+  Merges `absorbed` into `survivor`: a lump, when a synonymy of the
+  absorbed taxon's name into the survivor comes into effect (`f923`). Its
+  names become the survivor's synonyms, the taxonomic-act Facts naming it
+  move to the survivor, the listeners move what they hold of it (the
+  Catalog's Inducer Facts are re-pointed; Gall renames are proposed) on a
+  `:merge` event, and it redirects to the survivor and is deleted. See
+  `Gallformers.Taxa.Lump`.
+  """
+  @spec merge(Actor.t(), taxon_ref(), taxon_ref()) ::
+          {:ok, Taxon.t()} | {:error, Lump.error()}
+  def merge(%Actor{} = actor, absorbed, survivor),
+    do: Lump.merge(actor, taxon_id(absorbed), taxon_id(survivor))
+
+  @doc """
+  Records that `taxon` was split into the taxa `into_ids` (two or more,
+  each an existing taxon other than it): calls the listeners with a
+  `:split` event, for the curator questions about its Galls (`f923`
+  "Splits"). The tree itself is unchanged: the daughters are taxa already.
+  `{:error, :needs_two_daughters}` or `{:error, :not_found}`.
+  """
+  @spec split(Actor.t(), taxon_ref(), [integer()]) ::
+          {:ok, Taxon.t()} | {:error, :needs_two_daughters | :not_found | Events.rejection()}
+  def split(%Actor{} = actor, taxon, into_ids) when is_list(into_ids) do
+    id = taxon_id(taxon)
+    into = into_ids |> Enum.uniq() |> Enum.reject(&(&1 == id))
+
+    Audit.transaction(actor, "taxa.split", fn ->
+      cond do
+        length(into) < 2 ->
+          Repo.rollback(:needs_two_daughters)
+
+        Repo.aggregate(from(t in Taxon, where: t.id in ^[id | into]), :count) != length(into) + 1 ->
+          Repo.rollback(:not_found)
+
+        true ->
+          :ok = Events.dispatch(%Event{type: :split, taxon_id: id, into_taxon_ids: into})
+          get_taxon!(id)
       end
     end)
   end
@@ -908,6 +1078,23 @@ defmodule Gallformers.Taxa do
   def find_act_fact(kind, key) do
     with {:ok, detail} <- ActFacts.find(Map.fetch!(@act_kinds, kind), key) do
       {:ok, detail && detail.fact_id}
+    end
+  end
+
+  @doc """
+  What act Fact `fact_id` states: `{kind, key}`, its kind (as `assert_act/4`
+  names them) and natural key (as `find_act_fact/2` takes it), or nil when
+  it is no taxonomic-act Fact.
+  """
+  @spec act_fact(integer()) :: {act_kind(), map()} | nil
+  def act_fact(fact_id) when is_integer(fact_id) do
+    case ActFacts.get_detail(fact_id) do
+      %module{} = detail ->
+        kind = Enum.find_value(@act_kinds, fn {kind, m} -> m == module && kind end)
+        {kind, module.key(detail)}
+
+      nil ->
+        nil
     end
   end
 

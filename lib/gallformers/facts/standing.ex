@@ -9,7 +9,10 @@ defmodule Gallformers.Facts.Standing do
 
   1. Attributions from retracted Sources are ignored. A Fact with
      attributions but none left is `:retracted`; a Fact with no attributions
-     at all is `:unsupported`.
+     at all is `:unsupported`. Attributions that do not count (`counts:
+     false`: a Source's taxonomic statement no curator has accepted, or one
+     declined, `f923`) are ignored too; a Fact left with none that count is
+     `:unsupported`.
   2. The newest `stated_on` decides: a confirmation makes the Fact
      `:current`, a denial `:withdrawn`. Import order never matters.
   3. Partial dates compare at the coarser precision of the two, so `"1897"`
@@ -57,6 +60,7 @@ defmodule Gallformers.Facts.Standing do
           required(:stated_on) => Date.t() | nil,
           required(:stated_precision) => PartialDate.precision() | nil,
           required(:retracted) => boolean(),
+          optional(:counts) => boolean(),
           optional(any()) => any()
         }
 
@@ -125,27 +129,38 @@ defmodule Gallformers.Facts.Standing do
         {:retracted, []}
 
       live ->
-        newest = newest(live, & &1)
-
-        case newest |> Enum.map(& &1.stance) |> Enum.uniq() do
-          [:confirm] ->
-            {:current, []}
-
-          [:deny] ->
-            {:withdrawn, []}
-
-          _both ->
-            conflict = %Conflict{type: :same_date, fact_ids: [id], attributions: newest}
-            {kept(previous), [conflict]}
+        case Enum.filter(live, &counts?/1) do
+          [] -> {:unsupported, []}
+          counting -> standing_of(id, previous, counting)
         end
     end
   end
+
+  defp standing_of(id, previous, live) do
+    newest = newest(live, & &1)
+
+    case newest |> Enum.map(& &1.stance) |> Enum.uniq() do
+      [:confirm] ->
+        {:current, []}
+
+      [:deny] ->
+        {:withdrawn, []}
+
+      _both ->
+        conflict = %Conflict{type: :same_date, fact_ids: [id], attributions: newest}
+        {kept(previous), [conflict]}
+    end
+  end
+
+  defp counts?(statement), do: Map.get(statement, :counts, true)
 
   defp settle_slot(current, standings) when length(current) < 2, do: {standings, []}
 
   defp settle_slot(current, standings) do
     confirmations =
-      for fact <- current, a <- fact.attributions, not a.retracted, a.stance == :confirm do
+      for fact <- current,
+          a <- fact.attributions,
+          not a.retracted and counts?(a) and a.stance == :confirm do
         {fact, a}
       end
 
