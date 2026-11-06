@@ -43,6 +43,32 @@ defmodule GallformersWeb.TaxonomyURL do
 
   def public_path(_), do: nil
 
+  @ranks ~w(family subfamily tribe subtribe genus section)a
+
+  @doc """
+  The public page of a taxon given as `%{id, name, rank, kingdom}` with the
+  rank and kingdom as strings (a read model's row): a plant species,
+  subspecies or variety's Host page; a family's, tribe's, genus's or
+  section's page; nil for a taxon with no page of its own (an inducer
+  species: its Galls have the pages).
+
+      iex> TaxonomyURL.taxon_path(%{id: 7, name: "Quercus alba", rank: "species", kingdom: "Plantae"})
+      "/host/7"
+  """
+  @spec taxon_path(map()) :: String.t() | nil
+  def taxon_path(%{id: id, rank: rank, kingdom: "Plantae"})
+      when rank in ["species", "subspecies", "variety"],
+      do: "/host/#{id}"
+
+  def taxon_path(%{name: name, rank: rank}) when is_binary(rank) do
+    case Enum.find(@ranks, &(Atom.to_string(&1) == rank)) do
+      nil -> nil
+      atom -> TreeBuilder.rank_path(atom, name)
+    end
+  end
+
+  def taxon_path(_), do: nil
+
   @doc """
   The old taxonomy ID in a numeric rank-page URL (`/genus/33`), mapped to
   its taxon's page through the crosswalk

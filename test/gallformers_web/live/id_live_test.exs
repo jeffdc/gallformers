@@ -17,6 +17,10 @@ defmodule GallformersWeb.IDLiveTest do
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
+  # The page's visible text: a name's italic and upright parts are separate
+  # elements, so assert on text rather than raw HTML.
+  defp page_text(html), do: html |> LazyHTML.from_document() |> LazyHTML.text()
+
   # Reading the seeds, converted, is much of what this module tests.
   # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
 
@@ -101,8 +105,9 @@ defmodule GallformersWeb.IDLiveTest do
     test "renders the host and genus pickers", %{conn: conn} do
       {:ok, view, html} = live(conn, ~p"/id")
 
-      assert html =~ "Host Plant Species:"
-      assert html =~ "Host Plant Genus / Section:"
+      assert html =~ "Host plant"
+      assert html =~ "Host genus or section"
+      assert has_element?(view, "h1", "Identify a gall")
       assert has_element?(view, "#host-picker-input[data-typeahead-input]")
       assert has_element?(view, "#genus-picker-input[data-typeahead-input]")
     end
@@ -127,7 +132,7 @@ defmodule GallformersWeb.IDLiveTest do
 
       for query <- ["Notholith", "Lithocarpus", "tanoak"] do
         html = render_click(view, "search_host", %{"value" => query})
-        assert html =~ "Notholithocarpus densiflorus (Lithocarpus densiflorus, tanoak)"
+        assert page_text(html) =~ "Notholithocarpus densiflorus (Lithocarpus densiflorus, tanoak)"
       end
     end
 
@@ -548,7 +553,8 @@ defmodule GallformersWeb.IDLiveTest do
       {:ok, view, html} = live(conn, @host_path)
 
       assert has_element?(view, "a[href='/gall/300'] img[src*='300_seed_small']")
-      assert has_element?(view, "a[href='/gall/301'] img[src*='noimage']")
+      # A Gall with no photo shows the gall icon placeholder, not a stand-in image
+      assert has_element?(view, "a[href='/gall/301'] [data-part=placeholder]")
       assert html =~ "Undescribed"
       refute html =~ "Non-gall"
       assert html =~ "galls"
@@ -561,6 +567,17 @@ defmodule GallformersWeb.IDLiveTest do
 
       assert patched_query(view) == %{"h" => @host}
       assert render(view) =~ "Selected: #{@host}"
+    end
+
+    test "a page opened with filters counts the Host's unfiltered galls", %{conn: conn} do
+      {:ok, unfiltered, _html} = live(conn, @host_path)
+      all = length(gall_links(unfiltered))
+      assert all > 0
+
+      {:ok, view, _html} = live(conn, @host_path <> "&co=red&de=both")
+
+      assert gall_links(view) == []
+      assert render(view) =~ ~r/\(\s*<span[^>]*>#{all}<\/span>\s*unfiltered\)/
     end
 
     test "a filter matching nothing shows the troubleshooting link", %{conn: conn} do

@@ -149,8 +149,14 @@ defmodule GallformersWeb.Admin.ReviewLive.FactsTest do
 
       view = facts(conn, package)
       assert has_element?(view, "h1", "Facts")
-      assert has_element?(view, "h1 a[href='/admin/review']", "Sources to review")
-      assert has_element?(view, "h1 a[href='#{base}']")
+
+      assert has_element?(
+               view,
+               "nav[aria-label=Breadcrumb] a[href='/admin/review']",
+               "Sources to review"
+             )
+
+      assert has_element?(view, "nav[aria-label=Breadcrumb] a[href='#{base}']")
       assert has_element?(view, "#step-bar-facts[aria-current=page]", "Facts")
       assert has_element?(view, "#step-bar-facts", "optional")
 

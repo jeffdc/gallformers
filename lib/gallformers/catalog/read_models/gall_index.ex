@@ -10,7 +10,9 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
   lineages from `Gallformers.Taxa`; the current Trait values; the default
   image; and the potential range,
   `Gallformers.Catalog.ReadModels.PotentialRange.for_galls/1`'s result
-  (empty `place_ids` with `everywhere` for a range that is every region).
+  (empty `place_ids` with `everywhere` for a range that is every region),
+  and where the Gall is known to occur, `PotentialRange.known_for_galls/1`
+  (`known_place_ids`, what Browse by place counts).
   Ancestor columns hold the taxa themselves too, so a family filter matches
   an Inducer that is the family and a genus filter a Host that is the
   genus. `undescribed` is the Gall page's rule: no current Inducer at
@@ -64,6 +66,7 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
           undescribed: boolean() | nil,
           image_id: integer() | nil,
           place_ids: [integer()],
+          known_place_ids: [integer()],
           everywhere: boolean() | nil,
           refreshed_at: DateTime.t() | nil
         }
@@ -80,6 +83,7 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
     field :undescribed, :boolean
     field :image_id, :id
     field :place_ids, {:array, :id}, default: []
+    field :known_place_ids, {:array, :id}, default: []
     field :everywhere, :boolean
     field :refreshed_at, :utc_datetime
   end
@@ -187,6 +191,7 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
     detachable = detachable_values()
     images = Images.default_image_ids_for_galls(ids)
     ranges = PotentialRange.for_galls(ids)
+    known = PotentialRange.known_for_galls(ids)
     inducers = Map.new(inducers)
     hosts = Map.new(hosts)
     now = DateTime.utc_now(:second)
@@ -211,6 +216,7 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
           image_id: Map.get(images, id),
           place_ids: if(range == :everywhere, do: [], else: Enum.map(range, & &1.place_id)),
           everywhere: range == :everywhere,
+          known_place_ids: known |> Map.fetch!(id) |> Enum.map(& &1.place_id),
           refreshed_at: now
         }
       end

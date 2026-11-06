@@ -225,161 +225,152 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="Taxonomy">
-      <div class="space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Taxonomy</:title>
+          <:description>
+            Every rank, from kingdoms to species: search by accepted name, synonym or common name, or browse down from the roots.
+          </:description>
+          <:action>
+            <.button navigate={~p"/admin/host-range"}>Host range review</.button>
+          </:action>
+          <:action>
+            <.button navigate={~p"/admin/taxonomy/new"} variant="primary" icon="ph-plus">
+              New taxon
+            </.button>
+          </:action>
+        </.page_header>
+
+        <div class="flex flex-col gap-block">
           <form
             id="taxonomy-search-form"
             phx-change="search"
             phx-submit="search"
-            class="flex-1 max-w-2xl"
+            class="max-w-xl"
           >
-            <.search_input
+            <.search_field
               id="taxonomy-search"
               name="q"
               value={@query}
-              placeholder="Search taxa by name, synonym or common name..."
-              phx-debounce="300"
+              label="Search taxa"
+              placeholder="Search taxa by name, synonym or common name"
             />
           </form>
-          <div class="flex items-center gap-2">
-            <.link navigate={~p"/admin/host-range"} class="gf-btn gf-btn-secondary">
-              Host Range Review
-            </.link>
-            <.link navigate={~p"/admin/taxonomy/new"} class="gf-btn gf-btn-primary">
-              New Taxon
-            </.link>
+
+          <nav
+            :if={@mode == :browse}
+            id="browse-trail"
+            aria-label="Where you are in the tree"
+            class="flex flex-wrap items-center gap-x-1.5 text-meta text-muted"
+          >
+            <.link patch={~p"/admin/taxonomy"}>All roots</.link>
+            <span :for={entry <- @lineage} class="flex items-center gap-x-1.5">
+              <span aria-hidden="true">›</span>
+              <.link patch={~p"/admin/taxonomy?#{%{parent: entry.taxon_id}}"}>
+                <.taxon_name name={entry.name} rank={name_rank(entry.rank)} />
+              </.link>
+            </span>
+          </nav>
+
+          <div
+            :if={@mode == :browse and MapSet.size(@selected) > 0}
+            class="flex items-center gap-2"
+          >
+            <.button phx-click="open_move_modal" icon="ph-arrow-right">
+              Move {MapSet.size(@selected)} selected
+            </.button>
+            <.button variant="ghost" phx-click="clear_selection">Clear</.button>
           </div>
+
+          <.data_table id="taxa-table" rows={@rows} row_id={&"taxon-#{&1.id}"}>
+            <:col :let={row} :if={@mode == :browse} label="">
+              <input
+                type="checkbox"
+                checked={MapSet.member?(@selected, row.id)}
+                phx-click="toggle_select"
+                phx-value-id={row.id}
+                aria-label={"Select #{row.name}"}
+                class="size-4 align-middle"
+              />
+            </:col>
+            <:col :let={row} label="Name" grow>
+              <.link navigate={~p"/admin/taxonomy/#{row.id}"} class="font-semibold">
+                <.taxon_name name={row.name} rank={name_rank(row.rank)} />
+              </.link>
+            </:col>
+            <:col :let={row} label="Rank">{rank_label(row.rank)}</:col>
+            <:col :let={row} :if={@mode == :search} label="Kingdom">{row.kingdom || "—"}</:col>
+            <:col
+              :let={row}
+              label={if @mode == :search, do: "Also known as", else: "Common names"}
+              hide_below={:md}
+            >
+              <span class="text-ink-2">{Enum.join(row.aliases, ", ")}</span>
+            </:col>
+            <:col :let={row} :if={@mode == :browse} label="Children" numeric>
+              <.link
+                :if={row.child_count > 0}
+                patch={~p"/admin/taxonomy?#{%{parent: row.id}}"}
+              >
+                {row.child_count} ›
+              </.link>
+              <span :if={row.child_count == 0} class="text-muted">—</span>
+            </:col>
+            <:empty>No taxa found.</:empty>
+          </.data_table>
+
+          <p class="text-meta text-muted">
+            <%= if @mode == :search and @total > length(@rows) do %>
+              Showing the first {length(@rows)} of {@total} taxa. Narrow the search to see the rest.
+            <% else %>
+              Showing {@total} {taxa_word(@total)}
+            <% end %>
+          </p>
         </div>
-
-        <nav :if={@mode == :browse} id="browse-trail" class="text-sm text-gray-600">
-          <.link patch={~p"/admin/taxonomy"} class="hover:underline">All roots</.link>
-          <span :for={entry <- @lineage}>
-            <span class="mx-1 text-gray-400">›</span>
-            <.link patch={~p"/admin/taxonomy?#{%{parent: entry.taxon_id}}"} class="hover:underline">
-              <.taxon_name name={entry.name} rank={name_rank(entry.rank)} />
-            </.link>
-          </span>
-        </nav>
-
-        <div
-          :if={@mode == :browse and MapSet.size(@selected) > 0}
-          class="flex items-center gap-2"
-        >
-          <button type="button" phx-click="open_move_modal" class="gf-btn gf-btn-secondary">
-            <.icon name="ph-arrow-right" class="h-4 w-4 mr-1" />
-            Move {MapSet.size(@selected)} Selected
-          </button>
-          <button type="button" phx-click="clear_selection" class="gf-btn gf-btn-ghost text-sm">
-            Clear
-          </button>
-        </div>
-
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table id="taxa-table" class="gf-table gf-table-dark">
-            <thead>
-              <tr>
-                <th :if={@mode == :browse} class="w-10"></th>
-                <th>Name</th>
-                <th>Rank</th>
-                <th :if={@mode == :search}>Kingdom</th>
-                <th>{if @mode == :search, do: "Also known as", else: "Common names"}</th>
-                <th :if={@mode == :browse} class="text-right">Children</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={row <- @rows} id={"taxon-#{row.id}"}>
-                <td :if={@mode == :browse} class="text-center">
-                  <input
-                    type="checkbox"
-                    checked={MapSet.member?(@selected, row.id)}
-                    phx-click="toggle_select"
-                    phx-value-id={row.id}
-                    class="h-4 w-4 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-                  />
-                </td>
-                <td>
-                  <.link navigate={~p"/admin/taxonomy/#{row.id}"} class="hover:underline font-medium">
-                    <.taxon_name name={row.name} rank={name_rank(row.rank)} />
-                  </.link>
-                </td>
-                <td>{rank_label(row.rank)}</td>
-                <td :if={@mode == :search}>{row.kingdom || "—"}</td>
-                <td class="text-gray-500">{Enum.join(row.aliases, ", ")}</td>
-                <td :if={@mode == :browse} class="text-right">
-                  <.link
-                    :if={row.child_count > 0}
-                    patch={~p"/admin/taxonomy?#{%{parent: row.id}}"}
-                    class="hover:underline"
-                  >
-                    {row.child_count} ›
-                  </.link>
-                  <span :if={row.child_count == 0} class="text-gray-400">—</span>
-                </td>
-              </tr>
-              <tr :if={@rows == []}>
-                <td colspan="6" class="text-center text-gray-500">No taxa found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p class="text-sm text-gray-500">
-          <%= if @mode == :search and @total > length(@rows) do %>
-            Showing the first {length(@rows)} of {@total} taxa. Narrow the search to see the rest.
-          <% else %>
-            Showing {@total} {taxa_word(@total)}
-          <% end %>
-        </p>
       </div>
 
-      <.modal :if={@show_move_modal} id="move-taxa-modal" show on_cancel={JS.push("close_move_modal")}>
-        <:header>Move {MapSet.size(@selected)} {taxa_word(MapSet.size(@selected))}</:header>
-        <:body>
-          <div class="space-y-4">
-            <div class="flex flex-wrap gap-2">
-              <span
-                :for={row <- Enum.filter(@rows, &MapSet.member?(@selected, &1.id))}
-                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800"
-              >
-                <.taxon_name name={row.name} rank={name_rank(row.rank)} />
-              </span>
-            </div>
-            <.typeahead
-              id="move-target-picker"
-              label="Move under"
-              placeholder="Search for the new parent..."
-              search_event="search_move_target"
-              select_event="select_move_target"
-              clear_event="clear_move_target"
-              query={@move_query}
-              results={@move_results}
-              selected={@move_target}
-              display_fn={fn t -> "#{t.name} (#{t.rank})" end}
-            />
-            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p class="text-sm text-amber-800">
-                <.icon name="ph-warning" class="h-4 w-4 inline mr-1" />
-                Each selected taxon moves with everything below it. This takes effect immediately.
-              </p>
-            </div>
+      <.dialog
+        :if={@show_move_modal}
+        id="move-taxa-modal"
+        title={"Move #{MapSet.size(@selected)} #{taxa_word(MapSet.size(@selected))}"}
+        show
+        on_cancel={JS.push("close_move_modal")}
+      >
+        <div class="flex flex-col gap-block">
+          <div class="flex flex-wrap gap-2">
+            <.chip :for={row <- Enum.filter(@rows, &MapSet.member?(@selected, &1.id))}>
+              <.taxon_name name={row.name} rank={name_rank(row.rank)} />
+            </.chip>
           </div>
-        </:body>
-        <:footer>
-          <button type="button" phx-click="close_move_modal" class="gf-btn gf-btn-secondary">
-            Cancel
-          </button>
-          <button
+          <.typeahead
+            id="move-target-picker"
+            label="Move under"
+            placeholder="Search for the new parent..."
+            search_event="search_move_target"
+            select_event="select_move_target"
+            clear_event="clear_move_target"
+            query={@move_query}
+            results={@move_results}
+            selected={@move_target}
+            display_fn={fn t -> "#{t.name} (#{t.rank})" end}
+          />
+          <.notice kind={:warn}>
+            Each selected taxon moves with everything below it. This takes effect immediately.
+          </.notice>
+        </div>
+        <:actions>
+          <.button phx-click="close_move_modal">Cancel</.button>
+          <.button
             id="move-selected"
-            type="button"
+            variant="primary"
             phx-click="move_selected"
             disabled={is_nil(@move_target)}
-            class="gf-btn gf-btn-primary"
           >
             Move
-          </button>
-        </:footer>
-      </.modal>
+          </.button>
+        </:actions>
+      </.dialog>
     </Layouts.admin>
     """
   end

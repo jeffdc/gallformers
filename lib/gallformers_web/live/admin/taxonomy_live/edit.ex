@@ -472,377 +472,387 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        Editing {rank_label(@taxon.rank)}
-        <.taxon_name name={@name} rank={name_rank(@taxon.rank)} class="font-bold" />
-      </:page_title_html>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin/taxonomy"}>Taxonomy</:crumb>
+          <:crumb :for={entry <- @lineage} navigate={~p"/admin/taxonomy/#{entry.taxon_id}"}>
+            <.taxon_name name={entry.name} rank={name_rank(entry.rank)} />
+          </:crumb>
+          <:title><.taxon_name name={@name} rank={name_rank(@taxon.rank)} /></:title>
+          <:chip variant={:rank}>{rank_label(@taxon.rank)}</:chip>
+          <:meta :if={@taxon.inserted_at} label="Created">
+            {format_date(@taxon.inserted_at, :short)}
+          </:meta>
+          <:meta :if={@taxon.updated_at} label="Updated">
+            {format_date(@taxon.updated_at, :short)}
+          </:meta>
+          <:description>
+            A taxon's names, placement and details. Each change is saved as you make it, except the Host range, which is saved with its Save button.
+          </:description>
+          <:action :if={@public_path}>
+            <.button href={@public_path} variant="ghost" size="sm" icon="ph-arrow-square-out">
+              View public page
+            </.button>
+          </:action>
+        </.page_header>
 
-      <Layouts.admin_edit_layout
-        back_path={~p"/admin/taxonomy"}
-        back_label="Back to Taxonomy"
-        public_url={@public_path}
-      >
-        <:intro>
-          A taxon's names, placement and details. Each change is saved as you make it, except the
-          Host range, which is saved with its Save button.
-        </:intro>
-
-        <nav :if={@lineage != []} id="taxon-lineage" class="mb-4 text-sm text-gray-600">
-          <span :for={{entry, i} <- Enum.with_index(@lineage)}>
-            <span :if={i > 0} class="mx-1 text-gray-400">›</span>
-            <.link navigate={~p"/admin/taxonomy/#{entry.taxon_id}"} class="hover:underline">
-              <.taxon_name name={entry.name} rank={name_rank(entry.rank)} />
-            </.link>
-          </span>
-        </nav>
-
-        <div class="space-y-6">
-          <%!-- Name --%>
-          <.card title="Name" icon="ph-text-aa">
-            <.form
-              for={@rename_form}
-              id="rename-form"
-              phx-submit="rename"
-              class="flex gap-2 items-end"
-            >
-              <div class="flex-1">
-                <.input field={@rename_form[:name]} label="Accepted name" />
-              </div>
-              <.button type="submit" variant="secondary">Rename</.button>
-            </.form>
-            <p class="mt-2 text-xs text-gray-500">
-              The old name is kept as a synonym. Galls whose names it changes get <.link
-                navigate={~p"/admin/review/renames"}
-                class="underline"
-              >rename proposals</.link>.
-            </p>
-          </.card>
-
-          <%!-- Placement --%>
-          <.card title="Placement" icon="ph-tree-structure">
-            <p class="text-sm text-gray-600 mb-2">
-              Rank: <strong>{rank_label(@taxon.rank)}</strong>
-              <span :if={@taxon.kingdom}>· Kingdom: <strong>{@taxon.kingdom}</strong></span>
-            </p>
-            <div class="flex gap-2 items-end">
-              <div class="flex-1">
-                <.typeahead
-                  id="parent-picker"
-                  label="Move under"
-                  placeholder="Search for the new parent..."
-                  search_event="search_parent"
-                  select_event="select_parent"
-                  clear_event="clear_parent"
-                  query={@parent_query}
-                  results={@parent_results}
-                  selected={@selected_parent}
-                  display_fn={fn p -> "#{p.name} (#{p.rank})" end}
+        <div class="gf-with-rail">
+          <div class="flex min-w-0 flex-col gap-section">
+            <.section title="Name" class="max-w-form">
+              <div class="flex flex-col gap-1">
+                <.form
+                  for={@rename_form}
+                  id="rename-form"
+                  phx-submit="rename"
+                  class="flex items-end gap-2"
                 >
-                  <:result :let={parent}>
-                    <.taxon_name name={parent.name} rank={name_rank(parent.rank)} />
-                    <span class="text-xs text-gray-500 ml-1">({parent.rank})</span>
-                  </:result>
+                  <div class="flex-1">
+                    <.input field={@rename_form[:name]} label="Accepted name" />
+                  </div>
+                  <.button type="submit" variant="secondary">Rename</.button>
+                </.form>
+                <p class="gf-hint">
+                  The old name is kept as a synonym. Galls whose names it changes get <.link navigate={
+                    ~p"/admin/review/renames"
+                  }>rename proposals</.link>.
+                </p>
+              </div>
+            </.section>
+
+            <.section title="Placement" class="max-w-form">
+              <div class="flex flex-col gap-block">
+                <div class="flex items-end gap-2">
+                  <div class="flex-1">
+                    <.typeahead
+                      id="parent-picker"
+                      label="Move under"
+                      placeholder="Search for the new parent..."
+                      search_event="search_parent"
+                      select_event="select_parent"
+                      clear_event="clear_parent"
+                      query={@parent_query}
+                      results={@parent_results}
+                      selected={@selected_parent}
+                      display_fn={fn p -> "#{p.name} (#{p.rank})" end}
+                    >
+                      <:result :let={parent}>
+                        <.taxon_name name={parent.name} rank={name_rank(parent.rank)} />
+                        <span class="ml-1 text-caption text-muted">({parent.rank})</span>
+                      </:result>
+                    </.typeahead>
+                  </div>
+                  <.button
+                    id="move-button"
+                    type="button"
+                    variant="secondary"
+                    phx-click="move"
+                    disabled={is_nil(@selected_parent)}
+                  >
+                    Move
+                  </.button>
+                </div>
+
+                <form :if={@plant? and @sections != []} id="section-form" phx-change="set_section">
+                  <.input
+                    type="select"
+                    name="section_id"
+                    label="Section"
+                    prompt="-- No Section --"
+                    options={Enum.map(@sections, &{&1.name, &1.taxon_id})}
+                    value={@taxon.parent_id}
+                  />
+                </form>
+              </div>
+            </.section>
+
+            <.section
+              :if={@taxon.rank == :section}
+              title="Plants in this section"
+              count={length(@members)}
+              class="max-w-form"
+            >
+              <div class="flex flex-col gap-block">
+                <p class="text-meta text-ink-2">All of a section's plants are in its genus.</p>
+                <ul id="section-members" class="divide-y divide-line">
+                  <li :for={member <- @members} class="flex items-center justify-between gap-2 py-1">
+                    <.link navigate={~p"/admin/taxonomy/#{member.taxon_id}"}>
+                      <.taxon_name name={member.name} />
+                    </.link>
+                    <.button
+                      variant="ghost"
+                      size="sm"
+                      phx-click="remove_member"
+                      phx-value-id={member.taxon_id}
+                    >
+                      Remove
+                    </.button>
+                  </li>
+                  <li :if={@members == []} class="py-1 text-meta text-muted">
+                    No plants yet. Add one below.
+                  </li>
+                </ul>
+                <.typeahead
+                  id="member-picker"
+                  label="Add a plant"
+                  placeholder="Search plants..."
+                  search_event="search_member"
+                  select_event="select_member"
+                  clear_event="clear_member"
+                  query={@member_query}
+                  results={@member_results}
+                  display_fn={& &1.name}
+                >
+                  <:result :let={plant}><.taxon_name name={plant.name} /></:result>
                 </.typeahead>
               </div>
-              <.button
-                id="move-button"
-                type="button"
-                variant="secondary"
-                phx-click="move"
-                disabled={is_nil(@selected_parent)}
+            </.section>
+
+            <.section title="Synonyms" count={length(@synonyms)} class="max-w-form">
+              <div class="flex flex-col gap-block">
+                <ul id="synonyms" class="divide-y divide-line">
+                  <li :for={synonym <- @synonyms} class="flex items-center justify-between gap-2 py-1">
+                    <span>
+                      <.taxon_name name={synonym.name} />
+                      <span :if={synonym.sensu} class="text-meta text-muted">
+                        sensu {synonym.sensu}
+                      </span>
+                    </span>
+                    <.button
+                      variant="ghost"
+                      size="sm"
+                      phx-click="remove_synonym"
+                      phx-value-id={synonym.id}
+                      data-confirm={"Remove the synonym #{synonym.name}?"}
+                    >
+                      Remove
+                    </.button>
+                  </li>
+                  <li :if={@synonyms == []} class="py-1 text-meta text-muted">
+                    No synonyms. Add one below.
+                  </li>
+                </ul>
+                <.form
+                  for={@synonym_form}
+                  id="synonym-form"
+                  phx-submit="add_synonym"
+                  class="flex items-end gap-2"
+                >
+                  <div class="flex-1"><.input field={@synonym_form[:name]} label="Synonym" /></div>
+                  <div class="flex-1">
+                    <.input field={@synonym_form[:sensu]} label="Sensu (misapplied names only)" />
+                  </div>
+                  <.button type="submit" variant="secondary">Add</.button>
+                </.form>
+              </div>
+            </.section>
+
+            <.section title="Common names" count={length(@common_names)} class="max-w-form">
+              <div class="flex flex-col gap-block">
+                <ul id="common-names" class="divide-y divide-line">
+                  <li
+                    :for={common <- @common_names}
+                    class="flex items-center justify-between gap-2 py-1"
+                  >
+                    <span>{common.name}</span>
+                    <.button
+                      variant="ghost"
+                      size="sm"
+                      phx-click="remove_common_name"
+                      phx-value-id={common.id}
+                    >
+                      Remove
+                    </.button>
+                  </li>
+                  <li :if={@common_names == []} class="py-1 text-meta text-muted">
+                    No common names. Add one below.
+                  </li>
+                </ul>
+                <.form
+                  for={@common_name_form}
+                  id="common-name-form"
+                  phx-submit="add_common_name"
+                  class="flex items-end gap-2"
+                >
+                  <div class="flex-1">
+                    <.input field={@common_name_form[:name]} label="Common name" />
+                  </div>
+                  <.button type="submit" variant="secondary">Add</.button>
+                </.form>
+              </div>
+            </.section>
+
+            <.section :if={@plant?} title="Plant details" class="max-w-form">
+              <.form
+                for={@editorial_form}
+                id="editorial-form"
+                phx-submit="save_editorial"
+                class="flex flex-col gap-block"
               >
-                Move
-              </.button>
-            </div>
-
-            <div :if={@plant? and @sections != []} class="mt-4">
-              <form id="section-form" phx-change="set_section">
+                <div class="max-w-xs">
+                  <.input
+                    field={@editorial_form[:abundance_id]}
+                    type="select"
+                    label="Abundance"
+                    prompt=""
+                    options={@abundances}
+                  />
+                </div>
                 <.input
-                  type="select"
-                  name="section_id"
-                  label="Section"
-                  prompt="-- No Section --"
-                  options={Enum.map(@sections, &{&1.name, &1.taxon_id})}
-                  value={@taxon.parent_id}
+                  type="checkbox"
+                  field={@editorial_form[:datacomplete]}
+                  label="All galls known to occur on this plant have been added to the database, and can be filtered by Location and Detachable. However, sources and images for galls associated with this host may be incomplete or absent, and other filters may not have been entered comprehensively or at all."
                 />
-              </form>
-            </div>
-          </.card>
+                <div>
+                  <.button type="submit" variant="secondary">Save details</.button>
+                </div>
+              </.form>
+            </.section>
 
-          <%!-- Section members --%>
-          <.card :if={@taxon.rank == :section} title="Plants in this section" icon="ph-leaf">
-            <p class="text-sm text-gray-600 mb-3">All of a section's plants are in its genus.</p>
-            <ul id="section-members" class="divide-y divide-gray-100 mb-3">
-              <li :for={member <- @members} class="flex items-center justify-between py-1">
-                <.link navigate={~p"/admin/taxonomy/#{member.taxon_id}"} class="hover:underline">
-                  <.taxon_name name={member.name} />
-                </.link>
-                <button
-                  type="button"
-                  phx-click="remove_member"
-                  phx-value-id={member.taxon_id}
-                  class="text-sm text-red-600 hover:underline"
-                >
-                  Remove
-                </button>
-              </li>
-              <li :if={@members == []} class="py-1 text-sm text-gray-500">No plants yet.</li>
-            </ul>
-            <.typeahead
-              id="member-picker"
-              label="Add a plant"
-              placeholder="Search plants..."
-              search_event="search_member"
-              select_event="select_member"
-              clear_event="clear_member"
-              query={@member_query}
-              results={@member_results}
-              display_fn={& &1.name}
-            >
-              <:result :let={plant}><.taxon_name name={plant.name} /></:result>
-            </.typeahead>
-          </.card>
+            <.section :if={@plant?} title="Host range">
+              <:aside>
+                <.chip :if={@link && @link.range_confirmed} variant={:ok} icon="ph-check-circle-fill">
+                  Range confirmed
+                </.chip>
+                <.chip :if={!(@link && @link.range_confirmed)} variant={:warn} icon="ph-warning">
+                  Range needs review
+                </.chip>
+              </:aside>
+              <div class="flex flex-col gap-block">
+                <p id="range-status" class="text-meta text-muted">
+                  <%= if @link && @link.wcvp_synced_at do %>
+                    Last synced with WCVP: {format_synced_at(@link.wcvp_synced_at)}
+                    <span :if={stale?(@link, @wcvp_built_at)} class="font-semibold text-warn">
+                      — WCVP data updated since last sync
+                    </span>
+                  <% else %>
+                    Never synced with WCVP
+                  <% end %>
+                </p>
 
-          <%!-- Synonyms --%>
-          <.card title="Synonyms" icon="ph-list">
-            <ul id="synonyms" class="divide-y divide-gray-100 mb-3">
-              <li :for={synonym <- @synonyms} class="flex items-center justify-between py-1">
-                <span>
-                  <.taxon_name name={synonym.name} />
-                  <span :if={synonym.sensu} class="text-sm text-gray-500">sensu {synonym.sensu}</span>
-                </span>
-                <button
-                  type="button"
-                  phx-click="remove_synonym"
-                  phx-value-id={synonym.id}
-                  data-confirm={"Remove the synonym #{synonym.name}?"}
-                  class="text-sm text-red-600 hover:underline"
-                >
-                  Remove
-                </button>
-              </li>
-              <li :if={@synonyms == []} class="py-1 text-sm text-gray-500">No synonyms.</li>
-            </ul>
-            <.form
-              for={@synonym_form}
-              id="synonym-form"
-              phx-submit="add_synonym"
-              class="flex gap-2 items-end"
-            >
-              <div class="flex-1"><.input field={@synonym_form[:name]} label="Synonym" /></div>
-              <div class="flex-1">
-                <.input field={@synonym_form[:sensu]} label="Sensu (misapplied names only)" />
-              </div>
-              <.button type="submit" variant="secondary">Add</.button>
-            </.form>
-          </.card>
-
-          <%!-- Common names --%>
-          <.card title="Common names" icon="ph-chat-text">
-            <ul id="common-names" class="divide-y divide-gray-100 mb-3">
-              <li :for={common <- @common_names} class="flex items-center justify-between py-1">
-                <span>{common.name}</span>
-                <button
-                  type="button"
-                  phx-click="remove_common_name"
-                  phx-value-id={common.id}
-                  class="text-sm text-red-600 hover:underline"
-                >
-                  Remove
-                </button>
-              </li>
-              <li :if={@common_names == []} class="py-1 text-sm text-gray-500">No common names.</li>
-            </ul>
-            <.form
-              for={@common_name_form}
-              id="common-name-form"
-              phx-submit="add_common_name"
-              class="flex gap-2 items-end"
-            >
-              <div class="flex-1">
-                <.input field={@common_name_form[:name]} label="Common name" />
-              </div>
-              <.button type="submit" variant="secondary">Add</.button>
-            </.form>
-          </.card>
-
-          <%!-- A plant's details --%>
-          <.card :if={@plant?} title="Plant details" icon="ph-leaf">
-            <.form for={@editorial_form} id="editorial-form" phx-submit="save_editorial">
-              <div class="mb-3 max-w-xs">
-                <.input
-                  field={@editorial_form[:abundance_id]}
-                  type="select"
-                  label="Abundance"
-                  prompt=""
-                  options={@abundances}
+                <RangeEditor.editor
+                  range_taxon_name={@range_taxon_name}
+                  range_entries={@range_entries}
+                  all_places={@all_places}
+                  place_by_code={@place_by_code}
+                  in_range={@in_range}
+                  inherited_range={@inherited_range}
+                  introduced_range={@introduced_range}
+                  range_bounds={@range_bounds}
+                  powo_diff={@powo_diff}
+                  wcvp_nomatch_search={@wcvp_nomatch_search}
+                  wcvp_available={@wcvp_available}
+                  wcvp_refreshing={@wcvp_refreshing}
+                  wcvp_searching={@wcvp_searching}
+                  wcvp_loading={@wcvp_loading}
                 />
+
+                <div class="flex justify-end gap-2 border-t border-line pt-block">
+                  <.button variant="ghost" phx-click="request_cancel">Cancel</.button>
+                  <.button
+                    :if={!(@link && @link.range_confirmed)}
+                    id="save-confirm-range"
+                    icon="ph-check-circle"
+                    phx-click="save_range"
+                    phx-value-confirm="true"
+                  >
+                    Save &amp; Confirm Range
+                  </.button>
+                  <.button
+                    id="save-range"
+                    variant="primary"
+                    phx-click="save_range"
+                    disabled={not @form_dirty}
+                  >
+                    Save
+                  </.button>
+                </div>
               </div>
-              <.input
-                type="checkbox"
-                field={@editorial_form[:datacomplete]}
-                label="All galls known to occur on this plant have been added to the database, and can be filtered by Location and Detachable. However, sources and images for galls associated with this host may be incomplete or absent, and other filters may not have been entered comprehensively or at all."
+            </.section>
+
+            <.section :if={@plant?} title="POWO-WCVP link" class="max-w-form">
+              <div class="flex flex-col gap-block">
+                <.fact_list id="wcvp-link" columns={2}>
+                  <:item label="WCVP ID">{(@link && @link.wcvp_id) || "—"}</:item>
+                  <:item label="POWO ID">{(@link && @link.powo_id) || "—"}</:item>
+                  <:item label="Match status">
+                    <.chip :if={@link && @link.wcvp_match_status} variant={:warn}>
+                      {String.replace(@link.wcvp_match_status, "_", " ")}
+                    </.chip>
+                    <span :if={!(@link && @link.wcvp_match_status)}>—</span>
+                  </:item>
+                </.fact_list>
+                <div class="flex flex-wrap gap-2">
+                  <.button type="button" variant="secondary" size="sm" phx-click="wcvp_match">
+                    Match to WCVP
+                  </.button>
+                  <.button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    phx-click="wcvp_sync"
+                    data-confirm="Replace this plant's Host range with WCVP's?"
+                  >
+                    Sync range from WCVP
+                  </.button>
+                  <.button
+                    :if={!(@link && @link.wcvp_match_status == "ignored")}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    phx-click="wcvp_ignore"
+                  >
+                    Ignore for WCVP
+                  </.button>
+                  <.button
+                    :if={@link && @link.wcvp_match_status}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    phx-click="wcvp_clear_status"
+                  >
+                    Clear match status
+                  </.button>
+                </div>
+              </div>
+            </.section>
+
+            <.section id="images" title="Images">
+              <.live_component
+                module={ImagesComponent}
+                id="taxon-images"
+                owner={{:taxon, @taxon.id}}
+                uploader={@actor.name}
+                name={@name}
               />
-              <div class="mt-3">
-                <.button type="submit" variant="secondary">Save details</.button>
-              </div>
-            </.form>
-          </.card>
+            </.section>
+          </div>
 
-          <%!-- Host range --%>
-          <.card :if={@plant?} title="Host range" icon="ph-map-trifold">
-            <div id="range-status" class="mb-4 text-sm">
-              <div class="flex items-center gap-2">
-                <span
-                  :if={@link && @link.range_confirmed}
-                  class="inline-flex items-center gap-1 text-green-700"
-                >
-                  <.icon name="ph-check-circle-fill" class="h-4 w-4" /> Range confirmed
-                </span>
-                <span
-                  :if={!(@link && @link.range_confirmed)}
-                  class="inline-flex items-center gap-1 text-amber-600"
-                >
-                  <.icon name="ph-warning" class="h-4 w-4" /> Range needs review
-                </span>
-              </div>
-              <p class="text-gray-500 mt-1">
-                <%= if @link && @link.wcvp_synced_at do %>
-                  Last synced with WCVP: {format_synced_at(@link.wcvp_synced_at)}
-                  <span :if={stale?(@link, @wcvp_built_at)} class="text-amber-600 font-medium">
-                    — WCVP data updated since last sync
-                  </span>
-                <% else %>
-                  Never synced with WCVP
-                <% end %>
-              </p>
-            </div>
+          <.rail width={:narrow}>
+            <.panel id="about" title="About">
+              <.fact_list layout={:inline}>
+                <:item label="Rank">{rank_label(@taxon.rank)}</:item>
+                <:item :if={@taxon.kingdom} label="Kingdom">{@taxon.kingdom}</:item>
+              </.fact_list>
+            </.panel>
 
-            <RangeEditor.editor
-              range_taxon_name={@range_taxon_name}
-              range_entries={@range_entries}
-              all_places={@all_places}
-              place_by_code={@place_by_code}
-              in_range={@in_range}
-              inherited_range={@inherited_range}
-              introduced_range={@introduced_range}
-              range_bounds={@range_bounds}
-              powo_diff={@powo_diff}
-              wcvp_nomatch_search={@wcvp_nomatch_search}
-              wcvp_available={@wcvp_available}
-              wcvp_refreshing={@wcvp_refreshing}
-              wcvp_searching={@wcvp_searching}
-              wcvp_loading={@wcvp_loading}
-            />
-
-            <div class="flex justify-end gap-2 pt-3 border-t border-gray-200">
-              <button type="button" phx-click="request_cancel" class="gf-btn gf-btn-soft">
-                Cancel
-              </button>
-              <button
-                :if={!(@link && @link.range_confirmed)}
-                id="save-confirm-range"
-                type="button"
-                phx-click="save_range"
-                phx-value-confirm="true"
-                class="gf-btn bg-green-600 text-white hover:bg-green-700"
-              >
-                Save &amp; Confirm Range
-              </button>
-              <button
-                id="save-range"
-                type="button"
-                phx-click="save_range"
-                disabled={not @form_dirty}
-                class="gf-btn gf-btn-primary"
-              >
-                Save
-              </button>
-            </div>
-          </.card>
-
-          <%!-- WCVP link --%>
-          <.card :if={@plant?} title="POWO-WCVP link" icon="ph-link">
-            <dl id="wcvp-link" class="text-sm grid grid-cols-2 gap-x-4 gap-y-1 mb-3 max-w-lg">
-              <dt class="text-gray-500">WCVP ID</dt>
-              <dd>{(@link && @link.wcvp_id) || "—"}</dd>
-              <dt class="text-gray-500">POWO ID</dt>
-              <dd>{(@link && @link.powo_id) || "—"}</dd>
-              <dt class="text-gray-500">Match status</dt>
-              <dd>
-                <.badge :if={@link && @link.wcvp_match_status} variant="warning">
-                  {String.replace(@link.wcvp_match_status, "_", " ")}
-                </.badge>
-                <span :if={!(@link && @link.wcvp_match_status)}>—</span>
-              </dd>
-            </dl>
-            <div class="flex flex-wrap gap-2">
-              <.button type="button" variant="secondary" size="sm" phx-click="wcvp_match">
-                Match to WCVP
-              </.button>
-              <.button
-                type="button"
-                variant="secondary"
-                size="sm"
-                phx-click="wcvp_sync"
-                data-confirm="Replace this plant's Host range with WCVP's?"
-              >
-                Sync range from WCVP
-              </.button>
-              <.button
-                :if={!(@link && @link.wcvp_match_status == "ignored")}
-                type="button"
-                variant="secondary"
-                size="sm"
-                phx-click="wcvp_ignore"
-              >
-                Ignore for WCVP
-              </.button>
-              <.button
-                :if={@link && @link.wcvp_match_status}
-                type="button"
-                variant="secondary"
-                size="sm"
-                phx-click="wcvp_clear_status"
-              >
-                Clear match status
-              </.button>
-            </div>
-          </.card>
-
-          <%!-- Images --%>
-          <.card id="images" title="Images" icon="ph-image">
-            <.live_component
-              module={ImagesComponent}
-              id="taxon-images"
-              owner={{:taxon, @taxon.id}}
-              uploader={@actor.name}
-              name={@name}
-            />
-          </.card>
-
-          <%!-- Delete --%>
-          <.card title="Delete" icon="ph-trash">
-            <%= if @references == [] do %>
-              <p class="text-sm text-gray-600 mb-3">
-                Nothing refers to this taxon, so it can be deleted.
-              </p>
-              <button id="delete-button" type="button" phx-click="delete" class="gf-btn gf-btn-danger">
-                Delete
-              </button>
-            <% else %>
-              <p class="text-sm text-gray-600 mb-2">
-                This taxon can't be deleted while something refers to it:
-              </p>
-              <ul id="taxon-references" class="list-disc pl-5 text-sm text-gray-700">
-                <li :for={reference <- @references}>{reference_text(reference)}</li>
-              </ul>
-            <% end %>
-          </.card>
+            <.panel id="danger" variant={:danger} title="Delete">
+              <%= if @references == [] do %>
+                <p class="mb-3 text-ui text-ink-2">
+                  Nothing refers to this taxon, so it can be deleted. You'll be asked to type its name.
+                </p>
+                <.button id="delete-button" variant="danger" phx-click="delete">Delete…</.button>
+              <% else %>
+                <p class="mb-2 text-ui text-ink-2">
+                  This taxon can't be deleted while something refers to it:
+                </p>
+                <ul id="taxon-references" class="list-disc pl-5 text-ui text-ink-2">
+                  <li :for={reference <- @references}>{reference_text(reference)}</li>
+                </ul>
+              <% end %>
+            </.panel>
+          </.rail>
         </div>
-
-        <.record_metadata inserted_at={@taxon.inserted_at} updated_at={@taxon.updated_at} />
 
         <.discard_confirm_modal show={@show_discard_confirm} />
 
@@ -856,7 +866,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
           ]}
           confirmation_value={@delete_confirmation}
         />
-      </Layouts.admin_edit_layout>
+      </div>
     </Layouts.admin>
     """
   end

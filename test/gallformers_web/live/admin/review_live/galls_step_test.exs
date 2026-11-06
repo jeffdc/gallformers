@@ -152,7 +152,7 @@ defmodule GallformersWeb.Admin.ReviewLive.GallsStepTest do
 
     assert has_element?(
              view,
-             "#{choices} [data-role=gall-meta] a[href='/admin/galls/#{elsewhere.id}']",
+             "#{choices} [data-role=gall-meta] a[href='/gall/#{elsewhere.id}?edit']",
              "Open ↗"
            )
   end

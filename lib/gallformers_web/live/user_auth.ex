@@ -4,6 +4,9 @@ defmodule GallformersWeb.Live.UserAuth do
 
     * `:fetch_current_user` makes the current user available to public
       LiveViews for the layout (header/footer display).
+    * `:fetch_curator` assigns `:curator` on the public LiveViews: an
+      admin's `Gallformers.Audit.Actor` (their tray's, matter ec2c), else
+      nil (`curator/1`).
     * `:require_superadmin` and `:require_operator` guard the role-restricted
       admin live sessions. Plugs only run on HTTP requests, not on live
       navigation or socket connects, so these hooks enforce the same role
@@ -29,6 +32,10 @@ defmodule GallformersWeb.Live.UserAuth do
   def on_mount(:fetch_current_user, _params, session, socket) do
     current_user = session["current_user"]
     {:cont, assign(socket, current_user: current_user)}
+  end
+
+  def on_mount(:fetch_curator, _params, session, socket) do
+    {:cont, assign(socket, curator: curator(session["current_user"]))}
   end
 
   def on_mount(:require_superadmin, _params, session, socket) do
@@ -57,6 +64,21 @@ defmodule GallformersWeb.Live.UserAuth do
            )
            |> redirect(to: "/admin")}
       end
+    end
+  end
+
+  @doc """
+  The curator a session user is on the public pages (matter ec2c): an
+  admin's `Gallformers.Audit.Actor`, the one their tray's calls take; nil
+  for anyone else, or for an admin with no local user.
+  """
+  @spec curator(map() | nil) :: Actor.t() | nil
+  def curator(session_user) do
+    with true <- Accounts.admin?(session_user),
+         %User{} = user <- local_user(session_user) do
+      Actor.user(user.id, name(user))
+    else
+      _ -> nil
     end
   end
 

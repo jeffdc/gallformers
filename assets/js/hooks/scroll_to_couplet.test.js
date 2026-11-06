@@ -29,6 +29,27 @@ describe('ScrollToCouplet', () => {
     target.remove()
   })
 
+  test('scroll_to_couplet clears the sticky header and path tracker, whatever their height', () => {
+    document.body.innerHTML = `
+      <header data-sticky-chrome></header>
+      <div data-sticky-chrome></div>
+      <div id="couplet-7"></div>
+    `
+    const [header, tracker] = document.querySelectorAll('[data-sticky-chrome]')
+    Object.defineProperty(header, 'offsetHeight', { value: 64 })
+    Object.defineProperty(tracker, 'offsetHeight', { value: 44 })
+    const target = document.getElementById('couplet-7')
+    target.getBoundingClientRect = () => ({ top: 500 })
+
+    const hook = mountHook(ScrollToCouplet, '<div></div>')
+    hook.mounted()
+    pushServerEvent(hook, 'scroll_to_couplet', { id: 'couplet-7' })
+
+    // 500 - (64 + 44) - 8px breathing room
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 384, behavior: 'smooth' })
+    document.body.innerHTML = ''
+  })
+
   test('scroll_to_couplet does nothing for missing element', () => {
     const hook = mountHook(ScrollToCouplet, '<div></div>')
     hook.mounted()

@@ -21,7 +21,8 @@ defmodule Gallformers.Keys do
   alias Gallformers.Storage.PDFKeys
 
   @doc """
-  Returns a list of all available keys (metadata only, no couplet data).
+  Returns a list of all available keys (metadata only, no couplet data),
+  each with its `couplet_count`.
   """
   @spec list_keys() :: [Key.t()]
   def list_keys do
@@ -35,7 +36,9 @@ defmodule Gallformers.Keys do
       citation: k.citation,
       citation_url: k.citation_url,
       description: k.description,
-      version: k.version
+      version: k.version,
+      couplet_count:
+        fragment("(SELECT count(*) FROM jsonb_object_keys(?::jsonb))::integer", k.couplets)
     })
     |> order_by([k], asc: k.title)
     |> Repo.all()

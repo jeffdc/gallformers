@@ -1,16 +1,16 @@
-// AdminNav hook - highlights the active nav link based on the current URL path
+// AdminNav hook - marks the admin sidebar link for the current page with
+// aria-current="page"; the design system styles it (.gf-sidenav in
+// assets/css/system/components.css).
 const AdminNav = {
-  mounted() { this.highlight() },
-  updated() { this.highlight() },
-  highlight() {
+  mounted() { this.mark() },
+  updated() { this.mark() },
+  mark() {
     const path = window.location.pathname
     this.el.querySelectorAll("[data-nav-href]").forEach(link => {
       const href = link.dataset.navHref
-      const active = href === "/admin" ? path === "/admin" : path.startsWith(href)
-      link.classList.toggle("opacity-50", !active)
-      link.classList.toggle("underline", active)
-      link.classList.toggle("underline-offset-4", active)
-      link.classList.toggle("decoration-2", active)
+      const current = href === "/admin" ? path === "/admin" : path.startsWith(href)
+      if (current) link.setAttribute("aria-current", "page")
+      else link.removeAttribute("aria-current")
     })
   }
 }

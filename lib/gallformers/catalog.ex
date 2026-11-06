@@ -60,6 +60,7 @@ defmodule Gallformers.Catalog do
       Gall,
       GallName,
       GallRedirect,
+      InducerGroups,
       LegacyCitation,
       LegacyTraitIds,
       PendingTraitTerm,
@@ -92,6 +93,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.GallName
   alias Gallformers.Catalog.GallRenames
   alias Gallformers.Catalog.Identify
+  alias Gallformers.Catalog.InducerGroups
   alias Gallformers.Catalog.LegacyCitation
   alias Gallformers.Catalog.LegacyTraitIds
   alias Gallformers.Catalog.NonGallRedirect
@@ -104,6 +106,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Catalog.ReadModels.GallSummary
   alias Gallformers.Catalog.ReadModels.PotentialRange
+  alias Gallformers.Catalog.ReadModels.Site
   alias Gallformers.Catalog.Records
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
@@ -1179,6 +1182,46 @@ defmodule Gallformers.Catalog do
   @doc "A random Gall with an image, with the image's URL and credits, or nil."
   @spec random_gall() :: Gallformers.Catalog.ReadModels.Site.random_gall() | nil
   defdelegate random_gall(), to: Gallformers.Catalog.ReadModels.Site
+
+  @doc "The Host genera carrying the most Galls, most first, each with a small photo or nil."
+  @spec top_host_genera(pos_integer()) :: [Gallformers.Catalog.ReadModels.Site.ranked()]
+  defdelegate top_host_genera(limit), to: Gallformers.Catalog.ReadModels.Site
+
+  @doc "Distinct Galls on each plant taxon with a page (family … section), with a small photo, by taxon ID."
+  @spec host_gall_counts() :: %{integer() => %{count: pos_integer(), image_url: String.t() | nil}}
+  defdelegate host_gall_counts(), to: Site
+
+  @doc """
+  What curators changed: their audited changes, grouped and described down
+  to each Fact (`Gallformers.Audit.ChangeLog.groups/1`; options `:limit`,
+  `:since`). For the admin dashboard and Changes page.
+  """
+  defdelegate changes(opts \\ []), to: Gallformers.Audit.ChangeLog, as: :groups
+
+  @doc "Distinct Galls known to occur in each place, by place code, and how many have no range data."
+  @spec place_gall_counts() :: %{
+          counts: %{String.t() => pos_integer()},
+          everywhere: non_neg_integer()
+        }
+  defdelegate place_gall_counts(), to: Site
+
+  @doc "What a search result shows of each Gall: a small photo, its Hosts' names, its plant part and season."
+  @spec gall_search_details([integer()]) :: %{integer() => Site.gall_details()}
+  defdelegate gall_search_details(gall_ids), to: Site
+
+  @doc "A small photo URL for each Gall with an image, by Gall ID."
+  @spec gall_photo_urls() :: %{integer() => String.t()}
+  defdelegate gall_photo_urls(), to: Site
+
+  @doc """
+  The current Inducers' families gathered into plain-language groups
+  (`Gallformers.Catalog.InducerGroups`), most Galls first.
+  """
+  @spec inducer_groups() :: [InducerGroups.group()]
+  def inducer_groups do
+    Site.inducer_families()
+    |> InducerGroups.groups()
+  end
 
   @doc "Every Gall's ID, ascending."
   @spec list_gall_ids() :: [integer()]

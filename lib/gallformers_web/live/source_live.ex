@@ -1,13 +1,15 @@
 defmodule GallformersWeb.SourceLive do
   @moduledoc """
-  LiveView for the source/reference detail page.
-
-  Displays a scientific source's metadata, when it came to Gallformers
-  (`Gallformers.Import.source_dates/1`), its images, the Galls it speaks
-  of (`Gallformers.Catalog.list_galls_for_source/1`) and what it says of
-  them: its Facts, grouped by Gall then category
-  (`Gallformers.Import.facts_for_source/1`, read-only; matter `f14c`),
-  read on the connected mount only.
+  The Source page, on the design system (matter bc0d; behavior in
+  docs/design-system/inventory/host-and-source-pages.md): a Source's title,
+  kind, status and retraction (with its notice), its authors, year, DOI,
+  ISBN and license, the original, its citation, the Galls it speaks of
+  (`Gallformers.Catalog.list_galls_for_source/1`, each opening that Gall's
+  entry for it), what it says of them (its Facts, grouped by Gall then
+  category, `Gallformers.Import.facts_for_source/1`, read-only; matter
+  `f14c`, read on the connected mount only), when it came to Gallformers
+  (`Gallformers.Import.source_dates/1`) and its images, when it has any. An
+  unknown or malformed ID is a 404.
   """
   use GallformersWeb, :live_view
 
@@ -16,7 +18,8 @@ defmodule GallformersWeb.SourceLive do
   alias Gallformers.{Accounts, Catalog, Images, Import, Sources}
   alias Gallformers.Images.Image
 
-  @page_size 20
+  # 60 Galls a page fill three columns.
+  @page_size 60
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -25,34 +28,14 @@ defmodule GallformersWeb.SourceLive do
         load_source(socket, source_id)
 
       _ ->
-        {:ok,
-         assign(socket,
-           page_title: "Source Not Found",
-           page_description: "The requested source was not found on Gallformers.",
-           page_url: nil,
-           page_image: nil,
-           page_json_ld: nil,
-           page_noindex: true,
-           source: nil,
-           error: "Invalid source ID"
-         )}
+        raise GallformersWeb.NotFoundError, "No source #{id}"
     end
   end
 
   defp load_source(socket, source_id) do
     case Sources.get_source(source_id) do
       nil ->
-        {:ok,
-         assign(socket,
-           page_title: "Source Not Found",
-           page_description: "The requested source was not found on Gallformers.",
-           page_url: nil,
-           page_image: nil,
-           page_json_ld: nil,
-           page_noindex: true,
-           source: nil,
-           error: "Source not found"
-         )}
+        raise GallformersWeb.NotFoundError, "No source #{source_id}"
 
       source ->
         galls = Catalog.list_galls_for_source(source_id)
@@ -80,8 +63,7 @@ defmodule GallformersWeb.SourceLive do
            images: images,
            current_page: 1,
            page_size: @page_size,
-           facts: nil,
-           error: nil
+           facts: nil
          )
          |> load_facts(source_id)}
     end
@@ -94,6 +76,14 @@ defmodule GallformersWeb.SourceLive do
       do: assign(socket, facts: Import.facts_for_source(source_id)),
       else: socket
   end
+
+  # The Source's kind, and its authors (the new list, else the old field).
+  defp kind_label(kind),
+    do: kind |> to_string() |> String.replace("_", " ") |> String.capitalize()
+
+  defp authors(%{authors: [_ | _] = authors}), do: Enum.join(authors, "; ")
+  defp authors(%{author: author}) when author not in [nil, ""], do: author
+  defp authors(_source), do: nil
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -118,8 +108,9 @@ defmodule GallformersWeb.SourceLive do
         id: img.id,
         url: full_url,
         src: full_url,
+        thumb: "#{base_url}/#{small_path}",
         small_url: "#{base_url}/#{small_path}",
-        alt: "Image from source",
+        alt: nil,
         creator: img.creator,
         attribution: img.attribution,
         license: img.license,
@@ -146,158 +137,126 @@ defmodule GallformersWeb.SourceLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div>
-        <%= if @error do %>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
-        <% else %>
-          <%= if @source do %>
-            <%!-- Header --%>
-            <div class="mb-6">
-              <div class="flex items-start justify-between gap-4 mb-2">
-                <div class="flex items-center gap-2">
-                  <h1 class="text-2xl font-bold text-gf-maroon">{@source.title}</h1>
-                  <.link
-                    :if={Accounts.admin?(@current_user)}
-                    href={~p"/admin/sources/#{@source.id}"}
-                    class="text-gray-400 hover:text-gf-maroon"
-                    title="Edit in admin"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-5 w-5" />
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>{@source.title}</:title>
+          <:chip :if={@source.kind} variant={:rank}>{kind_label(@source.kind)}</:chip>
+          <:chip :if={@source.retracted_on} variant={:danger}>Retracted</:chip>
+          <:chip variant={if @source.datacomplete, do: :ok, else: :warn}>
+            <span title={
+              if @source.datacomplete,
+                do:
+                  "This source has been comprehensively reviewed and all relevant information entered.",
+                else:
+                  "We are still working on this source so information from the source is potentially still missing."
+            }>
+              {if @source.datacomplete, do: "Complete", else: "In progress"}
+            </span>
+          </:chip>
+          <:meta label="Authors">{authors(@source) || "Not specified"}</:meta>
+          <:meta label="Year">{@source.pubyear || "Not specified"}</:meta>
+          <:meta :if={@source.doi} label="DOI">
+            <a href={"https://doi.org/#{@source.doi}"} target="_blank" rel="noopener noreferrer">
+              {@source.doi}
+            </a>
+          </:meta>
+          <:meta :if={@source.isbn} label="ISBN">{@source.isbn}</:meta>
+          <:meta label="License">
+            <.link
+              :if={valid_url?(@source.licenselink)}
+              href={@source.licenselink}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {@source.license || "View"}
+            </.link>
+            <span :if={!valid_url?(@source.licenselink)}>{@source.license || "Not specified"}</span>
+          </:meta>
+          <:action>
+            <.button
+              :if={valid_url?(@source.link)}
+              href={@source.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              icon="ph-arrow-square-out"
+            >
+              Original
+            </.button>
+            <.button
+              :if={Accounts.admin?(@current_user)}
+              href={~p"/admin/sources/#{@source.id}"}
+              variant="ghost"
+              size="sm"
+              icon="ph-pencil-simple"
+            >
+              Edit
+            </.button>
+          </:action>
+        </.page_header>
+
+        <.notice
+          :if={@source.retracted_on}
+          kind={:danger}
+          title={"Retracted on #{@source.retracted_on}"}
+        >
+          Gallformers no longer relies on what this Source says.
+          <.link :if={@source.retracted_by_id} navigate={"/source/#{@source.retracted_by_id}"}>
+            The retraction notice
+          </.link>
+        </.notice>
+
+        <div class={if @images != [], do: "gf-with-rail", else: ""}>
+          <div class="flex min-w-0 flex-col gap-section">
+            <.section :if={@source.citation} title="Citation">
+              <p class="font-serif text-body text-ink">{@source.citation}</p>
+            </.section>
+
+            <.section id="source-galls-section" title="Galls it covers" count={length(@galls)}>
+              <p :if={@galls == []} class="text-ui text-muted">No galls connected to this source.</p>
+              <.name_list
+                :if={@galls != []}
+                id="source-galls"
+                items={paginated_galls(@galls, @current_page, @page_size)}
+                columns={3}
+              >
+                <:item :let={gall}>
+                  <.link navigate={"/gall/#{gall.id}?source=#{@source.id}"}>
+                    <.taxon_name name={gall.name} />
                   </.link>
-                </div>
-                <.data_complete_badge
-                  complete={@source.datacomplete}
-                  complete_tooltip="This source has been comprehensively reviewed and all relevant information entered."
-                  incomplete_tooltip="We are still working on this source so information from the source is potentially still missing."
-                />
-              </div>
+                </:item>
+              </.name_list>
+              <.pagination
+                :if={total_pages(@galls, @page_size) > 1}
+                page={@current_page}
+                total_pages={total_pages(@galls, @page_size)}
+                total_items={length(@galls)}
+                page_size={@page_size}
+                on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+                class="mt-3"
+              />
+            </.section>
 
-              <.source_dates id="source-dates" dates={@dates} class="text-sm text-gray-500 mb-1" />
-
-              <%= if valid_url?(@source.link) do %>
-                <.link
-                  href={@source.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hover:underline break-all"
-                >
-                  {@source.link}
-                </.link>
-              <% end %>
-            </div>
-
-            <%!-- Source Info and Images Grid --%>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-              <%!-- Source Info Column --%>
-              <div class="lg:col-span-2 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span class="font-semibold text-gray-700">Authors:</span>
-                    <span class="text-gray-900">{@source.author || "Not specified"}</span>
-                  </div>
-                  <div>
-                    <span class="font-semibold text-gray-700">License:</span>
-                    <%= if valid_url?(@source.licenselink) do %>
-                      <.link
-                        href={@source.licenselink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="hover:underline"
-                      >
-                        {@source.license || "View"}
-                      </.link>
-                    <% else %>
-                      <span class="text-gray-900">{@source.license || "Not specified"}</span>
-                    <% end %>
-                  </div>
-                  <div>
-                    <span class="font-semibold text-gray-700">Publication Year:</span>
-                    <span class="text-gray-900">{@source.pubyear || "Not specified"}</span>
-                  </div>
-                </div>
-
-                <%!-- Citation --%>
-                <%= if @source.citation do %>
-                  <div>
-                    <span class="font-semibold text-gray-700">Citation (MLA Form):</span>
-                    <p class="text-gray-900 italic mt-1">{@source.citation}</p>
-                  </div>
-                <% end %>
-              </div>
-
-              <%!-- Images Column --%>
-              <div class="lg:col-span-1">
-                <.image_gallery images={@images} id="source-images" />
-              </div>
-            </div>
-
-            <%!-- Connected Galls --%>
-            <div class="mt-8">
-              <h2 class="text-lg font-semibold text-gray-800 mb-3">
-                Connected Galls ({length(@galls)})
-              </h2>
-              <%= if @galls != [] do %>
-                <div class="bg-white rounded border border-gray-200 overflow-hidden">
-                  <table class="gf-table gf-table-compact">
-                    <thead>
-                      <tr>
-                        <th>Gall</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr :for={gall <- paginated_galls(@galls, @current_page, @page_size)}>
-                        <td>
-                          <.link
-                            href={"/gall/#{gall.id}?source=#{@source.id}"}
-                            class="hover:underline"
-                          >
-                            <.taxon_name name={gall.name} />
-                          </.link>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <.pagination
-                  :if={total_pages(@galls, @page_size) > 1}
-                  page={@current_page}
-                  total_pages={total_pages(@galls, @page_size)}
-                  total_items={length(@galls)}
-                  page_size={@page_size}
-                  on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
-                  class="mt-4"
-                />
-              <% else %>
-                <p class="text-gray-500 italic">No galls connected to this source.</p>
-              <% end %>
-            </div>
-
-            <%!-- What the Source says: its Facts (matter f14c) --%>
-            <section id="source-facts" class="mt-8">
-              <h2 class="text-lg font-semibold text-gray-800">What this Source says</h2>
-              <p class="mb-3 text-sm text-gray-500">
-                The Facts Gallformers holds from this Source, by Gall, each with the Source's own
-                words.
+            <.section id="source-facts" title="What this Source says">
+              <:aside>The facts Gallformers holds from it, by gall, in its own words</:aside>
+              <p :if={@facts == nil} class="flex items-center gap-2 text-ui text-muted">
+                <.loading_spinner size="sm" /> Loading…
               </p>
-              <%= cond do %>
-                <% @facts == nil -> %>
-                  <p class="flex items-center gap-2 text-sm text-gray-500">
-                    <.loading_spinner size="sm" /> Loading…
-                  </p>
-                <% @facts == [] -> %>
-                  <p class="text-gray-500 italic">No Facts from this Source yet.</p>
-                <% true -> %>
-                  <.facts_view id="source-facts-galls" galls={@facts} mode={:public} />
-              <% end %>
-            </section>
+              <p :if={@facts == []} class="text-ui text-muted">No facts from this Source yet.</p>
+              <.facts_view
+                :if={@facts not in [nil, []]}
+                id="source-facts-galls"
+                galls={@facts}
+                mode={:public}
+              />
+            </.section>
 
-            <.record_metadata inserted_at={@source.inserted_at} updated_at={@source.updated_at} />
-          <% else %>
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-              Source not found
-            </div>
-          <% end %>
-        <% end %>
+            <.source_dates id="source-dates" dates={@dates} class="text-meta text-muted" />
+          </div>
+
+          <.rail :if={@images != []} width={:wide}>
+            <.photo_viewer id="source-images" photos={@images} name={@source.title} />
+          </.rail>
+        </div>
       </div>
     </Layouts.app>
     """

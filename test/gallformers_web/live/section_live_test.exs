@@ -37,9 +37,10 @@ defmodule GallformersWeb.SectionLiveTest do
   test "renders the section with its common names and breadcrumb", %{conn: conn} do
     section_fixture()
 
-    {:ok, view, html} = live(conn, "/section/Sectionfixtlobatae")
+    {:ok, view, _html} = live(conn, "/section/Sectionfixtlobatae")
 
-    assert html =~ "Section Sectionfixtlobatae (red fixture oaks)"
+    assert has_element?(view, "h1", "Sectionfixtlobatae")
+    assert has_element?(view, "header dd", "red fixture oaks")
     assert page_title(view) =~ "Section Sectionfixtlobatae"
     assert has_element?(view, ~s{a[href="/family/Sectionfixturaceae"]})
     assert has_element?(view, ~s{a[href="/genus/Sectionfixtura"]})
@@ -48,9 +49,9 @@ defmodule GallformersWeb.SectionLiveTest do
   test "lists its plants with common names and gall counts", %{conn: conn} do
     %{rubra: rubra, velutina: velutina} = section_fixture()
 
-    {:ok, view, html} = live(conn, "/section/Sectionfixtlobatae")
+    {:ok, view, _html} = live(conn, "/section/Sectionfixtlobatae")
 
-    assert html =~ "Species (2)"
+    assert has_element?(view, "#section-species-section [data-part=count]", "2")
     assert has_element?(view, ~s{a[href="/host/#{rubra.id}"]})
     assert has_element?(view, ~s{a[href="/host/#{velutina.id}"]})
     assert has_element?(view, "tbody tr", ~r/Sectionfixtura rubra\s+northern fixture oak\s+1/)
@@ -68,10 +69,7 @@ defmodule GallformersWeb.SectionLiveTest do
     refute html =~ "Sectionfixtura velutina"
   end
 
-  test "returns not found for a nonexistent section", %{conn: conn} do
-    {:ok, view, html} = live(conn, "/section/Nonexistent")
-
-    assert html =~ "Section not found"
-    assert page_title(view) =~ "Not Found"
+  test "an unknown section name is a 404", %{conn: conn} do
+    assert_error_sent 404, fn -> get(conn, "/section/Nonexistent") end
   end
 end

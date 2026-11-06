@@ -44,10 +44,10 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
     end
 
     test "page loads successfully for logged-in admin", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/profile")
+      {:ok, view, html} = live(conn, ~p"/admin/profile")
 
-      assert html =~ "Editing"
-      assert html =~ "Display Name"
+      assert has_element?(view, "h1", "Your profile")
+      assert html =~ "Display name"
     end
 
     test "displays current user profile data", %{conn: conn, user: user} do
@@ -142,12 +142,12 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
     end
 
     test "displays Auth0 nickname as read-only", %{conn: conn, auth0_user: auth0_user} do
-      {:ok, _view, html} = live(conn, ~p"/admin/profile")
+      {:ok, view, _html} = live(conn, ~p"/admin/profile")
 
-      # Should show the nickname from Auth0
-      assert html =~ auth0_user.nickname
-      # The nickname field should be disabled
-      assert html =~ "disabled"
+      # Shown in the Account panel, not as a field
+      assert has_element?(view, "#account", auth0_user.nickname)
+      refute has_element?(view, "#profile-form input[value='#{auth0_user.nickname}']")
+      assert has_element?(view, "#account a[target=_blank]", "Reset your password")
     end
   end
 
@@ -272,7 +272,7 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
     test "back link points to dashboard", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/profile")
 
-      assert has_element?(view, "a[href='/admin']")
+      assert has_element?(view, "nav[aria-label=Breadcrumb] a[href='/admin']", "Dashboard")
     end
   end
 end

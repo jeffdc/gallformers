@@ -16,46 +16,45 @@ function getLink(hook, href) {
   return hook.el.querySelector(`[data-nav-href="${href}"]`)
 }
 
+function current(hook) {
+  return [...hook.el.querySelectorAll('[aria-current="page"]')].map(a => a.dataset.navHref)
+}
+
 describe('AdminNav', () => {
-  test('highlights exact match for /admin', () => {
+  test('marks /admin current only on the dashboard itself', () => {
     vi.stubGlobal('location', { pathname: '/admin' })
 
     const hook = mountHook(AdminNav, navHTML())
     hook.mounted()
 
-    expect(getLink(hook, '/admin').classList.contains('underline')).toBe(true)
-    expect(getLink(hook, '/admin/galls').classList.contains('opacity-50')).toBe(true)
+    expect(current(hook)).toEqual(['/admin'])
 
     vi.unstubAllGlobals()
   })
 
-  test('highlights prefix match for sub-paths', () => {
+  test('marks the section a sub-path belongs to', () => {
     vi.stubGlobal('location', { pathname: '/admin/galls/123' })
 
     const hook = mountHook(AdminNav, navHTML())
     hook.mounted()
 
-    expect(getLink(hook, '/admin/galls').classList.contains('underline')).toBe(true)
-    expect(getLink(hook, '/admin').classList.contains('opacity-50')).toBe(true)
-    expect(getLink(hook, '/admin/hosts').classList.contains('opacity-50')).toBe(true)
+    expect(current(hook)).toEqual(['/admin/galls'])
+    expect(getLink(hook, '/admin').hasAttribute('aria-current')).toBe(false)
 
     vi.unstubAllGlobals()
   })
 
-  test('updated re-highlights', () => {
+  test('moves the mark when the page changes', () => {
     vi.stubGlobal('location', { pathname: '/admin/hosts' })
 
     const hook = mountHook(AdminNav, navHTML())
     hook.mounted()
+    expect(current(hook)).toEqual(['/admin/hosts'])
 
-    expect(getLink(hook, '/admin/hosts').classList.contains('underline')).toBe(true)
-
-    // Simulate navigation
     vi.stubGlobal('location', { pathname: '/admin/galls' })
     hook.updated()
 
-    expect(getLink(hook, '/admin/galls').classList.contains('underline')).toBe(true)
-    expect(getLink(hook, '/admin/hosts').classList.contains('opacity-50')).toBe(true)
+    expect(current(hook)).toEqual(['/admin/galls'])
 
     vi.unstubAllGlobals()
   })

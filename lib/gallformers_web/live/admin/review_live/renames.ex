@@ -60,61 +60,56 @@ defmodule GallformersWeb.Admin.ReviewLive.Renames do
     assigns = assign(assigns, open: open)
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        <.link navigate={~p"/admin/review"} class="hover:underline">Sources to review</.link>
-        <span class="text-gray-400">›</span> <span>Gall rename proposals</span>
-      </:page_title_html>
-
-      <div id="renames-head" class="gf-card p-4 mt-2 grid gap-3">
-        <div>
-          <p class="text-sm text-gray-500">
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-block">
+        <.page_header>
+          <:crumb navigate={~p"/admin/review"}>Sources to review</:crumb>
+          <:title>Gall rename proposals</:title>
+          <:description>
             Renaming or moving a taxon changes the names of the Galls named after it. They come
             from no Source, so nothing here holds an approval.
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <span id="progress" class="text-sm">{length(@open)} to decide</span>
+          </:description>
+        </.page_header>
+
+        <div id="renames-head" class="flex flex-wrap items-center gap-2">
+          <span id="progress" class="text-ui">{length(@open)} to decide</span>
           <span class="flex-1"></span>
           <.button
             id="show-decided"
             phx-click="show_decided"
-            shape="pill"
             size="sm"
-            variant={if @show_decided, do: "primary", else: "soft"}
+            variant={if @show_decided, do: "primary", else: "secondary"}
           >
             Show decided
           </.button>
         </div>
-      </div>
 
-      <div id="review-sections">
-        <p :if={@entries == []} class="gf-card mt-4 px-4 py-3 text-gray-500">
-          No Gall rename proposal is waiting.
-        </p>
-        <.review_section
-          :if={@entries != []}
-          id={"section-#{@section.id}"}
-          section={Atom.to_string(@section.id)}
-          title={@section.title}
-          count={count_text(@open)}
-          explanation={@section.explanation}
-          holds={@section.holds}
-          holds_approval={@section.holds_approval}
-          done={@open == []}
-          closed={@closed}
-          on_toggle="toggle_section"
-        >
-          <.live_component
-            :for={entry <- @entries}
-            module={ItemRow}
-            id={"item-row-#{entry.item.id}"}
-            entry={entry}
-            actor={@actor}
-            definitions={@definitions}
-            source_name="The tree"
-          />
-        </.review_section>
+        <div id="review-sections">
+          <.empty_state :if={@entries == []} title="No Gall rename proposal is waiting." />
+          <.review_section
+            :if={@entries != []}
+            id={"section-#{@section.id}"}
+            section={Atom.to_string(@section.id)}
+            title={@section.title}
+            count={count_text(@open)}
+            explanation={@section.explanation}
+            holds={@section.holds}
+            holds_approval={@section.holds_approval}
+            done={@open == []}
+            closed={@closed}
+            on_toggle="toggle_section"
+          >
+            <.live_component
+              :for={entry <- @entries}
+              module={ItemRow}
+              id={"item-row-#{entry.item.id}"}
+              entry={entry}
+              actor={@actor}
+              definitions={@definitions}
+              source_name="The tree"
+            />
+          </.review_section>
+        </div>
       </div>
     </Layouts.admin>
     """

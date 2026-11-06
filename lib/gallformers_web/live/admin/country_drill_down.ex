@@ -160,9 +160,14 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
       >
         <:header_extra>
           <%!-- Country-level toggle --%>
-          <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-            <label class="flex items-center justify-between cursor-pointer">
-              <span class="text-sm font-medium text-gray-700">Country-level range</span>
+          <div class="mb-4 flex flex-col gap-2 rounded-panel bg-surface-2 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <label
+                for={"country-level-#{@country.code}"}
+                class="cursor-pointer text-ui font-semibold text-ink-2"
+              >
+                Country-level range
+              </label>
               <.toggle
                 id={"country-level-#{@country.code}"}
                 name="country_level"
@@ -171,73 +176,68 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
                 phx-click="toggle_country_level"
                 phx-target={@myself}
               />
-            </label>
-            <div :if={@country_level_on} class="mt-2 flex items-center gap-2">
-              <span class="text-xs text-gray-500">Type:</span>
-              <button
-                id={"country-type-native-#{@country.code}"}
-                type="button"
-                phx-click="set_country_type"
-                phx-value-type="native"
-                phx-target={@myself}
-                class={[
-                  "text-xs px-2 py-0.5 rounded-full border",
-                  if(@country_dist_type == "native",
-                    do: "bg-green-100 border-green-400 text-green-800 font-medium",
-                    else: "border-gray-300 text-gray-500 hover:bg-gray-50"
-                  )
-                ]}
-              >
-                Native
-              </button>
-              <button
-                id={"country-type-introduced-#{@country.code}"}
-                type="button"
-                phx-click="set_country_type"
-                phx-value-type="introduced"
-                phx-target={@myself}
-                class={[
-                  "text-xs px-2 py-0.5 rounded-full border",
-                  if(@country_dist_type == "introduced",
-                    do: "bg-amber-100 border-amber-400 text-amber-800 font-medium",
-                    else: "border-gray-300 text-gray-500 hover:bg-gray-50"
-                  )
-                ]}
-              >
-                Introduced
-              </button>
             </div>
-            <p :if={@country_level_on} class="mt-2 text-xs text-gray-500">
+            <div :if={@country_level_on} class="flex items-center gap-2">
+              <span class="text-caption text-muted">Type:</span>
+              <span
+                class="inline-flex overflow-hidden rounded-ctl border border-line-strong"
+                role="group"
+                aria-label="Country-level type"
+              >
+                <button
+                  id={"country-type-native-#{@country.code}"}
+                  type="button"
+                  phx-click="set_country_type"
+                  phx-value-type="native"
+                  phx-target={@myself}
+                  aria-pressed={to_string(@country_dist_type == "native")}
+                  class={choice_class(@country_dist_type == "native")}
+                >
+                  Native
+                </button>
+                <button
+                  id={"country-type-introduced-#{@country.code}"}
+                  type="button"
+                  phx-click="set_country_type"
+                  phx-value-type="introduced"
+                  phx-target={@myself}
+                  aria-pressed={to_string(@country_dist_type == "introduced")}
+                  class={choice_class(@country_dist_type == "introduced")}
+                >
+                  Introduced
+                </button>
+              </span>
+            </div>
+            <p :if={@country_level_on} class="text-caption text-muted">
               All states shown as probable — check individual states to mark as documented.
             </p>
-            <button
+            <.button
               :if={@country_level_on}
-              type="button"
+              size="sm"
               phx-click="apply_country_baseline"
               phx-target={@myself}
-              class="mt-3 text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
+              class="mt-1 self-start"
             >
               Replace subdivisions with {String.capitalize(@country_dist_type)} baseline
-            </button>
+            </.button>
           </div>
 
           <%!-- Exact subdivision editing --%>
-          <div class="mb-3 p-3 bg-gray-50 rounded-lg">
-            <div class="text-xs text-gray-500 mb-2">Click counties as:</div>
-            <div class="flex items-center gap-2">
+          <div class="mb-3 flex flex-col gap-2 rounded-panel bg-surface-2 p-3">
+            <div class="text-caption text-muted">Click counties as:</div>
+            <span
+              class="inline-flex self-start overflow-hidden rounded-ctl border border-line-strong"
+              role="group"
+              aria-label="Click counties as"
+            >
               <button
                 id={"exact-type-native-#{@country.code}"}
                 type="button"
                 phx-click="set_exact_click_type"
                 phx-value-type="native"
                 phx-target={@myself}
-                class={[
-                  "text-xs px-2 py-0.5 rounded-full border",
-                  if(@exact_dist_type == "native",
-                    do: "bg-green-100 border-green-400 text-green-800 font-medium",
-                    else: "border-gray-300 text-gray-500 hover:bg-gray-50"
-                  )
-                ]}
+                aria-pressed={to_string(@exact_dist_type == "native")}
+                class={choice_class(@exact_dist_type == "native")}
               >
                 Native
               </button>
@@ -247,87 +247,61 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
                 phx-click="set_exact_click_type"
                 phx-value-type="introduced"
                 phx-target={@myself}
-                class={[
-                  "text-xs px-2 py-0.5 rounded-full border",
-                  if(@exact_dist_type == "introduced",
-                    do: "bg-amber-100 border-amber-400 text-amber-800 font-medium",
-                    else: "border-gray-300 text-gray-500 hover:bg-gray-50"
-                  )
-                ]}
+                aria-pressed={to_string(@exact_dist_type == "introduced")}
+                class={choice_class(@exact_dist_type == "introduced")}
               >
                 Introduced
               </button>
-            </div>
+            </span>
           </div>
 
           <%!-- Bulk buttons --%>
-          <div class="flex gap-2 mb-3">
-            <button
-              type="button"
-              phx-click="set_all_exact_native"
-              phx-target={@myself}
-              class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-            >
+          <div class="mb-3 flex flex-wrap gap-2">
+            <.button size="sm" phx-click="set_all_exact_native" phx-target={@myself}>
               All native
-            </button>
-            <button
-              type="button"
-              phx-click="set_all_exact_introduced"
-              phx-target={@myself}
-              class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-            >
+            </.button>
+            <.button size="sm" phx-click="set_all_exact_introduced" phx-target={@myself}>
               All introduced
-            </button>
-            <button
-              type="button"
-              phx-click="clear_all_exact"
-              phx-target={@myself}
-              class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-            >
+            </.button>
+            <.button size="sm" phx-click="clear_all_exact" phx-target={@myself}>
               Clear all
-            </button>
+            </.button>
           </div>
         </:header_extra>
 
-        <%!-- Subdivision list --%>
-        <ul class="space-y-1">
+        <%!-- Subdivision list: each row's swatch is the map legend's fill
+             (documented, hatched when introduced, country-level, none). --%>
+        <ul class="flex flex-col gap-1">
           <li :for={subdiv <- @subdivisions} class="flex items-center">
             <button
               type="button"
               phx-click="toggle_subdivision"
               phx-target={@myself}
               phx-value-code={subdiv.code}
+              data-state={subdivision_state(subdiv.code, assigns)}
               class={[
-                "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer text-left",
-                subdiv.code in @introduced_places && "bg-amber-50 hover:bg-amber-100",
-                subdiv.code not in @introduced_places && subdiv.code in @exact_places &&
-                  "bg-green-50 hover:bg-green-100",
-                subdiv.code not in @exact_places && @country_level_on &&
-                  "bg-emerald-50/50 hover:bg-emerald-100/50",
-                subdiv.code not in @exact_places && !@country_level_on && "hover:bg-gray-50"
+                "flex w-full cursor-pointer items-center gap-2 rounded-ctl px-2 py-1.5 text-left text-ui text-ink",
+                row_class(subdivision_state(subdiv.code, assigns))
               ]}
             >
               <span class={[
-                "w-4 h-4 rounded-sm shrink-0 inline-flex items-center justify-center",
-                subdiv.code in @introduced_places && "bg-amber-500",
-                subdiv.code not in @introduced_places && subdiv.code in @exact_places &&
-                  "bg-green-500",
-                subdiv.code not in @exact_places && "border-2 border-gray-300"
+                "inline-flex size-4 shrink-0 items-center justify-center rounded-ctl",
+                swatch_class(subdivision_state(subdiv.code, assigns))
               ]}>
                 <.icon
                   :if={subdiv.code in @exact_places}
                   name="ph-check"
-                  class="size-3 text-white"
+                  class="size-3 text-on-fill"
                 />
               </span>
               <span>{subdiv.name}</span>
               <span
                 :if={subdiv.code in @introduced_places}
-                class="ml-1 text-xs text-amber-700 font-medium"
+                class="ml-1 text-caption font-semibold text-ink-2"
               >
                 (introduced)
               </span>
-              <span class="ml-auto text-xs text-gray-400">{subdiv.code}</span>
+              <span class="ml-auto text-caption text-muted">{subdiv.code}</span>
             </button>
           </li>
         </ul>
@@ -335,4 +309,34 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
     </div>
     """
   end
+
+  # A segment of the Native / Introduced choice.
+  defp choice_class(selected?) do
+    [
+      "px-2 py-0.5 text-caption font-semibold",
+      if(selected?,
+        do: "bg-brand-fill text-on-fill",
+        else: "bg-surface text-ink-2 hover:bg-surface-2"
+      )
+    ]
+  end
+
+  # How a subdivision stands in the range, as the map shows it.
+  defp subdivision_state(code, assigns) do
+    cond do
+      code in assigns.introduced_places -> "introduced"
+      code in assigns.exact_places -> "native"
+      assigns.country_level_on -> "inherited"
+      true -> "none"
+    end
+  end
+
+  defp row_class("none"), do: "hover:bg-sky-soft"
+  defp row_class("inherited"), do: "bg-map-country/15 hover:bg-map-country/30"
+  defp row_class(_in_range), do: "bg-map-documented/15 hover:bg-map-documented/25"
+
+  defp swatch_class("introduced"), do: "bg-map-documented gf-hatch"
+  defp swatch_class("native"), do: "bg-map-documented"
+  defp swatch_class("inherited"), do: "border border-line-strong bg-map-country"
+  defp swatch_class("none"), do: "border border-line-strong bg-map-none"
 end

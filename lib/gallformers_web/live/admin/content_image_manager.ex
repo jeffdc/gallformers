@@ -61,30 +61,30 @@ defmodule GallformersWeb.Admin.ContentImageManager do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} data-content-image-manager class="space-y-4">
+    <div id={@id} data-content-image-manager class="flex flex-col gap-block">
       <%!-- Image Grid --%>
       <div
         :if={@images != []}
         id={"#{@id}-grid"}
         phx-hook="SortableImages"
         phx-target={@myself}
-        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+        class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
       >
         <div
           :for={image <- @images}
           data-image-id={image.id}
           class={[
-            "relative group rounded-lg border overflow-hidden",
+            "group relative overflow-hidden rounded-panel border",
             if(Attribution.image_attributed?(image),
-              do: "border-gray-200",
-              else: "border-amber-400 ring-1 ring-amber-400"
+              do: "border-line",
+              else: "border-autumn ring-1 ring-autumn"
             )
           ]}
         >
           <img
             src={ImageStorage.public_url(image.path)}
             alt={image.caption || "Content image"}
-            class="w-full h-24 object-cover"
+            class="h-24 w-full object-cover"
             loading="lazy"
           />
 
@@ -92,43 +92,45 @@ defmodule GallformersWeb.Admin.ContentImageManager do
           <div
             :if={not Attribution.image_attributed?(image)}
             data-attribution-warning
-            class="absolute top-1 left-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full"
+            class="absolute top-1 left-1 rounded-full bg-autumn px-1.5 text-caption font-semibold text-on-fill"
+            title="Not attributed"
           >
             !
           </div>
 
           <%!-- Hover actions --%>
-          <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <button
-              type="button"
+          <div class="absolute inset-0 flex items-center justify-center gap-2 bg-overlay opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+            <.button
+              size="sm"
+              icon="ph-pencil-simple"
+              icon_only
+              label="Edit metadata"
+              title="Edit metadata"
               phx-click="edit_image"
               phx-value-id={image.id}
               phx-target={@myself}
               data-action="edit"
-              class="p-1.5 bg-white rounded-full text-gray-700 hover:text-gf-maroon"
-              title="Edit metadata"
-            >
-              <.icon name="ph-pencil-simple" class="w-4 h-4" />
-            </button>
-            <button
-              type="button"
+            />
+            <.button
+              variant="danger"
+              size="sm"
+              icon="ph-trash"
+              icon_only
+              label="Delete"
+              title="Delete"
               phx-click="confirm_delete"
               phx-value-id={image.id}
               phx-target={@myself}
               data-action="delete"
-              class="p-1.5 bg-white rounded-full text-gray-700 hover:text-red-600"
-              title="Delete"
-            >
-              <.icon name="ph-trash" class="w-4 h-4" />
-            </button>
+            />
           </div>
         </div>
       </div>
 
       <%!-- Empty State --%>
-      <div :if={@images == []} class="text-center py-6 text-gray-500 text-sm">
+      <p :if={@images == []} class="py-4 text-center text-ui text-muted">
         No images yet. Upload images below.
-      </div>
+      </p>
 
       <%!-- Upload Area --%>
       <div
@@ -140,149 +142,136 @@ defmodule GallformersWeb.Admin.ContentImageManager do
         data-owner-id={@owner_id}
         data-max-files="10"
         data-accepted-types="image/jpeg,image/png,image/jpg"
+        class="flex flex-col items-start gap-3"
       >
         <div
           data-dropzone
-          class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gf-maroon hover:bg-gf-sky-blue/10 transition-colors"
+          class="flex w-full cursor-pointer flex-col items-center gap-1 rounded-panel border-2 border-dashed border-line-strong p-6 text-center transition-colors hover:border-brand hover:bg-sky-soft"
         >
-          <.icon name="ph-upload-simple" class="w-8 h-8 mx-auto text-gray-400 mb-2" />
-          <p class="text-sm text-gray-600">
-            Drop images here or <span class="text-gf-maroon font-medium">click to browse</span>
+          <.icon name="ph-upload-simple" class="size-8 text-muted" />
+          <p class="text-ui text-ink-2">
+            Drop images here or <span class="font-semibold text-link">click to browse</span>
           </p>
-          <p class="text-xs text-gray-400 mt-1">JPG or PNG, up to 10 files</p>
+          <p class="text-meta text-muted">JPG or PNG, up to 10 files</p>
           <input data-file-input type="file" multiple hidden accept="image/jpeg,image/png" />
         </div>
 
-        <div data-preview-container class="flex flex-wrap gap-3 mt-3"></div>
-        <div data-progress-container class="hidden mt-3"></div>
+        <div data-preview-container class="flex flex-wrap gap-3"></div>
+        <div data-progress-container class="hidden w-full"></div>
 
-        <button
-          data-upload-button
-          type="button"
-          disabled
-          class="mt-3 px-4 py-2 bg-gf-maroon text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gf-maroon/90"
-        >
-          Upload Images
-        </button>
+        <.button data-upload-button variant="primary" disabled>Upload Images</.button>
       </div>
 
-      <%!-- Edit Modal --%>
-      <.modal
+      <%!-- Edit dialog --%>
+      <.dialog
         :if={@show_edit_modal && @editing_image}
         id="content-image-edit-modal"
+        title="Edit image metadata"
         show
         on_cancel={JS.push("close_edit", target: @myself)}
       >
-        <:header>Edit Image Metadata</:header>
-        <:body>
-          <div class="flex gap-4">
-            <img
-              src={ImageStorage.public_url(@editing_image.path)}
-              alt="Editing"
-              class="w-32 h-32 object-cover rounded"
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <img
+            src={ImageStorage.public_url(@editing_image.path)}
+            alt="Editing"
+            class="size-32 shrink-0 rounded-panel object-cover"
+          />
+          <form
+            id="content-image-edit-form"
+            phx-submit="save_image"
+            phx-change="form_change"
+            phx-target={@myself}
+            class="flex min-w-0 flex-1 flex-col gap-3"
+          >
+            <.input
+              type="select"
+              name="license"
+              label="License"
+              value={@editing_image.license}
+              options={[{"Select license...", ""} | Licenses.options()]}
             />
-            <form
-              id="content-image-edit-form"
-              phx-submit="save_image"
-              phx-change="form_change"
-              phx-target={@myself}
-              class="flex-1 space-y-3"
-            >
-              <.input
-                type="select"
-                name="license"
-                label="License"
-                value={@editing_image.license}
-                options={[{"Select license...", ""} | Licenses.options()]}
-              />
-              <.input
-                type="text"
-                name="creator"
-                label="Creator / Photographer"
-                value={@editing_image.creator}
-              />
-              <.input
-                type="text"
-                name="licenselink"
-                label="License URL"
-                value={@editing_image.licenselink}
-              />
-              <.input
-                type="text"
-                name="sourcelink"
-                label="Source Link"
-                value={@editing_image.sourcelink}
-              />
-              <.input
-                type="textarea"
-                name="attribution"
-                label="Attribution Notes"
-                value={@editing_image.attribution}
-              />
-              <.input
-                type="textarea"
-                name="caption"
-                label="Caption"
-                value={@editing_image.caption}
-              />
-              <div class="flex justify-end gap-2 pt-2">
-                <.button
-                  type="button"
-                  phx-click="close_edit"
-                  phx-target={@myself}
-                  variant="secondary"
-                >
-                  Cancel
-                </.button>
-                <.button type="submit" variant="primary" disabled={not @form_dirty}>
-                  Save
-                </.button>
-              </div>
-            </form>
-          </div>
-        </:body>
-      </.modal>
+            <.input
+              type="text"
+              name="creator"
+              label="Creator / Photographer"
+              value={@editing_image.creator}
+            />
+            <.input
+              type="text"
+              name="licenselink"
+              label="License URL"
+              value={@editing_image.licenselink}
+            />
+            <.input
+              type="text"
+              name="sourcelink"
+              label="Source Link"
+              value={@editing_image.sourcelink}
+            />
+            <.input
+              type="textarea"
+              name="attribution"
+              label="Attribution Notes"
+              value={@editing_image.attribution}
+            />
+            <.input
+              type="textarea"
+              name="caption"
+              label="Caption"
+              value={@editing_image.caption}
+            />
+          </form>
+        </div>
+        <:actions>
+          <.button type="button" phx-click="close_edit" phx-target={@myself}>
+            Cancel
+          </.button>
+          <.button
+            type="submit"
+            variant="primary"
+            form="content-image-edit-form"
+            disabled={not @form_dirty}
+          >
+            Save
+          </.button>
+        </:actions>
+      </.dialog>
 
-      <%!-- Delete Confirmation Modal --%>
-      <.modal
+      <%!-- Delete confirmation --%>
+      <.dialog
         :if={@show_delete_modal && @deleting_image}
         id="content-image-delete-modal"
+        title="Delete this image?"
+        size={:sm}
         show
         on_cancel={JS.push("close_delete", target: @myself)}
       >
-        <:header>Delete Image</:header>
-        <:body>
-          <div class="space-y-4">
-            <img
-              src={ImageStorage.public_url(@deleting_image.path)}
-              alt="Deleting"
-              class="w-32 h-32 object-cover rounded mx-auto"
-            />
-            <p class="text-sm text-gray-600 text-center">
-              This will permanently delete this image. This cannot be undone.
-            </p>
-            <div class="flex justify-end gap-2">
-              <.button
-                type="button"
-                phx-click="close_delete"
-                phx-target={@myself}
-                variant="secondary"
-              >
-                Cancel
-              </.button>
-              <.button
-                type="button"
-                id="confirm-delete-content-image"
-                phx-click="delete_image"
-                phx-target={@myself}
-                variant="danger"
-              >
-                Delete
-              </.button>
-            </div>
-          </div>
-        </:body>
-      </.modal>
+        <div class="flex flex-col items-center gap-block">
+          <img
+            src={ImageStorage.public_url(@deleting_image.path)}
+            alt="Deleting"
+            class="size-32 rounded-panel object-cover"
+          />
+          <p class="text-center text-ink-2">
+            This will permanently delete this image. This cannot be undone.
+          </p>
+        </div>
+        <:actions>
+          <.button type="button" phx-click="close_delete" phx-target={@myself}>
+            Cancel
+          </.button>
+          <.button
+            type="button"
+            id="confirm-delete-content-image"
+            variant="danger"
+            icon="ph-trash"
+            phx-click="delete_image"
+            phx-target={@myself}
+          >
+            Delete image
+          </.button>
+        </:actions>
+      </.dialog>
     </div>
     """
   end

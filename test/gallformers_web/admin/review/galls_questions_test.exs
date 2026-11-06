@@ -169,7 +169,7 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
 
       assert it.comparison.who == @who
       assert it.comparison.gall == "Callirhytis quercusoperator (sexgen)"
-      assert it.comparison.path == "/admin/galls/501"
+      assert it.comparison.path == "/gall/501?edit"
 
       assert it.comparison.rows == [
                %{

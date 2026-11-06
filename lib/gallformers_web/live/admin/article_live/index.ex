@@ -1,6 +1,8 @@
 defmodule GallformersWeb.Admin.ArticleLive.Index do
   @moduledoc """
-  Admin page for listing and managing reference articles.
+  The articles admin list (design system matter bc0d, the admin list
+  pattern): every article with its status, tags and public page, filtered
+  by title or author, tag and status. Deleting is on the edit page.
   """
   use GallformersWeb, :live_view
 
@@ -22,8 +24,6 @@ defmodule GallformersWeb.Admin.ArticleLive.Index do
       |> assign(:tag_filter, "")
       |> assign(:status_filter, "")
       |> assign(:all_tags, all_tags)
-      |> assign(:delete_article, nil)
-      |> assign(:delete_confirmation, "")
 
     {:ok, socket}
   end
@@ -53,212 +53,103 @@ defmodule GallformersWeb.Admin.ArticleLive.Index do
   end
 
   @impl true
-  def handle_event("delete", %{"id" => id}, socket) do
-    article = Articles.get_article!(String.to_integer(id))
-
-    {:noreply,
-     socket
-     |> assign(:delete_article, article)
-     |> assign(:delete_confirmation, "")}
-  end
-
-  @impl true
-  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :delete_confirmation, value)}
-  end
-
-  @impl true
-  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
-    selected_article = socket.assigns.delete_article
-
-    case selected_article && Articles.get_article(selected_article.id) do
-      nil ->
-        {:noreply,
-         socket
-         |> assign(:delete_article, nil)
-         |> assign(:delete_confirmation, "")
-         |> put_flash(:info, "Article already deleted")
-         |> reload_articles()}
-
-      article when confirmation != article.title ->
-        {:noreply,
-         put_flash(socket, :error, "Title does not match. Type the exact article title.")}
-
-      article ->
-        case Articles.delete_article(article) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> assign(:delete_article, nil)
-             |> assign(:delete_confirmation, "")
-             |> put_flash(:info, "Article deleted.")
-             |> reload_articles()}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to delete article.")}
-        end
-    end
-  end
-
-  @impl true
-  def handle_event("cancel_delete", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:delete_article, nil)
-     |> assign(:delete_confirmation, "")}
-  end
-
-  @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="Articles">
-      <div class="space-y-6">
-        <%!-- Header with filters and new button --%>
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex flex-1 gap-3 max-w-2xl">
-            <form phx-change="search" phx-submit="search" id="article-search-form" class="flex-1">
-              <.search_input
-                id="article-search"
-                name="query"
-                value={@search_query}
-                placeholder="Filter by title or author..."
-                phx-debounce="300"
-              />
-            </form>
-            <form phx-change="filter_tag" id="article-tag-filter" class="w-48">
-              <.input
-                type="select"
-                name="tag"
-                prompt="All Tags"
-                options={Enum.map(@all_tags, &{&1, &1})}
-                value={@tag_filter}
-              />
-            </form>
-            <form phx-change="filter_status" id="article-status-filter" class="w-40">
-              <.input
-                type="select"
-                name="status"
-                prompt="All Status"
-                options={[{"Published", "published"}, {"Draft", "draft"}]}
-                value={@status_filter}
-              />
-            </form>
-          </div>
-          <.link navigate={~p"/admin/articles/new"} class="gf-btn gf-btn-primary">
-            New Article
-          </.link>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Articles</:title>
+          <:meta label="Articles">{length(@articles)}</:meta>
+          <:description>
+            Long-form pages on galls and gall study, listed on the site's Articles page once published.
+          </:description>
+          <:action>
+            <.button navigate={~p"/admin/articles/new"} variant="primary" icon="ph-plus">
+              New article
+            </.button>
+          </:action>
+        </.page_header>
+
+        <div class="flex flex-wrap items-end gap-3">
+          <form
+            id="article-search-form"
+            phx-change="search"
+            phx-submit="search"
+            class="w-80 max-w-full"
+          >
+            <.search_field
+              id="article-search"
+              name="query"
+              value={@search_query}
+              label="Filter the articles"
+              placeholder="Title or author"
+            />
+          </form>
+          <.filter_select
+            id="article-tag-filter"
+            name="tag"
+            label="Tag"
+            prompt="Every tag"
+            value={@tag_filter}
+            options={Enum.map(@all_tags, &{&1, &1})}
+            class="w-48"
+            phx-change="filter_tag"
+          />
+          <.filter_select
+            id="article-status-filter"
+            name="status"
+            label="Status"
+            prompt="Any status"
+            value={@status_filter}
+            options={[{"Published", "published"}, {"Draft", "draft"}]}
+            class="w-40"
+            phx-change="filter_status"
+          />
+          <span class="pb-2 text-meta text-muted">
+            {length(@filtered_articles)} of {length(@articles)}
+          </span>
         </div>
 
-        <%!-- Articles Table --%>
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <%= if @filtered_articles == [] do %>
-            <div class="p-8 text-center text-gray-500">
-              <.icon name="ph-article" class="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <%= if @articles == [] do %>
-                <p>No articles yet. Create your first article to get started.</p>
-              <% else %>
-                <p>No articles match your filters. Try a different search term or tag.</p>
-              <% end %>
-            </div>
-          <% else %>
-            <table class="gf-table gf-table-dark gf-table-compact">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Author</th>
-                  <th>Status</th>
-                  <th>Tags</th>
-                  <th>Updated</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr :for={article <- @filtered_articles}>
-                  <td>
-                    <.link
-                      navigate={~p"/admin/articles/#{article.id}"}
-                      class="font-medium hover:underline"
-                    >
-                      {article.title}
-                    </.link>
-                  </td>
-                  <td class="text-gray-600">{article.author}</td>
-                  <td>
-                    <%= if article.is_published do %>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                        Published
-                      </span>
-                    <% else %>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                        Draft
-                      </span>
-                    <% end %>
-                  </td>
-                  <td class="text-gray-600 text-sm">
-                    <%= if article.tags != [] do %>
-                      {Enum.join(article.tags, ", ")}
-                    <% else %>
-                      <span class="text-gray-400">-</span>
-                    <% end %>
-                  </td>
-                  <td class="text-gray-600 text-sm">{format_date(article.updated_at, :short)}</td>
-                  <td class="text-right">
-                    <.table_actions>
-                      <.action_button
-                        icon="ph-pencil-simple"
-                        label="Edit"
-                        variant="primary"
-                        navigate={~p"/admin/articles/#{article.id}"}
-                      />
-                      <.action_button
-                        icon="ph-arrow-square-out"
-                        label={if article.is_published, do: "View", else: "Preview"}
-                        href={~p"/articles/#{article.slug}"}
-                        target="_blank"
-                      />
-                      <.action_button
-                        icon="ph-trash"
-                        label="Delete"
-                        variant="danger"
-                        phx-click="delete"
-                        phx-value-id={article.id}
-                      />
-                    </.table_actions>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          <% end %>
-        </div>
-
-        <p class="text-sm text-gray-500">
-          Showing {length(@filtered_articles)} of {length(@articles)} article{if length(@articles) !=
-                                                                                   1,
-                                                                                 do: "s",
-                                                                                 else: ""}
-        </p>
+        <.data_table
+          id="articles"
+          rows={@filtered_articles}
+          row_id={&"articles-#{&1.id}"}
+          compact
+        >
+          <:col :let={article} label="Title" grow>
+            <.link navigate={~p"/admin/articles/#{article.id}"} class="font-semibold">
+              {article.title}
+            </.link>
+          </:col>
+          <:col :let={article} label="Author" hide_below={:md}>
+            <span class="text-ink-2">{article.author}</span>
+          </:col>
+          <:col :let={article} label="Status">
+            <span data-status>
+              <.chip :if={article.is_published} variant={:ok} size="sm">Published</.chip>
+              <.chip :if={!article.is_published} variant={:warn} size="sm">Draft</.chip>
+            </span>
+          </:col>
+          <:col :let={article} label="Tags" hide_below={:lg}>
+            <span class="text-meta text-muted">{Enum.join(article.tags, ", ")}</span>
+          </:col>
+          <:col :let={article} label="Updated" hide_below={:md}>
+            <span class="text-meta text-muted">{format_date(article.updated_at, :short)}</span>
+          </:col>
+          <:col :let={article} label="On the site">
+            <.link href={~p"/articles/#{article.slug}"} target="_blank">
+              {if article.is_published, do: "View", else: "Preview"} ↗
+            </.link>
+          </:col>
+          <:empty>
+            {if @articles == [],
+              do: "No articles yet. Start one with New article.",
+              else: "No articles match these filters."}
+          </:empty>
+        </.data_table>
       </div>
-
-      <.dangerous_delete_modal
-        :if={@delete_article}
-        show
-        item_type="article"
-        item_name={@delete_article.title}
-        consequences={[
-          "The article content, publication state, and tags will be permanently deleted.",
-          "All images owned by this article will be deleted from storage."
-        ]}
-        confirmation_value={@delete_confirmation}
-      />
     </Layouts.admin>
     """
-  end
-
-  defp reload_articles(socket) do
-    socket
-    |> assign(:articles, Articles.list_articles())
-    |> assign(:all_tags, Articles.list_all_tags())
-    |> apply_filters()
   end
 
   defp apply_filters(socket) do

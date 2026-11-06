@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-02
-updated: 2026-10-27
+updated: 2026-11-05
 epic: taxonomy
-relates: [8567, 803b, a856]
+relates: [8567, 803b, a856, 9119]
 ---
 
 # Taxonomy migration
@@ -285,3 +285,9 @@ Read-only queries against a production copy restored into local `gallformers_dev
 | Images | 7,663 on galls (5,365 from iNat); 17 on plants |
 | Non-gall records | 120 |
 | Keys | 4 |
+
+
+### Gall synonyms in the new model (found 2026-11-05, design-system work)
+
+Production's Gall page synonymy lists the Gall's own aliases (old `alias`/`alias_species`, 2,196 scientific on Galls; 283 common). The new Gall page reads the Inducer's synonyms (`taxon_names` not accepted) plus the Gall's current former labels and codes (`alias_facts`). Comparing names exactly, **224 of the 2,196 old scientific aliases appear nowhere in the new model** (209 on described Galls, 15 on undescribed). Some are formatting: a generation qualifier dropped or added ("Callirhytis furva (agamic)", "Andricus lustrans" without "(agamic)"). Some look genuinely lost: misapplied names with authority ("Callaspidia confluens Fitch, non Harris" on 582), and common names filed as scientific ("Blue Gum Chalcid Wasp" on 607). Jeff (2026-11-05): the Gall page's "Also known as" must include **all** the synonyms, old common names included. Needs a migration check: map each old alias to a synonym, a former label or a common name.
+

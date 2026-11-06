@@ -1,24 +1,27 @@
 defmodule GallformersWeb.GallsBrowseLive do
   @moduledoc """
-  Browse all Galls organized by their Inducer's Family > Genus > Gall
-  (`Gallformers.Catalog.gall_tree/0`).
+  Browse all Galls by what causes them: the Inducer families
+  (`Gallformers.Catalog.gall_tree/0`) as `family_card`s in their
+  plain-language groups (`Gallformers.Catalog.InducerGroups`).
 
-  Includes a toggle to switch to the undescribed Galls
-  (`Gallformers.Catalog.undescribed_gall_tree/0`). Uses a tree UI with
-  search filtering and smart expand.
+  The cards are the browse tree: a card opens to its genera and a genus to
+  its Galls (`toggle_node`, `expand_all`, `collapse_all`), and the name
+  filter keeps what matches with smart expand (`GallformersWeb.BrowseHelpers`).
+  "Undescribed galls only" switches to `Gallformers.Catalog.undescribed_gall_tree/0`.
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.Catalog
+  alias Gallformers.Catalog.InducerGroups
   alias GallformersWeb.BrowseHelpers
-  alias GallformersWeb.TreeComponents
 
   @impl true
   def mount(_params, _session, socket) do
     galls_tree = Catalog.gall_tree()
 
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
        page_title: "Galls",
        page_description: "Browse gall-forming species organized by family and genus.",
        page_url: "/galls",
@@ -28,9 +31,10 @@ defmodule GallformersWeb.GallsBrowseLive do
        search_query: "",
        galls_tree: galls_tree,
        undescribed_tree: nil,
-       filtered: galls_tree,
+       photos: Catalog.gall_photo_urls(),
        expanded: MapSet.new()
-     )}
+     )
+     |> show_tree(galls_tree)}
   end
 
   @impl true
@@ -52,11 +56,13 @@ defmodule GallformersWeb.GallsBrowseLive do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    tree = active_tree(socket.assigns)
-    filtered = BrowseHelpers.filter_tree(tree, query)
+    filtered = BrowseHelpers.filter_tree(active_tree(socket.assigns), query)
     expanded = BrowseHelpers.smart_expand(filtered, query, socket.assigns.expanded)
 
-    {:noreply, assign(socket, search_query: query, filtered: filtered, expanded: expanded)}
+    {:noreply,
+     socket
+     |> assign(search_query: query, expanded: expanded)
+     |> show_tree(filtered)}
   end
 
   @impl true
@@ -81,53 +87,117 @@ defmodule GallformersWeb.GallsBrowseLive do
         else: MapSet.new()
 
     {:noreply,
-     assign(socket,
-       showing_undescribed: new_showing,
-       filtered: filtered,
-       expanded: expanded
-     )}
+     socket
+     |> assign(showing_undescribed: new_showing, expanded: expanded)
+     |> show_tree(filtered)}
   end
 
   defp active_tree(assigns) do
     if assigns.showing_undescribed, do: assigns.undescribed_tree, else: assigns.galls_tree
   end
 
+  # The filtered tree, and its cards in their groups.
+  defp show_tree(socket, filtered) do
+    groups =
+      filtered
+      |> BrowseHelpers.family_cards({:leaves, socket.assigns.photos})
+      |> InducerGroups.groups()
+
+    total = active_tree(socket.assigns) |> Enum.flat_map(&leaf_keys/1) |> length()
+    assign(socket, filtered: filtered, groups: groups, total: total)
+  end
+
+  defp leaf_keys(%{nodes: [_ | _] = nodes}), do: Enum.flat_map(nodes, &leaf_keys/1)
+  defp leaf_keys(%{key: key}), do: [key]
+
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div id="galls-browse-container">
-        <div class="flex items-center justify-between mb-6">
-          <p class="text-lg text-gray-600">
-            Browse gall-forming species by family and genus.
-          </p>
-          <button
-            phx-click="toggle_undescribed"
-            class={[
-              "px-3 py-1.5 rounded-md text-sm font-medium border transition-colors",
-              if(@showing_undescribed,
-                do: "bg-gf-maroon text-white border-gf-maroon",
-                else: "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              )
-            ]}
-            data-active-view={if @showing_undescribed, do: "undescribed", else: "described"}
+      <div id="galls-browse-container" class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Browse galls</:title>
+          <:description>
+            {format_number(@total)} {if @showing_undescribed,
+              do: "undescribed galls",
+              else: "galls"}, by what causes them.
+          </:description>
+        </.page_header>
+
+        <.tab_nav label="Browse by" class="-mt-4">
+          <:tab
+            :for={{label, path} <- BrowseHelpers.browse_tabs()}
+            navigate={path}
+            current={path == "/galls"}
           >
-            Undescribed
-          </button>
+            {label}
+          </:tab>
+        </.tab_nav>
+
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <form
+              id="galls-browse-search-form"
+              phx-change="search"
+              phx-submit="search"
+              class="w-full sm:w-80"
+            >
+              <.search_field
+                id="galls-browse-search"
+                name="query"
+                value={@search_query}
+                label="Filter by name"
+                placeholder="Filter by name…"
+              />
+            </form>
+            <label
+              class="flex items-center gap-2 text-ui text-ink-2"
+              data-active-view={if @showing_undescribed, do: "undescribed", else: "described"}
+            >
+              <input
+                type="checkbox"
+                class="gf-checkbox"
+                checked={@showing_undescribed}
+                phx-click="toggle_undescribed"
+              /> Undescribed galls only
+            </label>
+            <div class="flex gap-2 sm:ml-auto">
+              <.button variant="ghost" size="sm" phx-click="expand_all">Show all galls</.button>
+              <.button variant="ghost" size="sm" phx-click="collapse_all">Collapse all</.button>
+            </div>
+          </div>
+
+          <nav
+            :if={@groups != []}
+            aria-label="Groups"
+            class="flex flex-wrap gap-x-4 gap-y-1 text-meta"
+          >
+            <a :for={group <- @groups} href={"#group-#{group.slug}"}>
+              {group.name}
+              <span class="tabular-nums text-muted">{format_number(group.count)}</span>
+            </a>
+          </nav>
         </div>
 
-        <TreeComponents.tree_browser
-          id="galls-browse"
-          nodes={@filtered}
-          expanded={@expanded}
-          search_query={@search_query}
-          show_search={true}
-          show_controls={true}
-          on_toggle="toggle_node"
-          on_expand_all="expand_all"
-          on_collapse_all="collapse_all"
-          on_search="search"
-        />
+        <p :if={@groups == []} class="text-ui text-muted">
+          {if @search_query != "", do: "No matching items found.", else: "No items found."}
+        </p>
+
+        <.section
+          :for={group <- @groups}
+          id={"group-#{group.slug}"}
+          title={group.name}
+          count={format_number(group.count)}
+        >
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <.family_card
+              :for={card <- group.families}
+              card={card}
+              expanded={@expanded}
+              on_toggle="toggle_node"
+            />
+          </div>
+        </.section>
       </div>
     </Layouts.app>
     """

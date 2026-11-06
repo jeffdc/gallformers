@@ -1,8 +1,8 @@
 defmodule Gallformers.Taxa.TreeBuilder do
   @moduledoc """
   Builds the Family → Genus → leaf tree of the browse pages (`/galls`,
-  `/hosts`) from flat rows, in the node shape `GallformersWeb.TreeComponents`
-  renders. Pure: the rows come from `Gallformers.Taxa.plant_tree/0` and
+  `/hosts`) from flat rows, in the node shape `GallformersWeb.BrowseHelpers`
+  reads. Pure: the rows come from `Gallformers.Taxa.plant_tree/0` and
   `Gallformers.Catalog.gall_tree/0`.
 
   Each row has `family_id`, `family_name`, `family_description`, `genus_id`,

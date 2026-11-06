@@ -251,15 +251,14 @@ defmodule GallformersWeb.Admin.ReviewLive.Step do
       )
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>
-        <.link navigate={~p"/admin/review"} class="hover:underline">Sources to review</.link>
-        <span class="text-gray-400">›</span>
-        <.link navigate={@base} class="hover:underline">{@name}</.link>
-        <span class="text-gray-400">›</span> <span>{@step.title}</span>
-      </:page_title_html>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <.page_header>
+        <:crumb navigate={~p"/admin/review"}>Sources to review</:crumb>
+        <:crumb navigate={@base}>{@name}</:crumb>
+        <:title>{@step.title}</:title>
+      </.page_header>
       <%!-- Room for the Source's text beside the questions, when open (Task 22). --%>
-      <div id="step-page" data-reading={@reader != nil} class={[@reader && "lg:mr-[min(38rem,46vw)]"]}>
+      <div id="step-page" data-reading={@reader != nil} class={[@reader && "lg:mr-reader"]}>
         <.review_source_head
           name={@name}
           title={@summary.title}
@@ -300,7 +299,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Step do
                 phx-click="leave_rest"
                 phx-value-section={s.section.id}
                 size="sm"
-                variant="soft"
+                variant="secondary"
               >
                 Leave the rest out ({s.proposable})
               </.button>
@@ -311,32 +310,29 @@ defmodule GallformersWeb.Admin.ReviewLive.Step do
                 phx-click="confirm_bulk"
                 phx-value-section={s.section.id}
                 size="sm"
-                variant="soft"
+                variant="secondary"
               >
                 Accept firm matches ({s.proposable})
               </.button>
             </:actions>
             <:confirm :if={@confirm_bulk == Atom.to_string(s.section.id)}>
-              <div
-                id={"bulk-confirm-#{s.section.id}"}
-                class="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-yellow-50 text-yellow-900 text-sm border-b border-gray-200"
-              >
-                <span class="flex-1 min-w-[16rem]">
-                  Accept {s.proposable} firm {if s.proposable == 1, do: "match", else: "matches"}: {firm_list(
-                    s
-                  )}.{bulk_rest(length(s.open) - s.proposable)}
-                </span>
-                <.button
-                  id={"bulk-accept-#{s.section.id}"}
-                  phx-click="accept_bulk"
-                  phx-value-section={s.section.id}
-                  size="sm"
-                  variant="primary"
-                >
-                  Accept {s.proposable}
-                </.button>
-                <.button phx-click="cancel_bulk" size="sm" variant="secondary">Cancel</.button>
-              </div>
+              <.notice id={"bulk-confirm-#{s.section.id}"} kind={:warn}>
+                Accept {s.proposable} firm {if s.proposable == 1, do: "match", else: "matches"}: {firm_list(
+                  s
+                )}.{bulk_rest(length(s.open) - s.proposable)}
+                <:action>
+                  <.button
+                    id={"bulk-accept-#{s.section.id}"}
+                    phx-click="accept_bulk"
+                    phx-value-section={s.section.id}
+                    size="sm"
+                    variant="primary"
+                  >
+                    Accept {s.proposable}
+                  </.button>
+                  <.button phx-click="cancel_bulk" size="sm" variant="secondary">Cancel</.button>
+                </:action>
+              </.notice>
             </:confirm>
             <.live_component
               :for={entry <- s.rows}
@@ -351,12 +347,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Step do
           </.review_section>
         </div>
 
-        <p :if={@moved != []} id="trait-disputes-moved" class="mt-3 text-sm text-gray-600">
-          {moved_text(@moved)} on the <.link
-            navigate={"#{@base}/traits"}
-            class="text-gf-maroon hover:underline"
-          >
-            Traits step</.link>, with the other terms.
+        <p :if={@moved != []} id="trait-disputes-moved" class="mt-3 text-meta text-ink-2">
+          {moved_text(@moved)} on the <.link navigate={"#{@base}/traits"}>Traits step</.link>, with the other terms.
         </p>
 
         <.review_step_foot prev={@prev} next={@next} />

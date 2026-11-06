@@ -905,28 +905,25 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
         <:written>
           <span
             :if={@q.trait}
-            class="mr-1 text-[0.7rem] font-normal uppercase tracking-wider text-gray-500"
+            class="mr-1 text-caption font-normal uppercase tracking-wider text-muted"
           >
             {humanize(@q.trait)}
           </span>
           {@q.written}
-          <span :if={@q.tag} class="ml-1 align-[1px]">
+          <span :if={@q.tag} class="ml-1 align-middle">
             <.review_tag>{@q.tag}</.review_tag>
           </span>
-          <span
-            :if={@q.covers > 1}
-            class="ml-1 align-[1px] rounded-full bg-blue-50 text-blue-800 px-1.5 text-xs font-semibold"
-          >
+          <.chip :if={@q.covers > 1} variant={:info} size="sm" class="ml-1 align-middle">
             {@q.covers} Galls
-          </span>
-          <span :if={@q.context} class="block text-sm font-normal text-gray-500 line-clamp-2">
+          </.chip>
+          <span :if={@q.context} class="block text-meta font-normal text-muted line-clamp-2">
             {@q.context}
           </span>
         </:written>
         <:answer>
           <.answer entry={@entry} decided={@decided} />
         </:answer>
-        <p :if={@error} id={"item-#{@item.id}-error"} class="px-4 pb-2 text-sm text-red-700">
+        <p :if={@error} id={"item-#{@item.id}-error"} class="px-4 pb-2 text-meta text-danger">
           {@error}
         </p>
         <.review_note_list
@@ -952,16 +949,14 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
                 />
               </:action>
             </.review_ask>
-            <p :if={@q.warning} class="rounded-md bg-red-50 text-red-800 px-3 py-2 text-sm">
-              {@q.warning}
-            </p>
+            <.notice :if={@q.warning} kind={:danger}>{@q.warning}</.notice>
             <div :if={@evidence.quotes != []} id={"item-#{@item.id}-quotes"} class="grid gap-2">
               <.review_quote :for={quote <- @evidence.quotes} text={quote.text} where={quote.where}>
                 <:passage :if={@document}>
                   <.review_passage blocks={Document.passage(@document, quote)} />
                 </:passage>
               </.review_quote>
-              <p :if={@evidence.more > 0} class="text-sm text-gray-500">
+              <p :if={@evidence.more > 0} class="text-meta text-muted">
                 Used for {@evidence.more} more {if @evidence.more == 1, do: "Gall", else: "Galls"}; {@evidence.see}
               </p>
             </div>
@@ -1018,7 +1013,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
                   />
                 </:extra>
                 <:follow :if={choice.note && is_nil(choice.picker)}>
-                  <p class="text-sm text-gray-600" data-role="note">{choice.note}</p>
+                  <p class="text-meta text-ink-2" data-role="note">{choice.note}</p>
                 </:follow>
                 <:follow :if={choice.picker == :galls}>
                   <.term_galls
@@ -1058,13 +1053,13 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
                 </:follow>
               </.review_option>
             </div>
-            <p :if={@q.more} id={"item-#{@item.id}-more"} class="text-sm text-gray-500">
+            <p :if={@q.more} id={"item-#{@item.id}-more"} class="text-meta text-muted">
               {@q.more}
             </p>
 
             <p
               :if={@accept != nil and @q.section.id != :trait_terms}
-              class="flex flex-wrap items-center gap-2 text-sm text-gray-500"
+              class="flex flex-wrap items-center gap-2 text-meta text-muted"
             >
               Not right?
               <.button
@@ -1078,7 +1073,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
               </.button>
               It stays open, out of “{bulk_action(@q.section.id)}”.
             </p>
-            <p :if={@entry.rejected} class="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <p :if={@entry.rejected} class="flex flex-wrap items-center gap-2 text-meta text-muted">
               You rejected the recommendation.
               <.button
                 id={"item-#{@item.id}-restore"}
@@ -1246,7 +1241,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
         <:passage :let={quote} :if={@document}>
           <.review_passage blocks={Document.passage(@document, quote)} />
         </:passage>
-        <label for={"#{@id}-#{m.item.id}-tick"} class="inline-flex items-center gap-2 text-sm">
+        <label for={"#{@id}-#{m.item.id}-tick"} class="inline-flex items-center gap-2 text-meta">
           <input
             type="checkbox"
             id={"#{@id}-#{m.item.id}-tick"}
@@ -1270,7 +1265,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
     <span class="font-semibold">
       <.icon name="ph-check" class="size-4 inline" /> {@entry.decided}
     </span>
-    <span class="block text-xs text-gray-500">
+    <span class="block text-caption text-muted">
       Decided<span :if={@entry.item.decided_by_name}> by {@entry.item.decided_by_name}</span>
     </span>
     """
@@ -1279,8 +1274,8 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
   defp answer(%{entry: %{rejected: true, question: %{proposal: proposal}}} = assigns)
        when is_map(proposal) do
     ~H"""
-    <span class="line-through text-gray-500">{@entry.question.proposal.label}</span>
-    <span class="block text-sm text-red-700">
+    <span class="line-through text-muted">{@entry.question.proposal.label}</span>
+    <span class="block text-meta text-danger">
       Recommendation rejected: choose another answer
     </span>
     """
@@ -1291,14 +1286,14 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
        when is_binary(check) do
     ~H"""
     <span class="font-medium">{@entry.question.proposal.label}?</span>
-    <span class="block text-sm text-gray-500">{@entry.question.proposal.check}</span>
+    <span class="block text-meta text-muted">{@entry.question.proposal.check}</span>
     """
   end
 
   defp answer(%{entry: %{question: %{proposal: proposal}}} = assigns) when is_map(proposal) do
     ~H"""
     <span class="font-medium">{@entry.question.proposal.label}</span>
-    <span class="block text-sm text-gray-500">
+    <span class="block text-meta text-muted">
       <%= if @entry.question.proposal.firm do %>
         Recommended.<span :if={@entry.question.proposal.why}> {@entry.question.proposal.why}</span>
       <% else %>
@@ -1310,12 +1305,12 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
 
   defp answer(assigns) do
     ~H"""
-    <span class="italic text-gray-500">
+    <span class="italic text-muted">
       {(@entry.question.undecided && @entry.question.undecided.label) || "No recommendation"}
     </span>
     <span
       :if={@entry.question.undecided && @entry.question.undecided.why}
-      class="block text-sm text-gray-500"
+      class="block text-meta text-muted"
     >
       {@entry.question.undecided.why}
     </span>
@@ -1346,7 +1341,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
         on_pick="pick_tree"
         target={@target}
       />
-      <p :if={@pick.kind == "own"} class="text-sm text-gray-600">{@choice.note}</p>
+      <p :if={@pick.kind == "own"} class="text-meta text-ink-2">{@choice.note}</p>
       <.name_search
         :if={@pick.kind == "move"}
         id={@id}
@@ -1435,7 +1430,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
         pick={@pick}
         target={@target}
       />
-      <p :if={is_nil(@pick.selected)} class="text-sm text-gray-600" data-role="note">
+      <p :if={is_nil(@pick.selected)} class="text-meta text-ink-2" data-role="note">
         {@choice.note}
       </p>
     </div>
@@ -1456,15 +1451,12 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
     ~H"""
     <div id={@id} class="grid gap-2">
       <.form for={%{}} id={"#{@id}-filter"} phx-change="filter_values" phx-target={@target}>
-        <label for={"#{@id}-filter-q"} class="sr-only">Search {humanize(@trait)} values</label>
-        <input
-          type="search"
+        <.search_field
           id={"#{@id}-filter-q"}
           name="q"
           value={@pick.query}
-          placeholder={"Search #{humanize(@trait)} values"}
-          class="gf-input"
-          phx-debounce="150"
+          label={"Search #{humanize(@trait)} values"}
+          debounce="150"
         />
       </.form>
       <.review_value_list
@@ -1593,7 +1585,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
     >
       <:result :let={result}>
         <span class="italic">{result.name}</span>
-        <span :if={result.meta} class="text-xs text-gray-500 ml-1">{result.meta}</span>
+        <span :if={result.meta} class="text-caption text-muted ml-1">{result.meta}</span>
       </:result>
     </.typeahead>
     """

@@ -49,15 +49,15 @@ defmodule GallformersWeb.E2E.BrowseTest do
 
       conn
       |> visit("/gall/#{gall.id}")
-      # Page uses h2 for the Gall's name, wrapped in em tags
-      |> assert_has("h2 em", text: base_name(gall.name))
+      # The Gall's name is the page's h1
+      |> assert_has("h1", text: base_name(gall.name))
     end
 
     test "shows 404 for invalid gall ID", %{conn: conn} do
       conn
       |> visit("/gall/999999999")
-      # Should show not found message
-      |> assert_has("body", text: "not found")
+      # The 404 page
+      |> assert_has("body", text: "This Page Was Not Found")
     end
   end
 
@@ -68,14 +68,14 @@ defmodule GallformersWeb.E2E.BrowseTest do
 
       conn
       |> visit("/host/#{id}")
-      |> assert_has("h2", text: host.name)
+      |> assert_has("h1", text: host.name)
     end
 
     test "shows 404 for invalid host ID", %{conn: conn} do
       conn
       |> visit("/host/999999999")
-      # Should show not found message
-      |> assert_has("body", text: "not found")
+      # The 404 page
+      |> assert_has("body", text: "This Page Was Not Found")
     end
   end
 
@@ -89,7 +89,7 @@ defmodule GallformersWeb.E2E.BrowseTest do
       |> visit("/gall/#{gall.id}")
       # Find and click link to host
       |> click_link(host.name)
-      |> assert_has("h2", text: host.name)
+      |> assert_has("h1", text: host.name)
     end
   end
 end

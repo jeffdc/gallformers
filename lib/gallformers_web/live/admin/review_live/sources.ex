@@ -89,11 +89,14 @@ defmodule GallformersWeb.Admin.ReviewLive.Sources do
     assigns = assign(assigns, :rows, shown(assigns.sources, assigns.filter, assigns.sort))
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="Sources to review">
-      <div class="space-y-3">
-        <p class="text-sm text-gray-500">
-          Each Source is checked on its own page. Approve it when nothing holds it.
-        </p>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-block">
+        <.page_header>
+          <:title>Sources to review</:title>
+          <:description>
+            Each Source is checked on its own page. Approve it when nothing holds it.
+          </:description>
+        </.page_header>
 
         <div class="flex flex-wrap items-center gap-2">
           <.button
@@ -107,15 +110,14 @@ defmodule GallformersWeb.Admin.ReviewLive.Sources do
             id={"filter-#{value}"}
             phx-click="filter"
             phx-value-filter={value}
-            shape="pill"
             size="sm"
-            variant={if @filter == value, do: "primary", else: "soft"}
+            variant={if @filter == value, do: "primary", else: "secondary"}
           >
             {label}
           </.button>
           <span class="flex-1"></span>
           <.form for={%{}} id="review-sort" phx-change="sort" class="flex items-center gap-2">
-            <label for="review-sort-select" class="text-sm text-gray-500">Sort</label>
+            <label for="review-sort-select" class="text-meta text-muted">Sort</label>
             <select id="review-sort-select" name="sort" class="gf-select w-auto">
               <option
                 :for={
@@ -134,45 +136,40 @@ defmodule GallformersWeb.Admin.ReviewLive.Sources do
           </.form>
         </div>
 
-        <div class="bg-white shadow-sm rounded-lg overflow-x-auto">
-          <.table
-            id="review-sources"
-            rows={@rows}
-            row_id={& &1.id}
-            row_click={&JS.navigate(&1.path)}
-            zebra={false}
-          >
-            <:col :let={s} label="Source">
-              <.link navigate={s.path} class="font-semibold text-gray-900 hover:text-gf-maroon">
-                {s.title}
-              </.link>
-              <div :if={s.citation && s.citation != s.title} class="text-sm text-gray-500">
-                {s.citation}
-              </div>
-              <div class="mt-1 flex flex-wrap gap-1.5">
-                <.review_tag :if={s.kind}>{s.kind}</.review_tag>
-                <.review_tag :if={s.notes}>{s.packages} notes</.review_tag>
-              </div>
-            </:col>
-            <:col :let={s} label="To decide">
-              <span data-role="to-decide" class="text-lg font-semibold tabular-nums">
-                {s.to_decide}
-              </span>
-              <div class="text-sm text-gray-500">{s.proposed} with a proposed answer</div>
-              <div :if={s.set_aside > 0} data-role="set-aside" class="text-sm text-gray-500">
-                {s.set_aside} set aside
-              </div>
-              <.review_progress done={0} proposed={s.proposed} total={s.to_decide} class="mt-1 w-36" />
-            </:col>
-            <:col :let={s} label="Holding approval">
-              <span data-role="holding" class="text-sm text-gray-700">{holding_text(s.holding)}</span>
-            </:col>
-            <:col :let={s} label="Status">
-              <.badge variant={if s.ready, do: "success", else: "warning"}>{s.status}</.badge>
-            </:col>
-          </.table>
-          <p :if={@rows == []} class="p-4 text-gray-500">No Sources here.</p>
-        </div>
+        <.data_table
+          id="review-sources"
+          rows={@rows}
+          row_id={& &1.id}
+          row_click={&JS.navigate(&1.path)}
+        >
+          <:col :let={s} label="Source" grow full>
+            <.link navigate={s.path} class="font-semibold">{s.title}</.link>
+            <div :if={s.citation && s.citation != s.title} class="text-meta text-muted">
+              {s.citation}
+            </div>
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              <.review_tag :if={s.kind}>{s.kind}</.review_tag>
+              <.review_tag :if={s.notes}>{s.packages} notes</.review_tag>
+            </div>
+          </:col>
+          <:col :let={s} label="To decide" full>
+            <span data-role="to-decide" class="text-subsection font-semibold tabular-nums">
+              {s.to_decide}
+            </span>
+            <div class="text-meta text-muted">{s.proposed} with a proposed answer</div>
+            <div :if={s.set_aside > 0} data-role="set-aside" class="text-meta text-muted">
+              {s.set_aside} set aside
+            </div>
+            <.review_progress done={0} proposed={s.proposed} total={s.to_decide} class="mt-1 w-36" />
+          </:col>
+          <:col :let={s} label="Holding approval" full>
+            <span data-role="holding" class="text-meta text-ink-2">{holding_text(s.holding)}</span>
+          </:col>
+          <:col :let={s} label="Status">
+            <.chip variant={if s.ready, do: :ok, else: :warn}>{s.status}</.chip>
+          </:col>
+          <:empty>No Sources here.</:empty>
+        </.data_table>
       </div>
     </Layouts.admin>
     """

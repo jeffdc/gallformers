@@ -44,9 +44,9 @@ defmodule GallformersWeb.SourceLiveTest do
     end
 
     test "lists the Galls it cites, linking to their Source entry", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/source/59")
+      {:ok, view, _html} = live(conn, ~p"/source/59")
 
-      assert html =~ "Connected Galls (1)"
+      assert has_element?(view, "#source-galls-section [data-part=count]", "1")
       assert has_element?(view, "a[href='/gall/300?source=59']", "Andricus seedii (agamic)")
     end
 
@@ -67,9 +67,9 @@ defmodule GallformersWeb.SourceLiveTest do
           confirm(source)
         )
 
-      {:ok, view, html} = live(conn, ~p"/source/#{source.id}")
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
 
-      assert html =~ "Connected Galls (1)"
+      assert has_element?(view, "#source-galls-section [data-part=count]", "1")
       assert has_element?(view, "a[href^='/gall/#{gall.id}']", "Facts-only gall")
     end
 
@@ -78,7 +78,6 @@ defmodule GallformersWeb.SourceLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/source/#{source.id}")
 
-      assert html =~ "Connected Galls (0)"
       assert html =~ "No galls connected to this source."
     end
 
@@ -166,21 +165,55 @@ defmodule GallformersWeb.SourceLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
 
-      assert has_element?(view, "#source-facts", "No Facts from this Source yet.")
+      assert has_element?(view, "#source-facts", "No facts from this Source yet.")
+    end
+  end
+
+  describe "the design system's Source page" do
+    test "shows its DOI as a link, and Original when it has a link", %{conn: conn} do
+      source =
+        "Weld"
+        |> source_fixture("1959")
+        |> Ecto.Changeset.change(doi: "10.1234/fixture.doi", link: "https://example.org/weld")
+        |> Gallformers.Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
+
+      assert has_element?(view, ~s{header a[href="https://doi.org/10.1234/fixture.doi"]})
+      assert has_element?(view, ~s{a[href="https://example.org/weld"]}, "Original")
+    end
+
+    test "a retracted Source says so, linking the retraction notice", %{conn: conn} do
+      notice = source_fixture("Retraction notice", "2026")
+
+      source =
+        "Retracted fixture"
+        |> source_fixture("1990")
+        |> Ecto.Changeset.change(retracted_on: ~D[2026-01-02], retracted_by_id: notice.id)
+        |> Gallformers.Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
+
+      assert has_element?(view, "header", "Retracted")
+      assert has_element?(view, "[role=alert]", "Retracted on 2026-01-02")
+      assert has_element?(view, ~s{[role=alert] a[href="/source/#{notice.id}"]})
+    end
+
+    test "with no images, there is no empty photo box", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/source/58")
+
+      refute has_element?(view, "#source-images")
+      refute html =~ "No images available"
     end
   end
 
   describe "Not found" do
-    test "for an invalid ID", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/source/invalid")
-      assert html =~ "Invalid source ID"
+    test "an ID that isn't a number is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/source/invalid") end
     end
 
-    test "for a missing ID", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/source/999999999")
-
-      assert html =~ "Source not found"
-      assert page_title(view) =~ "Not Found"
+    test "a missing ID is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/source/999999999") end
     end
   end
 end

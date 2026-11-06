@@ -42,4 +42,21 @@ defmodule GallformersWeb.FilterGuideControllerTest do
     assert conn.assigns.page_title == "Filter Guide"
     assert conn.assigns.page_url == "/filterguide"
   end
+
+  test "GET /filterguide: one section per Trait, each anchored, with jump links to them", %{
+    conn: conn
+  } do
+    html = conn |> get(~p"/filterguide") |> html_response(200)
+    doc = LazyHTML.from_document(html)
+
+    for id <- ~w(alignment cells detachable forms plant_part season shape texture walls) do
+      assert doc |> LazyHTML.query("section##{id} h2") |> Enum.count() == 1, id
+      assert doc |> LazyHTML.query(~s{nav a[href="##{id}"]}) |> Enum.count() == 1, id
+    end
+
+    assert doc |> LazyHTML.query("h1") |> LazyHTML.text() =~ "ID Tool Filter Guide"
+
+    assert doc |> LazyHTML.query("section#season") |> LazyHTML.text() =~
+             "When the gall forms and grows"
+  end
 end

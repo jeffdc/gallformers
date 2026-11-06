@@ -69,19 +69,19 @@ const ImageUpload = {
   handleDragOver(e) {
     e.preventDefault()
     e.stopPropagation()
-    this.dropzone.classList.add("border-gf-maroon", "bg-gf-sky-blue/20")
+    this.dropzone.classList.add("border-brand", "bg-sky-soft")
   },
 
   handleDragLeave(e) {
     e.preventDefault()
     e.stopPropagation()
-    this.dropzone.classList.remove("border-gf-maroon", "bg-gf-sky-blue/20")
+    this.dropzone.classList.remove("border-brand", "bg-sky-soft")
   },
 
   handleDrop(e) {
     e.preventDefault()
     e.stopPropagation()
-    this.dropzone.classList.remove("border-gf-maroon", "bg-gf-sky-blue/20")
+    this.dropzone.classList.remove("border-brand", "bg-sky-soft")
 
     const files = Array.from(e.dataTransfer.files)
     this.addFiles(files)
@@ -132,7 +132,7 @@ const ImageUpload = {
       preview.className = "relative group"
 
       const img = document.createElement("img")
-      img.className = "w-24 h-24 object-cover rounded border border-gray-200"
+      img.className = "size-24 object-cover rounded-ctl border border-line"
       img.alt = file.name
 
       // Create object URL for preview
@@ -142,12 +142,12 @@ const ImageUpload = {
 
       const removeBtn = document.createElement("button")
       removeBtn.type = "button"
-      removeBtn.className = "absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs hidden group-hover:block"
+      removeBtn.className = "absolute -top-2 -right-2 size-5 rounded-full bg-danger text-on-fill text-caption hidden group-hover:block group-focus-within:block"
       removeBtn.textContent = "×"
       removeBtn.onclick = () => this.removeFile(index)
 
       const name = document.createElement("div")
-      name.className = "text-xs text-gray-600 truncate w-24 mt-1"
+      name.className = "mt-1 w-24 truncate text-caption text-muted"
       name.textContent = file.name
 
       preview.appendChild(img)
@@ -252,12 +252,12 @@ const ImageUpload = {
       this.progressContainer.classList.remove("hidden")
       this.progressContainer.innerHTML = this.files.map((file, i) => `
         <div class="mb-2" data-progress-item="${i}">
-          <div class="flex justify-between text-sm mb-1">
-            <span class="text-gray-700">${file.name}</span>
-            <span class="text-gray-500" data-percent>0%</span>
+          <div class="mb-1 flex justify-between text-meta">
+            <span class="text-ink-2">${file.name}</span>
+            <span class="text-muted" data-percent>0%</span>
           </div>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-gf-maroon h-2 rounded-full transition-all duration-200 w-0" data-bar></div>
+          <div class="h-2 w-full rounded-full bg-surface-2">
+            <div class="h-2 w-0 rounded-full bg-brand-fill transition-all duration-200" data-bar></div>
           </div>
         </div>
       `).join("")
@@ -289,11 +289,11 @@ const ImageUpload = {
 
   showMessage(message, type) {
     const alertClass = type === "success"
-      ? "bg-green-50 border-green-200 text-green-800"
-      : "bg-red-50 border-red-200 text-red-800"
+      ? "bg-ok-bg border-ok text-ok"
+      : "bg-danger-bg border-danger text-danger"
 
     const alert = document.createElement("div")
-    alert.className = `p-3 rounded border ${alertClass} mb-4`
+    alert.className = `mb-4 rounded-ctl border p-3 ${alertClass}`
     alert.textContent = message
 
     this.el.insertBefore(alert, this.el.firstChild)

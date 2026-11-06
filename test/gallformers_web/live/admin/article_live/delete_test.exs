@@ -59,35 +59,16 @@ defmodule GallformersWeb.Admin.ArticleLive.DeleteTest do
     refute Repo.get(Article, article.id)
   end
 
-  test "index view requires the exact article title before deletion", %{conn: conn} do
+  test "the edit page handles an article deleted while its confirmation is open", %{conn: conn} do
     article = create_article!()
-    {:ok, view, _html} = live(conn, ~p"/admin/articles")
+    {:ok, view, _html} = live(conn, ~p"/admin/articles/#{article.id}")
 
-    render_click(view, "delete", %{"id" => Integer.to_string(article.id)})
-
-    assert has_element?(view, "#dangerous-delete-modal", article.title)
-    assert Repo.get(Article, article.id) != nil
-
-    html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong title"})
-
-    assert html =~ "Title does not match"
-    assert Repo.get(Article, article.id) != nil
+    render_click(view, "delete")
+    Articles.delete_article(article)
 
     render_submit(view, "confirm_delete", %{"confirmation" => article.title})
 
-    refute Repo.get(Article, article.id)
-  end
-
-  test "index handles an article deleted while its confirmation is open", %{conn: conn} do
-    article = create_article!()
-    {:ok, view, _html} = live(conn, ~p"/admin/articles")
-
-    render_click(view, "delete", %{"id" => Integer.to_string(article.id)})
-    Articles.delete_article(article)
-
-    html = render_submit(view, "confirm_delete", %{"confirmation" => article.title})
-
-    assert html =~ "Article already deleted"
-    refute has_element?(view, "#dangerous-delete-modal")
+    flash = assert_redirect(view, "/admin/articles")
+    assert flash["info"] == "Article already deleted"
   end
 end

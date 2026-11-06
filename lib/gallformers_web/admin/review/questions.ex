@@ -2165,7 +2165,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
       description: {source[:text], gall[:description]},
       meta: meta,
       quoted_in: gall[:quoted_in] && "✓ Gallformers' description comes from #{gall.quoted_in}",
-      path: "/admin/galls/#{id}"
+      path: "/gall/#{id}?edit"
     }
   end
 

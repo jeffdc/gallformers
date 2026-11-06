@@ -1,0 +1,423 @@
+# Components
+
+Every piece of UI is one of these components. Each entry says what the component is for, when to use it and when not, its attributes and slots, and what it replaces. Statuses:
+
+- **Proposed**: designed, awaiting approval. Don't build or use yet.
+- **Approved**: agreed; may be built.
+- **Built**: in the code, in the style guide, with a component test. Use it.
+- **Retiring**: replaced; don't use in new code. Removed once nothing calls it.
+
+The catalog was approved on 2026-11-04. Components are HEEx function components, imported into every template through `GallformersWeb.html_helpers`. Sizes come from the density context and colors from tokens (see [foundations.md](foundations.md)); no component takes a color or size class from its caller except through its documented attributes. Every component accepts `class` for layout only (margins, grid placement), and `rest` for `id`, `phx-*` and `aria-*`.
+
+Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_badge`, `list`, `header`, `table`, `badge`, `modal` with `show_modal` and `hide_modal` (CoreComponents); `abundance_indicator`, `data_completeness_indicator`, `edit_button`, `external_links`, `host_list`, `source_citation`, `source_list`, `species_synonymy`, `taxonomy_breadcrumb`, `table_actions`, `action_button` (DataDisplayComponents); `field_wrapper`, `file_dropzone`, `multi_select`, `radio_group` (FormComponents); `back_link` (Layouts); `head`, `species_json_ld`, `website_json_ld` (SEO); `skeleton`, `tabs` and the `Tabs` hook, `card`, `error_message`, `info_tip` (UIComponents). The "Replaces" column still names them, as history.
+
+## Summary
+
+| Component | Module | Group | Status | Replaces |
+|---|---|---|---|---|
+| `command_palette` | PaletteLive | Shell | Built | the header's search box |
+| `site_shell` | Layouts.app | Shell | Built | `Layouts.app`, `site_header`, `site_footer` |
+| `admin_shell` | Layouts.admin | Shell | Built | `Layouts.admin`, `admin_edit_layout`, the admin nav and title band |
+| `page_header` | PageComponents | Page structure | Built | `CoreComponents.header`, 6 hand-written title patterns, `taxonomy_breadcrumb`, `back_link`, Quick Links bars |
+| `section` | PageComponents | Page structure | Built | `<.card>` used as a page region, sky-band section cards |
+| `panel` | PageComponents | Page structure | Built | `<.card>` as an object, `.gf-card`, `.card`, `species_card`'s shell, 20 hand-rolled cards |
+| `rail` | PageComponents | Page structure | Built | ad hoc side columns |
+| `data_table` | DataComponents | Data | Built | `<.table>`, `species_table`, 21 raw `gf-table` tables |
+| `fact_list` | DataComponents | Data | Built | the trait grid, ad hoc label/value lists, `record_metadata` |
+| `name_list` | DataComponents | Data | Built | slash-separated Host lines, one-column name tables |
+| `see_also` | UIComponents | Data | Built (restyled) | the See Also logos: now "More info", text links searching iNaturalist, BugGuide (Galls), Google Scholar, BHL |
+| `chip` | DataComponents | Data | Built | `badge`, `chip`, `data_complete_badge`, `.gf-badge`, `.gf-pill`, `destination_badge` |
+| `stat` | DataComponents | Data | Built | the home and dashboard number tiles |
+| `empty_state` | DataComponents | Data | Built | ad hoc "Nothing here" text |
+| `taxon_name` | DataDisplayComponents | Domain | Built | — |
+| `gall_card` | DomainComponents | Domain | Built | the ID grid card, `species_card` |
+| `source_entry` | DomainComponents | Domain | Built | the Gall page's Further Information cards, `source_citation`, `source_list` |
+| `photo_viewer` | DomainComponents | Domain | Built | `image_gallery` and the ImageGallery hook (retired) |
+| `range_map` | DomainComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
+| `source_quote` | DomainComponents | Domain | Built | `blockquote` styling, review "The Source wrote" text |
+| `button` | ActionComponents | Actions | Built | `button`, `edit_button`, `action_button`, `admin_edit_link`, 122 raw buttons |
+| `menu` | ActionComponents | Actions | Built | the header dropdowns, row-action menus |
+| `tabs` | UIComponents | Navigation | Removed (unused) | — (page tabs are `tab_nav`; build in-page tabs anew if a page needs them) |
+| `tab_nav` | PageComponents | Navigation | Built | the Browse pages' hand-made tab links |
+| `pagination` | UIComponents | Navigation | Approved (restyle) | — |
+| `field` | FormComponents | Forms | Built | `field_wrapper`, `input`'s label/help/error wrapper |
+| `input`, `select`, `textarea`, `checkbox`, `toggle` | FormComponents | Forms | Built (restyled) | `.gf-input` and friends |
+| `search_field` | FormComponents | Forms | Built | `search_input`, three search-input classes, the header search |
+| `typeahead` | FormComponents | Forms | Approved (consolidate) | `typeahead`, `multi_select`, `multi_select_dropdown`, `multi_select_typeahead` |
+| `file_drop` | FormComponents | Forms | Approved (restyle) | `file_dropzone` |
+| `save_bar` | FormComponents | Forms | Approved (pending the save model) | per-section Save buttons |
+| `filter_select` | FormComponents | Forms | Built | the ID page's filter dropdowns |
+| `category_tile` | DomainComponents | Domain | Built | home page group and Host genus rows |
+| `family_card` | DomainComponents | Domain | Built | `tree_browser` (retired) on `/galls` and `/hosts` |
+| `facet_group` | FormComponents | Forms | Built | the ID page's filter row, browse filters |
+| `notice` | FeedbackComponents | Feedback | Built | `alert`, `error_message`, `.gf-admin-info`, info banners |
+| `toast` | CoreComponents (flash) | Feedback | Approved (restyle) | `flash` |
+| `dialog` | FeedbackComponents | Overlays | Built | `modal`, `dangerous_delete_modal`, `discard_confirm_modal` |
+| `tooltip` | UIComponents | Overlays | Approved (restyle) | `info_tip`, `glossary_tooltip` |
+| `skeleton`, `spinner` | FeedbackComponents | Feedback | Approved (`skeleton` to build when a page needs it; the old one was unused and removed) | `loading_spinner`, `loading_overlay` |
+| `bar_chart` | DataComponents | Data | Built | the analytics chart, the `DailyChart` hook and d3 (removed) |
+| `share_list` | DataComponents | Data | Built | the analytics devices and browsers tables |
+| `prose` | PageComponents | Content | Built | the Tailwind typography plugin (removed) |
+| `article_card` | DomainComponents | Domain | Built | the Articles list's shadowed boxes |
+| `chip_nav` | PageComponents | Navigation | Built | the Articles list's tag pills |
+| `link_tile` | PageComponents | Navigation | Built | — |
+| `change_entry` | DomainComponents | Domain | Built | — |
+| `edit_toggle`, `edit_scope`, `fact_row`, `fact_chip` | CurationComponents | Editing | Built (Gall page: Inducer, Hosts, Traits) | the admin's Gall and taxon edit screens, in time |
+| `change_tray`, `review_apply` | CurationComponents | Editing | Built (`GallformersWeb.TrayLive`, on every page) | — |
+| `key_couplet` | KeyComponents | Domain | Built | `couplet`, `lead`, `destination_badge`, `lead_images` |
+| `key_path` | KeyComponents | Domain | Built | `path_tracker` |
+
+## Shell
+
+### `site_shell`
+
+The public page frame.
+
+- **Header** (56px, sticky, `bg-sky`): wordmark; Identify, Browse ▾, Resources ▾ (League Spartan); a search field with a `/` shortcut; Log in, or the signed-in user's menu (with Admin for admins). On phones: wordmark, search icon, menu button.
+- **Main**: `max-w-page`, `px-page-x`, Reading density.
+- **Footer** at the end of the page, never fixed: Phenology Tool, Donate, Privacy, About, license line.
+- **Search:** the `palette_trigger`, a button that looks like a search field ("Search Gallformers" and its key `/`), opens the command palette; on phones a search icon. The header has no search box of its own.
+- **Theme switch** (`theme_switch`) at the right of the header, on phones too: an icon button showing the current choice (a half circle for Match my device, a sun, a moon; `gf-contrast`, `gf-sun`, `gf-moon`) that opens Match my device, Light and Dark as `menuitemradio`s. See foundations.md, "Dark mode".
+- Slots: `inner_block`. Attributes: `current_user`, `flash`, `region` (the region scope bar, shown on pages that filter by region).
+
+### `admin_shell`
+
+The admin frame.
+
+- **Sidebar** (212px, `bg-surface-2`): Admin mark; Dashboard; Review with its count of open questions (`text-autumn-ink`); Galls; Taxonomy; Sources; Host ranges; then Glossary, Articles, Keys, Vocabulary; then the roles' extras (Users, Jobs, Ops); then View public site ↗. The current item has a maroon inset bar. Collapses to a menu button below 960px.
+- **Top bar** (44px): a search across Galls, taxa and Sources; the user; Log out.
+- **Main**: fills the remaining width, Working density (`gf-density-working`).
+- Light theme only (`data-theme="light"`) until the admin pages are on tokens.
+- Slots: `inner_block`. Attributes: `current_user`, `active` (sidebar item), `counts` (badge numbers).
+
+### `command_palette`
+
+Search and go anywhere, on every page, public and admin (`GallformersWeb.PaletteLive`, rendered once from the root layout; the Palette hook). Opened by a `palette_trigger` (the header's, the admin top bar's) or the keys `/` and `s` while not typing in a field (not ⌘K: browsers bind it). With nothing typed, the fixed Go to list (Identify a gall, Browse galls / host plants / places, Articles, Identification keys, Glossary) and, for a curator, their commands (Edit this page, Sources to review, Changes). Typing searches (`GallformersWeb.Palette`: `Search.global_search/2` and `Articles.search_published/2`): Go to shortcuts into the ID tool ("Galls on *Quercus alba*", "… in Virginia", "Galls in Virginia"), then Galls, Host plants, Groups, Places, Sources, Glossary, Articles, and last "See every result" (the search page). ↑ ↓ move the selection, Enter follows it, Esc or a click outside closes; following a row closes the palette. A panel near the top of the screen (`gf-palette`); full screen on phones. Keys are shown with `gf-kbd`. Commands still to come with their targets (ec2c): Add from observation…, Review: <Source>.
+
+## Page structure
+
+### `page_header`
+
+The top of every page. One per page; it holds the page's only `h1`.
+
+```heex
+<.page_header>
+  <:crumb navigate={~p"/family/Cynipidae"}>Cynipidae</:crumb>
+  <:crumb navigate={~p"/genus/Callirhytis"} italic>Callirhytis</:crumb>
+  <:title name>Callirhytis quercuscornigera (agamic)</:title>
+  <:chip variant={:warn}>In progress</:chip>
+  <:meta label="Other generation"><.link navigate={…}><em>C. quercuscornigera (sexgen)</em></.link></:meta>
+  <:meta label="Season">Spring, Summer</:meta>
+  <:action><.button navigate={…}>Edit</.button></:action>
+</.page_header>
+```
+
+- `crumb` slots make the breadcrumb (lineage, or the admin path). `title` with `name` sets a scientific name in Source Sans italic; without it, League Spartan.
+- `chip` slots sit beside the title; `meta` slots make one line of label/value pairs under it; `action` slots sit at the right.
+- Use it on every page. Don't put a title anywhere else, and don't add an "Editing …" prefix: the admin context already says so.
+
+### `section`
+
+A part of a page: a heading on a rule, then content. Not a box.
+
+```heex
+<.section title="Hosts" count={14}>
+  <:aside>Oldest first · <.link …>newest first</.link></:aside>
+  …
+</.section>
+```
+
+- Attributes: `title`, `count` (muted, beside the title), `id` (anchor), `level` (2 by default; 3 inside another section).
+- Slots: `aside` (right side of the heading row: sort, a filter, an action), `inner_block`.
+- Use for every page region. Don't wrap a section in a panel.
+
+### `panel`
+
+A separate object on the page: a bordered surface. Use it when the thing inside is one object (a Source excerpt opened for reading, a review item, an ID Notes box, a rail box), never for a page region.
+
+- Attributes: `variant` (`:plain` — surface with a line border; `:info` — sky-soft, no border, for Gallformers' own notes; `:danger` — for destructive zones), `title`, `padding` (`:default`, `:none` for tables and images).
+- Slots: `header_action`, `inner_block`, `footer`.
+
+### `rail`
+
+The right-hand column of a detail or edit page. Stacks under the page header on phones (the photo first on Gall pages).
+
+- Attributes: `width` (`:wide` 420px for public detail pages, `:narrow` 300px for admin), `stack` (`:first` or `:last` on narrow screens; a wide rail stacks first, a narrow one last).
+- Put the main column and the rail inside `<div class="gf-with-rail">`, which makes the two-column grid on wide screens.
+- Holds panels, a `fact_list`, a photo viewer or a map. Facts *about* the record go here; the record's content goes in the main column.
+
+## Data
+
+### `data_table`
+
+The one table. Rows are `--gf-row-h` tall and single-line: long text truncates, with the full text in a `title`. A column's `wrap` allows two lines; `full` shows its whole text (glossary definitions). `active` (a function row -> boolean) marks the row a keyboard highlights (`aria-current`, highlighted; search results).
+
+```heex
+<.data_table id="sources" rows={@sources} row_navigate={&~p"/admin/sources/#{&1.id}"} sort={@sort}>
+  <:col :let={s} label="Title" field={:title} sortable grow><%= s.title %></:col>
+  <:col :let={s} label="Authors" field={:authors}><%= s.authors %></:col>
+  <:col :let={s} label="Year" field={:year} sortable numeric><%= s.year %></:col>
+  <:col :let={s} label="Status"><.chip :if={s.complete} variant={:ok}>Complete</.chip></:col>
+  <:empty>No Sources match "<%= @query %>".</:empty>
+</.data_table>
+```
+
+- Column attributes: `label`, `field`, `sortable`, `numeric` (right-aligned, tabular), `grow` (takes the spare width), `wrap` (allow two lines), `hide_below` (`:md`, `:lg`: hide on narrow screens).
+- Table attributes: `id`, `rows` (a list or a stream), `row_id`, `row_item`, `row_navigate` or `row_click`, `sort` (`%{field:, dir:}`; a sortable head emits `sort` with `field`), `selectable` with `selected`, `select_id` and `select_label` (a checkbox column, emits `select` with `id`), `compact` (28px rows).
+- Slots: `col`, `empty`, `footer` (pagination, totals).
+- Grey heads (`bg-surface-2`), caption-size uppercase labels, hairline rows, `bg-sky-soft` on hover.
+- A column that is empty for every row is not shown (columns with a `field`, list rows).
+- The table has a minimum width (36rem): in a narrow container it scrolls sideways rather than crushing its `grow` column. Don't use a table for a list of names alone (use `name_list`) or for label/value pairs (use `fact_list`).
+
+### `fact_list`
+
+Label/value pairs in one to three columns: a Gall's traits, a record's facts in a rail.
+
+```heex
+<.fact_list columns={3} missing_label="Not recorded">
+  <:item label="Detachable">Integral</:item>
+  <:item label="Shape" value={nil} />
+</.fact_list>
+```
+
+- Items with no value collect into one line at the end ("Not recorded: shape, alignment, walls"), so known values stand out and gaps stay visible.
+- Attributes: `columns`, `missing_label` (nil hides missing items), `layout` (`:grid` ruled cells, `:inline` for a rail).
+
+### `name_list`
+
+A list of short names that flows into columns: Hosts, a Source's Galls, families on a browse page.
+
+- Attributes: `items`, `columns` (max columns, 1–6; fewer on narrow screens), `italic` (scientific names). Names flow down each column, so an alphabetical list reads down.
+- Slots: `item` (to render a link and a count).
+
+### `chip`
+
+A small labelled state or category. Every variant has one meaning.
+
+| Variant | Meaning | Example |
+|---|---|---|
+| `:ok` | done, complete | Complete |
+| `:warn` | in progress, needs a look | In progress · Holds approval |
+| `:danger` | conflict, error | Conflicts with Gallformers |
+| `:info` | neutral fact | Publication |
+| `:rank` | a taxonomic rank | Family |
+| `:neutral` | a category | Plantae |
+| `:count` | a number that needs you | 358 |
+
+Attributes: `variant`, `icon`. Never a chip for decoration, never color without a word.
+
+### `stat`
+
+A number with a label: 3,976 Galls. For dashboards and the home page only, where the figures are the point.
+
+### `empty_state`
+
+What a list or region says when it has nothing: one line saying what would be here and, when possible, how to add the first one. Attributes: `title`, `action` slot.
+
+### `bar_chart`
+
+A bar chart drawn on the server as SVG: one group of bars per item (a day), one bar per series, to scale against a y axis from 0 to a round number (steps of 1, 2, 2.5 or 5 × 10^k, at most five). Bars use percentage positions, so the chart fills its column at any width without stretching its text. Each bar is titled with its value ("Oct 21 · Page views: 3,861", the browser's tooltip); a legend names the series; a visually hidden table carries the numbers for screen readers. Day labels thin out on long ranges (every day up to 7, every 3rd up to 30, else every 7th). With no data: "No data for this period." Attributes: `id`, `label` (accessible name), `data` (maps with `label` and a number per series key), `series` (maps with `key`, `label`, `tone`: `:brand`, `:autumn`, `:sky`), `height` (px, default 180), `class`. Replaced the analytics page's d3 chart; d3 and the `DailyChart` hook are gone.
+
+### `share_list`
+
+Shares of a whole, one row each: the name, a bar as wide as the share, the percentage and the count (the analytics page's devices and browsers). With no items: "Nothing recorded in this period." Attributes: `id`, `items` (maps with `count` and `percentage`), `name` (function item -> its name), `class`.
+
+## Domain
+
+### `taxon_name`
+
+Renders a name with correct italics, from `Gallformers.TaxonName.segments/1`: the binomial and an infraspecific name italic; rank words (var., subsp.), authorities (Michx.) and a parenthetical qualifier such as the generation, "(agamic)", upright. An undescribed Gall's placeholder ("Unknown (Cynipidae) q-rubra-spur-gall") is not a scientific name and stays upright. Ranks above genus are upright. Every component that shows a name uses it.
+
+### `gall_card`
+
+A Gall at a glance: the photo (square, `rounded-panel`), the name (italic), and one muted line of what tells it apart (plant part · form · season). Optional chips (Undescribed). For the ID results grid, rank pages, browse pages and the home page.
+
+- Attributes (plain values, so any page maps its own read model onto them): `navigate` (required; the whole card is one link), `name` (required; set through `taxon_name`), `image_url`, `image_alt` (defaults to "Photo of …"; `""` when the name beside it says enough), `subtitle` (the distinguishing traits, e.g. "stem · abrupt swelling · Spring"), `size` (`:md`, `:sm`). Slot `chip` (e.g. Undescribed).
+- Lay cards out in `<div class="gf-photo-grid">`: photos fill the row at a minimum of 280px, so a wider screen shows more photos, never smaller ones (four across at 1312px, six at 1920px). Photos are the most important thing on an identification page; don't shrink them to fit more. `data-size="sm"` (at least 176px, two across on phones) is for overview rows (home page tiles, rank pages).
+- A Gall with no photo shows the gall icon on `bg-surface-2`, not an empty grey box.
+
+### `source_entry`
+
+One Source as it relates to a page: year, title (link), authors, and the opening of what it says, in serif (`source_quote`). Expands in place to the whole excerpt, the license and links to the Source page and the original. Used on Gall pages (one row per Source, by year) and on Source pages.
+
+- Attributes (plain values): `id`, `title` (both required), `href` (the Source page), `year` (missing shows "n.d."), `authors`, `excerpt` (plain text; paragraphs split on blank lines — strip Markdown first), `license`, `license_url`, `original_url`, `open`, `pinned` (Gallformers ID Notes: an `:info` panel, always open, placed above the list).
+- Expanding is client-side, with `aria-expanded` on the toggle.
+
+### `photo_viewer`
+
+The photos of a Gall, a Host or a Source: one large photo shown whole (never cropped), its caption and its own credit (creator, license linked or plain, source link), arrows and a "n / N" count and a thumbnail strip with two or more, a full-size view (a dialog; photos load when shown) and a Details dialog (source, license, attribution, creator, uploader, last changed by, caption). The `PhotoViewer` hook shows the current photo: arrows, thumbnails, arrow keys (wrapping) and a horizontal swipe move; Escape or Close closes a dialog and focus returns to what opened it; every move pushes `gallery_index_changed`. With no photos: "No photos yet." and, for an admin, "Add images". Attributes: `id`, `photos` (maps with atom or string keys: `src`, `thumb`, `alt`, `caption`, `creator`, `license`, `licenselink`, `sourcelink`, `attribution`, `uploader`, `lastchangedby`), `name` (for alt text: "Photo n of <name>"), `edit_href`, `admin`, `class`. The admin image manager is a separate component.
+
+### `range_map`
+
+The possible-range map, as a card that opens a large map in a dialog, with full screen from there.
+
+- The card frames the native range. Introduced ranges are drawn but don't widen the frame (built on the Gall page: bounds from the range without its introduced places).
+- The legend is a single line under the card; the caveat ("Where the Hosts grow, not where the Gall was found") goes under the legend.
+- Attributes: `ranges`, `size` (`:card` 420×293, `:wide` the main column's width).
+- On the Gall page: a 288px-high card in the wide rail, with Enlarge opening a full-size dialog that has the map's own full-screen control.
+
+### `source_quote`
+
+What a Source wrote, in Source Serif: a quote or excerpt, with a page reference. Used inside `source_entry` and in review. (Named `source_quote` because `quote` is reserved in Elixir.)
+
+## Actions and navigation
+
+### `button`
+
+One button, as a `<button>` or a link (`navigate`, `patch`, `href`).
+
+- Variants: `:primary` (maroon fill: one per region), `:secondary` (surface, line-strong border: the default), `:ghost` (no border, link color: low-emphasis actions), `:danger` (destructive, confirms through a dialog).
+- Attributes: `variant`, `icon`, `icon_only` (requires `label` for `aria-label`), `size` (`:default` follows density, `:sm`), `disabled`, `loading`.
+- Labels say exactly what happens ("Approve 9 notes", "Rename", "Add synonym").
+
+### `menu`
+
+A button that opens a list of links or actions (the header's Browse and Resources; a row's actions). Keyboard-navigable; closes on Escape and outside click. Uses `shadow-float`.
+
+### `pagination`
+
+Exists. Restyle to tokens. (`tabs`, the in-page tabs with the `Tabs` hook, was unused and is removed.)
+
+### `tab_nav`
+
+Tabs that are links, each tab its own page: Browse's "By what causes them" (`/galls`), "By host plant" (`/hosts`), "By place" (`/places`); the tab list is `BrowseHelpers.browse_tabs/0`. Attributes: `label` (the nav's accessible name), `class`; a `tab` slot with `navigate`, `href` or `patch`, and `current` (sets `aria-current="page"`). It sits right under the `page_header`. For tabs that switch content within one page, use `tabs`.
+
+## Forms
+
+### `field`
+
+A control with its label, help and error. Two layouts:
+
+- `:stacked` (label above): public forms and narrow spaces.
+- `:row` (label left, 150px; help under the control): admin edit pages.
+
+Attributes: `label`, `for` (the control's id), `help`, `errors`, `layout`, `required`, `saved`. Slot: the control. The help and errors get ids `<for>-help` and `<for>-errors`; wire them to the control with `aria-describedby`, and set `aria-invalid` when there are errors. `saved` shows "Saved" in an `aria-live` region beside the control.
+
+### Controls
+
+`input`, `select`, `textarea`, `checkbox`, `toggle` keep their current APIs and take their look from tokens: `h-ctl` tall, `border-line-strong`, `rounded-ctl`, focus ring from `--gf-focus`.
+
+- `input`'s label is `gf-label`, its required mark and errors `text-danger`; a checkbox sits beside its label with a gap.
+- `toggle` is a checkbox with `role="switch"` drawn as a track (`.gf-toggle-track`). With no visible `label`, give it an `aria-label`; `phx-click` and `phx-value-*` go on the checkbox.
+- A file input takes `.gf-file`: its button drawn like a secondary button, the chosen file's name beside it.
+- `dangerous_delete_modal` (typed-name delete) keeps its API and events and renders as a `dialog` with a `:danger` notice.
+
+### `search_field`
+
+A search input with an icon, a clear button (`on_clear`) and an optional keyboard shortcut hint (`shortcut="/"`, shown while the field is empty). One component for the header search, list filters and the admin top bar. Attributes: `name`, `label` (both required), `value`, `placeholder`, `debounce`, and anything for the input (`phx-change` …).
+
+### `typeahead`
+
+Find and pick by name: one component for single and multiple selection (`multiple`), with chips for chosen items, grouped results (accepted name, synonym, WCVP), and keyboard support. Consolidates four components into one.
+
+### `file_drop`
+
+Exists. Restyle: one row ("Upload files… or drop JPG/PNG here") instead of a tall dashed box when space is short.
+
+### `save_bar`
+
+Shows unsaved changes and offers Save and Discard. Its role depends on the admin save model, which is still open (matter `bc0d`).
+
+### `filter_select`
+
+A filter in the ID page's filter row. It matches the current screens' behavior exactly ([inventory/typeahead-and-id.md](inventory/typeahead-and-id.md)):
+
+- **Single-value filters** (detachable, family, season, alignment, form, walls, cells, shape, color): a select inside its own `<form phx-change="change_filter" phx-value-filter=…>` with `name="value"` and an "Any …" prompt, as today. While a filter is unset, each option shows how many of the loaded results have that value ("leaf midrib (22)"); a set filter is drawn with a brand border.
+- **Multi-value filters** (plant parts, textures): the `multi_select_typeahead` mechanics unchanged (type to filter, chips in options order, Clear all, the mousedown guard, server-tracked focus), restyled to sit in the same row, with the ANY/ALL toggle under it when two or more values are chosen (only ALL is written to the URL).
+- On phones the filter row folds behind one Filters button showing how many filters are set.
+
+Built (2026-11-05); used by the ID page (`IDLive`).
+
+### `category_tile`
+
+A group of Galls to browse into, as one link: a photo, the name and how many Galls it holds. The home page's "Start from the plant" (Host genera, `italic`) and "Browse by what causes them" (the Gallformer groups of `Gallformers.Catalog.InducerGroups`).
+
+- `layout={:row}` (default): a compact list row (40px thumbnail, name, count, ruled below). Lay rows out in a `<ul>` grid of one or two columns. The home page uses this.
+- `layout={:tile}`: a square photo above the name and count, for `gf-photo-grid data-size="sm"`.
+
+Attributes: `navigate`, `name`, `count`, `image_url`, `italic` (genus and below), `icon` (shown on the well when there is no photo; `gf-gall` by default, `gf-host` for plants), `layout`, `class`. The photo is decorative (`alt=""`): the name says what the tile is.
+
+### `family_card`
+
+A family on a Browse page: a photo, the family (a link) with its common names, "N galls · M genera", and its largest genera with their counts. Built from the browse tree by `GallformersWeb.BrowseHelpers.family_cards/2`. On `/galls` the count is the Galls under it; on `/hosts` it is the distinct Galls on the plant family or genus.
+
+It is also the browse tree. Its toggle opens the card across the grid to every genus, flowing in columns; each genus has its own caret that lists its leaves (Galls, or plants with `leaves="plants"`). The page keeps the open keys (`expanded`) and handles `toggle_node`, `expand_all` and `collapse_all`, as the tree did. Lay cards out in `grid gap-3 md:grid-cols-2 xl:grid-cols-3`. Attributes: `card`, `expanded`, `on_toggle`, `limit` (genera shown while closed, 6), `icon` (`gf-host` for plants), `leaves`.
+
+### `facet_group`
+
+A filter with counts: a legend and options, each with how many results it would leave ("leaf 41 · stem 22 · bud 12"). For the ID page and browse pages. Options with zero results are dimmed, not hidden; options past `limit` hide behind "Show N more". Attributes: `id`, `title`, `name`, `options` (`%{value:, label:, count:, selected:}`), `multiple` (checkboxes named `name[]`, with an empty value so clearing all still sends the param), `limit`, `italic`. It sits inside the page's `<form phx-change>`.
+
+## Feedback
+
+### `notice`
+
+An inline message in the page: `kind` `:info`, `:ok`, `:warn`, `:danger` (role `alert` for danger, `status` otherwise), optional `title`, an `action` slot and `on_dismiss`. One line where possible. Replaces four message components.
+
+### `toast`, `skeleton`, `spinner`
+
+`toast` and `spinner` exist: restyle to tokens; toasts use `shadow-float`. `skeleton` is to be built (to tokens) when a page first needs one; the old, unused one was removed.
+
+## Overlays
+
+### `dialog`
+
+One modal: `title`, body, `actions` slot. Sizes `:sm`, `:md`, `:lg`, `:full` (the range map). Open and close with `show_dialog/2` and `hide_dialog/2`. Escape, the backdrop and the Close button cancel it; focus is trapped inside and returns to what opened it.
+
+Confirmation and discarding are patterns, not variants (see the component's docs and [patterns.md](patterns.md)): the title names the thing, the body the consequence, and a `danger` button repeats the verb ("Delete taxon"). A typed-name confirmation is a form in the body. Replaces three modal components.
+
+### `tooltip`
+
+Exists. Restyle: `bg-ink text-paper`, `shadow-float`, caption size.
+
+## Content
+
+### `chip_nav`
+
+Links as a wrapping row of rounded chips, for filters that are their own pages (the Articles list's topics, `?tag=`). The current chip is filled with the brand and carries `aria-current="page"`; each may show a `count`. For page tabs, use `tab_nav`; for state labels, `chip`. Attributes: `label` (the nav's accessible name), `class`; slot `chip` with `href`, `navigate`, `patch`, `current`, `count`.
+
+### `link_tile`
+
+A link to another part of the site as a small tile: an icon on a sky square, a name, one line saying what is there. For a "More to read" row at the end of a page (the Articles list links the keys, glossary and filter guide). Attributes: `href`, `icon`, `name`, `class`; the inner block is the line.
+
+### `prose`
+
+Running text: rendered Markdown (`markdown` attribute, through `Gallformers.Markdown`, glossary terms linked) or the page's own markup (inner block). Styles headings (Markdown's `#` and `##` both at section size, since the page header holds the `h1`), paragraphs, links, lists, quotes (serif), images and captions, tables (scrolling sideways when wide), code, rules and `details` from tokens. Glossary links keep the text's color with a dotted underline. It sets no width: put it in a `max-w-text` column. Attributes: `markdown`, `size` (`:sm` 14px, `:base` 16, `:lg` 18, `:xl` 20; the source reader's A−/A+ steps through them), `font` (`:sans`, `:serif` for ID Notes and Source text), `class`. Used by articles (`:lg`), Privacy (`:lg`), the Gall page's ID Notes (`:sm`, serif) and source reader, and the admin article preview (`:sm`). Replaces the Tailwind typography plugin.
+
+### `article_card`
+
+An article in the Articles list. A band tinted by its topic (`tone`: `:sky` identification and guides, `:autumn` FAQ, taxonomy, undescribed, `:brand` the site and its people, `:plain` anything else) names the topic and carries a large icon, tilted and cropped by the band's edge; then the title in the brand face, a three-line preview and a meta line (author · date). The card is one link; `edit_href` adds an admin pencil in its corner. `featured` lays it out wide (band beside the text on wide screens, a larger title and preview, every topic named) with a `label` ("Newest"). Which tone and icon a topic gets is the page's choice (`ArticlesHTML`), not the component's. Attributes: `href`, `title`, `topic`, `icon`, `tone`, `meta`, `featured`, `label`, `edit_href`, `class`; the inner block is the preview.
+
+### `change_entry`
+
+One curator change in the change log (a `Gallformers.Audit.ChangeLog` group, via `Catalog.changes/1`): when (`time_ago`), who did what and from which Source (linked to its review); the Galls and taxa it touched and the taxon names it added (each taxon with its rank); what happened to its Facts as chips (added, made current, superseded, withdrawn, unsupported); and "Show the N Facts", each Fact in words with its Gall or taxon. Every Gall, taxon and Fact links **View** (the public page, at `#fact-<id>`, in a new tab) and **Edit** (the same page with `?edit`, the inline editor, matter ec2c). A taxon with no page of its own (an inducer species) is found by search and edited in the taxonomy admin. The dashboard and the Changes page render the same entry. Attribute: `group`.
+
+### Inline editing (`CurationComponents`)
+
+Curators edit on the pages themselves (matter ec2c). These take data in the change-set contract's shapes (`Gallformers.Curation`, built on the ingestion side): items with their display text and flags, each flag `%{kind, text}` with its words from the back end. Fact keys travel as strings (`GallformersWeb.FactKey`: `host:7`, `trait:season:spring`).
+
+- **`edit_toggle`**: in a page header, for admins: "Edit", or "Editing · Done" filled with the brand; a link to the page with `?edit` or without it. Attributes `editing`, `path`.
+- **`edit_scope`**: with Edit on, what isn't edited here. `:elsewhere` (↗, edited on another page: says where, with Open ↗) or `:follows` (ⓘ, follows from other data: says from what, muted). The Editing notice keys the three kinds: ✎ actions (edit here), ↗, ⓘ. Attributes `kind`, `href`, `class`.
+- **`fact_row`**: one Fact in a list with Edit on: what it says, the Sources stating it, and its actions (Withdraw, Correct…, Note…, as three text buttons) sending `fact_action` with the action and key. In the tray it shows "in your tray" (struck through when withdrawn) or, once submitted, "waiting to apply", and has no actions. Attributes `fact_key`, `sources`, `actions`, `pending`, `target` (a LiveComponent's, for the actions).
+- **`fact_chip`**: one value of a Trait with Edit on, as a chip: the value, its Sources as its title, ✕ to withdraw it (`fact_action`). In the tray it has no ✕: struck through when withdrawn, marked green (`data-pending`) when added. Attributes `fact_key`, `sources`, `pending`, `target`.
+- **`change_tray`**: pinned at the foot of every page while the curator's tray holds changes: the count, the changes on one line, Discard (`tray_discard`; the page confirms) and Review and apply (`tray_review`). Attribute `summary` (`%{count, lines, oldest_at}`).
+- **`review_apply`**: the body of the Review and apply dialog. Each change with its flags as chips (new ok; already held neutral; supersedes, changed since, needs confirmation warn; editorial and adds-statement info; needs a reason, blocked danger; each flag carries `data-flag` and `data-variant`), "I'm sure" for one needing confirmation (`toggle_confirm`), Apply for it alone (`apply_item`; not while it needs a reason, is blocked, awaits confirmation or is already submitted) and Take out (`remove_item`); the evidence for the Fact changes, asked once (why, observations, a Source; `set_evidence`); Apply all (`apply_all`). Attributes `id`, `items`, `evidence`, `confirmed`, and for the Source picker (a `typeahead` outside the evidence form: `search_evidence_source`, `select_evidence_source`, `clear_evidence_source`) `source`, `source_query`, `source_results`. Observations show as their links (iNaturalist, BugGuide), so a pasted link round-trips.
+
+### `key_couplet`
+
+One couplet of a dichotomous key, set as a printed key sets it: the couplet number, then its leads a, b, c… each with its text, notes and images, and where it goes at the right ("go to 4" with the group label when the key gives one, or the result: the taxon linked to its Gall, its context under it; a result covering several Galls names each, linked). `state`: `:active` (the couplet to choose at: a brand edge, raised), `:visited` (a well; the chosen lead checked on an ok fill, the others muted) or `:unvisited` (dimmed, still choosable). A choosable lead is a button inside a row that sends `select_lead`. Attributes: `number`, `couplet`, `key_slug`, `state`, `chosen`, `image_url_map`, `gall_names`. `key_result` renders a result on its own.
+
+### `key_path`
+
+The path through a key. `layout: :panel`: "Your path" in the rail on wide screens, each step ("3b") with its lead's text, the result on an ok fill, then Copy link and (at a result) Copy as text, Back and Start over. `layout: :bar`: the same as one line pinned under the site header on narrow screens (`data-sticky-chrome`, so `ScrollToCouplet` clears it). Before the first choice it says where to start. A step sends `jump_to`; Copy link copies the `?path=` link (CopyToClipboard hook); Copy as text sends `copy_path`. Attributes: `layout`, `key`, `path`, `terminal`, `link`, `gall_names`, `class`.
+
+## Third-party code
+
+The system adds no dependencies. Current front-end dependencies and what happens to them:
+
+| Dependency | Used for | Proposal |
+|---|---|---|
+| MapLibre GL, pmtiles | The range maps | Keep: real value, no lighter equivalent. |
+| d3-array, d3-axis, d3-scale, d3-selection | One chart on the analytics page | Removed: replaced by `bar_chart` (server-rendered SVG). |
+| @tailwindcss/typography | `.prose` on Markdown pages | Removed: replaced by `prose`. |
+| topbar | LiveView's page-loading bar | Keep: tiny and standard; color it from a token. |
+| Phosphor icons (vendored) | Interface icons | Keep. |

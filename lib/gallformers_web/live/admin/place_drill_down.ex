@@ -206,92 +206,72 @@ defmodule GallformersWeb.Admin.PlaceDrillDown do
         target={@myself}
       >
         <:header_extra>
-          <button
+          <.button
             :if={@panel_mode == :country && @continent}
-            type="button"
+            variant="ghost"
+            size="sm"
+            icon="ph-arrow-up"
             phx-click="navigate_to_continent"
             phx-target={@myself}
-            class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline mb-2"
+            class="mb-2"
           >
-            <.icon name="ph-arrow-up" class="h-3 w-3" />
             {@continent.name}
-          </button>
+          </.button>
 
           <%= if @panel_mode == :country do %>
-            <p class="text-xs text-gray-500 mb-2">
+            <p class="mb-2 text-caption text-muted">
               Check states to include them in this gall's range.
             </p>
-            <div class="flex gap-2 mb-3">
-              <button
-                type="button"
-                phx-click="include_all"
-                phx-target={@myself}
-                class="text-xs text-green-700 hover:text-green-900 underline"
-              >
+            <div class="mb-3 flex flex-wrap gap-2">
+              <.button size="sm" phx-click="include_all" phx-target={@myself}>
                 Select All
-              </button>
-              <span class="text-xs text-gray-300">|</span>
-              <button
-                type="button"
-                phx-click="exclude_all"
-                phx-target={@myself}
-                class="text-xs text-red-700 hover:text-red-900 underline"
-              >
+              </.button>
+              <.button size="sm" phx-click="exclude_all" phx-target={@myself}>
                 Deselect All
-              </button>
+              </.button>
             </div>
           <% else %>
-            <p class="text-xs text-gray-500 mb-2">
+            <p class="mb-2 text-caption text-muted">
               Select countries to include in this gall's range.
             </p>
-            <div class="flex gap-2 mb-3">
-              <button
-                type="button"
-                phx-click="include_all_continent"
-                phx-target={@myself}
-                class="text-xs text-green-700 hover:text-green-900 underline"
-              >
+            <div class="mb-3 flex flex-wrap gap-2">
+              <.button size="sm" phx-click="include_all_continent" phx-target={@myself}>
                 Select All
-              </button>
-              <span class="text-xs text-gray-300">|</span>
-              <button
-                type="button"
-                phx-click="exclude_all_continent"
-                phx-target={@myself}
-                class="text-xs text-red-700 hover:text-red-900 underline"
-              >
+              </.button>
+              <.button size="sm" phx-click="exclude_all_continent" phx-target={@myself}>
                 Deselect All
-              </button>
+              </.button>
             </div>
           <% end %>
         </:header_extra>
 
         <%= if @panel_mode == :country do %>
-          <ul class="space-y-1">
+          <%!-- Each row's tint is the map legend's: in the Gall's range, or
+               a Host's place left out of it. --%>
+          <ul class="flex flex-col gap-1">
             <li :for={subdiv <- @subdivisions} class="flex items-center">
-              <label class={[
-                "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer",
-                subdiv.code in @omitted_codes && "bg-red-50 hover:bg-red-100",
-                subdiv.code not in @omitted_codes && subdiv.code in @introduced_codes &&
-                  "bg-amber-50 hover:bg-amber-100",
-                subdiv.code not in @omitted_codes && "bg-green-50 hover:bg-green-100"
-              ]}>
+              <label
+                data-state={if subdiv.code in @omitted_codes, do: "excluded", else: "included"}
+                class={[
+                  "flex w-full cursor-pointer items-center gap-2 rounded-ctl px-2 py-1.5 text-ui text-ink",
+                  if(subdiv.code in @omitted_codes,
+                    do: "bg-map-excluded/30 hover:bg-map-excluded/50",
+                    else: "bg-map-documented/15 hover:bg-map-documented/25"
+                  )
+                ]}
+              >
                 <input
                   type="checkbox"
                   checked={subdiv.code not in @omitted_codes}
                   phx-click="toggle_place"
                   phx-target={@myself}
                   phx-value-code={subdiv.code}
-                  class={[
-                    "rounded border-gray-300",
-                    subdiv.code in @omitted_codes && "text-red-600 focus:ring-red-500",
-                    subdiv.code not in @omitted_codes && "text-green-600 focus:ring-green-500"
-                  ]}
+                  class="gf-checkbox"
                 />
                 <span>{subdiv.name}</span>
                 <span
                   :if={subdiv.code in @introduced_codes}
-                  class="ml-1 text-xs text-amber-700 font-medium"
+                  class="ml-1 text-caption font-semibold text-ink-2"
                 >
                   (introduced host range)
                 </span>
@@ -299,17 +279,17 @@ defmodule GallformersWeb.Admin.PlaceDrillDown do
             </li>
           </ul>
         <% else %>
-          <ul class="space-y-1">
+          <ul class="flex flex-col gap-1">
             <li :for={country <- @continent_countries} class="flex items-center">
               <button
                 type="button"
                 phx-click="drill_into_country"
                 phx-target={@myself}
                 phx-value-code={country.code}
-                class="flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm hover:bg-gray-50"
+                class="flex w-full items-center gap-2 rounded-ctl px-2 py-1.5 text-left text-ui text-ink hover:bg-sky-soft"
               >
                 <span>{country.name}</span>
-                <span class="ml-auto text-xs text-gray-400">{country.code}</span>
+                <span class="ml-auto text-caption text-muted">{country.code}</span>
               </button>
             </li>
           </ul>

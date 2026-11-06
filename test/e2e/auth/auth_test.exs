@@ -18,13 +18,13 @@ defmodule GallformersWeb.E2E.AuthTest do
 
       conn
       |> visit("/")
-      |> assert_has("a[href='/auth/auth0']", text: "Login")
+      |> assert_has("a[href='/auth/auth0']", text: "Log in")
     end
 
     test "home page shows logout link when auth bypass is enabled", %{conn: conn} do
       conn
       |> visit("/")
-      |> assert_has("a[href='/auth/logout']", text: "Log Out")
+      |> assert_has("a[href='/auth/logout']", text: "Log out")
     end
   end
 

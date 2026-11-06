@@ -537,181 +537,189 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
-      <:page_title_html>New Taxon</:page_title_html>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin/taxonomy"}>Taxonomy</:crumb>
+          <:title>New taxon</:title>
+          <:description>
+            Add a plant from the POWO World Checklist of Vascular Plants, or any taxon by its name, rank and parent.
+          </:description>
+        </.page_header>
 
-      <Layouts.admin_edit_layout back_path={~p"/admin/taxonomy"} back_label="Back to Taxonomy">
-        <:intro>
-          Add a plant from the POWO World Checklist of Vascular Plants, or any taxon by its name,
-          rank and parent.
-        </:intro>
-
-        <div class="space-y-6">
+        <div class="flex min-w-0 flex-col gap-section">
           <%!-- From WCVP --%>
-          <.card
+          <.section
             :if={@wcvp_available}
             title="Add a plant from POWO-WCVP"
-            icon="ph-leaf"
-            class="overflow-visible relative"
+            class="relative max-w-form"
           >
             <.loading_overlay :if={@wcvp_loading} label="Loading WCVP data..." />
-            <p class="text-sm text-gray-600 mb-3">
-              Search the
-              <a
-                href="https://powo.science.kew.org/about-wcvp"
-                target="_blank"
-                class="text-blue-600 hover:underline"
+            <div class="flex flex-col gap-block">
+              <p class="text-ui text-ink-2">
+                Search the
+                <a href="https://powo.science.kew.org/about-wcvp" target="_blank">
+                  POWO World Checklist of Vascular Plants
+                </a>
+                to add a plant with its name, family, genus and range.
+              </p>
+              <.typeahead
+                id="wcvp-picker"
+                label="WCVP Search:"
+                placeholder="Search WCVP by species name (min 3 characters)..."
+                search_event="search_wcvp"
+                select_event="select_wcvp"
+                clear_event="clear_wcvp"
+                query={@wcvp_search_query}
+                results={@wcvp_search_results}
+                selected={@wcvp_selected}
+                display_fn={fn item -> item.taxon_name end}
               >
-                POWO World Checklist of Vascular Plants
-              </a>
-              to add a plant with its name, family, genus and range.
-            </p>
-            <.typeahead
-              id="wcvp-picker"
-              label="WCVP Search:"
-              placeholder="Search WCVP by species name (min 3 characters)..."
-              search_event="search_wcvp"
-              select_event="select_wcvp"
-              clear_event="clear_wcvp"
-              query={@wcvp_search_query}
-              results={@wcvp_search_results}
-              selected={@wcvp_selected}
-              display_fn={fn item -> item.taxon_name end}
-            >
-              <:result :let={item}>
-                <span class="italic">{item.taxon_name}</span>
-                <span class="text-gray-500 text-sm ml-1">{item.taxon_authors}</span>
-                <span class="text-gray-400 text-xs ml-2">({item.family})</span>
-              </:result>
-            </.typeahead>
-            <div
-              :if={@wcvp_searching}
-              id="wcvp-search-loading"
-              class="flex items-center gap-2 mt-2 text-sm text-gray-500"
-            >
-              <.loading_spinner size="sm" label="Searching WCVP..." />
-              <span>Searching WCVP...</span>
-            </div>
-
-            <div :if={@wcvp_prefilled} id="wcvp-prefilled" class="mt-3 space-y-3">
-              <.duplicate_host_warning warnings={@wcvp_warnings} />
-              <dl class="text-sm grid grid-cols-2 gap-x-4 gap-y-1 max-w-lg">
-                <dt class="text-gray-500">Name</dt>
-                <dd><.taxon_name name={@wcvp_prefilled.record.taxon_name} /></dd>
-                <dt class="text-gray-500">Genus</dt>
-                <dd>{@wcvp_prefilled.record.genus}</dd>
-                <dt class="text-gray-500">Family</dt>
-                <dd>{@wcvp_prefilled.record.family}</dd>
-              </dl>
-              <div class="text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
-                <p>{@wcvp_prefilled.summary}</p>
-                <label
-                  :if={@wcvp_prefilled.introduced_count > 0}
-                  class="mt-2 flex items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={@wcvp_prefilled.include_introduced}
-                    phx-click="toggle_wcvp_introduced"
-                    class="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                  <span>Include introduced range</span>
-                </label>
+                <:result :let={item}>
+                  <span class="italic">{item.taxon_name}</span>
+                  <span class="ml-1 text-meta text-muted">{item.taxon_authors}</span>
+                  <span class="ml-2 text-caption text-muted">({item.family})</span>
+                </:result>
+              </.typeahead>
+              <div
+                :if={@wcvp_searching}
+                id="wcvp-search-loading"
+                class="flex items-center gap-2 text-meta text-muted"
+              >
+                <.loading_spinner size="sm" label="Searching WCVP..." />
+                <span>Searching WCVP...</span>
               </div>
-              <.button id="add-from-wcvp" type="button" variant="primary" phx-click="add_from_wcvp">
-                Add plant
-              </.button>
+
+              <div :if={@wcvp_prefilled} id="wcvp-prefilled" class="flex flex-col gap-block">
+                <.duplicate_host_warning warnings={@wcvp_warnings} />
+                <.fact_list columns={1} class="max-w-lg">
+                  <:item label="Name"><.taxon_name name={@wcvp_prefilled.record.taxon_name} /></:item>
+                  <:item label="Genus">{@wcvp_prefilled.record.genus}</:item>
+                  <:item label="Family">{@wcvp_prefilled.record.family}</:item>
+                </.fact_list>
+                <.notice kind={:ok}>
+                  <p>{@wcvp_prefilled.summary}</p>
+                  <label
+                    :if={@wcvp_prefilled.introduced_count > 0}
+                    class="mt-2 flex cursor-pointer items-center gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={@wcvp_prefilled.include_introduced}
+                      phx-click="toggle_wcvp_introduced"
+                      class="gf-checkbox"
+                    />
+                    <span>Include introduced range</span>
+                  </label>
+                </.notice>
+                <div>
+                  <.button
+                    id="add-from-wcvp"
+                    type="button"
+                    variant="primary"
+                    phx-click="add_from_wcvp"
+                  >
+                    Add plant
+                  </.button>
+                </div>
+              </div>
             </div>
-          </.card>
+          </.section>
 
           <%!-- By name --%>
-          <.card title="Add a taxon by name" icon="ph-plus">
-            <.form for={@form} id="taxon-form" phx-change="validate" phx-submit="create">
-              <div class="grid grid-cols-2 gap-4 mb-3">
-                <.input field={@form[:name]} label="Name" placeholder="e.g. Quercus alba" />
-                <.input field={@form[:rank]} type="select" label="Rank" options={rank_options()} />
+          <.section title="Add a taxon by name">
+            <div class="flex flex-col gap-block">
+              <.form
+                for={@form}
+                id="taxon-form"
+                phx-change="validate"
+                phx-submit="create"
+                class="flex max-w-form flex-col gap-block"
+              >
+                <div class="grid grid-cols-2 gap-block">
+                  <.input field={@form[:name]} label="Name" placeholder="e.g. Quercus alba" />
+                  <.input field={@form[:rank]} type="select" label="Rank" options={rank_options()} />
+                </div>
+
+                <div>
+                  <.typeahead
+                    id="parent-picker"
+                    label="Parent"
+                    placeholder="Search for the parent..."
+                    search_event="search_parent"
+                    select_event="select_parent"
+                    clear_event="clear_parent"
+                    query={@parent_query}
+                    results={@parent_results}
+                    selected={@selected_parent}
+                    display_fn={fn p -> "#{p.name} (#{p.rank})" end}
+                  >
+                    <:result :let={parent}>
+                      <.taxon_name name={parent.name} rank={name_rank(parent.rank)} />
+                      <span class="ml-1 text-caption text-muted">({parent.rank})</span>
+                    </:result>
+                  </.typeahead>
+                  <p class="gf-hint">
+                    Below family a parent is required. The new taxon takes its parent's kingdom.
+                  </p>
+                </div>
+
+                <div :if={is_nil(@selected_parent)} class="max-w-xs">
+                  <.input field={@form[:kingdom]} label="Kingdom" placeholder="e.g. Animalia" />
+                </div>
+
+                <.duplicate_host_warning warnings={@duplicate_warnings} />
+
+                <div :if={@children != []} id="children-to-move">
+                  <p class="gf-label">Children to move under it</p>
+                  <p class="mb-2 text-meta text-muted">
+                    The parent's children that rank below the new taxon. Moving one moves its subtree.
+                  </p>
+                  <ul class="flex flex-col gap-1">
+                    <li :for={child <- @children}>
+                      <label class="flex items-center gap-2 text-ui">
+                        <input
+                          type="checkbox"
+                          checked={MapSet.member?(@selected_children, child.taxon_id)}
+                          phx-click="toggle_child"
+                          phx-value-id={child.taxon_id}
+                          class="gf-checkbox"
+                        />
+                        <.taxon_name name={child.name} rank={name_rank(child.rank)} />
+                        <span class="text-caption text-muted">({child.rank})</span>
+                      </label>
+                    </li>
+                  </ul>
+                </div>
+              </.form>
+
+              <div :if={@plant?}>
+                <p class="gf-label">Host range</p>
+                <RangeEditor.editor
+                  refreshable={false}
+                  range_taxon_name={@range_taxon_name}
+                  range_entries={@range_entries}
+                  all_places={@all_places}
+                  place_by_code={@place_by_code}
+                  in_range={@in_range}
+                  inherited_range={@inherited_range}
+                  introduced_range={@introduced_range}
+                  range_bounds={@range_bounds}
+                />
               </div>
 
-              <div class="mb-3">
-                <.typeahead
-                  id="parent-picker"
-                  label="Parent"
-                  placeholder="Search for the parent..."
-                  search_event="search_parent"
-                  select_event="select_parent"
-                  clear_event="clear_parent"
-                  query={@parent_query}
-                  results={@parent_results}
-                  selected={@selected_parent}
-                  display_fn={fn p -> "#{p.name} (#{p.rank})" end}
-                >
-                  <:result :let={parent}>
-                    <.taxon_name name={parent.name} rank={name_rank(parent.rank)} />
-                    <span class="text-xs text-gray-500 ml-1">({parent.rank})</span>
-                  </:result>
-                </.typeahead>
-                <p class="mt-1 text-xs text-gray-500">
-                  Below family a parent is required. The new taxon takes its parent's kingdom.
-                </p>
+              <div class="flex justify-end gap-2 border-t border-line pt-block">
+                <.button variant="ghost" phx-click="request_cancel">Cancel</.button>
+                <.button id="create-taxon" type="submit" form="taxon-form" variant="primary">
+                  Create
+                </.button>
               </div>
-
-              <div :if={is_nil(@selected_parent)} class="mb-3 max-w-xs">
-                <.input field={@form[:kingdom]} label="Kingdom" placeholder="e.g. Animalia" />
-              </div>
-
-              <.duplicate_host_warning warnings={@duplicate_warnings} />
-
-              <div :if={@children != []} id="children-to-move" class="mb-3">
-                <p class="gf-label">Children to move under it</p>
-                <p class="mb-2 text-xs text-gray-500">
-                  The parent's children that rank below the new taxon. Moving one moves its subtree.
-                </p>
-                <ul class="space-y-1">
-                  <li :for={child <- @children}>
-                    <label class="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={MapSet.member?(@selected_children, child.taxon_id)}
-                        phx-click="toggle_child"
-                        phx-value-id={child.taxon_id}
-                        class="rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-                      />
-                      <.taxon_name name={child.name} rank={name_rank(child.rank)} />
-                      <span class="text-xs text-gray-500">({child.rank})</span>
-                    </label>
-                  </li>
-                </ul>
-              </div>
-            </.form>
-
-            <div :if={@plant?} class="mt-3">
-              <p class="gf-label">Host range</p>
-              <RangeEditor.editor
-                refreshable={false}
-                range_taxon_name={@range_taxon_name}
-                range_entries={@range_entries}
-                all_places={@all_places}
-                place_by_code={@place_by_code}
-                in_range={@in_range}
-                inherited_range={@inherited_range}
-                introduced_range={@introduced_range}
-                range_bounds={@range_bounds}
-              />
             </div>
-
-            <div class="flex justify-end gap-2 pt-3 border-t border-gray-200">
-              <button type="button" phx-click="request_cancel" class="gf-btn gf-btn-soft">
-                Cancel
-              </button>
-              <button id="create-taxon" type="submit" form="taxon-form" class="gf-btn gf-btn-primary">
-                Create
-              </button>
-            </div>
-          </.card>
+          </.section>
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
-      </Layouts.admin_edit_layout>
+      </div>
     </Layouts.admin>
     """
   end

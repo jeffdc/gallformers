@@ -18,6 +18,35 @@ defmodule GallformersWeb.HostsBrowseLiveTest do
 
   defp family_key(old_id), do: "f-#{Taxa.get_by_legacy_id(:taxonomy, old_id).id}"
 
+  describe "/hosts cards" do
+    test "families most galled first, each counting its distinct Galls", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/hosts")
+
+      counts =
+        view
+        |> render()
+        |> LazyHTML.from_document()
+        |> LazyHTML.query("article [data-part=count]")
+        |> Enum.map(fn count ->
+          count
+          |> LazyHTML.text()
+          |> String.split()
+          |> hd()
+          |> String.replace(",", "")
+          |> String.to_integer()
+        end)
+
+      assert counts == Enum.sort(counts, :desc)
+      assert hd(counts) > 0
+
+      assert has_element?(
+               view,
+               ~s{nav[aria-label="Browse by"] a[aria-current=page]},
+               "By host plant"
+             )
+    end
+  end
+
   describe "/hosts page" do
     test "renders the hosts browse page with tree", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/hosts")

@@ -150,7 +150,23 @@ defmodule Gallformers.Catalog.GallIndexTest do
 
       :ok = Catalog.refresh_gall_index([gall.id])
 
-      assert %GallIndex{everywhere: true, place_ids: [], image_id: nil} = row(gall)
+      assert %GallIndex{everywhere: true, place_ids: [], known_place_ids: [], image_id: nil} =
+               row(gall)
+    end
+
+    test "known places leave out a Host's introduced range where the Gall isn't recorded", %{
+      source: source
+    } do
+      oak = plant_fixture()
+      host_range_fixture(oak, [{"US-CA", "exact"}, {"RO-B", "exact", "introduced"}])
+      gall = gall_fixture()
+      host!(oak, gall, confirm(source))
+
+      :ok = Catalog.refresh_gall_index([gall.id])
+      row = row(gall)
+
+      assert Enum.sort(row.place_ids) == Enum.sort([place_id("US-CA"), place_id("RO-B")])
+      assert row.known_place_ids == [place_id("US-CA")]
     end
 
     test "a genus Host's places are its species' ranges", %{source: source} do

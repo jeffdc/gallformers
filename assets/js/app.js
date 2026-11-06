@@ -4,6 +4,8 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import {installSearchShortcut} from "./search_shortcut"
+import {listen as listenForTheme} from "./theme"
 
 // Hooks
 import AdminNav from "./hooks/admin_nav"
@@ -11,8 +13,8 @@ import ArticleImageUpload from "./hooks/article_image_upload"
 import AutoDismiss from "./hooks/auto_dismiss"
 import ContentImageUpload from "./hooks/content_image_upload"
 import CopyToClipboard from "./hooks/copy_to_clipboard"
-import DailyChart from "./hooks/daily_chart"
-import ImageGallery from "./hooks/image_gallery"
+import Palette from "./hooks/palette"
+import PhotoViewer from "./hooks/photo_viewer"
 import ImageUpload from "./hooks/image_upload"
 import IndeterminateCheckbox from "./hooks/indeterminate_checkbox"
 import InputEvent from "./hooks/input_event"
@@ -22,18 +24,23 @@ import RegionScope from "./hooks/region_scope"
 import ScrollToCouplet from "./hooks/scroll_to_couplet"
 import SortableImages from "./hooks/sortable_images"
 import SourceReader from "./hooks/source_reader"
-import Tabs from "./hooks/tabs"
 import Typeahead from "./hooks/typeahead"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
-  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, DailyChart, ImageGallery, ImageUpload, IndeterminateCheckbox, InputEvent, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, SourceReader, Tabs, Typeahead},
+  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, ImageUpload, IndeterminateCheckbox, InputEvent, Palette, PhotoViewer, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, SourceReader, Typeahead},
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+// The bar takes its color from the design system's link token.
+const linkColor = getComputedStyle(document.documentElement).getPropertyValue("--gf-link").trim()
+topbar.config({barColors: {0: linkColor || "#1c5d8f"}, shadowColor: "rgba(0, 0, 0, .3)"})
+
+// "/" (or a search_field's own shortcut) focuses search.
+installSearchShortcut()
+listenForTheme()
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 

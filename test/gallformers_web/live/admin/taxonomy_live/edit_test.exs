@@ -46,7 +46,12 @@ defmodule GallformersWeb.Admin.TaxonomyLive.EditTest do
 
       assert html =~ "#{Taxa.accepted_name(genus)} shown"
       assert html =~ "Species"
-      assert has_element?(view, "#taxon-lineage a[href='/admin/taxonomy/#{genus.id}']")
+
+      assert has_element?(
+               view,
+               "nav[aria-label='Breadcrumb'] a[href='/admin/taxonomy/#{genus.id}']"
+             )
+
       assert has_element?(view, "a[href='/host/#{plant.id}']")
     end
 

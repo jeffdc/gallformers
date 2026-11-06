@@ -13,6 +13,10 @@ defmodule GallformersWeb.GenusLiveTest do
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
+  # The page's visible text: a name's italic and upright parts are separate
+  # elements, so assert on text rather than raw HTML.
+  defp page_text(html), do: html |> LazyHTML.from_document() |> LazyHTML.text()
+
   # Reading the seeds, converted, is part of what this module tests.
   # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
 
@@ -52,17 +56,25 @@ defmodule GallformersWeb.GenusLiveTest do
     test "lists the Galls of its Inducers, the undescribed one too, with Host counts", %{
       conn: conn
     } do
-      {:ok, view, html} = live(conn, "/genus/Andricus")
+      {:ok, view, _html} = live(conn, "/genus/Andricus")
 
-      assert html =~ "Galls (4)"
-      refute html =~ "Hosts ("
+      assert has_element?(view, "#genus-galls-section h2", "Galls")
+      assert has_element?(view, "#genus-galls-section [data-part=count]", "4")
+      refute has_element?(view, "#genus-hosts-section")
 
       for id <- [200, 300, 301, 304] do
         assert has_element?(view, ~s{a[href="/gall/#{id}"]})
       end
 
+      view |> element("button[phx-click=galls_view][phx-value-view=table]") |> render_click()
+
       assert has_element?(view, "tbody tr", ~r/Andricus seedii \(agamic\)\s+seed oak apple\s+1/)
-      assert has_element?(view, "tbody tr", ~r/Andricus n-densiflorus-seed-gall\s+2/)
+
+      assert has_element?(
+               view,
+               "tbody tr",
+               ~r/Andricus n-densiflorus-seed-gall\s+Undescribed\s+2/
+             )
     end
 
     test "filters the list by name or common name", %{conn: conn} do
@@ -70,15 +82,12 @@ defmodule GallformersWeb.GenusLiveTest do
 
       html = view |> element("#genus-search-form") |> render_change(%{"query" => "oak apple"})
 
-      assert html =~ "Andricus seedii (agamic)"
-      refute html =~ "Andricus crystallinus"
+      assert page_text(html) =~ "Andricus seedii (agamic)"
+      refute page_text(html) =~ "Andricus crystallinus"
     end
 
-    test "returns error for nonexistent genus name", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/genus/Nonexistent")
-
-      assert html =~ "Genus not found"
-      assert page_title(view) =~ "Not Found"
+    test "an unknown genus name is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, "/genus/Nonexistent") end
     end
 
     test "an old numeric URL redirects through the crosswalk", %{conn: conn} do
@@ -90,80 +99,92 @@ defmodule GallformersWeb.GenusLiveTest do
     test "lists its plants with gall counts, and the Galls on the genus as a whole", %{
       conn: conn
     } do
-      {:ok, view, html} = live(conn, "/genus/Notholithocarpus")
+      {:ok, view, _html} = live(conn, "/genus/Notholithocarpus")
 
-      assert html =~ "Hosts (1)"
+      assert has_element?(view, "#genus-hosts-section h2", "Species")
+      assert has_element?(view, "#genus-hosts-section [data-part=count]", "1")
       assert has_element?(view, ~s{a[href="/host/10"]})
       assert has_element?(view, "tbody tr", ~r/Notholithocarpus densiflorus\s+tanoak\s+5/)
 
-      assert html =~ "Galls on the genus as a whole (1)"
-      assert has_element?(view, ~s{a[href="/gall/304"]})
-      refute html =~ "Galls (1)"
+      assert has_element?(view, "#galls-on-taxon", "Andricus")
+      assert has_element?(view, ~s{#galls-on-taxon a[href="/gall/304"]})
+      refute has_element?(view, "#genus-galls-section")
+
+      assert has_element?(
+               view,
+               ~s{a[href="/id?g=Notholithocarpus"]},
+               "Identify a gall on Notholithocarpus"
+             )
     end
 
     test "shows its common name, migrated from the old taxonomy description", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/genus/Notholithocarpus")
+      {:ok, view, _html} = live(conn, "/genus/Notholithocarpus")
 
-      assert html =~ "Notholithocarpus (Tanoaks)"
+      assert has_element?(view, "header dd", "Tanoaks")
     end
   end
 
   describe "related genera" do
-    test "shows associated host genera collapsed and filters Galls when expanded", %{conn: conn} do
+    test "the Host genus facet narrows the Galls", %{conn: conn} do
       fixture = create_mapping_fixture()
+      other_host = plant_fixture(name: "LiveMappingOtherHost", rank: :genus)
 
-      {:ok, view, html} = live(conn, "/genus/#{fixture.gall_genus_name}")
+      extra =
+        for i <- 1..6 do
+          gall = gall_fixture(name: "LiveMappingGallGenus unrelatus extra #{i}")
+          relate!("inducer_of", fixture.unrelated_inducer, gall)
+          relate!("host_of", other_host, gall)
+          gall
+        end
 
-      assert html =~ "Host genera used by this genus"
-      assert html =~ "Show filters"
-      refute has_element?(view, "#related-genera-filters-galls")
+      :ok =
+        Catalog.refresh_gall_index(
+          [fixture.associated_gall.id, fixture.unrelated_gall.id] ++ Enum.map(extra, & &1.id)
+        )
 
-      view
-      |> element("button[phx-click='toggle_related_genera'][phx-value-section='galls']")
-      |> render_click()
+      {:ok, view, _html} = live(conn, "/genus/#{fixture.gall_genus_name}")
 
-      assert has_element?(view, "#related-genera-filters-galls")
-      assert render(view) =~ fixture.host_genus_name
-      assert has_element?(view, "button.gf-btn-pill[phx-value-id='all']")
+      assert has_element?(view, "#genus-galls-facets", fixture.host_genus_name)
 
-      view
-      |> element(
-        "button[phx-click='filter_related_genus'][phx-value-id='#{fixture.host_genus.id}']"
-      )
-      |> render_click()
+      html =
+        view
+        |> element("#genus-galls-facets")
+        |> render_change(%{"host" => [fixture.host_genus_name]})
 
-      filtered_html = render(view)
-      assert filtered_html =~ fixture.associated_gall.name
-      refute filtered_html =~ fixture.unrelated_gall.name
+      assert page_text(html) =~ fixture.associated_gall.name
+      refute page_text(html) =~ fixture.unrelated_gall.name
+      assert has_element?(view, "#genus-galls-section [data-part=count]", "1 of 8")
+
+      view |> element("button[phx-click=galls_clear]") |> render_click()
+      assert has_element?(view, "#genus-galls-section [data-part=count]", "8")
     end
 
-    test "shows associated gall-former genera collapsed and filters hosts when expanded", %{
-      conn: conn
-    } do
+    test "the Gallformer genera on its plants filter the plants", %{conn: conn} do
       fixture = create_mapping_fixture()
 
-      {:ok, view, html} = live(conn, "/genus/#{fixture.host_genus_name}")
+      {:ok, view, _html} = live(conn, "/genus/#{fixture.host_genus_name}")
 
-      assert html =~ "Gall-former genera found on this host"
-      assert html =~ "Show filters"
-      refute has_element?(view, "#related-genera-filters-hosts")
+      assert has_element?(view, "button[phx-click=plants_filter]", fixture.gall_genus_name)
 
-      view
-      |> element("button[phx-click='toggle_related_genera'][phx-value-section='hosts']")
-      |> render_click()
+      html =
+        view
+        |> element("button[phx-click=plants_filter][phx-value-id='#{fixture.gall_genus.id}']")
+        |> render_click()
 
-      assert has_element?(view, "#related-genera-filters-hosts")
-      assert render(view) =~ fixture.gall_genus_name
+      assert page_text(html) =~ fixture.associated_host_name
+      refute page_text(html) =~ fixture.unrelated_host_name
 
-      view
-      |> element(
-        "button[phx-click='filter_related_genus'][phx-value-id='#{fixture.gall_genus.id}']"
-      )
-      |> render_click()
+      assert has_element?(
+               view,
+               "button[phx-click=plants_filter][phx-value-id='#{fixture.gall_genus.id}'][aria-pressed=true]"
+             )
 
-      filtered_html = render(view)
-      assert filtered_html =~ fixture.associated_host_name
-      refute filtered_html =~ fixture.unrelated_host_name
+      html =
+        view
+        |> element("button[phx-click=plants_filter][phx-value-id=all]")
+        |> render_click()
+
+      assert page_text(html) =~ fixture.unrelated_host_name
     end
   end
 
@@ -174,10 +195,11 @@ defmodule GallformersWeb.GenusLiveTest do
     gall = gall_fixture(name: "Bothfixtura leucarpa witches broom")
     relate!("inducer_of", mistletoe, gall)
 
-    {:ok, view, html} = live(conn, "/genus/Bothfixtura")
+    :ok = Catalog.refresh_gall_index([gall.id])
+    {:ok, view, _html} = live(conn, "/genus/Bothfixtura")
 
-    assert html =~ "Galls (1)"
-    assert html =~ "Hosts (1)"
+    assert has_element?(view, "#genus-galls-section [data-part=count]", "1")
+    assert has_element?(view, "#genus-hosts-section [data-part=count]", "1")
     assert has_element?(view, ~s{a[href="/gall/#{gall.id}"]})
     assert has_element?(view, ~s{a[href="/host/#{mistletoe.id}"]})
   end
@@ -203,9 +225,9 @@ defmodule GallformersWeb.GenusLiveTest do
     end
 
     test "the family hint picks one", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/genus/Twinfixta?family=Twinfixtaceae")
+      {:ok, view, html} = live(conn, "/genus/Twinfixta?family=Twinfixtaceae")
 
-      assert html =~ "Hosts (1)"
+      assert has_element?(view, "#genus-hosts-section [data-part=count]", "1")
       assert html =~ "Twinfixta alba"
     end
   end
@@ -236,6 +258,7 @@ defmodule GallformersWeb.GenusLiveTest do
       host_genus_name: "LiveMappingHostGenus",
       associated_gall: associated_gall,
       unrelated_gall: unrelated_gall,
+      unrelated_inducer: unrelated_inducer,
       associated_host_name: "LiveMappingHostGenus associata",
       unrelated_host_name: "LiveMappingHostGenus unrelata"
     }

@@ -326,7 +326,7 @@ describe('ImageUpload drag and drop', () => {
     event.stopPropagation = vi.fn()
     hook.dropzone.dispatchEvent(event)
 
-    expect(hook.dropzone.classList.contains('border-gf-maroon')).toBe(true)
+    expect(hook.dropzone.classList.contains('border-brand')).toBe(true)
   })
 
   test('dragleave removes highlight classes', () => {
@@ -344,6 +344,6 @@ describe('ImageUpload drag and drop', () => {
     leave.stopPropagation = vi.fn()
     hook.dropzone.dispatchEvent(leave)
 
-    expect(hook.dropzone.classList.contains('border-gf-maroon')).toBe(false)
+    expect(hook.dropzone.classList.contains('border-brand')).toBe(false)
   })
 })

@@ -167,6 +167,48 @@ defmodule GallformersWeb.Admin.KeyLive.FormTest do
     end
   end
 
+  describe "the page" do
+    setup do
+      {:ok, key} =
+        Keys.create_key(%{
+          title: "Key to fixture galls",
+          version: "2026-11-06",
+          couplets: @couplets
+        })
+
+      %{key: key}
+    end
+
+    test "a key: crumb, title, version, couplets and its page on the site", %{
+      conn: conn,
+      key: key
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/keys/#{key.id}")
+
+      assert has_element?(view, "nav[aria-label=Breadcrumb] a[href='/admin/keys']", "Keys")
+      assert has_element?(view, "h1", "Key to fixture galls")
+      assert has_element?(view, "[data-part=meta]", "2026-11-06")
+      assert has_element?(view, "[data-part=meta]", "Couplets")
+      assert has_element?(view, "a[href='/keys/#{key.slug}']", "View on site")
+    end
+
+    test "Regenerate PDFs and Delete are in the rail", %{conn: conn, key: key} do
+      {:ok, view, _html} = live(conn, ~p"/admin/keys/#{key.id}")
+
+      assert has_element?(view, "#pdfs button[phx-click=regenerate_pdfs]")
+
+      view |> element("#danger button", "Delete…") |> render_click()
+      assert has_element?(view, "#dangerous-delete-modal", key.title)
+    end
+
+    test "a new key: its title, no rail", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/keys/new")
+
+      assert has_element?(view, "h1", "New key")
+      refute has_element?(view, "#danger")
+    end
+  end
+
   describe "dangerous delete confirmation" do
     test "edit view requires the exact key title before deletion", %{conn: conn} do
       {:ok, key} =
@@ -191,31 +233,6 @@ defmodule GallformersWeb.Admin.KeyLive.FormTest do
       render_submit(view, "confirm_delete", %{"confirmation" => key.title})
 
       assert_redirect(view, "/admin/keys")
-      assert {:error, :not_found} = Keys.get_key(key.slug)
-    end
-
-    test "index view requires the exact key title before deletion", %{conn: conn} do
-      {:ok, key} =
-        Keys.create_key(%{
-          title: "Destructive delete key",
-          version: "2026-09-02",
-          couplets: @couplets
-        })
-
-      {:ok, view, _html} = live(conn, ~p"/admin/keys")
-
-      render_click(view, "delete", %{"id" => Integer.to_string(key.id)})
-
-      assert has_element?(view, "#dangerous-delete-modal", key.title)
-      assert Keys.get_key!(key.id).id == key.id
-
-      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong title"})
-
-      assert html =~ "Title does not match"
-      assert Keys.get_key!(key.id).id == key.id
-
-      render_submit(view, "confirm_delete", %{"confirmation" => key.title})
-
       assert {:error, :not_found} = Keys.get_key(key.slug)
     end
   end

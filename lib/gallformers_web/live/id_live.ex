@@ -918,9 +918,19 @@ defmodule GallformersWeb.IDLive do
         unscoped_count: unscoped_count
       )
 
-    if socket.assigns.filters == default_filters(),
-      do: assign(socket, total_count: length(results)),
-      else: socket
+    # The Host's (or genus's) count before any filter: from these results
+    # when no filter is set, otherwise counted with the filters reset, so a
+    # page opened with filters, or a new Host under filters, reports it truly.
+    total_count =
+      if socket.assigns.filters == default_filters(),
+        do: length(results),
+        else:
+          socket
+          |> assign(filters: default_filters())
+          |> identify_filters()
+          |> Catalog.count_identified()
+
+    assign(socket, total_count: total_count)
   end
 
   # The page's selections as `Gallformers.Catalog.identify/1` filters.
@@ -997,214 +1007,198 @@ defmodule GallformersWeb.IDLive do
           default_continent_code={@default_continent_code}
         />
       </:subheader>
-      <div class="py-4">
-        <%!-- Host/Genus Pickers --%>
-        <div class="mb-2">
-          <div class="grid grid-cols-1 md:grid-cols-11 gap-2 items-end">
-            <div class="md:col-span-5">
-              <.typeahead
-                id="host-picker"
-                label="Host Plant Species:"
-                placeholder="Search species..."
-                query={@host_query}
-                results={@host_results}
-                selected={@selected_host}
-                search_event="search_host"
-                select_event="select_host"
-                clear_event="clear_host"
-                display_fn={&format_host_display/1}
-              >
-                <:result :let={host}>
-                  <.taxon_name name={format_host_display(host)} />
-                  <span :if={!host.datacomplete} class="ml-2 text-xs text-yellow-600">
-                    (incomplete)
-                  </span>
-                </:result>
-              </.typeahead>
-            </div>
-            <div class="md:col-span-1 text-center text-sm text-gray-500 pb-2">
-              OR
-            </div>
-            <div class="md:col-span-5">
-              <.typeahead
-                id="genus-picker"
-                label="Host Plant Genus / Section:"
-                placeholder="Search genera..."
-                query={@genus_query}
-                results={@genus_results}
-                selected={@selected_genus}
-                search_event="search_genus"
-                select_event="select_genus"
-                clear_event="clear_genus"
-                display_fn={&format_genus_display/1}
-              >
-                <:result :let={genus}>
-                  <.taxon_name name={genus.name} rank={to_string(genus.rank)} />
-                  <span :if={rank_label(genus.rank) != ""} class="ml-1 text-xs text-gray-500">
-                    {String.trim(rank_label(genus.rank))}
-                  </span>
-                  <span :if={genus.description} class="block text-xs text-gray-500 truncate">
-                    {genus.description}
-                  </span>
-                </:result>
-              </.typeahead>
-            </div>
+      <div class="flex flex-col gap-block">
+        <.page_header>
+          <:title>Identify a gall</:title>
+        </.page_header>
+
+        <%!-- Host / genus pickers: always visible --%>
+        <div class="grid grid-cols-1 items-end gap-3 rounded-panel border border-line bg-surface p-panel md:grid-cols-12">
+          <div class="md:col-span-6">
+            <.typeahead
+              id="host-picker"
+              label="Host plant"
+              placeholder="Species or common name: Quercus rubra, red oak…"
+              query={@host_query}
+              results={@host_results}
+              selected={@selected_host}
+              search_event="search_host"
+              select_event="select_host"
+              clear_event="clear_host"
+              display_fn={&format_host_display/1}
+            >
+              <:result :let={host}>
+                <.taxon_name name={format_host_display(host)} />
+                <.chip :if={!host.datacomplete} variant={:warn} size="sm" class="ml-2">
+                  incomplete
+                </.chip>
+              </:result>
+            </.typeahead>
+          </div>
+          <div class="text-center text-meta text-muted md:col-span-1 md:pb-2">or</div>
+          <div class="md:col-span-5">
+            <.typeahead
+              id="genus-picker"
+              label="Host genus or section"
+              placeholder="Quercus, sect. Lobatae…"
+              query={@genus_query}
+              results={@genus_results}
+              selected={@selected_genus}
+              search_event="search_genus"
+              select_event="select_genus"
+              clear_event="clear_genus"
+              display_fn={&format_genus_display/1}
+            >
+              <:result :let={genus}>
+                <.taxon_name name={genus.name} rank={to_string(genus.rank)} />
+                <span :if={rank_label(genus.rank) != ""} class="ml-1 text-caption text-muted">
+                  {String.trim(rank_label(genus.rank))}
+                </span>
+                <span :if={genus.description} class="block truncate text-caption text-muted">
+                  {genus.description}
+                </span>
+              </:result>
+            </.typeahead>
           </div>
         </div>
 
-        <hr class="border-gray-200 mb-4" />
-
-        <%!-- Filter Panel (only shown when host/genus selected) --%>
-        <div :if={@selected_host != nil or @selected_genus != nil} class="mb-2">
-          <%!-- Primary Filters (4-column grid) --%>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <.multi_select_typeahead
-                id="plant_parts"
-                name="plant_part"
-                label="Plant Part(s):"
-                placeholder="Plant Parts"
-                options={@plant_part_options}
-                selected={@filters.plant_parts}
-                option_label={:label}
-                query={@plant_part_query}
-                focused={@plant_part_focused}
-              />
-              <.logic_toggle
-                :if={length(@filters.plant_parts) > 1}
-                logic={@filters.plant_part_logic}
-                toggle_event="toggle_plant_part_logic"
-              />
-            </div>
-            <.detachable_filter value={@filters.detachable} />
-            <div>
-              <.typeahead
-                id="place-filter"
-                label="Region"
-                placeholder="Search regions..."
-                search_event="search_place"
-                select_event="select_place"
-                clear_event="clear_place"
-                query={@place_query}
-                results={@place_results}
-                selected={@selected_place}
-                display_fn={
-                  fn place ->
-                    type = Map.get(place, :type)
-                    parent = Map.get(place, :parent_name)
-
-                    if type in ["state", "province"] and parent not in [nil, ""] do
-                      "#{place.name} — #{parent}"
-                    else
-                      place.name
-                    end
-                  end
-                }
-                group_key={:group}
-              />
-            </div>
-            <.family_filter families={@families} value={@filters.family && @filters.family.id} />
-          </div>
-
-          <%!-- Advanced Filters Toggle and Clear --%>
-          <div class="flex justify-between items-center pt-2">
+        <%!-- Filters: once a host or genus is chosen; they apply to the traits only --%>
+        <div :if={@selected_host != nil or @selected_genus != nil} class="flex flex-col gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-subsection">Narrow it down</h2>
+            <%!-- Phones: the filters fold behind one button (markup only) --%>
             <button
               type="button"
-              phx-click="toggle_advanced"
-              class="text-sm hover:underline"
+              class="gf-btn gf-btn-secondary md:hidden"
+              phx-click={JS.toggle_class("hidden", to: "#id-filter-panel")}
             >
-              {if @show_advanced, do: "Hide Advanced Filters", else: "Show Advanced Filters"}
+              <.icon name="ph-funnel" /> Filters
+              <span :if={active_filters(@filters) > 0} class="text-autumn-ink tabular-nums">
+                {active_filters(@filters)}
+              </span>
             </button>
-            <.button type="button" phx-click="clear_all" variant="danger" size="sm">
-              Clear Filters
-            </.button>
+            <div class="ml-auto flex items-center gap-2">
+              <.button variant="ghost" phx-click="toggle_advanced">
+                {if @show_advanced, do: "Fewer filters", else: "More filters"}
+              </.button>
+              <.button
+                :if={active_filters(@filters) > 0}
+                icon="ph-x"
+                phx-click="clear_all"
+                title="Clears the trait filters. The Host, your region and the name filter stay."
+              >
+                Clear {active_filters(@filters)} {if active_filters(@filters) == 1,
+                  do: "filter",
+                  else: "filters"}
+              </.button>
+            </div>
           </div>
 
-          <%!-- Advanced Filters (Collapsible) --%>
-          <div :if={@show_advanced} class="border-t border-gray-200 pt-3 mt-3">
-            <p class="text-sm text-gray-500 italic mb-3">
-              Be aware that many galls do not have associated information for all of the below properties.
-            </p>
+          <div id="id-filter-panel" class="hidden flex-col gap-3 md:flex">
+            <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div class="sm:col-span-2">
+                <.multi_select_typeahead
+                  id="plant_parts"
+                  name="plant_part"
+                  label="Plant parts"
+                  placeholder="Leaf, stem, bud…"
+                  options={@plant_part_options}
+                  selected={@filters.plant_parts}
+                  option_label={:label}
+                  query={@plant_part_query}
+                  focused={@plant_part_focused}
+                />
+                <.logic_toggle
+                  :if={length(@filters.plant_parts) > 1}
+                  logic={@filters.plant_part_logic}
+                  toggle_event="toggle_plant_part_logic"
+                />
+              </div>
+              <.detachable_filter value={@filters.detachable} counts={counts(@results, "detachable")} />
+              <div>
+                <.typeahead
+                  id="place-filter"
+                  label="Region"
+                  placeholder="Country, state…"
+                  search_event="search_place"
+                  select_event="select_place"
+                  clear_event="clear_place"
+                  query={@place_query}
+                  results={@place_results}
+                  selected={@selected_place}
+                  display_fn={
+                    fn place ->
+                      type = Map.get(place, :type)
+                      parent = Map.get(place, :parent_name)
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                      if type in ["state", "province"] and parent not in [nil, ""] do
+                        "#{place.name} — #{parent}"
+                      else
+                        place.name
+                      end
+                    end
+                  }
+                  group_key={:group}
+                />
+              </div>
+              <.family_filter families={@families} value={@filters.family && @filters.family.id} />
               <.trait_filter
                 filter="season"
                 label="Season (forms and grows)"
-                prompt="Any Season"
+                prompt="Any"
                 options={trait_options(@trait_values, "season")}
                 value={@filters.season}
-              />
-              <div>
-                <.multi_select_typeahead
-                  id="textures"
-                  name="texture"
-                  label="Texture(s):"
-                  placeholder="Textures"
-                  options={@texture_options}
-                  selected={@filters.textures}
-                  option_label={:label}
-                  query={@texture_query}
-                  focused={@texture_focused}
-                />
-                <.logic_toggle
-                  :if={length(@filters.textures) > 1}
-                  logic={@filters.texture_logic}
-                  toggle_event="toggle_texture_logic"
-                />
-              </div>
-              <.trait_filter
-                filter="alignment"
-                label="Alignment"
-                prompt="Any Alignment"
-                options={trait_options(@trait_values, "alignment")}
-                value={@filters.alignment}
-              />
-              <.trait_filter
-                filter="form"
-                label="Form"
-                prompt="Any Form"
-                options={trait_options(@trait_values, "form")}
-                value={@filters.form}
-              />
-              <.trait_filter
-                filter="walls"
-                label="Walls"
-                prompt="Any Walls"
-                options={trait_options(@trait_values, "walls")}
-                value={@filters.walls}
-              />
-              <.trait_filter
-                filter="cells"
-                label="Cells"
-                prompt="Any Cells"
-                options={trait_options(@trait_values, "cells")}
-                value={@filters.cells}
-              />
-              <.trait_filter
-                filter="shape"
-                label="Shape"
-                prompt="Any Shape"
-                options={trait_options(@trait_values, "shape")}
-                value={@filters.shape}
-              />
-              <.trait_filter
-                filter="color"
-                label="Color"
-                prompt="Any Color"
-                options={trait_options(@trait_values, "color")}
-                value={@filters.color}
+                counts={counts(@results, "season")}
               />
             </div>
 
-            <div class="mt-3 flex flex-wrap gap-6">
+            <div :if={@show_advanced} class="flex flex-col gap-3 rounded-panel bg-surface-2 p-panel">
+              <p class="text-meta text-muted">
+                Many galls have no recorded value for these, so filtering on them can hide a match.
+              </p>
+              <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                <div class="sm:col-span-2">
+                  <.multi_select_typeahead
+                    id="textures"
+                    name="texture"
+                    label="Textures"
+                    placeholder="Hairy, smooth…"
+                    options={@texture_options}
+                    selected={@filters.textures}
+                    option_label={:label}
+                    query={@texture_query}
+                    focused={@texture_focused}
+                  />
+                  <.logic_toggle
+                    :if={length(@filters.textures) > 1}
+                    logic={@filters.texture_logic}
+                    toggle_event="toggle_texture_logic"
+                  />
+                </div>
+                <.trait_filter
+                  :for={
+                    {trait, label} <- [
+                      {"form", "Form"},
+                      {"shape", "Shape"},
+                      {"color", "Color"},
+                      {"alignment", "Alignment"},
+                      {"walls", "Walls"},
+                      {"cells", "Cells"}
+                    ]
+                  }
+                  filter={trait}
+                  label={label}
+                  prompt="Any"
+                  options={trait_options(@trait_values, trait)}
+                  value={Map.get(@filters, String.to_existing_atom(trait))}
+                  counts={counts(@results, trait)}
+                />
+              </div>
               <.undescribed_filter value={@filters.undescribed} />
             </div>
           </div>
         </div>
 
-        <hr class="border-gray-200 my-3" />
-
-        <%!-- Results Grid --%>
         <.results_grid
           results={@filtered_results}
           summaries={@summaries}
@@ -1221,7 +1215,35 @@ defmodule GallformersWeb.IDLive do
     """
   end
 
-  # Component: Logic Toggle (AND/OR)
+  # How many filters are set (the count on Clear filters).
+  defp active_filters(filters) do
+    length(filters.plant_parts) + length(filters.textures) +
+      Enum.count(
+        [
+          :detachable,
+          :place,
+          :family,
+          :season,
+          :alignment,
+          :form,
+          :walls,
+          :cells,
+          :shape,
+          :color
+        ],
+        &(Map.get(filters, &1) not in [nil, ""])
+      ) + if(filters.undescribed, do: 1, else: 0)
+  end
+
+  # How many of the loaded results have each value of `trait`: the galls a
+  # single-value filter would leave. (Shown only while that filter is unset.)
+  defp counts(results, "detachable"),
+    do: results |> Enum.map(& &1.detachable) |> Enum.reject(&is_nil/1) |> Enum.frequencies()
+
+  defp counts(results, trait),
+    do: results |> Enum.flat_map(&Map.get(&1.traits, trait, [])) |> Enum.frequencies()
+
+  # Component: Logic Toggle (AND/OR) — same event and title, restyled
   attr :logic, :atom, required: true
   attr :toggle_event, :string, required: true
 
@@ -1230,102 +1252,96 @@ defmodule GallformersWeb.IDLive do
     <button
       type="button"
       phx-click={@toggle_event}
-      class="mt-1 text-xs text-gray-600 hover:text-gf-maroon flex items-center gap-1"
+      class="mt-1 inline-flex items-center gap-1 rounded-ctl text-caption font-semibold text-muted hover:text-ink"
       title={
         if @logic == :or,
           do: "Match ANY selected (click to require ALL)",
           else: "Match ALL selected (click to require ANY)"
       }
     >
-      <span class={["px-1.5 py-0.5 rounded", @logic == :or && "bg-blue-100 text-blue-700"]}>
-        ANY
-      </span>
-      <span class="text-gray-400">/</span>
-      <span class={["px-1.5 py-0.5 rounded", @logic == :and && "bg-green-100 text-green-700"]}>
-        ALL
-      </span>
+      Match
+      <span class={["rounded-ctl px-1.5 py-0.5", @logic == :or && "bg-sky-soft text-ink"]}>ANY</span>
+      <span class={["rounded-ctl px-1.5 py-0.5", @logic == :and && "bg-sky-soft text-ink"]}>ALL</span>
     </button>
     """
   end
 
-  # Component: Detachable Filter
+  # The single-value filters: each its own form sending `change_filter` with
+  # the filter's name, as before (docs/design-system/inventory/typeahead-and-id.md).
   attr :value, :string, required: true
+  attr :counts, :map, default: %{}
 
   defp detachable_filter(assigns) do
     ~H"""
-    <form phx-change="change_filter" phx-value-filter="detachable">
-      <.input
-        type="select"
-        name="value"
-        label="Detachable"
-        prompt="Any"
-        options={[{"Integral", "integral"}, {"Detachable", "detachable"}, {"Both", "both"}]}
-        value={@value}
-      />
-    </form>
+    <.filter_select
+      id="filter-detachable"
+      name="value"
+      label="Detachable"
+      prompt="Any"
+      options={[{"Integral", "integral"}, {"Detachable", "detachable"}, {"Both", "both"}]}
+      value={@value}
+      counts={@counts}
+      phx-change="change_filter"
+      phx-value-filter="detachable"
+    />
     """
   end
 
-  # Component: Family Filter
   attr :families, :list, required: true
   attr :value, :integer, required: true
 
   defp family_filter(assigns) do
     ~H"""
-    <form phx-change="change_filter" phx-value-filter="family">
-      <.input
-        type="select"
-        name="value"
-        label="Family"
-        prompt="Any Family"
-        options={Enum.map(@families, &{&1.name, &1.id})}
-        value={@value}
-      />
-    </form>
+    <.filter_select
+      id="filter-family"
+      name="value"
+      label="Family"
+      prompt="Any Family"
+      options={Enum.map(@families, &{&1.name, &1.id})}
+      value={@value}
+      phx-change="change_filter"
+      phx-value-filter="family"
+    />
     """
   end
 
-  # Component: a single-value Trait filter (a select of the Trait's values)
   attr :filter, :string, required: true
   attr :label, :string, required: true
   attr :prompt, :string, required: true
   attr :options, :list, required: true
   attr :value, :string, required: true
+  attr :counts, :map, default: %{}
 
   defp trait_filter(assigns) do
     ~H"""
-    <form phx-change="change_filter" phx-value-filter={@filter}>
-      <.input
-        type="select"
-        name="value"
-        label={@label}
-        prompt={@prompt}
-        options={@options}
-        value={@value}
-      />
-    </form>
+    <.filter_select
+      id={"filter-#{@filter}"}
+      name="value"
+      label={@label}
+      prompt={@prompt}
+      options={@options}
+      value={@value}
+      counts={@counts}
+      phx-change="change_filter"
+      phx-value-filter={@filter}
+    />
     """
   end
 
-  # Component: Undescribed Filter
   attr :value, :boolean, required: true
 
   defp undescribed_filter(assigns) do
     ~H"""
-    <div class="mb-2">
-      <form phx-change="change_filter" phx-value-filter="undescribed">
-        <.input
-          type="checkbox"
-          name="value"
-          checked={@value}
-          label="Show only undescribed galls"
-        />
-      </form>
-    </div>
+    <form phx-change="change_filter" phx-value-filter="undescribed">
+      <input type="hidden" name="value" value="false" />
+      <label class="inline-flex items-center gap-2 text-ui text-ink">
+        <input type="checkbox" name="value" value="true" checked={@value} class="accent-brand-fill" />
+        Show only undescribed galls
+      </label>
+    </form>
     """
   end
 
-  # Component: Results Grid
   attr :results, :list, required: true
   attr :summaries, :map, required: true
   attr :has_selection, :boolean, required: true
@@ -1338,129 +1354,81 @@ defmodule GallformersWeb.IDLive do
 
   defp results_grid(assigns) do
     ~H"""
-    <div>
+    <div class="flex flex-col gap-3 border-t border-line pt-3">
       <%= if !@has_selection do %>
-        <div class="text-center py-8 text-gray-600 bg-blue-50 rounded border border-blue-200">
-          <p class="text-base">
-            Select a Host Plant or Plant Genus/Section to see matching galls. Then you can use the filters to narrow down the list.
-          </p>
-        </div>
+        <.notice>
+          Select a Host Plant or Plant Genus/Section to see matching galls. Then you can use the filters to narrow down the list.
+        </.notice>
       <% else %>
-        <%= if @selected_host && !@selected_host.datacomplete do %>
-          <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-            This host does not yet have all known galls added to the database.
-          </div>
-        <% end %>
+        <.notice :if={@selected_host && !@selected_host.datacomplete} kind={:warn}>
+          This host does not yet have all known galls added to the database.
+        </.notice>
 
-        <div class="flex items-center justify-between gap-4 mb-3">
-          <p class="text-sm text-gray-600">
-            Showing <span class="font-semibold">{length(@results)}</span>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-ui text-ink-2">
+            Showing <span class="font-semibold text-ink tabular-nums">{length(@results)}</span>
             <span :if={length(@results) != @filter_count}>of {@filter_count}</span>
             <span :if={@filter_count != @total_count}>
-              (<span class="font-semibold">{@total_count}</span> unfiltered)
+              (<span class="font-semibold tabular-nums">{@total_count}</span> unfiltered)
             </span>
             galls
           </p>
-          <div :if={@filter_count > 0} class="relative">
+          <div :if={@filter_count > 0} class="relative w-full sm:w-72">
+            <.icon
+              name="ph-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted"
+            />
             <input
               type="text"
               value={@name_filter}
               placeholder="Filter by name or trait..."
+              aria-label="Filter by name or trait"
               phx-keyup="filter_by_name"
               phx-debounce="200"
-              class="text-sm border border-gray-300 rounded-md pl-7 pr-7 py-1 w-48 focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"
-            />
-            <.icon
-              name="ph-magnifying-glass"
-              class="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+              class="h-ctl w-full rounded-ctl border border-line-strong bg-surface pl-8 pr-8 text-ui text-ink"
             />
             <button
               :if={@name_filter != ""}
               type="button"
               phx-click="clear_name_filter"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear the name filter"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
             >
-              <.icon name="ph-x" class="h-4 w-4" />
+              <.icon name="ph-x" class="size-4" />
             </button>
           </div>
         </div>
 
         <%= if length(@results) == 0 do %>
-          <div class="p-4 bg-blue-50 border border-blue-200 rounded text-sm">
-            <%= if @unscoped_count > 0 do %>
-              <p>
-                No galls found in <strong>{@continent_name || "your selected region"}</strong>, but
-                there {if @unscoped_count == 1, do: "is", else: "are"}
-                <strong>{@unscoped_count}</strong>
-                {if @unscoped_count == 1, do: "gall", else: "galls"} matching your filters in other regions.
-                Try changing your region or selecting "All Regions" to see them.
-              </p>
-            <% else %>
-              <p>
-                There are no galls that match your filter. It's possible there are no described species that fit this set of traits and your gall is undescribed.
-              </p>
-              <p class="mt-2">
-                However, before giving up, try <.link
-                  href="/articles/IDGuide#troubleshooting"
-                  class="underline"
-                >altering your filter choices</.link>.
-              </p>
-            <% end %>
-          </div>
+          <.notice :if={@unscoped_count > 0}>
+            No galls found in <strong>{@continent_name || "your selected region"}</strong>, but
+            there {if @unscoped_count == 1, do: "is", else: "are"}
+            <strong>{@unscoped_count}</strong>
+            {if @unscoped_count == 1, do: "gall", else: "galls"} matching your filters in other regions.
+            Try changing your region or selecting "All Regions" to see them.
+          </.notice>
+          <.notice :if={@unscoped_count == 0}>
+            There are no galls that match your filter. It's possible there are no described species that fit this set of traits and your gall is undescribed.
+            However, before giving up, try <.link href="/articles/IDGuide#troubleshooting">altering your filter choices</.link>.
+          </.notice>
         <% else %>
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <.gall_card :for={gall <- @results} gall={gall} summary={@summaries[gall.id]} />
+          <div class="gf-photo-grid">
+            <.gall_card
+              :for={gall <- @results}
+              navigate={"/gall/#{gall.id}"}
+              name={gall.name}
+              image_url={gall.image_url}
+              image_alt=""
+              subtitle={@summaries[gall.id]}
+            >
+              <:chip :if={gall.undescribed} variant={:info}>Undescribed</:chip>
+            </.gall_card>
           </div>
-          <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
-            <p>
-              If none of these results match your gall, you may have found an undescribed species. However, before concluding that your gall is not in the database, try <.link
-                href="/articles/IDGuide#troubleshooting"
-                class="underline"
-              >altering your filter choices</.link>.
-            </p>
-          </div>
+          <.notice>
+            If none of these results match your gall, you may have found an undescribed species. However, before concluding that your gall is not in the database, try <.link href="/articles/IDGuide#troubleshooting">altering your filter choices</.link>.
+          </.notice>
         <% end %>
       <% end %>
-    </div>
-    """
-  end
-
-  # Component: Individual Gall Card
-  attr :gall, :map, required: true
-  attr :summary, :string, default: nil
-
-  defp gall_card(assigns) do
-    ~H"""
-    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-      <.link href={"/gall/#{@gall.id}"} class="block group">
-        <div class="aspect-square bg-gray-100">
-          <img
-            src={@gall.image_url || ~p"/images/noimage.jpg"}
-            alt=""
-            class={[
-              "w-full h-full object-cover",
-              !@gall.image_url && "opacity-60"
-            ]}
-            loading="lazy"
-          />
-        </div>
-        <div class="p-2">
-          <p class="text-sm font-medium text-gray-900 group-hover:text-gf-maroon truncate">
-            <.taxon_name name={@gall.name} />
-          </p>
-          <p :if={!@gall.image_url && @summary} class="text-xs text-gray-600 mt-1" title={@summary}>
-            {@summary}
-          </p>
-        </div>
-      </.link>
-      <div :if={@gall.undescribed} class="flex flex-wrap gap-1 px-2 pb-2">
-        <span
-          class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 cursor-help"
-          title="This species has not yet been formally described in scientific literature."
-        >
-          Undescribed
-        </span>
-      </div>
     </div>
     """
   end

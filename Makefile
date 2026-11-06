@@ -153,15 +153,21 @@ run-local-release:
 # Testing
 # =============================================================================
 
+# This checkout's test databases (config/test_db_names.exs): a worktree gets
+# its own. Worked out once, and only by the targets that use them.
+TEST_DB_NAMES = $(eval TEST_DB_NAMES := $(shell elixir -e '{f, _} = Code.eval_file("config/test_db_names.exs"); n = f.(File.cwd!()); IO.puts("#{n.app} #{n.wcvp}")'))$(TEST_DB_NAMES)
+TEST_DB = $(word 1,$(TEST_DB_NAMES))
+WCVP_TEST_DB = $(word 2,$(TEST_DB_NAMES))
+
 # Set up fresh test database with migrations + seed data
 test-db:
-	@echo "Setting up test database..."
+	@echo "Setting up test databases $(TEST_DB) and $(WCVP_TEST_DB)..."
 	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
 	@MIX_ENV=test mix ecto.create --quiet
 	@MIX_ENV=test mix ecto.migrate --quiet
-	@psql -d gallformers_test -f priv/repo/test_seeds.sql --quiet
-	@createdb wcvp_test 2>/dev/null || true
-	@psql -d wcvp_test -f priv/repo/wcvp_test_setup.sql --quiet
+	@psql -d $(TEST_DB) -f priv/repo/test_seeds.sql --quiet
+	@createdb $(WCVP_TEST_DB) 2>/dev/null || true
+	@psql -d $(WCVP_TEST_DB) -f priv/repo/wcvp_test_setup.sql --quiet
 	@MIX_ENV=test mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3
 	@echo "Test database ready"
 
@@ -187,9 +193,9 @@ PROD_DATA_DB ?=
 
 load-prod-data-test:
 ifneq ($(strip $(PROD_DATA_DB)),)
-	@echo "Cloning $(PROD_DATA_DB) into gallformers_test..."
+	@echo "Cloning $(PROD_DATA_DB) into $(TEST_DB)..."
 	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
-	createdb -T $(PROD_DATA_DB) gallformers_test
+	createdb -T $(PROD_DATA_DB) $(TEST_DB)
 else
 	@echo "Loading production data into test database..."
 	@if [ ! -f /tmp/gallformers.dump ]; then \
@@ -201,12 +207,12 @@ else
 	fi
 	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
 	@MIX_ENV=test mix ecto.create --quiet
-	@pg_restore --no-owner --no-acl -d gallformers_test /tmp/gallformers.dump || true
+	@pg_restore --no-owner --no-acl -d $(TEST_DB) /tmp/gallformers.dump || true
 	@echo "Converting it to the new back-end (migrations, then the catalog migration)..."
-	PGDATABASE=gallformers_test MIX_ENV=dev mix ecto.migrate
-	PGDATABASE=gallformers_test MIX_ENV=dev mix gallformers.catalog.migrate --no-s3
+	PGDATABASE=$(TEST_DB) MIX_ENV=dev mix ecto.migrate
+	PGDATABASE=$(TEST_DB) MIX_ENV=dev mix gallformers.catalog.migrate --no-s3
 endif
-	@echo "Production data loaded into gallformers_test"
+	@echo "Production data loaded into $(TEST_DB)"
 
 # Run context-level tests against converted production data (no browser)
 # Checks the new back-end's invariants against real data. All writes use Ecto

@@ -128,11 +128,10 @@ defmodule GallformersWeb.RegionScopeTest do
       {:ok, view, _html} = live_isolated(conn, RegionScopeTestLive)
 
       # Change to Asia
-      html = view |> element("[data-region-code=\"XA\"]") |> render_click()
+      view |> element("[data-region-code=\"XA\"]") |> render_click()
 
-      # Asia button should have font-bold
-      assert html =~
-               ~r/data-region-code="XA"[^>]*class="[^"]*font-bold/
+      assert has_element?(view, ~s([data-region-code="XA"][aria-current="true"]))
+      refute has_element?(view, ~s([data-region-code=""][aria-current="true"]))
     end
   end
 

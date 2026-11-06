@@ -507,15 +507,14 @@ defmodule GallformersWeb.Admin.VocabularyLive do
       )
 
     ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user} page_title="Vocabulary">
-      <div class="space-y-3">
-        <.header>
-          Vocabulary
-          <:subtitle>
-            The Trait categories the ID tool filters on, and the Sources' terms under them. Terms
-            are added by the import; categories change rarely, and only here.
-          </:subtitle>
-        </.header>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Vocabulary</:title>
+          <:description>
+            The Trait categories the ID tool filters on, and the Sources' terms under them. Terms are added by the import; categories change rarely, and only here.
+          </:description>
+        </.page_header>
 
         <.seed_terms
           groups={@seed_groups}
@@ -531,10 +530,10 @@ defmodule GallformersWeb.Admin.VocabularyLive do
           mixed={@seed_mixed}
         />
 
-        <section id="spot-checks" class="gf-card mt-4 overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Placements to spot-check</h2>
-            <p class="text-sm text-gray-500">
+        <section id="spot-checks" class="overflow-hidden rounded-panel border border-line bg-surface">
+          <div class="px-4 py-2.5 border-b border-line">
+            <h2 class="text-subsection text-ink">Placements to spot-check</h2>
+            <p class="text-meta text-muted">
               Terms placed for every Source because the producer and the checker agreed, most Galls
               first, and placed terms the producer suggested another category for. Two readers can
               share a blind spot.
@@ -542,11 +541,11 @@ defmodule GallformersWeb.Admin.VocabularyLive do
           </div>
           <p
             :if={@agreement == [] and @suggested == []}
-            class="px-4 py-2 text-sm text-gray-500"
+            class="px-4 py-2 text-meta text-muted"
           >
             Nothing to check.
           </p>
-          <div class="divide-y divide-gray-200">
+          <div class="divide-y divide-line">
             <div
               :for={t <- @agreement}
               id={"agreement-#{t.trait}-#{slug(t.term)}"}
@@ -554,10 +553,10 @@ defmodule GallformersWeb.Admin.VocabularyLive do
             >
               <div class="flex flex-wrap items-center gap-2">
                 <.review_tag>{humanize(t.trait)}</.review_tag>
-                <b class="text-gray-900">“{t.term}”</b>
-                <span class="text-gray-400" aria-hidden="true">→</span>
+                <b class="text-ink">“{t.term}”</b>
+                <span class="text-muted" aria-hidden="true">→</span>
                 <span>{category_text(t)}</span>
-                <span class="text-sm text-gray-500">
+                <span class="text-meta text-muted">
                   · {galls(@counts, t)} Galls · by agreement
                 </span>
                 <span class="flex-1"></span>
@@ -593,10 +592,10 @@ defmodule GallformersWeb.Admin.VocabularyLive do
               class="px-4 py-2 flex flex-wrap items-center gap-2"
             >
               <.review_tag>{humanize(s.trait)}</.review_tag>
-              <b class="text-gray-900">“{s.term}”</b>
-              <span class="text-gray-400" aria-hidden="true">→</span>
+              <b class="text-ink">“{s.term}”</b>
+              <span class="text-muted" aria-hidden="true">→</span>
               <span>{s.category}</span>
-              <span class="text-sm text-gray-500">
+              <span class="text-meta text-muted">
                 · the producer suggested {Enum.join(s.suggested, ", ")} ({facts_text(s.facts)})
               </span>
               <span class="flex-1"></span>
@@ -614,17 +613,17 @@ defmodule GallformersWeb.Admin.VocabularyLive do
           </div>
         </section>
 
-        <section id="no-fit" class="gf-card mt-4 overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Terms that fit no category</h2>
-            <p class="text-sm text-gray-500">
+        <section id="no-fit" class="overflow-hidden rounded-panel border border-line bg-surface">
+          <div class="px-4 py-2.5 border-b border-line">
+            <h2 class="text-subsection text-ink">Terms that fit no category</h2>
+            <p class="text-meta text-muted">
               Kept as text on their Galls. When several pile up, a category may be missing: add it
               below, then place the terms under it. Placing a term gives every Gall that kept it as
               text its Fact.
             </p>
           </div>
-          <p :if={@no_fit == []} class="px-4 py-2 text-sm text-gray-500">None.</p>
-          <div class="divide-y divide-gray-200">
+          <p :if={@no_fit == []} class="px-4 py-2 text-meta text-muted">None.</p>
+          <div class="divide-y divide-line">
             <.form
               :for={n <- @no_fit}
               for={%{}}
@@ -635,8 +634,8 @@ defmodule GallformersWeb.Admin.VocabularyLive do
               <input type="hidden" name="trait" value={n.trait} />
               <input type="hidden" name="term" value={n.term} />
               <.review_tag>{humanize(n.trait)}</.review_tag>
-              <b class="text-gray-900">“{n.term}”</b>
-              <span class="text-sm text-gray-500">
+              <b class="text-ink">“{n.term}”</b>
+              <span class="text-meta text-muted">
                 · {n.uses} {if n.uses == 1, do: "use", else: "uses"} kept as text
               </span>
               <span class="flex-1"></span>
@@ -656,9 +655,9 @@ defmodule GallformersWeb.Admin.VocabularyLive do
           </div>
         </section>
 
-        <section id="add-category-card" class="gf-card mt-4 px-4 py-3">
-          <h2 class="text-lg font-semibold text-gray-900">Add a category</h2>
-          <p class="text-sm text-gray-500">
+        <section id="add-category-card" class="rounded-panel border border-line bg-surface p-panel">
+          <h2 class="text-subsection text-ink">Add a category</h2>
+          <p class="text-meta text-muted">
             A new Trait value: the ID tool lists it, and producers and curators apply it by its
             definition.
           </p>
@@ -700,10 +699,10 @@ defmodule GallformersWeb.Admin.VocabularyLive do
           </.form>
         </section>
 
-        <section id="terms" class="gf-card mt-4 overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-gray-200 grid gap-2">
-            <h2 class="text-lg font-semibold text-gray-900">
-              Terms <span class="font-medium text-gray-500 tabular-nums">· {@matching}</span>
+        <section id="terms" class="flex flex-col gap-block">
+          <div class="grid gap-2">
+            <h2 class="text-subsection text-ink">
+              Terms <span class="font-normal text-muted tabular-nums">· {@matching}</span>
             </h2>
             <.form
               for={%{}}
@@ -740,44 +739,47 @@ defmodule GallformersWeb.Admin.VocabularyLive do
                 value={@filters["q"]}
                 placeholder="Find a term or category…"
                 phx-debounce="200"
-                class="flex-1 min-w-[12rem]"
+                class="flex-1 min-w-48"
               />
             </.form>
-            <p :if={@matching > length(@shown)} class="text-sm text-gray-500">
+            <p :if={@matching > length(@shown)} class="text-meta text-muted">
               Showing the first {length(@shown)}; narrow the filter to see the rest.
             </p>
           </div>
-          <div class="overflow-x-auto">
-            <.table id="term-rows" rows={@shown} row_id={&"term-#{&1.id}"} variant="compact">
-              <:col :let={t} label="Term"><b>{t.term}</b></:col>
-              <:col :let={t} label="Trait">{humanize(t.trait)}</:col>
-              <:col :let={t} label="Status">{status_word(t.status)}</:col>
-              <:col :let={t} label="Category">{category_text(t)}</:col>
-              <:col :let={t} label="Placed by">{placed_by_word(t.placed_by)}</:col>
-              <:col :let={t} label="Galls">
-                <span data-role="galls" class="tabular-nums">{galls(@counts, t)}</span>
-              </:col>
-              <:action :let={t}>
-                <div class="grid gap-2 justify-items-end">
-                  <.button
-                    size="sm"
-                    variant="ghost"
-                    phx-click="change"
-                    phx-value-where="term"
-                    phx-value-id={t.id}
-                  >
-                    Change…
-                  </.button>
-                  <.term_change
-                    :if={@changing == {"term", t.id}}
-                    id={"term-#{t.id}"}
-                    term={t}
-                    values={Map.get(@values, t.trait, [])}
-                  />
-                </div>
-              </:action>
-            </.table>
-          </div>
+          <.data_table
+            id="term-rows"
+            rows={@shown}
+            row_id={&"term-#{&1.id}"}
+            compact
+          >
+            <:col :let={t} label="Term" grow><b>{t.term}</b></:col>
+            <:col :let={t} label="Trait">{humanize(t.trait)}</:col>
+            <:col :let={t} label="Status">{status_word(t.status)}</:col>
+            <:col :let={t} label="Category" wrap>{category_text(t)}</:col>
+            <:col :let={t} label="Placed by" hide_below={:lg}>{placed_by_word(t.placed_by)}</:col>
+            <:col :let={t} label="Galls" numeric>
+              <span data-role="galls">{galls(@counts, t)}</span>
+            </:col>
+            <:col :let={t} label="" full>
+              <div class="grid justify-items-end gap-2">
+                <.button
+                  size="sm"
+                  variant="ghost"
+                  phx-click="change"
+                  phx-value-where="term"
+                  phx-value-id={t.id}
+                >
+                  Change…
+                </.button>
+                <.term_change
+                  :if={@changing == {"term", t.id}}
+                  id={"term-#{t.id}"}
+                  term={t}
+                  values={Map.get(@values, t.trait, [])}
+                />
+              </div>
+            </:col>
+          </.data_table>
         </section>
       </div>
     </Layouts.admin>
@@ -793,7 +795,7 @@ defmodule GallformersWeb.Admin.VocabularyLive do
 
   defp term_change(%{term: %{status: :placed}} = assigns) do
     ~H"""
-    <div class="grid gap-2 text-left font-normal min-w-[16rem]">
+    <div class="grid gap-2 text-left font-normal min-w-64">
       <.form for={%{}} id={"#{@id}-move"} phx-submit="move" class="flex flex-wrap gap-2">
         <input type="hidden" name="term_id" value={@term.id} />
         <label for={"#{@id}-move-category"} class="sr-only">Move to</label>
@@ -805,9 +807,9 @@ defmodule GallformersWeb.Admin.VocabularyLive do
       </.form>
       <.form for={%{}} id={"#{@id}-ambiguous"} phx-submit="mark_ambiguous" class="grid gap-1">
         <input type="hidden" name="term_id" value={@term.id} />
-        <span class="text-sm text-gray-700">Used in more than one sense? Its senses:</span>
+        <span class="text-meta text-ink-2">Used in more than one sense? Its senses:</span>
         <div class="flex flex-wrap gap-x-3 gap-y-1">
-          <label :for={v <- @values} class="text-sm flex items-center gap-1">
+          <label :for={v <- @values} class="text-meta flex items-center gap-1">
             <input
               type="checkbox"
               name="candidates[]"
@@ -883,13 +885,13 @@ defmodule GallformersWeb.Admin.VocabularyLive do
 
   defp seed_terms(assigns) do
     ~H"""
-    <section id="seed-terms" class="gf-card mt-4 overflow-hidden">
-      <div class="px-4 py-2.5 border-b border-gray-200 grid gap-2">
+    <section id="seed-terms" class="overflow-hidden rounded-panel border border-line bg-surface">
+      <div class="px-4 py-2.5 border-b border-line grid gap-2">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">
-            Seed terms <span class="font-medium text-gray-500 tabular-nums">· {@left} to decide</span>
+          <h2 class="text-subsection text-ink">
+            Seed terms <span class="font-normal text-muted tabular-nums">· {@left} to decide</span>
           </h2>
-          <p class="text-sm text-gray-500">
+          <p class="text-meta text-muted">
             The terms producers wrote before go-live, with the categories they suggested. Ruling on
             them now places each once for every Source, so early Sources don't bring a question for
             every term.
@@ -926,15 +928,15 @@ defmodule GallformersWeb.Admin.VocabularyLive do
       <div
         :if={@confirm}
         id="seed-bulk-confirm"
-        class="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-yellow-50 text-yellow-900 text-sm border-b border-gray-200"
+        class="flex flex-wrap items-center gap-2 border-b border-line bg-warn-bg px-4 py-2.5 text-meta text-ink"
       >
-        <span class="flex-1 min-w-[16rem]">{bulk_text(@agreeing, @mixed)}</span>
+        <span class="flex-1 min-w-64">{bulk_text(@agreeing, @mixed)}</span>
         <.button size="sm" variant="primary" phx-click="seed_bulk_confirm">
           Place {terms_text(@agreeing)}
         </.button>
         <.button size="sm" variant="secondary" phx-click="seed_bulk_cancel">Cancel</.button>
       </div>
-      <p :if={@groups == []} class="px-4 py-2 text-sm text-gray-500">No seed terms to decide.</p>
+      <p :if={@groups == []} class="px-4 py-2 text-meta text-muted">No seed terms to decide.</p>
     </section>
 
     <.review_section
@@ -993,15 +995,15 @@ defmodule GallformersWeb.Admin.VocabularyLive do
             aria-label={"Tick “#{@candidate.term}”"}
           />
           <span>“{@candidate.term}”</span>
-          <span class="text-sm font-normal text-gray-500">
+          <span class="text-meta font-normal text-muted">
             · <span data-role="uses" class="tabular-nums">{@candidate.total}</span>
             {if @candidate.total == 1, do: "use", else: "uses"}
           </span>
         </span>
       </:written>
       <:answer>
-        <span :if={@decided} class="text-gray-700">{decision_text(@candidate.decision)}</span>
-        <span :if={not @decided} class="text-gray-700">
+        <span :if={@decided} class="text-ink-2">{decision_text(@candidate.decision)}</span>
+        <span :if={not @decided} class="text-ink-2">
           Suggested: {suggestions_text(@candidate.suggestions)}
         </span>
       </:answer>
@@ -1049,9 +1051,9 @@ defmodule GallformersWeb.Admin.VocabularyLive do
           </.form>
           <.form for={%{}} id={"#{@id}-ambiguous"} phx-submit="seed_ambiguous" class="grid gap-1">
             <input type="hidden" name="candidate_id" value={@candidate.id} />
-            <span class="text-sm text-gray-700">Used in more than one sense? Its senses:</span>
+            <span class="text-meta text-ink-2">Used in more than one sense? Its senses:</span>
             <div class="flex flex-wrap gap-x-3 gap-y-1">
-              <label :for={v <- @values} class="text-sm flex items-center gap-1">
+              <label :for={v <- @values} class="text-meta flex items-center gap-1">
                 <input
                   type="checkbox"
                   name="candidates[]"

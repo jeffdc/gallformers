@@ -1,0 +1,240 @@
+/* ==========================================================================
+   Gallformers design system — tokens
+   Documentation: docs/design-system/foundations.md
+
+   Three tiers:
+   1. Raw tokens (--gf-*) hold values. Light values on :root and on
+      [data-theme="light"] (so a region, the admin, can stay light in a dark
+      page); dark values on [data-theme="dark"] and under prefers-color-scheme
+      when the root has no data-theme (no theme chosen).
+   2. Density tokens (--gf-fs-*, --gf-row-h, …) change with the density
+      context: Reading (default, public pages) or Working (.gf-density-working,
+      set by the admin shell).
+   3. The @theme inline block exposes both as Tailwind utilities
+      (text-ink, bg-surface, text-section, rounded-panel, max-w-page …).
+      Templates use the utilities, never the raw variables or hex values.
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  /* Brand */
+  --gf-maroon: #661419;          /* brand mark, active navigation, brand text */
+  --gf-maroon-fill: #661419;     /* primary button fill */
+  --gf-maroon-hover: #4f0f13;
+  --gf-sky: #c1e0f3;             /* site header band, selected rows */
+  --gf-sky-soft: #eaf4fb;        /* info surfaces, row hover */
+  --gf-autumn: #bc6428;          /* "needs you": marks, dots, fills */
+  --gf-autumn-ink: #a0521d;      /* "needs you" as text: counts (5:1 on every light surface) */
+
+  /* Text */
+  --gf-ink: #1e1b1a;             /* primary text, titles */
+  --gf-ink-2: #4a4442;           /* secondary text */
+  --gf-muted: #736b68;           /* labels, captions, placeholders */
+  --gf-link: #1c5d8f;
+  --gf-link-hover: #14476e;
+  --gf-on-fill: #ffffff;         /* text on a filled (maroon, state) surface */
+
+  /* Surfaces and rules */
+  --gf-paper: #fbfaf9;           /* page ground */
+  --gf-surface: #ffffff;         /* panels, inputs, tables */
+  --gf-surface-2: #f4f1ef;       /* wells, table heads, sidebar */
+  --gf-line: #e6e1de;            /* hairlines between rows */
+  --gf-line-strong: #d3ccc8;     /* control borders, section rules */
+
+  /* State (never decoration) */
+  --gf-ok: #2d7a4b;      --gf-ok-bg: #e5f2e9;
+  --gf-warn: #8a5a00;    --gf-warn-bg: #fbf0d6;
+  --gf-danger: #a8281e;  --gf-danger-bg: #fbe7e4;
+  --gf-info: #1c5d8f;    --gf-info-bg: #eaf4fb;
+
+  --gf-focus: #1c5d8f;
+  --gf-overlay: rgb(20 18 19 / 0.55);
+  --gf-shadow-float: 0 1px 2px rgb(30 27 26 / 0.08), 0 8px 24px rgb(30 27 26 / 0.16);
+
+  /* Range-map fills: the map's own legend, kept with the other colors */
+  --gf-map-documented: #228b22;
+  --gf-map-country: #90ee90;
+  --gf-map-introduced: #1a5e1a;
+  --gf-map-excluded: #fca5a5;    /* a Host's place outside the Gall's range (admin) */
+  --gf-map-none: #ffffff;        /* not in range */
+}
+
+:root {
+  /* Reading density (default) */
+  --gf-fs-page: 2.125rem;        /* 34px page title */
+  --gf-fs-section: 1.375rem;     /* 22px section heading */
+  --gf-fs-subsection: 1.125rem;  /* 18px */
+  --gf-fs-lead: 1.1875rem;       /* 19px intro paragraph */
+  --gf-fs-body: 1rem;            /* 16px running text */
+  --gf-fs-ui: 0.9375rem;         /* 15px table cells, controls, lists */
+  --gf-fs-meta: 0.875rem;        /* 14px secondary lines */
+  --gf-fs-caption: 0.75rem;      /* 12px labels, captions */
+  --gf-row-h: 2.25rem;           /* 36px table row / list row */
+  --gf-ctl-h: 2.25rem;           /* 36px input, select, button */
+  --gf-gap-section: 2rem;        /* between sections */
+  --gf-gap-block: 1rem;          /* between blocks inside a section */
+  --gf-pad-panel: 1rem;
+  --gf-page-x: 2rem;             /* page side gutter (wide screens) */
+}
+
+/* Working density: admin. Set once by the admin shell. */
+.gf-density-working {
+  --gf-fs-page: 1.75rem;         /* 28px */
+  --gf-fs-section: 1.1875rem;    /* 19px */
+  --gf-fs-subsection: 1rem;
+  --gf-fs-lead: 1rem;
+  --gf-fs-body: 0.875rem;        /* 14px */
+  --gf-fs-ui: 0.875rem;
+  --gf-fs-meta: 0.8125rem;       /* 13px */
+  --gf-fs-caption: 0.75rem;
+  --gf-row-h: 2rem;              /* 32px */
+  --gf-ctl-h: 2rem;
+  --gf-gap-section: 1.375rem;    /* 22px */
+  --gf-gap-block: 0.75rem;
+  --gf-pad-panel: 0.75rem;
+  --gf-page-x: 1.75rem;
+}
+
+/* Dark values. Applied where data-theme="dark" is set (a chosen theme on
+   <html>, or a previewed region), and by the OS setting when <html> has no
+   data-theme (docs/design-system/foundations.md, "Dark mode"). */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --gf-maroon: #e48a8f;
+  --gf-maroon-fill: #8c2a31;
+  --gf-maroon-hover: #a5343c;
+  --gf-sky: #1d3445;
+  --gf-sky-soft: #172a37;
+  --gf-autumn: #e0915a;
+  --gf-autumn-ink: #e0915a;
+  --gf-ink: #ece7e4;
+  --gf-ink-2: #c9c1bd;
+  --gf-muted: #9d9490;
+  --gf-link: #86bdea;
+  --gf-link-hover: #b3d6f2;
+  --gf-paper: #141213;
+  --gf-surface: #1c191a;
+  --gf-surface-2: #252122;
+  --gf-line: #322d2c;
+  --gf-line-strong: #463f3d;
+  --gf-ok: #7fcf9c;      --gf-ok-bg: #17301f;
+  --gf-warn: #e6b85c;    --gf-warn-bg: #33280f;
+  --gf-danger: #f08a7f;  --gf-danger-bg: #3a1915;
+  --gf-info: #86bdea;    --gf-info-bg: #172a37;
+  --gf-focus: #86bdea;
+  --gf-overlay: rgb(0 0 0 / 0.65);
+  --gf-shadow-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --gf-maroon: #e48a8f;
+    --gf-maroon-fill: #8c2a31;
+    --gf-maroon-hover: #a5343c;
+    --gf-sky: #1d3445;
+    --gf-sky-soft: #172a37;
+    --gf-autumn: #e0915a;
+    --gf-autumn-ink: #e0915a;
+  --gf-autumn-ink: #e0915a;
+    --gf-ink: #ece7e4;
+    --gf-ink-2: #c9c1bd;
+    --gf-muted: #9d9490;
+    --gf-link: #86bdea;
+    --gf-link-hover: #b3d6f2;
+    --gf-paper: #141213;
+    --gf-surface: #1c191a;
+    --gf-surface-2: #252122;
+    --gf-line: #322d2c;
+    --gf-line-strong: #463f3d;
+    --gf-ok: #7fcf9c;      --gf-ok-bg: #17301f;
+    --gf-warn: #e6b85c;    --gf-warn-bg: #33280f;
+    --gf-danger: #f08a7f;  --gf-danger-bg: #3a1915;
+    --gf-info: #86bdea;    --gf-info-bg: #172a37;
+    --gf-focus: #86bdea;
+    --gf-overlay: rgb(0 0 0 / 0.65);
+    --gf-shadow-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* Tailwind utilities for the tokens. `inline` makes each utility read the
+   variable at use, so dark values and density contexts apply. */
+@theme inline {
+  --color-brand: var(--gf-maroon);
+  --color-brand-fill: var(--gf-maroon-fill);
+  --color-brand-hover: var(--gf-maroon-hover);
+  --color-sky: var(--gf-sky);
+  --color-sky-soft: var(--gf-sky-soft);
+  --color-autumn: var(--gf-autumn);
+  --color-autumn-ink: var(--gf-autumn-ink);
+  --color-ink: var(--gf-ink);
+  --color-ink-2: var(--gf-ink-2);
+  --color-muted: var(--gf-muted);
+  --color-link: var(--gf-link);
+  --color-link-hover: var(--gf-link-hover);
+  --color-on-fill: var(--gf-on-fill);
+  --color-paper: var(--gf-paper);
+  --color-surface: var(--gf-surface);
+  --color-surface-2: var(--gf-surface-2);
+  --color-line: var(--gf-line);
+  --color-line-strong: var(--gf-line-strong);
+  --color-ok: var(--gf-ok);
+  --color-ok-bg: var(--gf-ok-bg);
+  --color-warn: var(--gf-warn);
+  --color-warn-bg: var(--gf-warn-bg);
+  --color-danger: var(--gf-danger);
+  --color-danger-bg: var(--gf-danger-bg);
+  --color-info: var(--gf-info);
+  --color-info-bg: var(--gf-info-bg);
+  --color-overlay: var(--gf-overlay);
+  --color-map-documented: var(--gf-map-documented);
+  --color-map-country: var(--gf-map-country);
+  --color-map-excluded: var(--gf-map-excluded);
+  --color-map-none: var(--gf-map-none);
+
+  --font-brand: "League Spartan", "Avenir Next", Futura, system-ui, sans-serif;
+  --font-sans: "Source Sans 3", "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+
+  --text-page: var(--gf-fs-page);
+  --text-page--line-height: 1.15;
+  --text-section: var(--gf-fs-section);
+  --text-section--line-height: 1.25;
+  --text-subsection: var(--gf-fs-subsection);
+  --text-subsection--line-height: 1.3;
+  --text-lead: var(--gf-fs-lead);
+  --text-lead--line-height: 1.5;
+  --text-body: var(--gf-fs-body);
+  --text-body--line-height: 1.5;
+  --text-ui: var(--gf-fs-ui);
+  --text-ui--line-height: 1.4;
+  --text-meta: var(--gf-fs-meta);
+  --text-meta--line-height: 1.4;
+  --text-caption: var(--gf-fs-caption);
+  --text-caption--line-height: 1.35;
+
+  --radius-ctl: 4px;
+  --radius-panel: 8px;
+
+  --shadow-float: var(--gf-shadow-float);
+
+  --container-page: 120rem;      /* 1920px: public page content; fluid below that */
+  --container-text: 44rem;       /* running text, about 70 characters */
+  --container-lead: 56rem;       /* a page's description: one sentence on one line */
+  --container-form: 48rem;       /* a single-column admin form */
+
+  --spacing-row: var(--gf-row-h);
+  --spacing-ctl: var(--gf-ctl-h);
+  --spacing-section: var(--gf-gap-section);
+  --spacing-block: var(--gf-gap-block);
+  --spacing-panel: var(--gf-pad-panel);
+  --spacing-page-x: var(--gf-page-x);
+
+  /* Sticky chrome heights: pin a bar under the bar above it (top-header,
+     top-admin-bar). Elements marked data-sticky-chrome are measured by
+     scrolling code. */
+  --spacing-header: 4rem;        /* the site header (64px) */
+  --spacing-reader: min(38rem, 46vw); /* the review's Source reader, and the room its page leaves for it */
+  --spacing-admin-bar: 2.75rem;  /* the admin top bar (44px) */
+}

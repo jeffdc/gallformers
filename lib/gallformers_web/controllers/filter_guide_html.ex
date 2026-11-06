@@ -1,4 +1,9 @@
 defmodule GallformersWeb.FilterGuideHTML do
+  @moduledoc """
+  The ID tool's filter guide, on the design system (matter bc0d): each
+  Trait a `section` (anchored by its id, for the jump links and the ID
+  page's links) listing its values with their definitions.
+  """
   use GallformersWeb, :html
 
   alias Gallformers.Markdown
@@ -9,20 +14,6 @@ defmodule GallformersWeb.FilterGuideHTML do
     Enum.sort_by(items, & &1.field)
   end
 
-  attr :href, :string, required: true
-  slot :inner_block, required: true
-
-  def jump_link(assigns) do
-    ~H"""
-    <a
-      href={@href}
-      class="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-full border border-gray-200 hover:bg-gf-maroon hover:border-gf-maroon hover:!text-white transition-colors"
-    >
-      {render_slot(@inner_block)}
-    </a>
-    """
-  end
-
   attr :id, :string, required: true
   attr :title, :string, required: true
   attr :items, :list, required: true
@@ -30,22 +21,17 @@ defmodule GallformersWeb.FilterGuideHTML do
 
   def filter_section(assigns) do
     ~H"""
-    <section id={@id}>
-      <h2 class="text-xl font-semibold text-gf-maroon mb-3 border-b border-gray-200 pb-2">
-        {@title}
-      </h2>
-      <dl class="space-y-2">
+    <.section id={@id} title={@title} count={length(@items)}>
+      <dl class="flex flex-col gap-1.5 text-ui">
         <div :for={item <- @items}>
-          <dt class="inline font-medium text-gray-900">{item.field}</dt>
-          <dd :if={item.description} class="inline text-gray-700">– {item.description}</dd>
+          <dt class="inline font-semibold text-ink">{item.field}{if item.description, do: ":"}</dt>
+          <dd :if={item.description} class="inline text-ink-2">{item.description}</dd>
         </div>
       </dl>
-      <%= if @note do %>
-        <p class="mt-3 text-sm text-gray-600 italic">
-          Note: {Phoenix.HTML.raw(Markdown.linkify_glossary_terms(@note))}
-        </p>
-      <% end %>
-    </section>
+      <p :if={@note} class="mt-3 text-meta text-muted">
+        Note: {Phoenix.HTML.raw(Markdown.linkify_glossary_terms(@note))}
+      </p>
+    </.section>
     """
   end
 end

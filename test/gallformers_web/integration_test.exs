@@ -17,7 +17,7 @@ defmodule GallformersWeb.IntegrationTest do
 
     test "home page renders as LiveView", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/")
-      assert html =~ "Welcome"
+      assert html =~ "Identify a plant gall"
     end
 
     test "about page loads successfully", %{conn: conn} do
@@ -85,14 +85,12 @@ defmodule GallformersWeb.IntegrationTest do
       assert html =~ host.name
     end
 
-    test "gall page handles invalid ID gracefully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/gall/999999999")
-      assert html =~ "not found" or html =~ "Not Found"
+    test "an unknown gall ID is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/gall/999999999") end
     end
 
-    test "host page handles invalid ID gracefully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/host/999999999")
-      assert html =~ "not found" or html =~ "Not Found"
+    test "an unknown host ID is a 404", %{conn: conn} do
+      assert_error_sent 404, fn -> get(conn, ~p"/host/999999999") end
     end
   end
 
@@ -110,7 +108,7 @@ defmodule GallformersWeb.IntegrationTest do
 
       # Verify galls browse link exists
       assert html =~ ~s(href="/galls")
-      assert html =~ "Browse Galls"
+      assert html =~ "browse the galls"
     end
 
     test "can navigate from gall to host", %{conn: conn} do

@@ -94,30 +94,28 @@ defmodule GallformersWeb.Admin.InatImportComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mt-6 border-t border-gray-200 pt-6">
-      <h3 class="text-sm font-medium text-gray-700 mb-3">Import from iNaturalist</h3>
+    <div>
+      <.section title="Import from iNaturalist" level={3}>
+        <div class="flex flex-col gap-3">
+          {render_state(assigns)}
 
-      {render_state(assigns)}
-
-      <.error_message
-        :if={@error}
-        title="Import Error"
-        message={@error}
-        class="mt-3"
-      />
+          <.notice :if={@error} kind={:danger} title="Import error">{@error}</.notice>
+        </div>
+      </.section>
     </div>
     """
   end
 
   defp render_state(%{state: :idle} = assigns) do
     ~H"""
-    <form phx-submit="inat_fetch" phx-target={@myself} class="flex gap-2 items-end">
+    <form phx-submit="inat_fetch" phx-target={@myself} class="flex flex-wrap items-end gap-2">
       <input
         type="text"
         name="url"
         data-role="inat-url-input"
         value={@url_input}
         placeholder="iNaturalist observation URL or ID"
+        aria-label="iNaturalist observation URL or ID"
         phx-change="inat_url_changed"
         phx-target={@myself}
         class="gf-input max-w-md"
@@ -138,7 +136,7 @@ defmodule GallformersWeb.Admin.InatImportComponent do
     ~H"""
     <div class="flex items-center gap-3">
       <.loading_spinner size="sm" />
-      <span class="text-sm text-gray-600">Fetching observation...</span>
+      <span class="text-meta text-ink-2">Fetching observation...</span>
       <.button phx-click="inat_cancel" phx-target={@myself} variant="ghost" size="sm">
         Cancel
       </.button>
@@ -148,48 +146,43 @@ defmodule GallformersWeb.Admin.InatImportComponent do
 
   defp render_state(%{state: :picking} = assigns) do
     ~H"""
-    <div>
+    <div class="flex flex-col gap-3">
       <%!-- Observation header --%>
-      <div class="mb-4 text-sm text-gray-600">
-        <p>
-          <span :if={@observation.taxon_name} class="font-medium italic">
-            {@observation.taxon_name}
-          </span>
-          observed by
-          <span class="font-medium">
-            {INaturalist.format_creator(@observation.observer_login, @observation.observer_name)}
-          </span>
-          —
-          <a href={@observation.url} target="_blank" class="text-gf-maroon hover:underline">
-            view on iNaturalist
-          </a>
-        </p>
-      </div>
+      <p class="text-meta text-ink-2">
+        <span :if={@observation.taxon_name} class="font-semibold italic">
+          {@observation.taxon_name}
+        </span>
+        observed by
+        <span class="font-semibold">
+          {INaturalist.format_creator(@observation.observer_login, @observation.observer_name)}
+        </span>
+        — <a href={@observation.url} target="_blank">view on iNaturalist ↗</a>
+      </p>
 
       <%!-- No photos message --%>
-      <div :if={@observation.photos == []} class="text-sm text-gray-500 py-4">
+      <p :if={@observation.photos == []} class="py-4 text-ui text-muted">
         This observation has no photos.
-      </div>
+      </p>
 
       <%!-- Photo grid --%>
       <div
         :if={@observation.photos != []}
         data-role="inat-photo-grid"
-        class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-4"
+        class="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5"
       >
         <label
           :for={photo <- @observation.photos}
           class={[
-            "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-colors",
+            "relative cursor-pointer overflow-hidden rounded-panel border-2 transition-colors",
             if(MapSet.member?(@selected_photo_ids, photo.id),
-              do: "border-gf-maroon",
-              else: "border-gray-200 hover:border-gray-300"
+              do: "border-brand",
+              else: "border-line hover:border-line-strong"
             )
           ]}
         >
           <img
             src={photo.thumbnail_url}
-            class="w-full aspect-square object-cover"
+            class="aspect-square w-full object-cover"
             loading="lazy"
           />
           <input
@@ -203,13 +196,13 @@ defmodule GallformersWeb.Admin.InatImportComponent do
           />
           <div
             :if={photo.all_rights_reserved?}
-            class="absolute bottom-0 inset-x-0 bg-amber-500/90 text-white text-xs px-2 py-1 text-center"
+            class="absolute inset-x-0 bottom-0 bg-warn-bg px-2 py-1 text-center text-caption font-semibold text-warn"
           >
             All Rights Reserved
           </div>
           <div
             :if={!photo.all_rights_reserved?}
-            class="absolute bottom-0 inset-x-0 bg-black/50 text-white text-xs px-2 py-1 text-center"
+            class="absolute inset-x-0 bottom-0 bg-overlay px-2 py-1 text-center text-caption text-on-fill"
           >
             {photo.mapped_license}
           </div>
@@ -239,7 +232,7 @@ defmodule GallformersWeb.Admin.InatImportComponent do
     ~H"""
     <div class="flex items-center gap-3">
       <.loading_spinner size="sm" />
-      <span class="text-sm text-gray-600">
+      <span class="text-meta text-ink-2">
         Importing {@import_progress.current} of {@import_progress.total}...
       </span>
     </div>
@@ -248,12 +241,14 @@ defmodule GallformersWeb.Admin.InatImportComponent do
 
   defp render_state(%{state: :done} = assigns) do
     ~H"""
-    <div class="text-sm">
-      <p class="text-green-700 font-medium">{@done_message}</p>
-      <.button phx-click="inat_reset" phx-target={@myself} variant="ghost" size="sm" class="mt-2">
-        Import another
-      </.button>
-    </div>
+    <.notice kind={if @error, do: :warn, else: :ok}>
+      {@done_message}
+      <:action>
+        <.button phx-click="inat_reset" phx-target={@myself} variant="ghost" size="sm">
+          Import another
+        </.button>
+      </:action>
+    </.notice>
     """
   end
 

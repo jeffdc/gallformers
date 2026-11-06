@@ -52,9 +52,9 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
     end
 
     test "page loads successfully for superadmin", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/users")
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
 
-      assert html =~ "User Management"
+      assert has_element?(view, "h1", "Users")
     end
 
     test "lists all users", %{conn: conn, user1: user1, user2: user2} do
@@ -74,8 +74,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
     test "shows toggle switch for show_on_about", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
-      # Should have toggle buttons with role="switch"
-      assert has_element?(view, "button[role='switch']")
+      assert has_element?(view, "#users input[type=checkbox][role=switch]")
     end
 
     test "can toggle show_on_about for a user", %{conn: conn, user2: user2} do
@@ -85,7 +84,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
 
       # Click toggle for user2
       view
-      |> element("button[phx-value-id='#{user2.id}']")
+      |> element("input[role=switch][phx-value-id='#{user2.id}']")
       |> render_click()
 
       # Verify the update persisted
@@ -100,7 +99,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
 
       # Click toggle for user1 (currently true)
       view
-      |> element("button[phx-value-id='#{user1.id}']")
+      |> element("input[role=switch][phx-value-id='#{user1.id}']")
       |> render_click()
 
       # Verify the update persisted
@@ -112,7 +111,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       view
-      |> element("button[phx-value-id='#{user1.id}']")
+      |> element("input[role=switch][phx-value-id='#{user1.id}']")
       |> render_click()
 
       html = render(view)
@@ -120,11 +119,9 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
     end
 
     test "shows user count", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/users")
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
 
-      # Should show "Showing N users"
-      assert html =~ "Showing"
-      assert html =~ "users"
+      assert has_element?(view, "[data-part=meta]", "Users")
     end
 
     test "displays info banner about purpose", %{conn: conn} do
@@ -209,8 +206,8 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         |> put_session(:db_display_name, "Test User")
 
       # Should load without error
-      {:ok, _view, html} = live(conn, ~p"/admin/users")
-      assert html =~ "User Management"
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+      assert has_element?(view, "h1", "Users")
     end
   end
 
@@ -285,15 +282,18 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         |> put_session(:current_user, superadmin)
         |> put_session(:db_display_name, "Test User")
 
+      {:ok, _} =
+        Accounts.create_user(%{auth0_id: unique_auth0_id(), display_name: "Table Row"})
+
       {:ok, conn: conn}
     end
 
     test "table has correct headers", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/admin/users")
 
-      assert html =~ "Display Name"
+      assert html =~ "Display name"
       assert html =~ "Nickname"
-      assert html =~ "Show on About"
+      assert html =~ "On the About page"
     end
 
     test "has proper table structure", %{conn: conn} do

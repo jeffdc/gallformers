@@ -1,16 +1,20 @@
 defmodule GallformersWeb.GallLive do
   @moduledoc """
-  LiveView for the Gall detail page.
-
-  Displays a Gall from `Gallformers.Catalog.gall_page/1`: its Inducer's
-  taxonomy, Hosts, Traits, images, range map, names and Sources (the
-  Gallformers note and the legacy citations).
+  The Gall page, on the design system (matter bc0d; behavior in
+  docs/design-system/inventory/gall-page.md). A Gall from
+  `Gallformers.Catalog.gall_page/1`: its Inducer's lineage, name and
+  generation, the other generation, Hosts, Traits, the Gallformers ID Notes
+  (pinned, in full), its Sources by year (each opens in the reader; a
+  `?source=` link opens it there directly), its photos, the range map
+  (framed on the native range; Enlarge opens a large map) and its names.
+  An unknown or malformed ID is a 404.
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.{
     Accounts,
     Catalog,
+    Curation,
     Galls,
     Glossaries,
     Markdown,
@@ -19,10 +23,11 @@ defmodule GallformersWeb.GallLive do
 
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
-  alias GallformersWeb.LineageBreadcrumb
+  alias GallformersWeb.Admin.PlaceDrillDown
+  alias GallformersWeb.GallLive.RangeEdit
   alias GallformersWeb.SEO
+  alias GallformersWeb.TaxonomyURL
 
-  @aliases_page_size 10
   @sources_initial_limit 8
 
   @detachable_values %{
@@ -36,52 +41,103 @@ defmodule GallformersWeb.GallLive do
   def mount(%{"id" => id}, _session, socket) do
     case Integer.parse(id) do
       {gall_id, ""} ->
-        load_gall(socket, gall_id)
+        {:ok, socket} = load_gall(socket, gall_id)
+        curator = socket.assigns[:curator]
 
-      _ ->
+        # A curator keeps up with their tray and others' (Edit mode, ec2c).
+        if curator && connected?(socket) do
+          Curation.subscribe(curator)
+          Curation.subscribe_subject({:gall, gall_id})
+        end
+
         {:ok,
          assign(socket,
-           page_title: "Gall Not Found",
-           page_description: "The requested gall was not found on Gallformers.",
-           page_url: nil,
-           page_image: nil,
-           page_json_ld: nil,
-           page_noindex: true,
-           gall: nil,
-           selected_source: nil,
-           error: "Invalid gall ID"
+           editing: false,
+           photos_open: false,
+           others_pending: [],
+           range_edit: nil,
+           range_bounds_edit: nil
          )}
+
+      _ ->
+        raise GallformersWeb.NotFoundError, "No gall #{id}"
     end
   end
 
   @impl true
-  def handle_params(%{"source" => source_id_str}, _uri, socket) do
+  def handle_params(params, _uri, socket) do
+    # Edit mode (`?edit`): curators only; for anyone else the public page.
+    editing = Map.has_key?(params, "edit") and socket.assigns[:curator] != nil
+
+    socket =
+      socket
+      |> assign(editing: editing, photos_open: editing and Map.has_key?(params, "photos"))
+      |> load_others_pending()
+
+    {:noreply, select_source(socket, params["source"])}
+  end
+
+  defp select_source(socket, nil), do: socket
+
+  defp select_source(socket, source_id_str) do
     with {source_id, ""} <- Integer.parse(source_id_str),
          source when not is_nil(source) <-
            Enum.find(socket.assigns[:sources] || [], fn s -> s.id == source_id end) do
-      {:noreply, assign(socket, selected_source: source, sources_expanded: true)}
+      assign(socket, selected_source: source, sources_expanded: true)
     else
-      _ -> {:noreply, socket}
+      _ -> socket
     end
   end
 
-  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+  defp load_others_pending(%{assigns: %{editing: true, curator: curator, gall: gall}} = socket),
+    do: assign(socket, others_pending: Curation.others_pending({:gall, gall.id}, curator))
+
+  defp load_others_pending(socket), do: assign(socket, others_pending: [])
+
+  # The tray changed (this curator's, or another's about this Gall): refresh
+  # Edit mode's marks.
+  @impl true
+  def handle_info({PlaceDrillDown, {:toggle_place, code}}, socket),
+    do: {:noreply, RangeEdit.mark(socket, code)}
+
+  def handle_info({PlaceDrillDown, {:include_all, codes}}, socket),
+    do: {:noreply, RangeEdit.include_all(socket, codes)}
+
+  def handle_info({PlaceDrillDown, {:exclude_all, codes}}, socket),
+    do: {:noreply, RangeEdit.exclude_all(socket, codes)}
+
+  def handle_info({PlaceDrillDown, :zoom_out}, socket),
+    do: {:noreply, push_event(socket, "range-zoom-out", %{})}
+
+  def handle_info({:change_set, _change}, socket) do
+    # The Editor's marks change even when the Gall's data doesn't.
+    if socket.assigns.editing,
+      do: send_update(GallformersWeb.GallLive.Editor, id: "gall-editor", refresh: true)
+
+    {:noreply, socket |> reload_gall() |> load_others_pending()}
+  end
+
+  # Something may have been applied: the Gall's data again, keeping what the
+  # reader has open.
+  defp reload_gall(socket) do
+    keep =
+      Map.take(socket.assigns, [
+        :editing,
+        :selected_source,
+        :modal_font_size,
+        :sources_expanded,
+        :sources_order,
+        :map_open
+      ])
+
+    {:ok, reloaded} = load_gall(socket, socket.assigns.gall.id)
+    assign(reloaded, keep)
+  end
 
   defp load_gall(socket, gall_id) do
     case Catalog.gall_page(gall_id) do
       :not_found ->
-        {:ok,
-         assign(socket,
-           page_title: "Gall Not Found",
-           page_description: "The requested gall was not found on Gallformers.",
-           page_url: nil,
-           page_image: nil,
-           page_json_ld: nil,
-           page_noindex: true,
-           gall: nil,
-           selected_source: nil,
-           error: "Gall not found"
-         )}
+        raise GallformersWeb.NotFoundError, "No gall #{gall_id}"
 
       {:ok, %GallPage{} = gall} ->
         images = format_images(gall.images)
@@ -95,8 +151,6 @@ defmodule GallformersWeb.GallLive do
         # Parse the generation qualifier off the name and fetch its definition
         {base_name, generation_term, glossary_word, generation_definition} =
           parse_generation_term(gall.name, gall.generation)
-
-        note = Enum.find(gall.sources, & &1.note?)
 
         # Build SEO data
         page_url = "/gall/#{gall_id}"
@@ -128,32 +182,37 @@ defmodule GallformersWeb.GallLive do
            generation_definition: generation_definition,
            images: images,
            sources: gall.sources,
-           taxonomy: breadcrumb(gall.inducers),
+           crumbs: crumbs(gall.inducers),
            range: range,
            inherited_range: inherited_range,
            introduced_range: introduced_range,
-           range_bounds: Places.get_bounds_for_codes(range ++ inherited_range),
+           # The map frames the native range; introduced places are drawn, not framed.
+           range_bounds:
+             Places.get_bounds_for_codes((range -- introduced_range) ++ inherited_range),
            range_unknown?: gall.display_range == :everywhere,
            related_galls: gall.related_galls,
            common_names: gall.common_names,
            name_rows: name_rows(gall),
            gallformers_code: gall.gallformers_code,
-           has_gallformers_notes: note != nil,
-           note_source_id: note && note.id,
-           notes_alert_dismissed: false,
-           aliases_page: 1,
-           aliases_page_size: @aliases_page_size,
+           traits: trait_values(gall),
            selected_source: nil,
            modal_font_size: :base,
            sources_expanded: false,
-           error: nil
+           sources_order: :asc,
+           map_open: false
          )}
     end
   end
 
-  # The taxonomy breadcrumb from the (first) Inducer's lineage.
-  defp breadcrumb([]), do: nil
-  defp breadcrumb([%{lineage: lineage} | _]), do: LineageBreadcrumb.from_lineage(lineage)
+  # The breadcrumb: the (first) Inducer's lineage, the ranks that have a
+  # page (family … genus), each linked by its encoded name.
+  defp crumbs([]), do: []
+
+  defp crumbs([%{lineage: lineage} | _]) do
+    for taxon <- lineage, path = TaxonomyURL.public_path(taxon), path != nil do
+      %{name: taxon.name, path: path, italic: taxon.rank in [:genus, :section]}
+    end
+  end
 
   # The names table: the Inducer's synonyms, then the Gall's former labels
   # and codes (never common names, which are listed apart).
@@ -174,6 +233,63 @@ defmodule GallformersWeb.GallLive do
 
   defp label_type(:former_label), do: "former label"
   defp label_type(:code), do: "code"
+
+  # The eleven Traits in today's order, and Abundance, each with its shown
+  # value; nil when not recorded (`fact_list` collects those into one line).
+  @traits [
+    {"Detachable", "detachable"},
+    {"Color", "color"},
+    {"Texture", "texture"},
+    {"Shape", "shape"},
+    {"Season", "season"},
+    {"Alignment", "alignment"},
+    {"Walls", "walls"},
+    {"Location", "plant_part"},
+    {"Form", "form"},
+    {"Cells", "cells"}
+  ]
+
+  defp trait_values(gall) do
+    traits = for {label, key} <- @traits, do: {label, blank(trait_display(gall, key))}
+    traits ++ [{"Abundance", blank(gall.abundance)}]
+  end
+
+  defp blank(value) when value in [nil, ""], do: nil
+  defp blank(value), do: value
+
+  defp trait_value(traits, label),
+    do: Enum.find_value(traits, fn {l, value} -> l == label && value end)
+
+  # Sources by year (n.d. last), oldest or newest first; the note is shown apart.
+  defp listed_sources(sources, order) do
+    {dated, undated} = sources |> Enum.reject(& &1.note?) |> Enum.split_with(&year(&1.pubyear))
+    Enum.sort_by(dated, &year(&1.pubyear), order) ++ undated
+  end
+
+  defp year(nil), do: nil
+
+  defp year(text) do
+    case Regex.run(~r/\d{4}/, text) do
+      [y] -> String.to_integer(y)
+      nil -> nil
+    end
+  end
+
+  # A Source's text for a two-line preview: no markup.
+  defp excerpt_text(markdown) do
+    markdown
+    |> Markdown.render!()
+    |> String.replace(~r/<[^>]+>/, " ")
+    |> String.replace(["&amp;", "&quot;", "&#39;", "&lt;", "&gt;"], fn
+      "&amp;" -> "&"
+      "&quot;" -> "\""
+      "&#39;" -> "'"
+      "&lt;" -> "<"
+      "&gt;" -> ">"
+    end)
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+  end
 
   defp host_href(%{link: {:host, id}}), do: "/host/#{id}"
   defp host_href(%{link: {rank, name}}), do: "/#{rank}/#{name}"
@@ -204,8 +320,9 @@ defmodule GallformersWeb.GallLive do
       Map.merge(img, %{
         url: full_url,
         src: full_url,
+        thumb: "#{base_url}/#{small_path}",
         small_url: "#{base_url}/#{small_path}",
-        alt: "Gall image"
+        alt: nil
       })
     end)
   end
@@ -264,11 +381,22 @@ defmodule GallformersWeb.GallLive do
   defp parse_generation_term(name, _generation), do: {name, nil, nil, nil}
 
   @impl true
-  def handle_event("dismiss_notes_alert", _params, socket) do
-    {:noreply, assign(socket, notes_alert_dismissed: true)}
-  end
+  # -- range exclusions (Edit mode; GallformersWeb.GallLive.RangeEdit) -----------
 
-  @impl true
+  def handle_event("open_range", _params, %{assigns: %{editing: true}} = socket),
+    do: {:noreply, RangeEdit.open(socket)}
+
+  def handle_event("close_range", _params, socket), do: {:noreply, RangeEdit.close(socket)}
+
+  def handle_event("toggle_region", %{"code" => code}, socket),
+    do: {:noreply, RangeEdit.mark(socket, code)}
+
+  def handle_event("toggle_country", %{"code" => code}, socket),
+    do: {:noreply, RangeEdit.country(socket, code)}
+
+  def handle_event("range_to_tray", _params, %{assigns: %{range_edit: %{}}} = socket),
+    do: {:noreply, RangeEdit.to_tray(socket)}
+
   def handle_event("clipboard_copy_success", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied to clipboard")}
   end
@@ -281,13 +409,6 @@ defmodule GallformersWeb.GallLive do
   @impl true
   def handle_event("gallery_index_changed", _params, socket) do
     {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("aliases_page", %{"page" => page}, socket) do
-    aliases = socket.assigns.name_rows
-    page = max(1, min(page, aliases_total_pages(aliases, socket.assigns.aliases_page_size)))
-    {:noreply, assign(socket, aliases_page: page)}
   end
 
   @impl true
@@ -326,24 +447,19 @@ defmodule GallformersWeb.GallLive do
   end
 
   @impl true
+  def handle_event("sources_order", %{"order" => order}, socket) when order in ["asc", "desc"],
+    do: {:noreply, assign(socket, sources_order: String.to_existing_atom(order))}
+
+  @impl true
+  def handle_event("open_map", _params, socket), do: {:noreply, assign(socket, map_open: true)}
+
+  @impl true
+  def handle_event("close_map", _params, socket), do: {:noreply, assign(socket, map_open: false)}
+
+  @impl true
   def handle_event("navigate_to_place", %{"code" => code}, socket) do
     {:noreply, push_navigate(socket, to: "/place/#{code}")}
   end
-
-  defp paginated_aliases(aliases, current_page, page_size) do
-    aliases
-    |> Enum.drop((current_page - 1) * page_size)
-    |> Enum.take(page_size)
-  end
-
-  defp aliases_total_pages(aliases, page_size) do
-    max(1, ceil(length(aliases) / page_size))
-  end
-
-  defp prose_size_class(:sm), do: "prose-sm"
-  defp prose_size_class(:base), do: "prose-base"
-  defp prose_size_class(:lg), do: "prose-lg"
-  defp prose_size_class(:xl), do: "prose-xl"
 
   defp visible_sources(sources, expanded?)
        when expanded? or length(sources) <= @sources_initial_limit do
@@ -375,469 +491,454 @@ defmodule GallformersWeb.GallLive do
 
   @impl true
   def render(assigns) do
+    assigns =
+      assign(assigns,
+        note: Enum.find(assigns.sources, & &1.note?),
+        listed: listed_sources(assigns.sources, assigns.sources_order)
+      )
+
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <%= if @error do %>
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
-      <% else %>
-        <%= if @gall do %>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 space-y-2">
-              <div class="flex items-start justify-between gap-4">
-                <div class="flex items-center gap-2">
-                  <h2 class="text-2xl font-bold">
-                    <em class="taxon-name">
-                      {@base_name}
-                      <.glossary_tooltip
-                        :if={@generation_term}
-                        term={@generation_term}
-                        glossary_word={@glossary_word}
-                        definition={@generation_definition}
-                      />
-                    </em>
-                  </h2>
-                  <.link
-                    :if={Accounts.admin?(@current_user)}
-                    href={~p"/admin/galls/#{@gall.id}"}
-                    class="text-gray-400 hover:text-gf-maroon"
-                    title="Edit in admin"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-5 w-5" />
-                  </.link>
-                </div>
-                <.data_complete_badge
-                  complete={@gall.datacomplete}
-                  complete_tooltip="All sources containing unique information relevant to this gall have been added and are reflected in its associated data."
-                  incomplete_tooltip="We are still working on this gall so data might be missing."
-                />
-              </div>
-
-              <div
-                :if={@gall.undescribed? && @gallformers_code}
-                class="bg-amber-50 border border-amber-200 rounded-lg p-4"
-              >
-                <p class="text-red-600 font-medium mb-2">
-                  The inducer of this gall is unknown or undescribed.
-                </p>
-                <p class="text-sm mb-2">
-                  <span class="font-medium text-gray-700">Gallformers Code:</span>
-                  <button
-                    id="copy-gallformers-code"
-                    phx-hook="CopyToClipboard"
-                    data-copy-text={@gallformers_code}
-                    class="ml-1 cursor-pointer hover:opacity-70"
-                  >
-                    <code class="px-2 py-0.5 bg-white border border-amber-200 rounded font-mono text-amber-800">
-                      {@gallformers_code}
-                    </code>
-                    <span class="ml-2 text-xs hover:underline">
-                      Click to Copy
-                    </span>
-                  </button>
-                </p>
-                <p class="text-sm text-gray-600">
-                  <a
-                    href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
-                    target="_blank"
-                    rel="noreferrer"
-                    class="text-gf-maroon hover:underline"
-                  >
-                    View observations collected with this code on iNaturalist.
-                  </a>
-                  <.link href="/articles/link-undescribed-inat" class="text-gf-maroon hover:underline">
-                    Learn more about how it works and how you can help.
-                  </.link>
-                </p>
-              </div>
-
-              <div
-                :if={!@gall.undescribed? && @gallformers_code}
-                class="text-sm text-gray-600"
-              >
-                Formerly tracked as undescribed —
-                <a
-                  href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
-                  target="_blank"
-                  rel="noreferrer"
-                  class="text-gf-maroon hover:underline"
-                >
-                  view iNat observations linked under Gallformers Code "{@gallformers_code}"
-                </a>
-              </div>
-
-              <div class="space-y-2">
-                <.taxonomy_breadcrumb
-                  :if={@taxonomy}
-                  family={@taxonomy.family}
-                  intermediates={@taxonomy.intermediates}
-                  genus={@taxonomy.genus}
-                />
-
-                <div :if={@gall.hosts != []} class="flex items-center gap-1">
-                  <div>
-                    <strong>Hosts:</strong>
-                    <span :for={{host, idx} <- Enum.with_index(@gall.hosts)}>
-                      {if idx > 0, do: " / "}<.link
-                        href={host_href(host)}
-                        class="hover:underline"
-                      ><.taxon_name
-                          name={host.name}
-                          genus_placeholder={host.rank == :genus}
-                        /></.link>
-                    </span>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4">
-                  <div class="space-y-1">
-                    <div>
-                      <strong>Detachable:</strong> {trait_display(@gall, "detachable")}
-                    </div>
-                    <div><strong>Color:</strong> {trait_display(@gall, "color")}</div>
-                    <div><strong>Texture:</strong> {trait_display(@gall, "texture")}</div>
-                    <div><strong>Abundance:</strong> {@gall.abundance || ""}</div>
-                  </div>
-                  <div class="space-y-1">
-                    <div><strong>Shape:</strong> {trait_display(@gall, "shape")}</div>
-                    <div><strong>Season:</strong> {trait_display(@gall, "season")}</div>
-                    <div>
-                      <strong>Alignment:</strong> {trait_display(@gall, "alignment")}
-                    </div>
-                    <div><strong>Walls:</strong> {trait_display(@gall, "walls")}</div>
-                  </div>
-                  <div class="space-y-1">
-                    <div>
-                      <strong>Location:</strong> {trait_display(@gall, "plant_part")}
-                    </div>
-                    <div><strong>Form:</strong> {trait_display(@gall, "form")}</div>
-                    <div><strong>Cells:</strong> {trait_display(@gall, "cells")}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div class="flex items-center gap-1">
-                  <strong>Possible Range:</strong>
-                  <.info_tip content="The gall's range is computed from the range of all hosts that the gall occurs on. In some cases we have evidence that the gall does not occur across the full range of the hosts and we will remove these places from the range. For undescribed species we will show the expected range based on hosts plus where the galls have been observed." />
-                </div>
-                <p
-                  :if={@range_unknown?}
-                  class="text-sm text-gray-600 italic mt-1"
-                >
-                  Range unknown — no host range data available.
-                </p>
-                <.alert :if={not @range_unknown?} variant="info" class="mt-1 mb-2">
-                  Not an occurrence map: this shows where this gall's hosts grow. In most cases the
-                  gall has not been documented throughout this area.
-                </.alert>
-                <.range_map
-                  :if={not @range_unknown?}
-                  id="gall-range-map"
-                  class="min-h-[250px] h-[300px]"
-                  in_range={@range}
-                  inherited_range={@inherited_range}
-                  introduced_range={@introduced_range}
-                  bounds={@range_bounds}
-                  navigable
-                />
-                <div
-                  :if={not @range_unknown? and (@inherited_range != [] or @introduced_range != [])}
-                  class="mt-1"
-                >
-                  <.range_map_legend mode={:public} />
-                </div>
-              </div>
-
-              <div :if={length(@common_names) > 0} class="mt-4">
-                <p>
-                  <strong>Common Name(s):</strong>
-                  {Enum.join(@common_names, ", ")}
-                </p>
-              </div>
-
-              <div :if={length(@name_rows) > 0} class="mt-4">
-                <h3 class="font-semibold text-gray-800 mb-2">
-                  Synonymy ({length(@name_rows)})
-                </h3>
-                <div class="bg-white rounded border border-gray-200 overflow-hidden">
-                  <table class="gf-table gf-table-compact">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr :for={a <- paginated_aliases(@name_rows, @aliases_page, @aliases_page_size)}>
-                        <td>
-                          <span :if={a.label?}>{a.name}</span>
-                          <.taxon_name :if={not a.label?} name={a.name} />
-                        </td>
-                        <td class="text-gray-600">{a.type}</td>
-                        <td class="text-gray-600">{a.notes || "—"}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <.pagination
-                  :if={aliases_total_pages(@name_rows, @aliases_page_size) > 1}
-                  page={@aliases_page}
-                  total_pages={aliases_total_pages(@name_rows, @aliases_page_size)}
-                  total_items={length(@name_rows)}
-                  page_size={@aliases_page_size}
-                  on_page_change={fn page -> JS.push("aliases_page", value: %{page: page}) end}
-                  class="mt-4"
-                />
-              </div>
-
-              <div :if={length(@related_galls) > 0} class="mt-4">
-                <h3 class="font-semibold text-gray-800 mb-2">
-                  Related Galls ({length(@related_galls)})
-                </h3>
-                <ul class="list-disc list-inside space-y-1">
-                  <li :for={related <- @related_galls}>
-                    <.link href={"/gall/#{related.id}"} class="hover:underline">
-                      <.taxon_name name={related.name} />
-                    </.link>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div class="lg:col-span-1">
-              <.image_gallery
-                images={@images}
-                id="gall-images"
-                edit_href={~p"/admin/galls/#{@gall.id}" <> "#images"}
-                current_user={@current_user}
-              />
-            </div>
-          </div>
-
-          <hr class="border-gray-200 my-4" />
-
-          <div
-            :if={
-              @has_gallformers_notes && !@notes_alert_dismissed &&
-                !(@selected_source && @selected_source.note?)
-            }
-            class="flex items-center gap-3 p-3 mb-4 bg-gf-sky-blue border border-blue-300 rounded text-sm text-gray-700"
-            role="alert"
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb :for={c <- @crumbs} navigate={c.path} italic={c.italic}>{c.name}</:crumb>
+          <:title name>
+            {@base_name}
+            <.glossary_tooltip
+              :if={@generation_term}
+              term={@generation_term}
+              glossary_word={@glossary_word}
+              definition={@generation_definition}
+            />
+          </:title>
+          <:chip :if={@gall.undescribed?} variant={:info}>Undescribed</:chip>
+          <:chip variant={if @gall.datacomplete, do: :ok, else: :warn}>
+            <span title={
+              if @gall.datacomplete,
+                do:
+                  "All sources containing unique information relevant to this gall have been added and are reflected in its associated data.",
+                else: "We are still working on this gall so data might be missing."
+            }>
+              {if @gall.datacomplete, do: "Complete", else: "In progress"}
+            </span>
+          </:chip>
+          <:meta
+            :if={@related_galls != []}
+            label={if length(@related_galls) == 1, do: "Other generation", else: "Related galls"}
           >
-            <.icon name="ph-info" class="h-5 w-5 text-blue-600 shrink-0" />
-            <p class="flex-1">
-              Our ID Notes may contain important tips necessary for distinguishing this gall
-              from similar galls and/or important information about the taxonomic status of
-              this gall inducer.
-            </p>
-            <button
-              type="button"
-              phx-click="show_source_detail"
-              phx-value-id={@note_source_id}
-              class="px-3 py-1 text-sm bg-white border border-blue-400 text-blue-700 hover:bg-blue-50 rounded whitespace-nowrap"
-            >
-              Show notes
-            </button>
-            <button
-              type="button"
-              class="text-gray-500 hover:text-gray-700"
-              phx-click="dismiss_notes_alert"
-              aria-label="Dismiss"
-            >
-              <.icon name="ph-x" class="h-4 w-4" />
-            </button>
-          </div>
+            <span :for={{related, i} <- Enum.with_index(@related_galls)}>
+              {if i > 0, do: " · "}<.link navigate={"/gall/#{related.id}"}><.taxon_name name={
+                  related.name
+                } /></.link>
+            </span>
+          </:meta>
+          <:meta :if={@common_names != []} label="Common name">
+            {Enum.join(@common_names, ", ")}
+          </:meta>
+          <:meta
+            :for={label <- ["Season", "Location", "Form"]}
+            :if={trait_value(@traits, label)}
+            label={label}
+          >
+            {trait_value(@traits, label)}
+          </:meta>
+          <:action :if={@curator}>
+            <.edit_toggle editing={@editing} path={"/gall/#{@gall.id}"} />
+          </:action>
+        </.page_header>
 
-          <%= if length(@sources) > 0 do %>
-            <div class="flex items-center gap-2 mb-2">
-              <h3 class="font-semibold">Further Information ({length(@sources)})</h3>
-            </div>
-            <div class="space-y-2">
-              <div
-                :for={source <- visible_sources(@sources, @sources_expanded)}
-                class={"p-3 rounded border bg-white #{if source.note?, do: "border-blue-200 border-l-4 border-l-blue-400", else: "border-gray-200"}"}
-              >
-                <div>
-                  <.icon
-                    :if={source.note?}
-                    name="ph-info"
-                    class="h-5 w-5 text-blue-500 inline-block align-text-bottom mr-1"
-                  />
-                  <.link
-                    href={"/source/#{source.id}"}
-                    class="font-medium hover:underline"
-                  >
-                    {source.title}
+        <div :if={@editing} id="editing" class="flex flex-col gap-2">
+          <.notice kind={:info} title="Editing">
+            Each change goes into your tray at the foot of the screen. Nothing changes until you Review and apply; Fact history is kept, so nothing is lost.
+          </.notice>
+          <.notice :if={@others_pending != []} id="others-pending" kind={:warn}>
+            <span :for={{other, i} <- Enum.with_index(@others_pending)}>
+              {if i > 0, do: "; "}{other.user.name} has {other.count} unapplied {if other.count == 1,
+                do: "change",
+                else: "changes"} here
+            </span>. Applying yours first means theirs are checked again against it.
+          </.notice>
+          <.edit_scope
+            :if={@gall.inducers != []}
+            kind={:elsewhere}
+            href={"/admin/taxonomy/#{hd(@gall.inducers).taxon_id}"}
+          >
+            The lineage and the Inducer's synonyms: on the taxonomy of <i>{hd(@gall.inducers).name}</i>.
+          </.edit_scope>
+          <.edit_scope :if={@related_galls != []} kind={:follows}>
+            The other generation follows from the Inducer: Galls with the same Inducer.
+          </.edit_scope>
+          <.edit_scope kind={:follows}>
+            Season, Location and Form above follow from the Traits below; the range map from the Hosts' ranges.
+          </.edit_scope>
+        </div>
+
+        <.notice
+          :if={@gall.undescribed? && @gallformers_code}
+          kind={:warn}
+          title="The inducer of this gall is unknown or undescribed."
+        >
+          Gallformers Code
+          <button
+            id="copy-gallformers-code"
+            type="button"
+            phx-hook="CopyToClipboard"
+            data-copy-text={@gallformers_code}
+            title="Copy"
+            class="rounded-ctl border border-line bg-surface px-1.5 font-mono text-ui"
+          >
+            {@gallformers_code} <.icon name="ph-copy" class="size-3.5" />
+          </button>
+          ·
+          <a
+            href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Observations with this code on iNaturalist ↗
+          </a>
+          · <.link href="/articles/link-undescribed-inat">How it works</.link>
+        </.notice>
+        <p :if={!@gall.undescribed? && @gallformers_code} class="-mt-4 text-meta text-muted">
+          Formerly tracked as undescribed:
+          <a
+            href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
+            target="_blank"
+            rel="noreferrer"
+          >
+            iNaturalist observations under "{@gallformers_code}" ↗
+          </a>
+        </p>
+
+        <div class="gf-with-rail">
+          <div class="flex min-w-0 flex-col gap-section">
+            <.live_component
+              :if={@editing}
+              module={GallformersWeb.GallLive.Editor}
+              id="gall-editor"
+              gall={@gall}
+              curator={@curator}
+              photos_open={@photos_open}
+            />
+
+            <.section :if={!@editing} title="Hosts" count={length(@gall.hosts)}>
+              <.name_list items={@gall.hosts} columns={4}>
+                <:item :let={host}>
+                  <.link navigate={host_href(host)}>
+                    <.taxon_name name={host.name} genus_placeholder={host.rank == :genus} />
                   </.link>
-                  {if source.author, do: " - #{source.author}"}
-                  {if source.pubyear, do: " (#{source.pubyear})"}
-                  <.link
-                    :if={valid_url?(source.externallink)}
-                    href={source.externallink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="ml-2 text-gray-500 hover:text-gf-maroon"
-                    title="View external source"
-                  >
-                    <.icon name="ph-arrow-square-out" class="h-4 w-4 inline-block align-text-bottom" />
+                </:item>
+              </.name_list>
+            </.section>
+
+            <.section
+              :if={!@editing}
+              id="gall-traits-section"
+              title="Traits"
+              count={"#{Enum.count(@traits, &elem(&1, 1))} of #{length(@traits)} recorded"}
+            >
+              <.fact_list id="gall-traits" columns={2}>
+                <:item :for={{label, value} <- @traits} label={label} value={value} />
+              </.fact_list>
+            </.section>
+
+            <.panel :if={@note} id="id-notes" variant={:info}>
+              <div class="flex flex-wrap items-baseline gap-x-3">
+                <h2 class="text-subsection">
+                  <.link navigate={"/source/#{@note.id}"} class="text-ink">
+                    Gallformers ID Notes
                   </.link>
-                  <button
-                    id={"copy-source-link-#{source.id}"}
-                    phx-hook="CopyToClipboard"
-                    data-copy-text={"/gall/#{@gall.id}?source=#{source.id}"}
-                    data-copy-url
-                    class="ml-2 text-gray-500 hover:text-gf-maroon cursor-pointer"
-                    title="Copy link to this description"
-                  >
-                    <.icon name="ph-link" class="h-4 w-4 inline-block align-text-bottom" />
-                  </button>
-                </div>
+                </h2>
+                <span class="text-meta text-muted">
+                  {@note.pubyear}{if @note.license, do: " · #{@note.license}"}
+                </span>
                 <button
-                  :if={source.description not in [nil, ""]}
+                  id={"copy-source-link-#{@note.id}"}
                   type="button"
-                  phx-click="show_source_detail"
-                  phx-value-id={source.id}
-                  class="mt-1 text-left w-full group cursor-pointer"
+                  phx-hook="CopyToClipboard"
+                  data-copy-text={"/gall/#{@gall.id}?source=#{@note.id}"}
+                  data-copy-url
+                  class="ml-auto text-muted"
+                  title="Copy link to the ID Notes"
                 >
-                  <div class="prose prose-sm max-w-none line-clamp-3 [&_p]:mb-0">
-                    {Phoenix.HTML.raw(Markdown.render!(source.description))}
-                  </div>
-                  <span class="text-sm text-gf-maroon group-hover:underline">Read more...</span>
+                  <.icon name="ph-link" class="size-4" />
                 </button>
-                <p :if={source.license} class="mt-1 text-sm text-gray-500">
-                  License:
-                  <%= if valid_url?(source.licenselink) do %>
-                    <.link
-                      href={source.licenselink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="hover:underline"
-                    >
-                      {source.license}
-                    </.link>
-                  <% else %>
-                    {source.license}
-                  <% end %>
-                </p>
               </div>
-            </div>
-            <div :if={show_expand_button?(@sources, @sources_expanded)} class="mt-4 text-center">
+              <.prose markdown={@note.description} size={:sm} font={:serif} class="mt-2" />
               <button
                 type="button"
-                phx-click="expand_sources"
-                class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
+                phx-click="show_source_detail"
+                phx-value-id={@note.id}
+                class="block text-left text-meta text-link"
               >
-                Show all {length(@sources)} sources
+                Read
               </button>
-            </div>
-          <% else %>
-            <p class="italic">No further information available for this species.</p>
-          <% end %>
+            </.panel>
 
-          <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed?} />
-
-          <.record_metadata inserted_at={@gall.inserted_at} updated_at={@gall.updated_at} />
-        <% else %>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            Gall not found
+            <.section id="gall-sources-section" title="Sources" count={length(@listed)}>
+              <:aside>
+                <span class="flex gap-2" role="group" aria-label="Order">
+                  <button
+                    :for={{order, label} <- [asc: "Oldest first", desc: "Newest first"]}
+                    type="button"
+                    phx-click="sources_order"
+                    phx-value-order={order}
+                    aria-pressed={to_string(@sources_order == order)}
+                    class={
+                      if @sources_order == order, do: "font-semibold text-ink", else: "text-link"
+                    }
+                  >
+                    {label}
+                  </button>
+                </span>
+              </:aside>
+              <%!-- PROPOSED: source_entry with Markdown (matter bc0d) --%>
+              <ul id="gall-sources" class="flex flex-col">
+                <li
+                  :for={source <- visible_sources(@listed, @sources_expanded)}
+                  id={"source-#{source.id}"}
+                  class="flex items-baseline gap-3 border-b border-line py-2"
+                >
+                  <span class="w-10 shrink-0 text-meta tabular-nums text-muted">
+                    {source.pubyear || "n.d."}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline gap-2">
+                      <span class="min-w-0 flex-1">
+                        <.link navigate={"/source/#{source.id}"} class="font-semibold">
+                          {source.title}
+                        </.link>
+                        <span :if={source.author} class="text-meta text-ink-2">
+                          · {source.author}
+                        </span>
+                      </span>
+                      <span class="flex shrink-0 items-center gap-2 text-muted">
+                        <.link
+                          :if={valid_url?(source.externallink)}
+                          href={source.externallink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View external source"
+                        >
+                          <.icon name="ph-arrow-square-out" class="size-4" />
+                        </.link>
+                        <button
+                          id={"copy-source-link-#{source.id}"}
+                          type="button"
+                          phx-hook="CopyToClipboard"
+                          data-copy-text={"/gall/#{@gall.id}?source=#{source.id}"}
+                          data-copy-url
+                          title="Copy link to this description"
+                        >
+                          <.icon name="ph-link" class="size-4" />
+                        </button>
+                      </span>
+                    </div>
+                    <button
+                      :if={source.description not in [nil, ""]}
+                      type="button"
+                      phx-click="show_source_detail"
+                      phx-value-id={source.id}
+                      class="mt-0.5 block w-full text-left"
+                    >
+                      <span class="line-clamp-2 font-serif text-ui text-ink-2">
+                        {excerpt_text(source.description)}
+                      </span>
+                      <span class="text-meta text-link">Read</span>
+                    </button>
+                    <p :if={source.license} class="text-caption text-muted">{source.license}</p>
+                  </div>
+                </li>
+              </ul>
+              <p :if={@sources == []} class="text-ui text-muted">
+                No further information available for this species.
+              </p>
+              <.button
+                :if={show_expand_button?(@listed, @sources_expanded)}
+                variant="secondary"
+                phx-click="expand_sources"
+                class="mt-3"
+              >
+                Show all {length(@listed)} sources
+              </.button>
+            </.section>
           </div>
-        <% end %>
-      <% end %>
 
-      <.modal
+          <.rail width={:wide}>
+            <.photo_viewer
+              id="gall-images"
+              photos={@images}
+              name={@gall.name}
+              edit_href={"/gall/#{@gall.id}?edit&photos"}
+              admin={Accounts.admin?(@current_user)}
+            />
+
+            <.panel title="Possible range">
+              <:header_action>
+                <.button
+                  :if={not @range_unknown?}
+                  variant="ghost"
+                  size="sm"
+                  icon="ph-arrows-out"
+                  phx-click="open_map"
+                >
+                  Enlarge
+                </.button>
+              </:header_action>
+              <p :if={@range_unknown?} class="text-ui text-muted">
+                Range unknown: no host range data.
+              </p>
+              <.range_map
+                :if={not @range_unknown? and not @map_open}
+                id="gall-range-map"
+                class="h-72"
+                in_range={@range}
+                inherited_range={@inherited_range}
+                introduced_range={@introduced_range}
+                bounds={@range_bounds}
+                navigable
+              />
+              <:footer :if={not @range_unknown?}>
+                <.range_map_legend
+                  :if={@inherited_range != [] or @introduced_range != []}
+                  mode={:public}
+                />
+                <p class="text-caption text-muted">
+                  Where the {length(@gall.hosts)} hosts grow, not where the gall was found.
+                </p>
+              </:footer>
+            </.panel>
+
+            <dl class="flex flex-col gap-3 text-ui">
+              <div :if={@name_rows != [] or @common_names != []}>
+                <dt class="text-meta font-semibold uppercase tracking-wide text-muted">
+                  Also known as
+                </dt>
+                <dd id="gall-names" class="text-ink-2">
+                  <span :for={{name, i} <- Enum.with_index(@common_names)}>
+                    {if i > 0, do: " · "}{name}<span class="text-meta text-muted"> (common name)</span>
+                  </span>{if @common_names !=
+                                                                                                                                                                                                            [] and
+                                                                                                                                                                                                            @name_rows !=
+                                                                                                                                                                                                              [],
+                                                                                                                                                                                                          do:
+                                                                                                                                                                                                            " · "}
+                  <span :for={{a, i} <- Enum.with_index(@name_rows)}>
+                    {if i > 0, do: " · "}<.taxon_name :if={not a.label?} name={a.name} />
+                    <span :if={a.label?}>
+                      {a.name}
+                    </span>
+                    <span
+                      :if={a.type != "synonym" or a.notes}
+                      class="text-meta text-muted"
+                    >
+                      ({[a.type != "synonym" && a.type, a.notes]
+                      |> Enum.filter(& &1)
+                      |> Enum.join(", ")})
+                    </span>
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed?} />
+
+            <.record_metadata inserted_at={@gall.inserted_at} updated_at={@gall.updated_at} />
+          </.rail>
+        </div>
+      </div>
+
+      <.dialog
+        :if={@map_open}
+        id="range-dialog"
+        title={"Possible range of #{@gall.name}"}
+        size={:full}
+        show
+        on_cancel={JS.push("close_map")}
+      >
+        <.range_map
+          id="gall-range-map-large"
+          class="h-160"
+          in_range={@range}
+          inherited_range={@inherited_range}
+          introduced_range={@introduced_range}
+          bounds={@range_bounds}
+          navigable
+        />
+        <p class="mt-2 text-caption text-muted">
+          Where the hosts grow, not where the gall was found. The map's full-screen button gives more room; Esc closes.
+        </p>
+      </.dialog>
+      <.dialog
         :if={@selected_source}
         id="source-detail-modal"
-        show={true}
+        title={@selected_source.title}
+        size={:lg}
+        show
         on_cancel={JS.push("close_source_modal")}
-        class="max-w-3xl"
       >
-        <:header>
-          <div class="flex items-center justify-between w-full pr-8">
-            <span>{@selected_source.title}</span>
-            <div class="flex items-center gap-1 ml-4">
-              <button
-                type="button"
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2 text-meta text-ink-2">
+            {@selected_source.author}{if @selected_source.pubyear,
+              do: " (#{@selected_source.pubyear})"}
+            <span class="ml-auto flex gap-1">
+              <.button
+                variant="ghost"
+                size="sm"
                 phx-click="decrease_font_size"
-                class="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                 disabled={@modal_font_size == :sm}
                 title="Decrease font size"
               >
-                A-
-              </button>
-              <button
-                type="button"
+                A−
+              </.button>
+              <.button
+                variant="ghost"
+                size="sm"
                 phx-click="increase_font_size"
-                class="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                 disabled={@modal_font_size == :xl}
                 title="Increase font size"
               >
                 A+
-              </button>
-            </div>
+              </.button>
+            </span>
           </div>
-        </:header>
-        <:body>
-          <div class="space-y-4">
-            <div class="text-sm text-gray-600">
-              {if @selected_source.author, do: @selected_source.author}
-              {if @selected_source.pubyear, do: " (#{@selected_source.pubyear})"}
-            </div>
-            <div
-              :if={@selected_source.description not in [nil, ""]}
-              class={"prose #{prose_size_class(@modal_font_size)} max-w-none"}
+          <.prose markdown={@selected_source.description} size={@modal_font_size} font={:serif} />
+          <p :if={@selected_source.license} class="border-t border-line pt-2 text-meta text-muted">
+            License:
+            <.link
+              :if={valid_url?(@selected_source.licenselink)}
+              href={@selected_source.licenselink}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              {Phoenix.HTML.raw(Markdown.render!(@selected_source.description))}
-            </div>
-            <div :if={@selected_source.license} class="text-sm text-gray-500 pt-2 border-t">
-              License:
-              <%= if valid_url?(@selected_source.licenselink) do %>
-                <.link
-                  href={@selected_source.licenselink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hover:underline"
-                >
-                  {@selected_source.license}
-                </.link>
-              <% else %>
-                {@selected_source.license}
-              <% end %>
-            </div>
-          </div>
-        </:body>
-        <:footer>
-          <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-4">
-              <.link
-                :if={valid_url?(@selected_source.externallink)}
-                href={@selected_source.externallink}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-gf-maroon hover:underline"
-              >
-                View external link →
-              </.link>
-              <.link
-                href={"/source/#{@selected_source.id}"}
-                class="text-gf-maroon hover:underline"
-              >
-                View source page →
-              </.link>
-            </div>
-            <button
-              id="copy-source-link"
-              phx-hook="CopyToClipboard"
-              data-copy-text={"/gall/#{@gall.id}?source=#{@selected_source.id}"}
-              data-copy-url
-              class="flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon cursor-pointer"
-              title="Copy link to this description"
-            >
-              <.icon name="ph-copy" class="h-4 w-4" /> Copy link
-            </button>
-          </div>
-        </:footer>
-      </.modal>
+              {@selected_source.license}
+            </.link>
+            <span :if={!valid_url?(@selected_source.licenselink)}>{@selected_source.license}</span>
+          </p>
+        </div>
+        <:actions>
+          <button
+            id="copy-source-link"
+            type="button"
+            phx-hook="CopyToClipboard"
+            data-copy-text={"/gall/#{@gall.id}?source=#{@selected_source.id}"}
+            data-copy-url
+            class="mr-auto text-meta text-link"
+          >
+            Copy link
+          </button>
+          <.button
+            :if={valid_url?(@selected_source.externallink)}
+            href={@selected_source.externallink}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="ghost"
+          >
+            External link ↗
+          </.button>
+          <.button navigate={"/source/#{@selected_source.id}"}>Source page</.button>
+        </:actions>
+      </.dialog>
+      <RangeEdit.range_dialog :if={@range_edit} edit={@range_edit} bounds={@range_bounds_edit} />
     </Layouts.app>
     """
   end

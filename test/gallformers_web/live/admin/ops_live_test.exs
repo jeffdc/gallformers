@@ -27,9 +27,11 @@ defmodule GallformersWeb.Admin.OpsLiveTest do
 
   describe "Ops page - operator access" do
     test "operator can access the page", %{conn: conn} do
-      {:ok, _view, html} = live(operator_conn(conn), ~p"/admin/ops")
+      {:ok, view, _html} = live(operator_conn(conn), ~p"/admin/ops")
 
-      assert html =~ "Site Operations"
+      assert has_element?(view, "h1", "Site operations")
+      assert has_element?(view, "#banner-enabled[role=switch]")
+      assert has_element?(view, "label", "Show the banner")
     end
 
     test "shows banner enabled toggle", %{conn: conn} do

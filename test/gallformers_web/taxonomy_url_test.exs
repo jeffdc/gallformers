@@ -3,6 +3,48 @@ defmodule GallformersWeb.TaxonomyURLTest do
 
   alias GallformersWeb.TaxonomyURL
 
+  describe "taxon_path/1" do
+    test "a plant species, subspecies or variety: its Host page" do
+      for rank <- ~w(species subspecies variety) do
+        assert TaxonomyURL.taxon_path(%{
+                 id: 7,
+                 name: "Quercus alba",
+                 rank: rank,
+                 kingdom: "Plantae"
+               }) ==
+                 "/host/7"
+      end
+    end
+
+    test "a rank with a page: that page, by name" do
+      assert TaxonomyURL.taxon_path(%{
+               id: 1,
+               name: "Andricus",
+               rank: "genus",
+               kingdom: "Animalia"
+             }) ==
+               "/genus/Andricus"
+
+      assert TaxonomyURL.taxon_path(%{
+               id: 2,
+               name: "Cynipini",
+               rank: "tribe",
+               kingdom: "Animalia"
+             }) ==
+               "/tribe/Cynipini"
+    end
+
+    test "an inducer species has no page of its own" do
+      assert TaxonomyURL.taxon_path(%{
+               id: 3,
+               name: "Andricus quercuscalifornicus",
+               rank: "species",
+               kingdom: "Animalia"
+             }) ==
+               nil
+    end
+  end
+
   describe "public_path/1" do
     test "family" do
       assert TaxonomyURL.public_path(%{type: "family", name: "Cynipidae"}) == "/family/Cynipidae"

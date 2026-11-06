@@ -2,9 +2,9 @@ defmodule GallformersWeb.UIComponents do
   @moduledoc """
   Shared UI components for the Gallformers application.
 
-  Provides reusable components for cards, spinners, alerts, pagination,
-  error messages, and tooltips. These components follow the visual style
-  from the v2_old SvelteKit implementation.
+  Provides spinners, alerts, pagination, the glossary tooltip, the region
+  scope and see-also links, styled from the design system's tokens
+  (docs/design-system/). `alert` is retiring: new code uses `notice`.
   """
   use Phoenix.Component
   use Gettext, backend: GallformersWeb.Gettext
@@ -14,66 +14,6 @@ defmodule GallformersWeb.UIComponents do
   alias Gallformers.TaxonName
   alias GallformersWeb.Live.ContinentScope
   alias Phoenix.LiveView.JS
-
-  @doc """
-  Renders a card container with optional header.
-
-  ## Examples
-
-      <.card>
-        <p>Card content here</p>
-      </.card>
-
-      <.card title="My Card">
-        <p>Card content with a title</p>
-      </.card>
-
-      <.card title="Actions Card">
-        <:actions>
-          <button>Edit</button>
-        </:actions>
-        <p>Card content with header actions</p>
-      </.card>
-  """
-  attr :title, :string, default: nil, doc: "optional card title"
-  attr :icon, :string, default: nil, doc: "optional icon name for the card header"
-  attr :class, :any, default: nil, doc: "additional CSS classes for the card"
-  attr :rest, :global
-
-  slot :inner_block, required: true
-  slot :actions, doc: "optional actions slot for the card header"
-
-  def card(assigns) do
-    ~H"""
-    <div
-      class={[
-        "bg-white rounded-lg shadow-sm border border-gray-200",
-        !@title && "p-4",
-        @class
-      ]}
-      {@rest}
-    >
-      <div
-        :if={@title}
-        class="px-4 py-3 border-b border-gray-200 bg-gf-sky-blue rounded-t-lg flex items-center justify-between"
-      >
-        <h3 class="text-lg font-medium text-gf-maroon flex items-center gap-2">
-          <.icon :if={@icon} name={@icon} class="size-5" />
-          {@title}
-        </h3>
-        <div :if={@actions != []} class="flex items-center gap-2">
-          {render_slot(@actions)}
-        </div>
-      </div>
-      <div :if={@title} class="p-4 text-gray-700">
-        {render_slot(@inner_block)}
-      </div>
-      <div :if={!@title} class="text-gray-700">
-        {render_slot(@inner_block)}
-      </div>
-    </div>
-    """
-  end
 
   @doc """
   Renders a loading spinner.
@@ -99,7 +39,7 @@ defmodule GallformersWeb.UIComponents do
 
     ~H"""
     <svg
-      class={["animate-spin text-gf-maroon", @size_class, @class]}
+      class={["animate-spin text-brand", @size_class, @class]}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -113,105 +53,6 @@ defmodule GallformersWeb.UIComponents do
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
       />
     </svg>
-    """
-  end
-
-  @doc """
-  Renders an error message with icon and optional retry button.
-
-  ## Examples
-
-      <.error_message title="Error" message="Something went wrong" />
-
-      <.error_message
-        variant="warning"
-        title="Warning"
-        message="Please check your input"
-      />
-
-      <.error_message
-        title="Connection Error"
-        message="Could not connect to server"
-        on_retry={JS.push("retry")}
-      />
-  """
-  attr :variant, :string,
-    default: "error",
-    values: ~w(error warning info),
-    doc: "the variant of the error message"
-
-  attr :title, :string, required: true, doc: "the error title"
-  attr :message, :string, required: true, doc: "the error message"
-  attr :on_retry, :any, default: nil, doc: "JS command or event to trigger on retry"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-  attr :rest, :global
-
-  def error_message(assigns) do
-    variant_styles = %{
-      "error" => %{
-        bg: "bg-red-50",
-        border: "border-red-200",
-        icon_color: "text-red-500",
-        title_color: "text-red-800",
-        text_color: "text-red-700",
-        button_bg: "bg-red-100 hover:bg-red-200 text-red-800",
-        icon: "ph-warning-circle"
-      },
-      "warning" => %{
-        bg: "bg-yellow-50",
-        border: "border-yellow-200",
-        icon_color: "text-yellow-500",
-        title_color: "text-yellow-800",
-        text_color: "text-yellow-700",
-        button_bg: "bg-yellow-100 hover:bg-yellow-200 text-yellow-800",
-        icon: "ph-warning"
-      },
-      "info" => %{
-        bg: "bg-blue-50",
-        border: "border-blue-200",
-        icon_color: "text-blue-500",
-        title_color: "text-blue-800",
-        text_color: "text-blue-700",
-        button_bg: "bg-blue-100 hover:bg-blue-200 text-blue-800",
-        icon: "ph-info"
-      }
-    }
-
-    assigns = assign(assigns, :styles, Map.fetch!(variant_styles, assigns.variant))
-
-    ~H"""
-    <div
-      class={[
-        "p-4 rounded-md border",
-        @styles.bg,
-        @styles.border,
-        @class
-      ]}
-      role="alert"
-      {@rest}
-    >
-      <div class="flex items-start gap-3">
-        <div class="flex-shrink-0">
-          <.icon name={@styles.icon} class={["size-5", @styles.icon_color]} />
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class={["text-sm font-semibold", @styles.title_color]}>{@title}</p>
-          <p class={["text-sm mt-1", @styles.text_color]}>{@message}</p>
-        </div>
-        <button
-          :if={@on_retry}
-          type="button"
-          phx-click={@on_retry}
-          class={[
-            "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-            @styles.button_bg
-          ]}
-        >
-          <.icon name="ph-arrows-clockwise" class="size-4" />
-          {gettext("Retry")}
-        </button>
-      </div>
-    </div>
     """
   end
 
@@ -254,7 +95,7 @@ defmodule GallformersWeb.UIComponents do
 
     ~H"""
     <nav class={["flex items-center justify-between", @class]} aria-label={gettext("Pagination")}>
-      <div class="text-sm text-gray-700">
+      <div class="text-meta text-ink-2">
         <span :if={@total_items}>
           {gettext("Showing %{start} to %{end} of %{total} results",
             start: @start_item,
@@ -271,18 +112,18 @@ defmodule GallformersWeb.UIComponents do
           type="button"
           phx-click={@on_page_change.(@page - 1)}
           disabled={@page <= 1}
-          class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="gf-btn gf-btn-sm"
         >
           {gettext("Previous")}
         </button>
-        <span class="text-sm text-gray-700">
+        <span class="text-meta text-ink-2">
           {gettext("Page %{page} of %{total}", page: @page, total: @total_pages)}
         </span>
         <button
           type="button"
           phx-click={@on_page_change.(@page + 1)}
           disabled={@page >= @total_pages}
-          class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="gf-btn gf-btn-sm"
         >
           {gettext("Next")}
         </button>
@@ -328,27 +169,27 @@ defmodule GallformersWeb.UIComponents do
   def alert(assigns) do
     variant_styles = %{
       "info" => %{
-        bg: "bg-blue-50",
-        border: "border-blue-200",
-        text: "text-blue-800",
+        bg: "bg-info-bg",
+        border: "border-info/30",
+        text: "text-info",
         icon: "ph-info"
       },
       "success" => %{
-        bg: "bg-green-50",
-        border: "border-green-200",
-        text: "text-green-800",
+        bg: "bg-ok-bg",
+        border: "border-ok/30",
+        text: "text-ok",
         icon: "ph-check-circle"
       },
       "warning" => %{
-        bg: "bg-yellow-50",
-        border: "border-yellow-200",
-        text: "text-yellow-800",
+        bg: "bg-warn-bg",
+        border: "border-warn/30",
+        text: "text-warn",
         icon: "ph-warning"
       },
       "error" => %{
-        bg: "bg-red-50",
-        border: "border-red-200",
-        text: "text-red-800",
+        bg: "bg-danger-bg",
+        border: "border-danger/30",
+        text: "text-danger",
         icon: "ph-warning-circle"
       }
     }
@@ -364,7 +205,7 @@ defmodule GallformersWeb.UIComponents do
     <div
       id={@id}
       class={[
-        "p-4 rounded-md border",
+        "rounded-panel border p-panel",
         @styles.bg,
         @styles.border,
         @class
@@ -377,10 +218,10 @@ defmodule GallformersWeb.UIComponents do
           <.icon name={@styles.icon} class={["size-5", @styles.text]} />
         </div>
         <div class={["ml-3 flex-1", @styles.text]}>
-          <p :if={@title != []} class="text-sm font-medium">
+          <p :if={@title != []} class="text-ui font-semibold">
             {render_slot(@title)}
           </p>
-          <div class={["text-sm", @title != [] && "mt-1"]}>
+          <div class={["text-ui", @title != [] && "mt-1"]}>
             {render_slot(@inner_block)}
           </div>
         </div>
@@ -389,7 +230,7 @@ defmodule GallformersWeb.UIComponents do
             type="button"
             phx-click={JS.hide(to: "##{@id}")}
             class={[
-              "-mx-1.5 -my-1.5 p-1.5 rounded-md inline-flex hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-offset-2",
+              "-m-1.5 inline-flex rounded-ctl p-1.5 hover:bg-surface",
               @styles.text
             ]}
           >
@@ -399,78 +240,6 @@ defmodule GallformersWeb.UIComponents do
         </div>
       </div>
     </div>
-    """
-  end
-
-  @doc """
-  Renders an info tip tooltip icon.
-
-  Displays a small "i" icon that shows a tooltip on hover with additional information.
-
-  ## Examples
-
-      <.info_tip content="This field is required for all species." />
-
-      <.info_tip>
-        <p>This is a longer explanation that can include</p>
-        <p>multiple paragraphs or formatted content.</p>
-      </.info_tip>
-  """
-  attr :content, :string, default: nil, doc: "tooltip text content"
-
-  attr :position, :string,
-    default: "top",
-    values: ~w(top right bottom left),
-    doc: "tooltip position"
-
-  attr :class, :any, default: nil, doc: "additional CSS classes for the trigger"
-
-  slot :inner_block, doc: "optional rich content for the tooltip"
-
-  def info_tip(assigns) do
-    position_classes = %{
-      "top" => "bottom-full left-0 mb-2",
-      "right" => "left-full top-1/2 -translate-y-1/2 ml-2",
-      "bottom" => "top-full left-0 mt-2",
-      "left" => "right-full top-1/2 -translate-y-1/2 mr-2"
-    }
-
-    arrow_classes = %{
-      "top" => "top-full left-4 border-t-gray-900 border-x-transparent border-b-transparent",
-      "right" =>
-        "right-full top-1/2 -translate-y-1/2 border-r-gray-900 border-y-transparent border-l-transparent",
-      "bottom" =>
-        "bottom-full left-4 border-b-gray-900 border-x-transparent border-t-transparent",
-      "left" =>
-        "left-full top-1/2 -translate-y-1/2 border-l-gray-900 border-y-transparent border-r-transparent"
-    }
-
-    assigns =
-      assigns
-      |> assign(:position_class, Map.fetch!(position_classes, assigns.position))
-      |> assign(:arrow_class, Map.fetch!(arrow_classes, assigns.position))
-
-    ~H"""
-    <span class={["relative inline-flex group", @class]}>
-      <button
-        type="button"
-        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-mono font-medium text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
-        aria-describedby="tooltip"
-      >
-        i
-      </button>
-      <div
-        class={[
-          "absolute z-50 hidden group-hover:block w-max max-w-md px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg",
-          @position_class
-        ]}
-        role="tooltip"
-      >
-        <span :if={@content}>{@content}</span>
-        <span :if={@inner_block != []}>{render_slot(@inner_block)}</span>
-        <div class={["absolute w-0 h-0 border-4", @arrow_class]} />
-      </div>
-    </span>
     """
   end
 
@@ -490,111 +259,20 @@ defmodule GallformersWeb.UIComponents do
   def loading_overlay(assigns) do
     ~H"""
     <div class={[
-      "absolute inset-0 z-10 flex items-center justify-center bg-white/80",
+      "absolute inset-0 z-10 flex items-center justify-center bg-surface/80",
       @class
     ]}>
       <div class="flex flex-col items-center gap-2">
         <.loading_spinner size="lg" label={@label} />
-        <span class="text-sm text-gray-600">{@label}</span>
+        <span class="text-meta text-ink-2">{@label}</span>
       </div>
     </div>
     """
   end
 
   @doc """
-  Renders a skeleton loading placeholder.
-
-  ## Examples
-
-      <.skeleton class="h-4 w-32" />
-      <.skeleton variant="circle" class="h-10 w-10" />
-      <.skeleton variant="text" lines={3} />
-  """
-  attr :variant, :string, default: "rect", values: ~w(rect circle text), doc: "shape variant"
-  attr :lines, :integer, default: 1, doc: "number of lines for text variant"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-
-  def skeleton(assigns) do
-    ~H"""
-    <div :if={@variant == "rect"} class={["animate-pulse bg-gray-200 rounded", @class]} />
-    <div :if={@variant == "circle"} class={["animate-pulse bg-gray-200 rounded-full", @class]} />
-    <div :if={@variant == "text"} class="space-y-2">
-      <div
-        :for={i <- 1..@lines}
-        class={[
-          "animate-pulse bg-gray-200 rounded h-4",
-          i == @lines && "w-3/4",
-          i != @lines && "w-full",
-          @class
-        ]}
-      />
-    </div>
-    """
-  end
-
-  @doc """
-  Renders tabs for content organization.
-
-  ## Examples
-
-      <.tabs id="species-tabs">
-        <:tab id="overview" label="Overview">
-          <p>Overview content</p>
-        </:tab>
-        <:tab id="hosts" label="Hosts">
-          <p>Hosts content</p>
-        </:tab>
-      </.tabs>
-  """
-  attr :id, :string, required: true, doc: "unique id for the tabs component"
-  attr :default_tab, :string, default: nil, doc: "id of the default active tab"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
-
-  slot :tab, required: true do
-    attr :id, :string, required: true
-    attr :label, :string, required: true
-  end
-
-  def tabs(assigns) do
-    default_tab = assigns.default_tab || (List.first(assigns.tab) || %{})[:id]
-    assigns = assign(assigns, :default_tab, default_tab)
-
-    ~H"""
-    <div id={@id} class={@class} phx-hook="Tabs" data-default-tab={@default_tab}>
-      <div class="border-b border-gray-200">
-        <nav class="-mb-px flex gap-1" aria-label="Tabs">
-          <button
-            :for={tab <- @tab}
-            type="button"
-            id={"#{@id}-tab-#{tab.id}"}
-            data-tab-id={tab.id}
-            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gf-maroon transition-colors data-[active]:border-gf-maroon data-[active]:text-gf-maroon"
-            role="tab"
-            aria-selected="false"
-            aria-controls={"#{@id}-panel-#{tab.id}"}
-          >
-            {tab.label}
-          </button>
-        </nav>
-      </div>
-      <div class="mt-4">
-        <div
-          :for={tab <- @tab}
-          id={"#{@id}-panel-#{tab.id}"}
-          data-tab-panel={tab.id}
-          class="hidden data-[active]:block"
-          role="tabpanel"
-          aria-labelledby={"#{@id}-tab-#{tab.id}"}
-        >
-          {render_slot(tab)}
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  @doc """
-  Renders "See Also" links to external resources with logo images.
+  "More info": links searching external resources for the name (design
+  system, matter bc0d; the logos were retired).
 
   For galls: iNaturalist, BugGuide, Google Scholar, BHL
   For hosts: iNaturalist, Google Scholar, BHL
@@ -608,6 +286,7 @@ defmodule GallformersWeb.UIComponents do
   attr :name, :string, required: true, doc: "species name for search queries"
   attr :type, :atom, values: [:gall, :host], required: true, doc: "type of entity"
   attr :undescribed, :boolean, default: false, doc: "whether the species is undescribed"
+  attr :class, :any, default: nil, doc: "layout only"
 
   def see_also(assigns) do
     parsed = TaxonName.parse(assigns.name)
@@ -634,55 +313,44 @@ defmodule GallformersWeb.UIComponents do
       |> assign(:undescribed_code, undescribed_code)
 
     ~H"""
-    <%= unless @undescribed do %>
-      <div>
-        <hr class="border-gray-200 my-4" />
-        <div class="mb-4 font-semibold text-gray-700">See Also:</div>
-        <div class={[
-          "grid items-center",
-          @type == :gall && "grid-cols-2 md:grid-cols-4",
-          @type == :host && "grid-cols-3"
-        ]}>
-          <a
-            href={"https://www.inaturalist.org/search?q=#{@search_name}"}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Search for this species on iNaturalist"
-            class="hover:opacity-80 transition-opacity"
-          >
-            <img src="/images/inatlogo-small.png" alt="iNaturalist" />
-          </a>
-          <a
-            :if={@type == :gall}
-            href={"https://bugguide.net/index.php?q=search&keys=#{@search_name}&search=Search"}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Search for this species on BugGuide"
-            class="hover:opacity-80 transition-opacity"
-          >
-            <img src="/images/bugguide-small.png" alt="BugGuide" />
-          </a>
-          <a
-            href={"https://scholar.google.com/scholar?hl=en&q=#{@search_name}"}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Search for this species on Google Scholar"
-            class="hover:opacity-80 transition-opacity"
-          >
-            <img src="/images/gscholar-small.png" alt="Google Scholar" />
-          </a>
-          <a
-            href={"https://www.biodiversitylibrary.org/search?SearchTerm=#{@search_name}&SearchCat=M#/names"}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Search for this species at the Biodiversity Heritage Library"
-            class="hover:opacity-80 transition-opacity"
-          >
-            <img src="/images/bhllogo.png" alt="Biodiversity Heritage Library" />
-          </a>
-        </div>
+    <div :if={!@undescribed} class={["flex flex-col gap-0.5", @class]}>
+      <span class="text-meta font-semibold uppercase tracking-wide text-muted">More info</span>
+      <div class="flex flex-wrap gap-x-4 text-ui">
+        <a
+          href={"https://www.inaturalist.org/search?q=#{@search_name}"}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Search for this species on iNaturalist"
+        >
+          iNaturalist ↗
+        </a>
+        <a
+          :if={@type == :gall}
+          href={"https://bugguide.net/index.php?q=search&keys=#{@search_name}&search=Search"}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Search for this species on BugGuide"
+        >
+          BugGuide ↗
+        </a>
+        <a
+          href={"https://scholar.google.com/scholar?hl=en&q=#{@search_name}"}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Search for this species on Google Scholar"
+        >
+          Google Scholar ↗
+        </a>
+        <a
+          href={"https://www.biodiversitylibrary.org/search?SearchTerm=#{@search_name}&SearchCat=M#/names"}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Search for this species at the Biodiversity Heritage Library"
+        >
+          Biodiversity Heritage Library ↗
+        </a>
       </div>
-    <% end %>
+    </div>
     """
   end
 
@@ -791,17 +459,17 @@ defmodule GallformersWeb.UIComponents do
 
     ~H"""
     <span class={["relative inline-flex group", @class]}>
-      <span class="cursor-help border-b border-dotted border-gray-400">({@term})</span>
+      <span class="cursor-help border-b border-dotted border-muted">({@term})</span>
       <span
-        class="absolute z-50 hidden group-hover:block top-full left-1/2 -translate-x-1/2 mt-2 w-80 px-3 py-2 text-sm font-normal not-italic text-white bg-gray-900 rounded-md shadow-lg"
+        class="absolute top-full left-1/2 z-50 mt-2 hidden w-80 -translate-x-1/2 rounded-ctl bg-ink px-3 py-2 text-meta font-normal not-italic text-paper shadow-float group-hover:block"
         role="tooltip"
       >
-        <span class="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-4 border-t-transparent border-x-transparent border-b-gray-900" />
+        <span class="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-4 border-x-transparent border-t-transparent border-b-ink" />
         <span class="font-semibold">{@link_word}:</span>
         <span :if={@short_definition != ""}>{@short_definition}</span>
         <a
           href={"/glossary##{String.downcase(@link_word)}"}
-          class="block mt-1 text-blue-300 hover:text-blue-200 text-xs"
+          class="mt-1 block text-caption text-paper underline"
         >
           View in glossary &rarr;
         </a>
@@ -853,17 +521,17 @@ defmodule GallformersWeb.UIComponents do
       :if={!@default_continent_code}
       id="region-prompt"
       phx-hook="RegionPrompt"
-      class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+      class="hidden fixed inset-0 z-60 flex items-center justify-center bg-overlay"
     >
-      <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+      <div class="mx-4 w-full max-w-md rounded-panel bg-surface p-6 shadow-float">
         <div class="text-center mb-4">
-          <.icon name="ph-globe" class="h-10 w-10 text-gf-maroon mx-auto mb-2" />
-          <h2 class="text-lg font-semibold text-gray-900">Welcome to Gallformers!</h2>
-          <p class="text-sm text-gray-600 mt-1">
+          <.icon name="ph-globe" class="mx-auto mb-2 size-10 text-brand" />
+          <h2 class="text-subsection text-ink">Welcome to Gallformers!</h2>
+          <p class="mt-1 text-ui text-ink-2">
             Select your region to see the most relevant results on filterable pages
             like Search, ID Tool, and Explore.
           </p>
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="mt-1 text-caption text-muted">
             You can change this anytime. Your choice is saved in this browser only.
           </p>
         </div>
@@ -874,7 +542,7 @@ defmodule GallformersWeb.UIComponents do
             phx-click="change_region"
             phx-value-code={code}
             data-prompt-code={code}
-            class="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 hover:bg-gf-sky-blue hover:border-gf-maroon transition-colors"
+            class="rounded-ctl border border-line-strong px-3 py-2 text-ui font-medium text-ink hover:border-brand hover:bg-sky-soft"
           >
             {name}
           </button>
@@ -885,7 +553,7 @@ defmodule GallformersWeb.UIComponents do
             phx-click="change_region"
             phx-value-code=""
             data-prompt-code=""
-            class="text-sm text-gray-500 hover:text-gray-700 underline"
+            class="text-meta text-muted underline hover:text-ink"
           >
             Show all regions
           </button>
@@ -897,46 +565,48 @@ defmodule GallformersWeb.UIComponents do
       id="region-scope"
       phx-hook="RegionScope"
       data-default-code={@default_continent_code || ""}
+      data-filtered={to_string(@continent_code != nil)}
       class={[
         "border-b",
-        if(@continent_code, do: "bg-amber-50 border-amber-200", else: "bg-gray-100 border-gray-200")
+        if(@continent_code, do: "border-line bg-warn-bg", else: "border-line bg-surface-2")
       ]}
     >
       <div class="px-6 sm:px-10 lg:px-16 py-1.5 flex items-center justify-between">
         <div class="flex items-center gap-1.5">
           <.icon
             name="ph-globe"
-            class={if(@continent_code, do: "h-4 w-4 text-amber-700", else: "h-4 w-4 text-gray-500")}
+            class={["size-4", if(@continent_code, do: "text-warn", else: "text-muted")]}
           />
           <div class="relative">
             <button
               type="button"
               data-region-toggle
               class={[
-                "flex items-center gap-1 text-sm",
+                "flex items-center gap-1 text-meta",
                 if(@continent_code,
-                  do: "text-amber-700 font-medium hover:text-amber-900",
-                  else: "text-gray-700 hover:text-gray-900"
+                  do: "font-medium text-warn hover:text-ink",
+                  else: "text-ink-2 hover:text-ink"
                 )
               ]}
             >
               <span data-region-label>
                 {if @continent_code, do: "Filtered to #{@continent_name}", else: "All Regions"}
               </span>
-              <.icon name="ph-caret-down" class="h-3 w-3" />
+              <.icon name="ph-caret-down" class="size-3" />
             </button>
             <div
               data-region-dropdown
-              class="hidden absolute left-0 z-10 mt-1 w-48 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+              class="gf-menu hidden left-0 mt-1 w-48"
             >
               <button
                 type="button"
                 phx-click="change_region"
                 phx-value-code=""
                 data-region-code=""
+                aria-current={!@continent_code && "true"}
                 class={[
-                  "block w-full text-left px-4 py-1.5 text-sm hover:bg-gray-100",
-                  !@continent_code && "font-bold bg-gray-50"
+                  "block w-full text-left",
+                  !@continent_code && "bg-surface-2 font-semibold"
                 ]}
               >
                 All Regions
@@ -947,9 +617,10 @@ defmodule GallformersWeb.UIComponents do
                 phx-click="change_region"
                 phx-value-code={code}
                 data-region-code={code}
+                aria-current={@continent_code == code && "true"}
                 class={[
-                  "block w-full text-left px-4 py-1.5 text-sm hover:bg-gray-100",
-                  @continent_code == code && "font-bold bg-gray-50"
+                  "block w-full text-left",
+                  @continent_code == code && "bg-surface-2 font-semibold"
                 ]}
               >
                 {name}
@@ -958,21 +629,21 @@ defmodule GallformersWeb.UIComponents do
           </div>
         </div>
 
-        <div :if={@overridden?} class="flex items-center gap-2 text-sm">
+        <div :if={@overridden?} class="flex items-center gap-2 text-meta">
           <button
             type="button"
             data-region-save
-            class="text-gf-maroon hover:underline"
+            class="text-link hover:underline"
           >
             Set as default
           </button>
-          <span class="text-gray-300">&middot;</span>
+          <span class="text-line-strong">&middot;</span>
           <button
             type="button"
             data-region-reset
             phx-click="change_region"
             phx-value-code={@default_continent_code || ""}
-            class="text-gray-500 hover:text-gray-700 hover:underline"
+            class="text-muted hover:text-ink hover:underline"
           >
             Reset
           </button>

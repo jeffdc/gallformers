@@ -533,10 +533,10 @@ defmodule Gallformers.Places do
   end
 
   @doc """
-  Returns the full place hierarchy as a nested tree for the tree browser.
+  Returns the full place hierarchy as a nested tree for Browse by place (`/places`).
 
   The tree has multiple continent roots (no single root node). Each node follows
-  the `TreeComponents.tree_browser` contract:
+  the browse tree contract (`GallformersWeb.BrowseHelpers`):
   - Branch nodes have a `:nodes` key with child nodes
   - Leaf nodes have no `:nodes` key
   - All nodes have `:key`, `:label`, `:name`, `:url`

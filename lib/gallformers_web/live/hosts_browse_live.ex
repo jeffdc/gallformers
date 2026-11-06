@@ -1,22 +1,26 @@
 defmodule GallformersWeb.HostsBrowseLive do
   @moduledoc """
-  Browse host plants organized by Family > Genus > plant
-  (`Gallformers.Taxa.plant_tree/0`).
+  Browse host plants: the plant families (`Gallformers.Taxa.plant_tree/0`)
+  as `family_card`s, the most galled first, counting the distinct Galls on
+  each family and genus (`Gallformers.Catalog.host_gall_counts/0`).
 
-  Uses a tree UI with search filtering and smart expand.
+  The cards are the browse tree: a card opens to its genera and a genus to
+  its plants (`toggle_node`, `expand_all`, `collapse_all`), and the name
+  filter keeps what matches with smart expand (`GallformersWeb.BrowseHelpers`).
   """
   use GallformersWeb, :live_view
 
+  alias Gallformers.Catalog
   alias Gallformers.Taxa
   alias GallformersWeb.BrowseHelpers
-  alias GallformersWeb.TreeComponents
 
   @impl true
   def mount(_params, _session, socket) do
     tree = Taxa.plant_tree()
 
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
        page_title: "Hosts",
        page_description: "Browse host plant species organized by family and genus.",
        page_url: "/hosts",
@@ -24,9 +28,10 @@ defmodule GallformersWeb.HostsBrowseLive do
        page_json_ld: nil,
        search_query: "",
        tree: tree,
-       filtered: tree,
+       counts: Catalog.host_gall_counts(),
        expanded: MapSet.new()
-     )}
+     )
+     |> show_tree(tree)}
   end
 
   @impl true
@@ -51,30 +56,74 @@ defmodule GallformersWeb.HostsBrowseLive do
     filtered = BrowseHelpers.filter_tree(socket.assigns.tree, query)
     expanded = BrowseHelpers.smart_expand(filtered, query, socket.assigns.expanded)
 
-    {:noreply, assign(socket, search_query: query, filtered: filtered, expanded: expanded)}
+    {:noreply,
+     socket
+     |> assign(search_query: query, expanded: expanded)
+     |> show_tree(filtered)}
+  end
+
+  defp show_tree(socket, filtered) do
+    cards = BrowseHelpers.family_cards(filtered, {:taxa, socket.assigns.counts})
+    assign(socket, filtered: filtered, cards: cards)
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div id="hosts-browse-container">
-        <p class="text-lg text-gray-600 mb-6">
-          Browse host plant species by family and genus.
+      <div id="hosts-browse-container" class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Browse galls</:title>
+          <:description>
+            Galls by the plants they grow on: {format_number(length(@tree))} host plant families, the most galled first.
+          </:description>
+        </.page_header>
+
+        <.tab_nav label="Browse by" class="-mt-4">
+          <:tab
+            :for={{label, path} <- BrowseHelpers.browse_tabs()}
+            navigate={path}
+            current={path == "/hosts"}
+          >
+            {label}
+          </:tab>
+        </.tab_nav>
+
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <form
+            id="hosts-browse-search-form"
+            phx-change="search"
+            phx-submit="search"
+            class="w-full sm:w-80"
+          >
+            <.search_field
+              id="hosts-browse-search"
+              name="query"
+              value={@search_query}
+              label="Filter by name"
+              placeholder="Filter by name…"
+            />
+          </form>
+          <div class="flex gap-2 sm:ml-auto">
+            <.button variant="ghost" size="sm" phx-click="expand_all">Show all plants</.button>
+            <.button variant="ghost" size="sm" phx-click="collapse_all">Collapse all</.button>
+          </div>
+        </div>
+
+        <p :if={@cards == []} class="text-ui text-muted">
+          {if @search_query != "", do: "No matching items found.", else: "No items found."}
         </p>
 
-        <TreeComponents.tree_browser
-          id="hosts-browse"
-          nodes={@filtered}
-          expanded={@expanded}
-          search_query={@search_query}
-          show_search={true}
-          show_controls={true}
-          on_toggle="toggle_node"
-          on_expand_all="expand_all"
-          on_collapse_all="collapse_all"
-          on_search="search"
-        />
+        <div :if={@cards != []} class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <.family_card
+            :for={card <- @cards}
+            card={card}
+            expanded={@expanded}
+            on_toggle="toggle_node"
+            icon="gf-host"
+            leaves="plants"
+          />
+        </div>
       </div>
     </Layouts.app>
     """

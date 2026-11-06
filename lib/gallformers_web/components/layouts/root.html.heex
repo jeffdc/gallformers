@@ -1,9 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
+    <meta name="color-scheme" content="light dark" />
+    <%!-- The saved theme (assets/js/theme.js), applied before the page paints. --%>
+    <script id="theme-init" nonce={assigns[:csp_nonce]}>
+      (function () {
+        var r = document.documentElement, t = null;
+        try { t = localStorage.getItem("gf-theme"); } catch (e) {}
+        if (t === "light" || t === "dark") r.setAttribute("data-theme", t);
+        r.setAttribute("data-theme-choice", t === "light" || t === "dark" ? t : "system");
+      })();
+    </script>
 
     <%!-- SEO Meta Tags --%>
     <GallformersWeb.SEO.meta_tags
@@ -56,17 +66,23 @@
     </div>
     <div
       :if={Application.get_env(:gallformers, :preview_deploy)}
-      class="bg-red-600 text-white text-center py-2 font-bold text-sm sticky top-0 z-[100]"
+      class="sticky top-0 z-100 bg-danger-bg py-2 text-center text-meta font-bold text-danger"
     >
       PREVIEW — this is not production
     </div>
     <div
       :if={Gallformers.SiteSettings.banner_enabled?()}
       id="maintenance-banner"
-      class="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium relative z-[100]"
+      class="relative z-100 bg-warn-bg px-4 py-2 text-center text-meta font-medium text-warn"
     >
       {Gallformers.SiteSettings.banner_text()}
     </div>
     {@inner_content}
+    {live_render(GallformersWeb.Layouts.outside_live_session(@conn), GallformersWeb.PaletteLive,
+      id: "palette-live"
+    )}
+    {live_render(GallformersWeb.Layouts.outside_live_session(@conn), GallformersWeb.TrayLive,
+      id: "tray-live"
+    )}
   </body>
 </html>

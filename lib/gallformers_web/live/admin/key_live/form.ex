@@ -355,129 +355,130 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.admin
-      flash={@flash}
-      current_user={@current_user}
-      page_title={@page_title}
-    >
-      <:page_title_html>
-        <%= if @mode == :edit do %>
-          Editing <em class="font-bold">{@key.title}</em>
-        <% else %>
-          New Identification Key
-        <% end %>
-      </:page_title_html>
-      <Layouts.admin_edit_layout
-        back_path={~p"/admin/keys"}
-        back_label="Back to Keys"
-        public_url={if @mode == :edit, do: ~p"/keys/#{@key.slug}"}
-      >
-        <:intro>
-          Upload a key JSON file or paste JSON directly. Metadata fields will be auto-populated from the JSON.
-        </:intro>
+    <Layouts.admin flash={@flash} current_user={@current_user}>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:crumb navigate={~p"/admin/keys"}>Keys</:crumb>
+          <:title>{if @mode == :edit, do: @key.title, else: "New key"}</:title>
+          <:meta :if={@mode == :edit} label="Version">{@key.version}</:meta>
+          <:meta :if={@mode == :edit} label="Couplets">{map_size(@key.couplets || %{})}</:meta>
+          <:description>
+            Upload the key's JSON file or paste its JSON. The fields below are filled from it.
+          </:description>
+          <:action :if={@mode == :edit}>
+            <.button
+              href={~p"/keys/#{@key.slug}"}
+              target="_blank"
+              variant="ghost"
+              size="sm"
+              icon="ph-arrow-square-out"
+            >
+              View on site
+            </.button>
+          </:action>
+        </.page_header>
 
-        <.form for={@form} id="key-form" phx-change="validate" phx-submit="save">
-          <%!-- JSON Input Section --%>
-          <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-700 mb-3">Key Data (JSON)</h3>
+        <div class="gf-with-rail">
+          <div class="flex max-w-form min-w-0 flex-col gap-section">
+            <.form
+              for={@form}
+              id="key-form"
+              phx-change="validate"
+              phx-submit="save"
+              class="flex flex-col gap-section"
+            >
+              <.section title="The key (JSON)">
+                <div class="flex flex-col gap-block">
+                  <div>
+                    <label class="gf-label" for={@uploads.key_json.ref}>Upload a JSON file</label>
+                    <.live_file_input upload={@uploads.key_json} class="gf-file" />
+                  </div>
+                  <div>
+                    <label class="gf-label" for="json-input">
+                      JSON
+                      <span :if={@couplet_count} class="font-normal text-muted">
+                        · {@couplet_count} {if @couplet_count == 1, do: "couplet", else: "couplets"}
+                      </span>
+                    </label>
+                    <textarea
+                      id="json-input"
+                      name="json_input"
+                      phx-hook="InputEvent"
+                      data-event="json_changed"
+                      rows="12"
+                      aria-invalid={@json_error && "true"}
+                      aria-describedby={@json_error && "json-input-errors"}
+                      class={["gf-textarea font-mono text-meta", @json_error && "gf-textarea-error"]}
+                      phx-debounce="500"
+                    >{@json_input}</textarea>
+                    <p
+                      :if={@json_error}
+                      id="json-input-errors"
+                      class="mt-1 text-meta text-danger"
+                    >
+                      {@json_error}
+                    </p>
+                  </div>
+                </div>
+              </.section>
 
-            <%!-- File Upload --%>
-            <div class="mb-3">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Upload JSON file</label>
-              <.live_file_input
-                upload={@uploads.key_json}
-                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gf-maroon file:text-white hover:file:bg-gf-maroon/90"
+              <.section title="About the key">
+                <div class="flex flex-col gap-block">
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-2">
+                    <.input field={@form[:title]} schema={Key} type="text" label="Title" />
+                    <.input field={@form[:subtitle]} type="text" label="Subtitle" />
+                    <.input
+                      field={@form[:slug]}
+                      type="text"
+                      label="Slug"
+                      placeholder="made from the title if blank"
+                    />
+                    <.input
+                      field={@form[:version]}
+                      schema={Key}
+                      type="text"
+                      label="Version"
+                      placeholder="e.g. 2026-02-10"
+                    />
+                  </div>
+                  <.input field={@form[:description]} type="textarea" label="Description" rows="3" />
+                  <div class="grid grid-cols-1 gap-block md:grid-cols-2">
+                    <.input field={@form[:citation]} type="text" label="Citation" />
+                    <.input field={@form[:citation_url]} type="text" label="Citation URL" />
+                  </div>
+                </div>
+              </.section>
+
+              <div class="flex justify-end border-t border-line pt-block">
+                <.form_actions form_dirty={@form_dirty} mode={@mode} create_label="Create key" />
+              </div>
+            </.form>
+
+            <.section :if={@mode == :edit} id="key-images" title="Key images">
+              <.live_component
+                module={GallformersWeb.Admin.ContentImageManager}
+                id="key-content-images"
+                owner_type={:key}
+                owner_id={@key.id}
+                current_user={@current_user}
               />
-            </div>
-
-            <%!-- JSON Textarea --%>
-            <div class="mb-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                JSON content
-                <span :if={@couplet_count} class="text-gray-500 font-normal">
-                  — {@couplet_count} couplet(s)
-                </span>
-              </label>
-              <textarea
-                id="json-input"
-                name="json_input"
-                phx-hook="InputEvent"
-                data-event="json_changed"
-                rows="12"
-                class={[
-                  "w-full rounded-md border font-mono text-sm p-3",
-                  if(@json_error, do: "border-red-300 bg-red-50", else: "border-gray-300")
-                ]}
-                phx-debounce="500"
-              >{@json_input}</textarea>
-              <p :if={@json_error} class="mt-1 text-sm text-red-600">{@json_error}</p>
-            </div>
+            </.section>
           </div>
 
-          <%!-- Metadata Fields --%>
-          <div class="space-y-3">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <.input field={@form[:title]} schema={Key} type="text" label="Title" />
-              <.input field={@form[:subtitle]} type="text" label="Subtitle" />
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <.input
-                field={@form[:slug]}
-                type="text"
-                label="Slug"
-                placeholder="Auto-generated from title"
-              />
-              <.input
-                field={@form[:version]}
-                schema={Key}
-                type="text"
-                label="Version"
-                placeholder="e.g. 2026-02-10"
-              />
-            </div>
-
-            <.input field={@form[:description]} type="textarea" label="Description" rows="3" />
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <.input field={@form[:citation]} type="text" label="Citation" />
-              <.input field={@form[:citation_url]} type="text" label="Citation URL" />
-            </div>
-          </div>
-
-          <div class="flex justify-between pt-4 mt-4 border-t border-gray-200">
-            <div class="flex gap-2">
-              <button
-                :if={@mode == :edit}
-                type="button"
-                phx-click="delete"
-                class="gf-btn gf-btn-danger"
-              >
-                Delete
-              </button>
-              <button
-                :if={@mode == :edit}
-                type="button"
-                phx-click="regenerate_pdfs"
-                class="gf-btn gf-btn-secondary"
-              >
-                Regenerate PDFs
-              </button>
-            </div>
-            <.form_actions form_dirty={@form_dirty} mode={@mode} create_label="Create Key" />
-          </div>
-        </.form>
-
-        <%!-- Content Image Manager (edit mode only) --%>
-        <div :if={@mode == :edit} class="mt-8 pt-6 border-t border-gray-200">
-          <h3 class="text-lg font-semibold text-gray-700 mb-3">Key Images</h3>
-          <.live_component
-            module={GallformersWeb.Admin.ContentImageManager}
-            id="key-content-images"
-            owner_type={:key}
-            owner_id={@key.id}
-            current_user={@current_user}
-          />
+          <.rail :if={@mode == :edit} width={:narrow}>
+            <.panel id="pdfs" title="PDFs">
+              <p class="mb-3 text-ui text-ink-2">
+                The printable versions of the key. They are rebuilt when it is saved; rebuild them by hand if they look out of date.
+              </p>
+              <.button variant="secondary" phx-click="regenerate_pdfs">Regenerate PDFs</.button>
+            </.panel>
+            <.panel id="danger" variant={:danger} title="Delete">
+              <p class="mb-3 text-ui text-ink-2">
+                Deletes the key, its couplets and every image it owns. You'll be asked to type its title.
+              </p>
+              <.button variant="danger" phx-click="delete">Delete…</.button>
+            </.panel>
+          </.rail>
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
@@ -493,7 +494,7 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
           ]}
           confirmation_value={@delete_confirmation}
         />
-      </Layouts.admin_edit_layout>
+      </div>
     </Layouts.admin>
     """
   end

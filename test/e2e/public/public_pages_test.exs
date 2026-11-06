@@ -12,7 +12,7 @@ defmodule GallformersWeb.E2E.PublicPagesTest do
     test "loads and displays welcome content", %{conn: conn} do
       conn
       |> visit("/")
-      |> assert_has("h1", text: "Welcome")
+      |> assert_has("h1", text: "Welcome to Gallformers")
     end
 
     test "has navigation to main sections", %{conn: conn} do
@@ -58,7 +58,7 @@ defmodule GallformersWeb.E2E.PublicPagesTest do
     test "loads successfully", %{conn: conn} do
       conn
       |> visit("/articles")
-      |> assert_has("h1", text: "Gallformers Articles")
+      |> assert_has("h1", text: "Articles")
     end
   end
 end

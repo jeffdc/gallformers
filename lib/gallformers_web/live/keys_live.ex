@@ -1,6 +1,7 @@
 defmodule GallformersWeb.KeysLive do
   @moduledoc """
-  LiveView for the identification keys index page.
+  The identification keys list (design system, matter bc0d): each key's
+  title, scope, couplet count, authors and description.
   """
   use GallformersWeb, :live_view
 
@@ -25,44 +26,37 @@ defmodule GallformersWeb.KeysLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
-      <div class="mx-auto max-w-4xl">
-        <h1 class="text-3xl font-bold text-gf-maroon mb-4">Identification Keys</h1>
+      <div class="flex flex-col gap-section">
+        <.page_header>
+          <:title>Identification keys</:title>
+          <:description>
+            Step-by-step keys: at each couplet, choose the lead that fits what you have.
+          </:description>
+        </.page_header>
 
-        <p class="text-gray-700 mb-6">
-          Dichotomous identification keys for parasitoids, inquilines, and other organisms
-          associated with galls.
-        </p>
+        <.empty_state :if={@keys == []} title="No keys yet" />
 
-        <%= if @keys == [] do %>
-          <div class="bg-gray-50 rounded-lg p-8 text-center">
-            <p class="text-gray-600">No keys available yet.</p>
-          </div>
-        <% else %>
-          <div class="space-y-6">
-            <article
-              :for={key <- @keys}
-              class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-            >
-              <h2 class="text-xl font-semibold mb-2">
-                <.link
-                  navigate={~p"/keys/#{key.slug}"}
-                  class="text-gf-maroon hover:underline"
-                >
-                  {key.title}
-                </.link>
-              </h2>
-              <p :if={key.subtitle} class="text-gf-autumn text-sm mb-2">{key.subtitle}</p>
-              <p :if={key.description} class="text-gray-600">
-                {String.slice(key.description || "", 0, 200)}{if String.length(key.description || "") >
-                                                                   200,
-                                                                 do: "..."}
-              </p>
-              <div :if={key.authors != []} class="text-sm text-gray-500 mt-3">
-                By {Enum.join(key.authors, ", ")}
-              </div>
-            </article>
-          </div>
-        <% end %>
+        <ol :if={@keys != []} class="flex max-w-text flex-col divide-y divide-line">
+          <li :for={key <- @keys} class="flex flex-col gap-1 py-4 first:pt-0">
+            <h2 class="text-subsection">
+              <.link navigate={~p"/keys/#{key.slug}"}>{key.title}</.link>
+            </h2>
+            <p class="text-meta text-muted">
+              {Enum.join(
+                Enum.reject(
+                  [
+                    key.subtitle,
+                    "#{key.couplet_count} couplets",
+                    key.authors != [] && Enum.join(key.authors, ", ")
+                  ],
+                  &(&1 in [nil, false])
+                ),
+                " · "
+              )}
+            </p>
+            <p :if={key.description} class="line-clamp-2 text-ui text-ink-2">{key.description}</p>
+          </li>
+        </ol>
       </div>
     </Layouts.app>
     """

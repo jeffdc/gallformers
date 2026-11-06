@@ -27,29 +27,30 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
     reclassify_to_native
   )a
 
+  # Each bucket's look, from the state tokens: places to add or reclassify
+  # on the ok tint (introduced ones with a dashed edge, as the map hatches
+  # them), places to drop on the danger tint.
   @default_bucket_config %{
     add_native: %{
       label: "+ Native places in WCVP but not in current range",
-      container_class: "bg-green-50 border border-green-200 rounded p-3",
-      text_class: "text-green-700",
-      heading_class: "text-green-800",
-      checkbox_class: "text-green-600 focus:ring-green-500"
+      container_class: "rounded-panel border border-line bg-ok-bg p-3",
+      text_class: "text-ok",
+      heading_class: "text-ok",
+      checkbox_class: "accent-ok"
     },
     add_introduced: %{
       label: "+ Introduced places in WCVP but not in current range",
-      container_class: "border border-green-200 rounded p-3",
-      container_style:
-        "background: repeating-linear-gradient(-45deg, #dcfce7, #dcfce7 3px, #bbf7d0 3px, #bbf7d0 6px)",
-      text_class: "text-green-700",
-      heading_class: "text-green-800",
-      checkbox_class: "text-green-600 focus:ring-green-500"
+      container_class: "rounded-panel border border-dashed border-ok bg-ok-bg p-3",
+      text_class: "text-ok",
+      heading_class: "text-ok",
+      checkbox_class: "accent-ok"
     },
     remove: %{
       label: "- Places in current range but not in WCVP",
-      container_class: "bg-red-50 border border-red-200 rounded p-3",
-      text_class: "text-red-700",
-      heading_class: "text-red-800",
-      checkbox_class: "text-red-600 focus:ring-red-500",
+      container_class: "rounded-panel border border-line bg-danger-bg p-3",
+      text_class: "text-danger",
+      heading_class: "text-danger",
+      checkbox_class: "accent-danger",
       mode: :review_remove,
       selection_noun: "kept",
       select_all_label: "Include all",
@@ -59,19 +60,17 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
     },
     reclassify_to_introduced: %{
       label: "Reclassify: WCVP says introduced (currently native)",
-      container_class: "border border-green-200 rounded p-3",
-      container_style:
-        "background: repeating-linear-gradient(-45deg, #dcfce7, #dcfce7 3px, #bbf7d0 3px, #bbf7d0 6px)",
-      text_class: "text-green-700",
-      heading_class: "text-green-800",
-      checkbox_class: "text-green-600 focus:ring-green-500"
+      container_class: "rounded-panel border border-dashed border-ok bg-ok-bg p-3",
+      text_class: "text-ok",
+      heading_class: "text-ok",
+      checkbox_class: "accent-ok"
     },
     reclassify_to_native: %{
       label: "Reclassify: WCVP says native (currently introduced)",
-      container_class: "bg-green-50 border border-green-200 rounded p-3",
-      text_class: "text-green-700",
-      heading_class: "text-green-800",
-      checkbox_class: "text-green-600 focus:ring-green-500"
+      container_class: "rounded-panel border border-line bg-ok-bg p-3",
+      text_class: "text-ok",
+      heading_class: "text-ok",
+      checkbox_class: "accent-ok"
     }
   }
 
@@ -112,60 +111,61 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
-      <h4 class="font-medium mb-2">{@title}</h4>
+    <div>
+      <.panel variant={:info} title={@title}>
+        <p :if={!@diff.has_changes} class="text-ui text-ink-2">
+          {@empty_message}
+        </p>
 
-      <div :if={!@diff.has_changes} class="text-sm text-gray-600">
-        {@empty_message}
-      </div>
+        <div :if={@diff.has_changes} class="flex flex-col gap-3 text-ui">
+          <.bucket_tree
+            :for={bucket <- Enum.reject(@active_buckets, &(&1 == @special_remove_bucket))}
+            bucket={bucket}
+            bucket_config={@bucket_config}
+            groups={Map.get(assigns, groups_field(bucket))}
+            selected={Map.get(assigns, selected_field(bucket))}
+            expanded={section_expanded(@expanded_countries, Atom.to_string(bucket))}
+            myself={@myself}
+          />
+          <.remove_bucket
+            :if={@special_remove_bucket && Map.get(@diff, @special_remove_bucket, []) != []}
+            bucket={@special_remove_bucket}
+            config={Map.fetch!(@bucket_config, @special_remove_bucket)}
+            groups={Map.get(assigns, groups_field(@special_remove_bucket))}
+            selected={Map.get(assigns, selected_field(@special_remove_bucket))}
+            introduced={@remove_as_introduced}
+            expanded={section_expanded(@expanded_countries, Atom.to_string(@special_remove_bucket))}
+            myself={@myself}
+          />
+        </div>
 
-      <div :if={@diff.has_changes} class="text-sm space-y-3">
-        <.bucket_tree
-          :for={bucket <- Enum.reject(@active_buckets, &(&1 == @special_remove_bucket))}
-          bucket={bucket}
-          bucket_config={@bucket_config}
-          groups={Map.get(assigns, groups_field(bucket))}
-          selected={Map.get(assigns, selected_field(bucket))}
-          expanded={section_expanded(@expanded_countries, Atom.to_string(bucket))}
-          myself={@myself}
-        />
-        <.remove_bucket
-          :if={@special_remove_bucket && Map.get(@diff, @special_remove_bucket, []) != []}
-          bucket={@special_remove_bucket}
-          config={Map.fetch!(@bucket_config, @special_remove_bucket)}
-          groups={Map.get(assigns, groups_field(@special_remove_bucket))}
-          selected={Map.get(assigns, selected_field(@special_remove_bucket))}
-          introduced={@remove_as_introduced}
-          expanded={section_expanded(@expanded_countries, Atom.to_string(@special_remove_bucket))}
-          myself={@myself}
-        />
-      </div>
+        <p :if={@diff.agree_count > 0} class="text-meta text-muted">
+          {@diff.agree_count} places match — no changes needed
+        </p>
 
-      <p :if={@diff.agree_count > 0} class="text-sm text-gray-500 mt-2">
-        {@diff.agree_count} places match — no changes needed
-      </p>
-
-      <div class="mt-3 flex gap-2">
-        <.button
-          :if={@diff.has_changes}
-          phx-click="apply"
-          phx-target={@myself}
-          type="button"
-          size="sm"
-          disabled={!has_any_selections?(assigns)}
-        >
-          {@apply_label}
-        </.button>
-        <.button
-          phx-click="cancel"
-          phx-target={@myself}
-          type="button"
-          variant="secondary"
-          size="sm"
-        >
-          Cancel
-        </.button>
-      </div>
+        <div class="mt-1 flex gap-2">
+          <.button
+            :if={@diff.has_changes}
+            variant="primary"
+            phx-click="apply"
+            phx-target={@myself}
+            type="button"
+            size="sm"
+            disabled={!has_any_selections?(assigns)}
+          >
+            {@apply_label}
+          </.button>
+          <.button
+            phx-click="cancel"
+            phx-target={@myself}
+            type="button"
+            variant="secondary"
+            size="sm"
+          >
+            Cancel
+          </.button>
+        </div>
+      </.panel>
     </div>
     """
   end
@@ -173,13 +173,11 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
   defp bucket_tree(assigns) do
     config = Map.fetch!(assigns.bucket_config, assigns.bucket)
     bid = bucket_id(assigns.bucket)
-    has_style = Map.has_key?(config, :container_style)
 
     assigns =
       assigns
       |> assign(:config, config)
       |> assign(:tree_id, "powo-#{bid}")
-      |> assign(:has_style, has_style)
       |> assign(:toggle_item_event, "toggle_item_#{bid}")
       |> assign(:toggle_group_event, "toggle_group_#{bid}")
       |> assign(:expand_group_event, "expand_group_#{bid}")
@@ -187,27 +185,7 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
       |> assign(:deselect_all_event, "deselect_all_#{bid}")
 
     ~H"""
-    <div :if={@has_style} style={@config.container_style} class={@config.container_class}>
-      <.selectable_tree
-        id={@tree_id}
-        label={@config.label}
-        groups={@groups}
-        selected={@selected}
-        expanded={@expanded}
-        toggle_item_event={@toggle_item_event}
-        toggle_group_event={@toggle_group_event}
-        expand_group_event={@expand_group_event}
-        select_all_event={@select_all_event}
-        deselect_all_event={@deselect_all_event}
-        target={@myself}
-        container_class=""
-        text_class={@config.text_class}
-        heading_class={@config.heading_class}
-        checkbox_class={@config.checkbox_class}
-      />
-    </div>
     <.selectable_tree
-      :if={!@has_style}
       id={@tree_id}
       label={@config.label}
       groups={@groups}
@@ -259,18 +237,18 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
           type="button"
           phx-click={if @all_selected, do: "deselect_all_#{@bid}", else: "select_all_#{@bid}"}
           phx-target={@myself}
-          class={["text-xs hover:underline", @config.text_class]}
+          class={["text-caption hover:underline", @config.text_class]}
         >
           {if @all_selected, do: @config.deselect_all_label, else: @config.select_all_label}
         </button>
       </div>
 
-      <p :if={@config[:help_text]} class={["text-xs mt-1 mb-2", @config.text_class]}>
-        <.icon name="ph-warning" class="h-3.5 w-3.5 inline-block align-text-bottom" />
+      <p :if={@config[:help_text]} class={["mt-1 mb-2 text-caption", @config.text_class]}>
+        <.icon name="ph-warning" class="size-3.5 inline-block align-text-bottom" />
         {@config.help_text}
       </p>
 
-      <p :if={@introduced_count > 0 or @removed_count > 0} class="text-xs text-gray-600 mb-2">
+      <p :if={@introduced_count > 0 or @removed_count > 0} class="mb-2 text-caption text-ink-2">
         {@kept_count} kept<span :if={@introduced_count > 0}>
           ({@introduced_count} as introduced)</span>, {@removed_count} excluded
       </p>
@@ -288,7 +266,7 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
               phx-click={"toggle_group_#{@bid}"}
               phx-target={@myself}
               phx-value-group={to_string(group.id)}
-              class={["rounded border-gray-300", @config.checkbox_class]}
+              class={["gf-checkbox", @config.checkbox_class]}
             />
             <button
               type="button"
@@ -296,13 +274,13 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
               phx-target={@myself}
               phx-value-group={to_string(group.id)}
               class={[
-                "flex items-center gap-1 text-xs font-medium hover:underline",
+                "flex items-center gap-1 text-caption font-semibold hover:underline",
                 @config.heading_class
               ]}
             >
               <span class="w-3 text-center">{if gs.expanded, do: "▾", else: "▸"}</span>
               {group.label}
-              <span class="font-normal text-gray-500">
+              <span class="font-normal text-muted">
                 ({gs.selected_count}/{gs.total_count})
               </span>
             </button>
@@ -316,9 +294,9 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
                   phx-click={"toggle_item_#{@bid}"}
                   phx-target={@myself}
                   phx-value-id={to_string(item.id)}
-                  class={["rounded border-gray-300", @config.checkbox_class]}
+                  class={["gf-checkbox", @config.checkbox_class]}
                 />
-                <span class="text-xs">{item.label}</span>
+                <span class="text-caption">{item.label}</span>
               </label>
               <button
                 :if={MapSet.member?(@selected, item.id)}
@@ -327,10 +305,10 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
                 phx-target={@myself}
                 phx-value-id={to_string(item.id)}
                 class={[
-                  "text-[10px] px-1.5 py-0.5 rounded-full font-medium cursor-pointer",
+                  "gf-chip gf-chip-sm cursor-pointer hover:underline",
                   if(MapSet.member?(@introduced, item.id),
-                    do: "bg-amber-100 text-amber-700 hover:bg-amber-200",
-                    else: "bg-green-100 text-green-700 hover:bg-green-200"
+                    do: "gf-chip-warn",
+                    else: "gf-chip-ok"
                   )
                 ]}
               >

@@ -27,7 +27,7 @@ defmodule Gallformers.Audit do
   """
   use Boundary,
     deps: [Gallformers.Repo],
-    exports: [Actor, ConflictError, Migration]
+    exports: [Actor, ChangeLog, ConflictError, Migration]
 
   alias Ecto.Multi
   alias Gallformers.Audit.Actor

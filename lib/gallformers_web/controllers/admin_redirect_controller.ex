@@ -34,14 +34,29 @@ defmodule GallformersWeb.AdminRedirectController do
   @spec sources(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def sources(conn, _params), do: moved(conn, ~p"/admin/sources")
 
-  @doc "`/admin/gallhost?id=` → the Gall page; without a Gall, the Gall search."
+  @doc "`/admin/galls` (the old Gall search) → Browse Galls."
+  @spec galls(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def galls(conn, _params), do: moved(conn, ~p"/galls")
+
+  @doc "`/admin/galls/:id` (the old admin Gall page) → the Gall page in Edit mode."
+  @spec gall(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def gall(conn, %{"id" => id}) do
+    case Integer.parse(id) do
+      {gall_id, ""} -> moved(conn, edit_gall_path(gall_id))
+      _ -> not_found(conn)
+    end
+  end
+
+  @doc "`/admin/gallhost?id=` → the Gall page in Edit mode; without a Gall, Browse Galls."
   @spec gall_host(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def gall_host(conn, params) do
     case Integer.parse(params["id"] || "") do
-      {gall_id, ""} -> moved(conn, ~p"/admin/galls/#{gall_id}")
-      _ -> moved(conn, ~p"/admin/galls")
+      {gall_id, ""} -> moved(conn, edit_gall_path(gall_id))
+      _ -> moved(conn, ~p"/galls")
     end
   end
+
+  defp edit_gall_path(gall_id), do: "/gall/#{gall_id}?edit"
 
   @doc """
   `/admin/images?species_id=` → the images section of the Gall page or of
@@ -80,7 +95,7 @@ defmodule GallformersWeb.AdminRedirectController do
 
   defp images_path(id) do
     cond do
-      Catalog.get_gall(id) -> ~p"/admin/galls/#{id}" <> "#images"
+      Catalog.get_gall(id) -> edit_gall_path(id)
       Taxa.get_taxon(id) -> ~p"/admin/taxonomy/#{id}" <> "#images"
       true -> nil
     end

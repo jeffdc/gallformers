@@ -61,6 +61,19 @@ defmodule Gallformers.ArticlesTest do
     end
   end
 
+  describe "search_published/2" do
+    test "published articles whose title has the words, up to the limit" do
+      create_article(%{title: "Rearing Gall Wasps", slug: "rearing", is_published: true})
+      create_article(%{title: "Gall wasp lookalikes", slug: "lookalikes", is_published: true})
+      create_article(%{title: "Rearing in secret", slug: "draft", is_published: false})
+
+      assert ["Rearing Gall Wasps"] = Articles.search_published("rearing") |> Enum.map(& &1.title)
+      assert length(Articles.search_published("gall wasp")) == 2
+      assert length(Articles.search_published("gall", 1)) == 1
+      assert Articles.search_published("  ") == []
+    end
+  end
+
   describe "list_published_articles/0" do
     test "returns only published articles" do
       _unpublished = create_article(%{title: "Unpublished"})

@@ -3,8 +3,8 @@ defmodule GallformersWeb.CoreComponents do
   Provides core UI components.
 
   At first glance, this module may seem daunting, but its goal is to provide
-  core building blocks for your application, such as tables, forms, and
-  inputs. The components consist mostly of markup and are well-documented
+  core building blocks for your application, such as forms, inputs,
+  icons and the legacy modal. The components consist mostly of markup and are well-documented
   with doc strings and declarative assigns. You may customize and style
   them in any way you want, based on your application growth and needs.
 
@@ -112,83 +112,7 @@ defmodule GallformersWeb.CoreComponents do
     """
   end
 
-  @doc """
-  Renders a button with navigation support.
-
-  ## Variants
-
-    * `primary` - Maroon background, white text
-    * `secondary` - White background, gray text, gray border
-    * `danger` - Red background, white text
-    * `warning` - Yellow background, white text
-    * `ghost` - Transparent background, maroon text
-    * `soft` - Light maroon background, maroon text (default)
-
-  ## Shapes
-
-    * `rect` - Rounded rectangle (default)
-    * `pill` - Fully rounded pill
-
-  ## Examples
-
-      <.button>Send!</.button>
-      <.button phx-click="go" variant="primary">Send!</.button>
-      <.button variant="danger">Delete</.button>
-      <.button shape="pill">Filter</.button>
-      <.button navigate={~p"/"}>Home</.button>
-      <.button type="submit" variant="primary">Save</.button>
-  """
-  attr :rest, :global,
-    include:
-      ~w(href navigate patch method download name value disabled type form phx-disable-with)
-
-  attr :class, :any, default: nil
-  attr :variant, :string, default: "soft", values: ~w(primary secondary danger warning ghost soft)
-  attr :size, :string, default: "md", values: ~w(sm md lg)
-  attr :shape, :string, default: "rect", values: ~w(rect pill)
-  slot :inner_block, required: true
-
-  def button(%{rest: rest} = assigns) do
-    variants = %{
-      "primary" => "gf-btn-primary",
-      "secondary" => "gf-btn-secondary",
-      "danger" => "gf-btn-danger",
-      "warning" => "gf-btn-warning",
-      "ghost" => "gf-btn-ghost",
-      "soft" => "gf-btn-soft"
-    }
-
-    sizes = %{
-      "sm" => "gf-btn-sm",
-      "md" => nil,
-      "lg" => "gf-btn-lg"
-    }
-
-    shapes = %{
-      "rect" => nil,
-      "pill" => "gf-btn-pill"
-    }
-
-    assigns =
-      assigns
-      |> assign(:variant_class, Map.fetch!(variants, assigns.variant))
-      |> assign(:size_class, Map.fetch!(sizes, assigns.size))
-      |> assign(:shape_class, Map.fetch!(shapes, assigns.shape))
-
-    if rest[:href] || rest[:navigate] || rest[:patch] do
-      ~H"""
-      <.link class={["gf-btn", @variant_class, @size_class, @shape_class, @class]} {@rest}>
-        {render_slot(@inner_block)}
-      </.link>
-      """
-    else
-      ~H"""
-      <button class={["gf-btn", @variant_class, @size_class, @shape_class, @class]} {@rest}>
-        {render_slot(@inner_block)}
-      </button>
-      """
-    end
-  end
+  # button/1 moved to GallformersWeb.ActionComponents (docs/design-system/components.md).
 
   @doc """
   Renders an input with label and error messages.
@@ -311,7 +235,7 @@ defmodule GallformersWeb.CoreComponents do
           disabled={@rest[:disabled]}
           form={@rest[:form]}
         />
-        <span class="label text-base font-medium text-gray-700">
+        <span class="inline-flex items-center gap-2 text-ui text-ink">
           <input
             type="checkbox"
             id={@id}
@@ -332,8 +256,8 @@ defmodule GallformersWeb.CoreComponents do
     ~H"""
     <div class="fieldset">
       <label>
-        <span :if={@label} class="label mb-2 text-base font-medium text-gray-700">
-          {@label}<span :if={@required} class="text-red-600 ml-0.5">*</span>
+        <span :if={@label} class="gf-label">
+          {@label}<span :if={@required} class="ml-0.5 text-danger">*</span>
         </span>
         <select
           id={@id}
@@ -357,8 +281,8 @@ defmodule GallformersWeb.CoreComponents do
     ~H"""
     <div class="fieldset">
       <label>
-        <span :if={@label} class="label mb-2 text-base font-medium text-gray-700">
-          {@label}<span :if={@required} class="text-red-600 ml-0.5">*</span>
+        <span :if={@label} class="gf-label">
+          {@label}<span :if={@required} class="ml-0.5 text-danger">*</span>
         </span>
         <textarea
           id={@id}
@@ -382,8 +306,8 @@ defmodule GallformersWeb.CoreComponents do
     ~H"""
     <div class="fieldset">
       <label>
-        <span :if={@label} class="label mb-2 text-base font-medium text-gray-700">
-          {@label}<span :if={@required} class="text-red-600 ml-0.5">*</span>
+        <span :if={@label} class="gf-label">
+          {@label}<span :if={@required} class="ml-0.5 text-danger">*</span>
         </span>
         <input
           type={@type}
@@ -407,139 +331,10 @@ defmodule GallformersWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
-      <.icon name="ph-warning-circle" class="size-5" />
+    <p class="mt-1 flex items-center gap-1.5 text-meta text-danger">
+      <.icon name="ph-warning-circle" class="size-4" />
       {render_slot(@inner_block)}
     </p>
-    """
-  end
-
-  @doc """
-  Renders a header with title.
-  """
-  slot :inner_block, required: true
-  slot :subtitle
-  slot :actions
-
-  def header(assigns) do
-    ~H"""
-    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4"]}>
-      <div>
-        <h1 class="text-lg font-semibold leading-8">
-          {render_slot(@inner_block)}
-        </h1>
-        <p :if={@subtitle != []} class="text-sm text-gray-500">
-          {render_slot(@subtitle)}
-        </p>
-      </div>
-      <div class="flex-none">{render_slot(@actions)}</div>
-    </header>
-    """
-  end
-
-  @doc """
-  Renders a table with generic styling.
-
-  ## Examples
-
-      <.table id="users" rows={@users}>
-        <:col :let={user} label="id">{user.id}</:col>
-        <:col :let={user} label="username">{user.username}</:col>
-      </.table>
-
-      <.table id="users" rows={@users} variant="compact">
-        <:col :let={user} label="id">{user.id}</:col>
-      </.table>
-  """
-  attr :id, :string, required: true
-  attr :rows, :list, required: true
-  attr :row_id, :any, default: nil, doc: "the function for generating the row id"
-  attr :row_click, :any, default: nil, doc: "the function for handling phx-click on each row"
-
-  attr :variant, :string,
-    default: "default",
-    values: ~w(default compact dense),
-    doc: "table density variant"
-
-  attr :zebra, :boolean, default: true, doc: "whether to show zebra striping"
-
-  attr :row_item, :any,
-    default: &Function.identity/1,
-    doc: "the function for mapping each row before calling the :col and :action slots"
-
-  slot :col, required: true do
-    attr :label, :string
-  end
-
-  slot :action, doc: "the slot for showing user actions in the last table column"
-
-  def table(assigns) do
-    assigns =
-      with %{rows: %Phoenix.LiveView.LiveStream{}} <- assigns do
-        assign(assigns, row_id: assigns.row_id || fn {id, _item} -> id end)
-      end
-
-    ~H"""
-    <table class={[
-      "gf-table",
-      @variant == "compact" && "gf-table-compact",
-      @variant == "dense" && "gf-table-dense",
-      @zebra && "gf-table-zebra"
-    ]}>
-      <thead>
-        <tr>
-          <th :for={col <- @col}>{col[:label]}</th>
-          <th :if={@action != []}>
-            <span class="sr-only">{gettext("Actions")}</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody id={@id} phx-update={is_struct(@rows, Phoenix.LiveView.LiveStream) && "stream"}>
-        <tr :for={row <- @rows} id={@row_id && @row_id.(row)}>
-          <td
-            :for={col <- @col}
-            phx-click={@row_click && @row_click.(row)}
-            class={@row_click && "hover:cursor-pointer"}
-          >
-            {render_slot(col, @row_item.(row))}
-          </td>
-          <td :if={@action != []} class="w-0 font-semibold">
-            <div class="flex gap-4">
-              <span :for={action <- @action}>
-                {render_slot(action, @row_item.(row))}
-              </span>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    """
-  end
-
-  @doc """
-  Renders a data list.
-
-  ## Examples
-
-      <.list>
-        <:item title="Title">{@post.title}</:item>
-        <:item title="Views">{@post.views}</:item>
-      </.list>
-  """
-  slot :item, required: true do
-    attr :title, :string, required: true
-  end
-
-  def list(assigns) do
-    ~H"""
-    <ul class="gf-list">
-      <li :for={item <- @item} class="gf-list-row">
-        <div class="gf-list-col-grow">
-          <div class="font-bold">{item.title}</div>
-          <div>{render_slot(item)}</div>
-        </div>
-      </li>
-    </ul>
     """
   end
 
@@ -560,7 +355,7 @@ defmodule GallformersWeb.CoreComponents do
 
       <.icon name="ph-x" />
       <.icon name="ph-arrows-clockwise" class="ml-1 size-3 motion-safe:animate-spin" />
-      <.icon name="gf-gall" class="size-6 text-gf-maroon" />
+      <.icon name="gf-gall" class="size-6 text-brand" />
   """
   attr :name, :string, required: true
   attr :class, :any, default: "size-4"
@@ -577,239 +372,9 @@ defmodule GallformersWeb.CoreComponents do
     """
   end
 
-  @doc """
-  Renders a data complete/in progress badge.
-
-  Used on species (gall/host) and source pages to indicate data completeness.
-
-  ## Examples
-
-      <.data_complete_badge
-        complete={true}
-        complete_tooltip="All data has been entered."
-        incomplete_tooltip="Data entry is still in progress."
-      />
-  """
-  attr :complete, :boolean, required: true, doc: "whether the data is complete"
-  attr :complete_tooltip, :string, required: true, doc: "tooltip when complete"
-  attr :incomplete_tooltip, :string, required: true, doc: "tooltip when incomplete"
-
-  def data_complete_badge(assigns) do
-    ~H"""
-    <span
-      class={[
-        "gf-badge cursor-help",
-        if(@complete, do: "gf-badge-success", else: "gf-badge-warning")
-      ]}
-      title={if @complete, do: @complete_tooltip, else: @incomplete_tooltip}
-    >
-      {if @complete, do: "Complete", else: "In Progress"}
-    </span>
-    """
-  end
-
-  @doc """
-  Status badge component.
-
-  ## Examples
-
-      <.badge variant="success">Complete</.badge>
-      <.badge variant="warning">Pending</.badge>
-      <.badge>Default info badge</.badge>
-  """
-  attr :variant, :string, default: "info", values: ~w(success warning info)
-  slot :inner_block, required: true
-
-  def badge(assigns) do
-    ~H"""
-    <span class={"gf-badge gf-badge-#{@variant}"}>
-      {render_slot(@inner_block)}
-    </span>
-    """
-  end
-
-  @doc """
-  Removable chip/tag component.
-
-  ## Examples
-
-      <.chip>Tag</.chip>
-      <.chip size="sm" on_remove={JS.push("remove", value: %{id: 1})}>Removable</.chip>
-  """
-  attr :size, :string, default: "md", values: ~w(sm md)
-  attr :on_remove, JS, default: nil
-  slot :inner_block, required: true
-
-  def chip(assigns) do
-    ~H"""
-    <span class={["gf-chip", @size == "sm" && "gf-chip-sm"]}>
-      {render_slot(@inner_block)}
-      <button :if={@on_remove} type="button" class="gf-chip-remove" phx-click={@on_remove}>
-        <.icon name="ph-x" class="h-3 w-3" />
-      </button>
-    </span>
-    """
-  end
-
-  @doc """
-  Renders a generic modal dialog.
-
-  ## Examples
-
-      <.modal id="confirm-delete" on_cancel={JS.exec("data-cancel", to: "#confirm-delete")}>
-        <:header>Confirm Delete</:header>
-        <:body>Are you sure you want to delete this item?</:body>
-        <:footer>
-          <.button phx-click={hide_modal("confirm-delete")}>Cancel</.button>
-          <.button variant="primary" phx-click="delete">Delete</.button>
-        </:footer>
-      </.modal>
-
-  ## Showing the modal
-
-  Use the `show_modal/1` JS command to show the modal:
-
-      <.button phx-click={show_modal("confirm-delete")}>Delete</.button>
-
-  ## Hiding the modal
-
-  Use the `hide_modal/1` JS command to hide the modal. The modal also closes
-  when clicking the backdrop or pressing Escape.
-
-  ## Focus management
-
-  The modal traps focus inside when open. When opened, focus moves to the first
-  focusable element inside the modal (or the close button if no header).
-  """
-  attr :id, :string, required: true
-  attr :show, :boolean, default: false
-  attr :on_cancel, JS, default: %JS{}, doc: "JS command to run when the modal is cancelled"
-  attr :class, :any, default: nil, doc: "additional CSS classes for the modal container"
-
-  slot :header, doc: "optional header content displayed at the top of the modal"
-  slot :body, required: true, doc: "the main content of the modal"
-  slot :footer, doc: "optional footer content, typically for action buttons"
-
-  def modal(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      phx-mounted={@show && show_modal(@id)}
-      phx-remove={hide_modal(@id)}
-      data-cancel={JS.exec(@on_cancel, "phx-remove")}
-      class="gf-modal-backdrop hidden"
-    >
-      <div
-        id={"#{@id}-bg"}
-        class="fixed inset-0 z-[60] bg-black/50 transition-opacity"
-        aria-hidden="true"
-      />
-      <div
-        class="fixed inset-0 z-[60] overflow-y-auto"
-        aria-labelledby={"#{@id}-title"}
-        aria-describedby={"#{@id}-description"}
-        role="dialog"
-        aria-modal="true"
-        tabindex="0"
-      >
-        <div class="flex min-h-full items-center justify-center p-4">
-          <.focus_wrap
-            id={"#{@id}-container"}
-            phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
-            phx-key="escape"
-            phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-            class={["gf-modal shadow-xl transition", @class]}
-          >
-            <div :if={@header != []} class="gf-modal-header">
-              <h3 id={"#{@id}-title"} class="text-xl font-semibold text-gray-900">
-                {render_slot(@header)}
-              </h3>
-              <button
-                type="button"
-                phx-click={JS.exec("data-cancel", to: "##{@id}")}
-                class="text-gray-400 hover:text-gray-600 cursor-pointer"
-                aria-label={gettext("close")}
-              >
-                <.icon name="ph-x" class="size-6" />
-              </button>
-            </div>
-            <div :if={@header == []} class="absolute right-4 top-4">
-              <button
-                type="button"
-                phx-click={JS.exec("data-cancel", to: "##{@id}")}
-                class="text-gray-400 hover:text-gray-600 cursor-pointer"
-                aria-label={gettext("close")}
-              >
-                <.icon name="ph-x" class="size-6" />
-              </button>
-            </div>
-            <div id={"#{@id}-description"} class="gf-modal-body">
-              {render_slot(@body)}
-            </div>
-            <div :if={@footer != []} class="gf-modal-footer">
-              {render_slot(@footer)}
-            </div>
-          </.focus_wrap>
-        </div>
-      </div>
-    </div>
-    """
-  end
+  # chip/1 moved to GallformersWeb.DataComponents (docs/design-system/components.md).
 
   ## JS Commands
-
-  @doc """
-  Shows the modal with the given id.
-
-  ## Example
-
-      <.button phx-click={show_modal("my-modal")}>Open</.button>
-  """
-  def show_modal(id) when is_binary(id) do
-    %JS{}
-    |> JS.show(to: "##{id}")
-    |> JS.show(
-      to: "##{id}-bg",
-      time: 300,
-      transition: {"transition-opacity ease-out duration-300", "opacity-0", "opacity-100"}
-    )
-    |> JS.show(
-      to: "##{id}-container",
-      time: 300,
-      transition:
-        {"transition-all ease-out duration-300",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95",
-         "opacity-100 translate-y-0 sm:scale-100"}
-    )
-    |> JS.add_class("overflow-hidden", to: "body")
-    |> JS.focus_first(to: "##{id}-container")
-  end
-
-  @doc """
-  Hides the modal with the given id.
-
-  ## Example
-
-      <.button phx-click={hide_modal("my-modal")}>Close</.button>
-  """
-  def hide_modal(id) when is_binary(id) do
-    %JS{}
-    |> JS.hide(
-      to: "##{id}-bg",
-      time: 200,
-      transition: {"transition-opacity ease-in duration-200", "opacity-100", "opacity-0"}
-    )
-    |> JS.hide(
-      to: "##{id}-container",
-      time: 200,
-      transition:
-        {"transition-all ease-in duration-200", "opacity-100 translate-y-0 sm:scale-100",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"}
-    )
-    |> JS.hide(to: "##{id}", time: 200, transition: {"", "", ""})
-    |> JS.remove_class("overflow-hidden", to: "body")
-    |> JS.pop_focus()
-  end
 
   def show(js \\ %JS{}, selector) do
     JS.show(js,
@@ -848,7 +413,7 @@ defmodule GallformersWeb.CoreComponents do
     <div
       :if={@inserted_at || @updated_at}
       class={[
-        "mt-8 pt-4 border-t border-gray-200 text-sm text-gray-600",
+        "mt-8 border-t border-line pt-4 text-meta text-muted",
         @class
       ]}
     >

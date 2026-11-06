@@ -6,6 +6,8 @@ defmodule GallformersWeb.PlacesBrowseLiveTest do
 
   import Phoenix.LiveViewTest
 
+  defp format(n), do: GallformersWeb.Helpers.format_number(n)
+
   describe "/places page" do
     test "renders the places browse page with tree", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/places")
@@ -20,16 +22,40 @@ defmodule GallformersWeb.PlacesBrowseLiveTest do
       assert page_title(view) =~ "Places"
     end
 
-    test "shows countries when continent is expanded", %{conn: conn} do
+    test "a continent's tile shows its countries", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/places")
 
-      html =
-        view
-        |> element(~s{button[phx-click="toggle_node"][phx-value-key="p-XN"]})
-        |> render_click()
+      view |> element(~s{nav[aria-label=Continents] a}, "Europe") |> render_click()
 
-      assert html =~ "United States"
-      assert html =~ "Canada"
+      assert_patch(view, "/places?c=XE")
+      assert has_element?(view, "#countries", "Romania")
+      refute has_element?(view, "#countries", "Canada")
+      assert has_element?(view, ~s{nav[aria-label=Continents] a[aria-current=page]}, "Europe")
+    end
+
+    test "opens on the continent with the most galls, countries ranked by galls", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/places")
+      %{counts: counts} = Gallformers.Catalog.place_gall_counts()
+
+      assert has_element?(
+               view,
+               ~s{nav[aria-label=Continents] a[aria-current=page]},
+               "North America"
+             )
+
+      assert has_element?(view, "#countries", "United States")
+      assert has_element?(view, "#countries", format(counts["US"]))
+      assert has_element?(view, ~s{nav[aria-label="Browse by"] a[aria-current=page]}, "By place")
+    end
+
+    test "the filter finds places in every continent", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/places")
+
+      view |> element("#places-browse-search-form") |> render_change(%{"query" => "Bucharest"})
+
+      assert has_element?(view, "#countries", "Romania")
+      assert has_element?(view, "#countries a", "Bucharest")
+      refute has_element?(view, "#countries", "United States")
     end
 
     test "search filters the tree", %{conn: conn} do
@@ -81,7 +107,8 @@ defmodule GallformersWeb.PlacesBrowseLiveTest do
         |> render_click()
 
       assert html =~ "North America"
-      refute html =~ "California"
+      # A country's busiest few stay in its row; only the rest fold away.
+      assert html =~ "California"
     end
   end
 end
