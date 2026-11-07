@@ -108,6 +108,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.ReadModels.PotentialRange
   alias Gallformers.Catalog.ReadModels.Site
   alias Gallformers.Catalog.Records
+  alias Gallformers.Catalog.SplitInducers
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Catalog.Vocab.Loader
@@ -675,6 +676,10 @@ defmodule Gallformers.Catalog do
   @spec gall_name_changes(Gallformers.Taxa.Event.t()) :: [GallRenames.change()]
   defdelegate gall_name_changes(event), to: GallRenames, as: :name_changes
 
+  @doc "The Galls among `gall_ids` whose derived names may change, as `gall_name_changes/1` (`Gallformers.Catalog.GallRenames.galls_name_changes/1`)."
+  @spec galls_name_changes([integer()]) :: [GallRenames.change()]
+  defdelegate galls_name_changes(gall_ids), to: GallRenames
+
   @doc """
   Applies an accepted rename proposal to Gall `gall_id`
   (`Gallformers.Catalog.GallRenames.accept/2`): the name its parts give now,
@@ -779,6 +784,39 @@ defmodule Gallformers.Catalog do
   @doc "Moves a merged Gall's Facts onto the survivor (`Gallformers.Catalog.Records.move_gall_facts/3`)."
   @spec move_gall_facts(Actor.t(), integer(), integer()) :: {:ok, Records.moves()}
   defdelegate move_gall_facts(actor, from_id, to_id), to: Records
+
+  @doc "Re-points a Gall's Inducer to another taxon, its statements kept (`Gallformers.Catalog.Records.move_gall_inducer/4`)."
+  @spec repoint_inducer(Actor.t(), integer(), integer(), integer()) :: {:ok, Records.moves()}
+  defdelegate repoint_inducer(actor, gall_id, from_id, to_id), to: Records, as: :move_gall_inducer
+
+  # -- splits (`f923`, `Gallformers.Catalog.SplitInducers`) ----------------------------
+
+  @doc "The Galls whose current Inducer is a taxon (`Gallformers.Catalog.SplitInducers.galls_on/1`)."
+  @spec galls_on_inducer(integer()) :: [integer()]
+  defdelegate galls_on_inducer(taxon_id), to: SplitInducers, as: :galls_on
+
+  @doc "The Inducers Sources state for Galls, among taxa (`Gallformers.Catalog.SplitInducers.stated_inducers/3`)."
+  @spec stated_inducers([integer()], [integer()], [integer()]) :: %{integer() => [integer()]}
+  defdelegate stated_inducers(gall_ids, source_ids, taxon_ids), to: SplitInducers
+
+  @doc "The daughter a split's Sources suggest for Galls, by shared Host (`Gallformers.Catalog.SplitInducers.suggestions/3`)."
+  @spec split_suggestions([integer()], [integer()], [integer()]) :: map()
+  defdelegate split_suggestions(gall_ids, source_ids, daughter_ids),
+    to: SplitInducers,
+    as: :suggestions
+
+  @doc "The Sources a split Fact counts for, the newest first (`Gallformers.Catalog.SplitInducers.split_sources/1`)."
+  @spec split_sources([integer()]) :: %{integer() => [SplitInducers.source()]}
+  defdelegate split_sources(split_fact_ids), to: SplitInducers
+
+  @doc "Marks a Gall's Inducer as known only in its broad sense before a split (`Gallformers.Catalog.SplitInducers.mark_broad_sense/4`)."
+  @spec mark_broad_sense(Actor.t(), integer(), integer(), integer() | nil) ::
+          {:ok, non_neg_integer()}
+  defdelegate mark_broad_sense(actor, gall_id, taxon_id, split_fact_id), to: SplitInducers
+
+  @doc "A Gall's Inducers known only in their broad sense, by taxon (`Gallformers.Catalog.SplitInducers.broad_sense_inducers/1`)."
+  @spec broad_sense_inducers(integer()) :: %{integer() => SplitInducers.mark()}
+  defdelegate broad_sense_inducers(gall_id), to: SplitInducers
 
   @doc "Moves the gall Facts naming a merged plant onto the survivor (`Gallformers.Catalog.Records.move_taxon_facts/3`)."
   @spec move_taxon_facts(Actor.t(), integer(), integer()) :: {:ok, Records.moves()}

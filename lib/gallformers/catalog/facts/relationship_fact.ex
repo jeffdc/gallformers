@@ -14,6 +14,11 @@ defmodule Gallformers.Catalog.Facts.RelationshipFact do
   most one Inducer, but competing Inducers are a curator's call, not a
   slot). A `host_of` subject must be a plant (kingdom Plantae), checked
   through `Gallformers.Taxa`; a genus-level Host is allowed.
+
+  An `inducer_of` Fact may be marked as naming its Inducer in its old broad
+  sense, before a split (`broad_sense_split_id`, the split Fact; `f923`
+  "Splits", `Gallformers.Catalog.SplitInducers`): a curator's mark, not
+  part of the natural key, never cast from a Source's statement.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -35,6 +40,7 @@ defmodule Gallformers.Catalog.Facts.RelationshipFact do
           object_taxon_id: integer() | nil,
           object_gall_id: integer() | nil,
           gall_context_id: integer() | nil,
+          broad_sense_split_id: integer() | nil,
           fact: Fact.t() | Ecto.Association.NotLoaded.t()
         }
 
@@ -62,6 +68,7 @@ defmodule Gallformers.Catalog.Facts.RelationshipFact do
     belongs_to :object_taxon, Taxon
     belongs_to :object_gall, Gall
     belongs_to :gall_context, Gall
+    field :broad_sense_split_id, :id
   end
 
   @impl true

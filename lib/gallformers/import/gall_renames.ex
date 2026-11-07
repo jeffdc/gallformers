@@ -58,16 +58,27 @@ defmodule Gallformers.Import.GallRenames do
   # -- proposals ---------------------------------------------------------------
 
   @impl true
-  def taxon_changed(%Event{type: type} = event) when type in [:move, :rename, :rank, :merge] do
-    {unchanged, changed} =
-      event |> Catalog.gall_name_changes() |> Enum.split_with(&(&1.from == &1.to))
-
-    withdraw(Enum.map(unchanged, & &1.gall_id))
-    reason = reason(event)
-    Enum.each(changed, &propose(&1, reason))
-  end
+  def taxon_changed(%Event{type: type} = event) when type in [:move, :rename, :rank, :merge],
+    do: event |> Catalog.gall_name_changes() |> proposals(reason(event))
 
   def taxon_changed(%Event{}), do: :ok
+
+  @doc """
+  Proposes the renames of Galls `gall_ids` whose Inducer itself changed
+  (a split's answer, `Gallformers.Import.SplitQuestions`), with `reason`,
+  as a taxonomy change does: inside the caller's transaction.
+  """
+  @spec propose_for_galls([integer()], String.t()) :: :ok
+  def propose_for_galls([], _reason), do: :ok
+
+  def propose_for_galls(gall_ids, reason) when is_list(gall_ids) and is_binary(reason),
+    do: gall_ids |> Catalog.galls_name_changes() |> proposals(reason)
+
+  defp proposals(changes, reason) do
+    {unchanged, changed} = Enum.split_with(changes, &(&1.from == &1.to))
+    withdraw(Enum.map(unchanged, & &1.gall_id))
+    Enum.each(changed, &propose(&1, reason))
+  end
 
   defp withdraw([]), do: :ok
 

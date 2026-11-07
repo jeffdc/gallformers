@@ -1816,6 +1816,57 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     end
   end
 
+  describe "a Gall whose Inducer was split (f923 Task 7)" do
+    defp split_question(proposal) do
+      %QueueItem{
+        kind: :split_inducer,
+        subject: %{
+          "gall_id" => 501,
+          "taxon_id" => 1,
+          "into_taxon_ids" => [1, 2],
+          "fact_id" => 9,
+          "source_id" => 3
+        },
+        proposal: proposal,
+        reason: "Ashmead split Disholandricus chrysolepidis into it and another."
+      }
+    end
+
+    test "asks which taxon induces the Gall now: each daughter, or not known yet" do
+      q = present(split_question(%{}))
+
+      assert q.section.id == :split_inducer
+      refute q.holds_approval
+      assert q.written == "Callirhytis morrisoni (sexgen)"
+
+      assert q.question ==
+               "Ashmead splits Disholandricus chrysolepidis into Disholandricus chrysolepidis " <>
+                 "and Heteroecus chrysolepidis. Which taxon induces Callirhytis morrisoni " <>
+                 "(sexgen) now?"
+
+      assert labels(q) == [
+               "Disholandricus chrysolepidis, in its narrow sense",
+               "Heteroecus chrysolepidis",
+               "Not known yet"
+             ]
+
+      assert choice(q, "Heteroecus chrysolepidis").decision == %{"taxon_id" => 2}
+      assert choice(q, "Heteroecus chrysolepidis").hint =~ "rename proposal"
+      assert choice(q, "Not known yet").decision == %{"not_known" => true}
+      assert choice(q, "Not known yet").hint =~ "old broad sense"
+      assert q.proposal == nil
+      refute Enum.any?(q.choices, & &1.proposed)
+      assert_plain(q)
+    end
+
+    test "a daughter the Source's Galls share a Host with is recommended, to check" do
+      q = present(split_question(%{"taxon_id" => 2, "why" => "Its Galls are on Quercus."}))
+
+      assert %{firm: false, why: "Its Galls are on Quercus."} = q.proposal
+      assert choice(q, "Heteroecus chrysolepidis").proposed == true
+    end
+  end
+
   # -- the Source, and renames ---------------------------------------------------
 
   test "a Source match picks a Source Gallformers holds or adds a new one" do
@@ -1923,6 +1974,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
              :hedge_gall,
              :hedge_other,
              :taxonomy_acceptance,
+             :split_inducer,
              :source
            ]
   end

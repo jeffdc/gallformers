@@ -196,7 +196,14 @@ defmodule Gallformers.FactsTest do
         observations: [%{provider: :inaturalist, external_id: "123"}]
       }
 
-      attribute!(fact, source, attrs)
+      %{attribution: attribution} = attribute!(fact, source, attrs)
+
+      # As if the second turned between the two statements: a write would
+      # bump `updated_at`.
+      Repo.update_all(from(a in Attribution, where: a.id == ^attribution.id),
+        set: [updated_at: ~U[2000-01-01 00:00:00Z]]
+      )
+
       before = Repo.aggregate(test_audit_changes(), :count)
 
       attribute!(fact, source, attrs)

@@ -56,6 +56,7 @@ defmodule Gallformers.Import.TaxonomyQueue do
   alias Gallformers.Import.BatchStatement
   alias Gallformers.Import.Queue
   alias Gallformers.Import.QueueItem
+  alias Gallformers.Import.SplitQuestions
   alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Repo
   alias Gallformers.Taxa
@@ -517,6 +518,33 @@ defmodule Gallformers.Import.TaxonomyQueue do
 
   def settle(%Actor{}, :reopen, %Attribution{}, _reason), do: :ok
 
+  @doc """
+  Closes the open questions whose statements were decided without going
+  through `Gallformers.Import.TaxonomicDecisions` (a call to
+  `Gallformers.Facts.accept/3` or `decline/4` itself: a lump declines the
+  absorbed taxon's own statements, `Gallformers.Taxa.Lump`), as
+  `settle/4` would have closed them: an accepted one's as accepted (and
+  older ones in its slot as history), a declined one's as declined with
+  the statement's reason. Inside the caller's transaction.
+  """
+  @spec settle_decided(Actor.t()) :: :ok
+  def settle_decided(%Actor{} = actor) do
+    from(q in QueueItem,
+      join: a in Attribution,
+      on: a.id == fragment("(?->>'attribution_id')::bigint", q.subject),
+      where:
+        q.kind == @kind and q.status == :open and
+          (not is_nil(a.accepted_at) or not is_nil(a.declined_at)),
+      order_by: q.id,
+      select: a
+    )
+    |> Repo.all()
+    |> Enum.each(fn
+      %Attribution{declined_at: %DateTime{}} = a -> settle(actor, :decline, a, a.decline_reason)
+      %Attribution{} = a -> settle(actor, :accept, a, nil)
+    end)
+  end
+
   @doc "After `op` on attribution `attribution_id`: a reopened statement is asked again."
   @spec asked_again(op(), integer()) :: :ok
   def asked_again(:reopen, attribution_id), do: ask_again(attribution_id)
@@ -809,8 +837,10 @@ defmodule Gallformers.Import.TaxonomyQueue do
     |> Enum.sort_by(& &1.from)
   end
 
-  # The splits coming into effect, and the Galls on the split taxon, each of
-  # which then asks which taxon induces it (`f923` Task 7).
+  # The splits coming into effect, and how many Galls on the split taxon
+  # then ask which taxon induces them: those the paper's own statements
+  # don't settle (`Gallformers.Import.SplitQuestions`, asked by the
+  # acceptances just made).
   defp split_effects(items) do
     for %QueueItem{subject: %{"kind" => "split", "stance" => "confirm"} = s} <- items,
         Repo.exists?(from(f in Fact, where: f.id == ^s["fact_id"] and f.standing == :current)) do
@@ -820,7 +850,7 @@ defmodule Gallformers.Import.TaxonomyQueue do
         taxon_id: id,
         name: Taxa.accepted_name(id),
         into: Enum.map(List.wrap(s["into_taxon_ids"]), &Taxa.accepted_name/1),
-        galls: length(Catalog.list_gall_summaries_by_inducer([id]))
+        galls: SplitQuestions.count_for_taxon(id)
       }
     end
   end

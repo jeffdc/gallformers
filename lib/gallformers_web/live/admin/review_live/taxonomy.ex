@@ -12,6 +12,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Taxonomy do
   Source's page has (`GallformersWeb.Admin.ReviewLive.ItemRow`): Accept
   (recommended) makes the tree follow the statement; Decline asks for the
   reason once chosen. A refusal from the tree shows its reason in the row.
+  Beside them, the split questions of a split the Source made
+  (`Gallformers.Import.SplitQuestions`, `f923` "Splits"): for each Gall on
+  the split taxon its own statements don't settle, which taxon induces it
+  now (each daughter, or not known yet; a daughter its Galls share a Host
+  with marked recommended).
   "Accept the rest of this paper" first shows what it would do to the tree
   (`Gallformers.Import.preview_accept_rest/2`: moves, renames, merges,
   Galls whose names change, splits and the Galls they ask about), then
@@ -167,7 +172,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Taxonomy do
           <:description>
             A newer paper's taxonomic statement counts only once you accept it; the tree then
             follows it. Declining keeps the tree on the paper it follows now, with your reason.
-            These come after a Source's approval, so nothing here holds one.
+            Once a split is accepted, each Gall on the split taxon that the paper doesn't settle
+            asks which taxon induces it now. These come after a Source's approval, so nothing
+            here holds one.
           </:description>
         </.page_header>
 
@@ -203,7 +210,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Taxonomy do
             on_toggle="toggle_section"
             layout={:question}
           >
-            <:actions :if={g.open > 0}>
+            <:actions :if={g.acceptance_open > 0}>
               <.button
                 id={"accept-rest-#{g.source_id}"}
                 phx-click="preview_rest"
@@ -211,7 +218,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Taxonomy do
                 size="sm"
                 variant="secondary"
               >
-                Accept the rest of this paper ({g.open})
+                Accept the rest of this paper ({g.acceptance_open})
               </.button>
             </:actions>
             <:confirm :for={preview <- List.wrap(previewing(@preview, g.source_id))}>

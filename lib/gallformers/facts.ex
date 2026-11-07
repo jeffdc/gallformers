@@ -768,9 +768,16 @@ defmodule Gallformers.Facts do
       )
       |> Repo.one()
 
-    existing
-    |> attribution_changeset(source, attrs)
-    |> Repo.insert_or_update()
+    # Restated unchanged, it is left as it is: Ecto would still write the
+    # preloaded children's parent, bumping `updated_at` (an audit change)
+    # whenever the second turned between the two statements.
+    case attribution_changeset(existing, source, attrs) do
+      %Changeset{valid?: true, changes: changes} when existing != nil and changes == %{} ->
+        {:ok, existing}
+
+      changeset ->
+        Repo.insert_or_update(changeset)
+    end
   end
 
   # The changeset attributing `attrs` over `existing` (nil for a new one),

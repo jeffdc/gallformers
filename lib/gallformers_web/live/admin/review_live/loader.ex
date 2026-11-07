@@ -323,15 +323,22 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
 
   @doc """
   The taxonomy questions (`Gallformers.Import.list_taxonomy_questions/1`)
-  by Source, the newest Source first: `%{source_id, source, summary, name,
-  entries, open}`, `name` the Source's short name (else its title) and
-  `entries` its questions as `t:entry/0`s, oldest first, each open one
-  reading what the tree holds now (`subject["now"]`). Options: `:status`
-  (default `:open`; `:all`), `:source_id`.
+  and the split questions (`Gallformers.Import.list_split_questions/1`,
+  under the splitting Source) by Source, the newest Source first:
+  `%{source_id, source, summary, name, entries, open, acceptance_open}`,
+  `name` the Source's short name (else its title), `entries` its questions
+  as `t:entry/0`s, oldest first, each open taxonomy question reading what
+  the tree holds now (`subject["now"]`), `open` how many are open and
+  `acceptance_open` how many of those are taxonomy questions (what
+  "Accept the rest of this paper" accepts). Options: `:status` (default
+  `:open`; `:all`), `:source_id`.
   """
   @spec taxonomy(keyword()) :: [map()]
   def taxonomy(opts \\ []) do
-    items = Import.list_taxonomy_questions(opts)
+    items =
+      (Import.list_taxonomy_questions(opts) ++ Import.list_split_questions(opts))
+      |> Enum.sort_by(& &1.id)
+
     sources = items |> Enum.map(& &1.subject["source_id"]) |> source_map()
 
     batches =
@@ -356,14 +363,16 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
         summary: summary,
         name: name || "A Source",
         entries: entries,
-        open: Enum.count(entries, &(&1.item.status == :open))
+        open: Enum.count(entries, &(&1.item.status == :open)),
+        acceptance_open:
+          Enum.count(entries, &(&1.item.status == :open and &1.item.kind == :taxonomy_acceptance))
       }
     end)
     |> Enum.sort_by(&{-((&1.summary && &1.summary.year) || 0), &1.name})
   end
 
   # An open question reads what the tree holds now, not when it was asked.
-  defp with_tree_now(%QueueItem{status: :open} = item) do
+  defp with_tree_now(%QueueItem{status: :open, kind: :taxonomy_acceptance} = item) do
     now = Import.taxonomy_tree_now(item) || "the tree follows it already"
     %{item | subject: Map.put(item.subject, "now", now)}
   end
@@ -387,8 +396,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
           path: "/admin/review/taxonomy",
           title: "Taxonomy questions",
           citation:
-            "Newer papers' placements, names and synonymies, to accept or decline. " <>
-              "They come after a Source's approval and hold none.",
+            "Newer papers' placements, names and synonymies, to accept or decline, and the " <>
+              "Galls of split taxa. They come after a Source's approval and hold none.",
           kind: nil,
           year: nil,
           notes: false,
@@ -1407,6 +1416,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
 
     acc
     |> add(:taxa, ints(suggested))
+    |> add(:taxa, split_ids(item))
     |> add(:galls, ints([subject["gall_id"], decision["gall_id"]]))
     |> add(
       :taxa,
@@ -1419,6 +1429,12 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
     )
     |> add(:sources, ints([decision["source_id"]]))
   end
+
+  # A split question names the split taxon, its daughters and the one suggested.
+  defp split_ids(%QueueItem{kind: :split_inducer, subject: s, proposal: p}),
+    do: ints([s["taxon_id"], (p || %{})["taxon_id"] | List.wrap(s["into_taxon_ids"])])
+
+  defp split_ids(_item), do: []
 
   defp statement_ids(%{kind: :taxon} = s, acc),
     do: add(acc, :taxa, ints([s.taxon_id | s.candidate_ids]))

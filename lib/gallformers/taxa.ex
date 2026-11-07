@@ -721,28 +721,39 @@ defmodule Gallformers.Taxa do
     do: Lump.merge(actor, taxon_id(absorbed), taxon_id(survivor))
 
   @doc """
-  Records that `taxon` was split into the taxa `into_ids` (two or more,
-  each an existing taxon other than it): calls the listeners with a
-  `:split` event, for the curator questions about its Galls (`f923`
-  "Splits"). The tree itself is unchanged: the daughters are taxa already.
-  `{:error, :needs_two_daughters}` or `{:error, :not_found}`.
+  Records that `taxon` was split into the taxa `into_ids` (two or more
+  existing taxa; `taxon` may be one, kept in its narrow sense): calls the
+  listeners with a `:split` event, for the curator questions about its
+  Galls (`f923` "Splits"). The tree itself is unchanged: the daughters are
+  taxa already. Options: `:fact_id`, the split Fact that came into effect
+  (`Gallformers.Taxa.Sync`), passed on in the event so listeners know the
+  splitting Sources. `{:error, :needs_two_daughters}` or
+  `{:error, :not_found}`.
   """
-  @spec split(Actor.t(), taxon_ref(), [integer()]) ::
+  @spec split(Actor.t(), taxon_ref(), [integer()], keyword()) ::
           {:ok, Taxon.t()} | {:error, :needs_two_daughters | :not_found | Events.rejection()}
-  def split(%Actor{} = actor, taxon, into_ids) when is_list(into_ids) do
+  def split(%Actor{} = actor, taxon, into_ids, opts \\ []) when is_list(into_ids) do
     id = taxon_id(taxon)
-    into = into_ids |> Enum.uniq() |> Enum.reject(&(&1 == id))
+    into = Enum.uniq(into_ids)
+    all = Enum.uniq([id | into])
 
     Audit.transaction(actor, "taxa.split", fn ->
       cond do
         length(into) < 2 ->
           Repo.rollback(:needs_two_daughters)
 
-        Repo.aggregate(from(t in Taxon, where: t.id in ^[id | into]), :count) != length(into) + 1 ->
+        Repo.aggregate(from(t in Taxon, where: t.id in ^all), :count) != length(all) ->
           Repo.rollback(:not_found)
 
         true ->
-          :ok = Events.dispatch(%Event{type: :split, taxon_id: id, into_taxon_ids: into})
+          :ok =
+            Events.dispatch(%Event{
+              type: :split,
+              taxon_id: id,
+              into_taxon_ids: into,
+              fact_id: opts[:fact_id]
+            })
+
           get_taxon!(id)
       end
     end)

@@ -18,7 +18,9 @@ defmodule Gallformers.Taxa.Event do
       survivor's Fact its statements moved onto (nil for one dropped);
       after the listeners it is deleted, so each listener moves what its
       side holds of it (`Gallformers.Taxa.merge/3`).
-    * `:split` — `taxon_id` was divided into `into_taxon_ids`.
+    * `:split` — `taxon_id` was divided into `into_taxon_ids` (which may
+      hold `taxon_id` itself, in its narrow sense); `fact_id` is the split
+      Fact that came into effect, when a Source's statement did.
     * `:host_range` — plant `taxon_id`'s Host range rows changed.
 
   Taxa emits `:move` (`Gallformers.Taxa.place/3`), `:rename`
@@ -40,6 +42,7 @@ defmodule Gallformers.Taxa.Event do
     :into_taxon_id,
     :old_rank,
     :new_rank,
+    :fact_id,
     into_taxon_ids: [],
     fact_map: %{}
   ]
@@ -58,6 +61,7 @@ defmodule Gallformers.Taxa.Event do
           old_rank: atom() | nil,
           new_rank: atom() | nil,
           into_taxon_ids: [integer()],
+          fact_id: integer() | nil,
           fact_map: %{integer() => integer() | nil}
         }
 end

@@ -224,9 +224,14 @@ defmodule Gallformers.Taxa.Lump do
   defp rekey(key, from, to) do
     key
     |> Map.new(fn
-      {field, ^from} when field in @taxon_fields -> {field, to}
-      {:into_taxon_ids, ids} -> {:into_taxon_ids, ids |> Enum.map(&swap(&1, from, to))}
-      other -> other
+      {field, ^from} when field in @taxon_fields ->
+        {field, to}
+
+      {:into_taxon_ids, ids} ->
+        {:into_taxon_ids, ids |> Enum.map(&swap(&1, from, to)) |> Enum.uniq()}
+
+      other ->
+        other
     end)
   end
 
@@ -235,8 +240,9 @@ defmodule Gallformers.Taxa.Lump do
 
   defp joins_itself?(PlacementFact, %{taxon_id: id, parent_id: id}), do: true
 
-  defp joins_itself?(SplitFact, %{taxon_id: id, into_taxon_ids: into}),
-    do: id in into or length(Enum.uniq(into)) < 2
+  # A split whose daughters the lump made one is no split. (The split taxon
+  # may be a daughter, in its narrow sense.)
+  defp joins_itself?(SplitFact, %{into_taxon_ids: into}), do: length(into) < 2
 
   defp joins_itself?(_module, _key), do: false
 

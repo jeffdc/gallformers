@@ -33,7 +33,8 @@ defmodule Gallformers.Taxa.Sync do
       this taxon's synonyms and is no lump;
     * **common names** — as synonyms, from common-name Facts;
     * **splits** — a split coming into effect is a `:split` event
-      (`split/3`); its Galls' questions are `f923` Task 7.
+      (`split/4`, with the split Fact); its Galls' questions are
+      `Gallformers.Import.SplitQuestions`'s.
 
   A slot with no current Fact leaves its rows as they are. A rewrite the
   tree refuses (a cycle, a rank inversion, a lump of a taxon with taxa
@@ -141,7 +142,8 @@ defmodule Gallformers.Taxa.Sync do
         commons = for %CommonNameFact{taxon_id: t} <- changed, uniq: true, do: t
         splits = for %SplitFact{} = s <- changed, current?(s.fact_id), do: s
 
-        followed = followed_taxa(placed ++ named ++ synonymous ++ commons)
+        split_taxa = for %SplitFact{taxon_id: t} <- splits, uniq: true, do: t
+        followed = followed_taxa(placed ++ named ++ synonymous ++ commons ++ split_taxa)
         follow = &Enum.filter(&1, fn id -> Map.has_key?(followed, id) end)
         expected = expected(Map.keys(followed))
 
@@ -434,8 +436,10 @@ defmodule Gallformers.Taxa.Sync do
 
   # -- splits --------------------------------------------------------------------------
 
-  defp split(actor, %SplitFact{taxon_id: id, into_taxon_ids: into}, followed) do
-    if Map.has_key?(followed, id), do: ok(Taxa.split(actor, id, into)), else: :ok
+  defp split(actor, %SplitFact{taxon_id: id, into_taxon_ids: into, fact_id: fact_id}, followed) do
+    if Map.has_key?(followed, id),
+      do: ok(Taxa.split(actor, id, into, fact_id: fact_id)),
+      else: :ok
   end
 
   defp ok({:ok, _}), do: :ok

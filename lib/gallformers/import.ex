@@ -176,6 +176,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.SetAside
   alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.SourceStep
+  alias Gallformers.Import.SplitQuestions
   alias Gallformers.Import.StableRef
   alias Gallformers.Import.StatementEdit
   alias Gallformers.Import.SynonymDecisions
@@ -1470,6 +1471,7 @@ defmodule Gallformers.Import do
       GallDecisions.gall?(item) -> GallDecisions.carry_out(actor, item, decision)
       Disputes.host?(item) -> GallDecisions.carry_out(actor, item, decision)
       SynonymDecisions.synonym?(item) -> SynonymDecisions.carry_out(actor, item, decision)
+      SplitQuestions.split?(item) -> SplitQuestions.carry_out(actor, item, decision)
       true -> {:ok, decision}
     end
   end
@@ -1793,6 +1795,13 @@ defmodule Gallformers.Import do
     ReplayLog.append!(:queue_decision, GallRenames.replay_key(item), %{
       "decision" => StableRef.encode_decision(item.decision),
       "from" => item.proposal["from"]
+    })
+  end
+
+  # A split question comes from no package: found again by its Gall and taxon.
+  defp log_decision(%QueueItem{kind: :split_inducer} = item) do
+    ReplayLog.append!(:queue_decision, SplitQuestions.replay_key(item), %{
+      "decision" => StableRef.encode_decision(item.decision)
     })
   end
 
@@ -3191,9 +3200,22 @@ defmodule Gallformers.Import do
   @spec list_taxonomy_questions(keyword()) :: [QueueItem.t()]
   def list_taxonomy_questions(opts \\ []), do: TaxonomyQueue.list(opts)
 
-  @doc "How many taxonomy questions are open: every Source's, or `source_id`'s."
+  @doc """
+  How many questions the taxonomy queue shows open: the taxonomy questions
+  and the split questions, every Source's or `source_id`'s.
+  """
   @spec count_taxonomy_questions(integer() | nil) :: non_neg_integer()
-  def count_taxonomy_questions(source_id \\ nil), do: TaxonomyQueue.count(source_id)
+  def count_taxonomy_questions(source_id \\ nil),
+    do: TaxonomyQueue.count(source_id) + SplitQuestions.count(source_id)
+
+  @doc """
+  The split questions (`Gallformers.Import.SplitQuestions`): for each Gall
+  on a taxon an accepted split divided, which taxon induces it now; oldest
+  first. Options: `:status` (default `:open`; `:all`), `:source_id` (the
+  splitting Source's).
+  """
+  @spec list_split_questions(keyword()) :: [QueueItem.t()]
+  def list_split_questions(opts \\ []), do: SplitQuestions.list(opts)
 
   @doc """
   What accepting every open taxonomy question of Source `source_id` would

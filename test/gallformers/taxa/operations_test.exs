@@ -113,6 +113,15 @@ defmodule Gallformers.Taxa.OperationsTest do
       assert Enum.sort(into) == Enum.sort([a.id, b.id])
     end
 
+    test "the split taxon may be a daughter, kept in its narrow sense", ctx do
+      a = taxon_fixture(name: "Opsa epsilon", parent: ctx.genus)
+
+      assert {:ok, _} = Taxa.split(test_actor(), ctx.species, [ctx.species.id, a.id])
+
+      assert_received {Recorder, %Event{type: :split, into_taxon_ids: into}}
+      assert Enum.sort(into) == Enum.sort([ctx.species.id, a.id])
+    end
+
     test "refuses daughters that are not taxa, or fewer than two", ctx do
       a = taxon_fixture(name: "Opsa delta", parent: ctx.genus)
       assert {:error, :needs_two_daughters} = Taxa.split(test_actor(), ctx.species, [a.id])

@@ -478,6 +478,33 @@ defmodule Gallformers.Catalog.Records do
     end)
   end
 
+  @doc """
+  Re-points Gall `gall_id`'s Inducer from taxon `from_id` to `to_id` (a
+  split's answer, `f923` "Splits"): its `inducer_of` Facts naming `from_id`
+  (and their qualifiers) move onto `to_id` as `move_gall_facts/3` moves
+  Facts, every attribution kept as it was (`name_as_written` untouched),
+  combined with the Fact `to_id` holds already; the emptied Facts are
+  deleted. The Gall's other Facts stay. Returns the moves.
+  """
+  @spec move_gall_inducer(Actor.t(), integer(), integer(), integer()) :: {:ok, moves()}
+  def move_gall_inducer(%Actor{} = actor, gall_id, from_id, to_id) do
+    Audit.transaction(actor, "catalog.move_gall_inducer", fn ->
+      inducers =
+        Repo.all(
+          from(r in RelationshipFact,
+            where:
+              r.type == "inducer_of" and r.object_gall_id == ^gall_id and
+                r.subject_taxon_id == ^from_id
+          )
+        )
+
+      rows = rows(inducers ++ qualifiers_of(inducers), {:taxon, [from_id]})
+      moved = move_all(actor, rows, &swap(&1, from_id, to_id))
+      {:ok, _} = delete_facts(actor, Enum.map(moved.moves, & &1.from))
+      moved
+    end)
+  end
+
   defp swap(id, id, to_id), do: to_id
   defp swap(id, _from_id, _to_id), do: id
 

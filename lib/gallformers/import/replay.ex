@@ -27,7 +27,10 @@ defmodule Gallformers.Import.Replay do
       proposal's decision (`"kind" => "gall_rename"`,
       no package) is found by its Gall and the name it was decided for
       (`Gallformers.Import.GallRenames.find/2`): replaying the taxonomy
-      change before it made the proposal again.
+      change before it made the proposal again. A split question's answer
+      (`"kind" => "split_inducer"`, no package) is found by its Gall and
+      the split taxon (`Gallformers.Import.SplitQuestions.find/2`):
+      replaying the split's acceptance asked it again.
     * `:synonym_added`, `:plant_added`, `:taxonomy_edit` — the Host-name
       step's and the taxonomy admin's edits, made again on the taxa found
       by name (the newer ops, and WCVP actions logged as the state they
@@ -95,6 +98,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.ReplayEntry
   alias Gallformers.Import.SourceEdits
+  alias Gallformers.Import.SplitQuestions
   alias Gallformers.Import.StableRef
   alias Gallformers.Import.SynonymDecisions
   alias Gallformers.Import.TaxonomicDecisions
@@ -158,6 +162,28 @@ defmodule Gallformers.Import.Replay do
        }) do
     with {:ok, gall_id} <- StableRef.resolve_gall(key["gall"]) do
       case GallRenames.find(gall_id, key["to"]) do
+        nil ->
+          {:error, {:no_queue_item, key}}
+
+        %QueueItem{status: :decided} ->
+          :ok
+
+        item ->
+          with {:ok, decision} <- StableRef.decode_decision(decision) do
+            ok(Import.decide_queue_item(actor, item, decision))
+          end
+      end
+    end
+  end
+
+  defp replay(actor, %{
+         kind: :queue_decision,
+         key: %{"kind" => "split_inducer"} = key,
+         payload: %{"decision" => decision}
+       }) do
+    with {:ok, gall_id} <- StableRef.resolve_gall(key["gall"]),
+         {:ok, taxon_id} <- StableRef.resolve_taxon(key["taxon"]) do
+      case SplitQuestions.find(gall_id, taxon_id) do
         nil ->
           {:error, {:no_queue_item, key}}
 

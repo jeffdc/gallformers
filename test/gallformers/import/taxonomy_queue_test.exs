@@ -315,6 +315,33 @@ defmodule Gallformers.Import.TaxonomyQueueTest do
       assert id == ctx.species.id
     end
 
+    test "a lump closes the questions of the statements it declines", ctx do
+      # A newer paper places the taxon to be lumped elsewhere: an open question.
+      placed =
+        paper("Placement", "2005", [{"t1", ctx.lumped}, {"t2", ctx.other}], [
+          placement("a1", "t1", "t2")
+        ])
+        |> import!()
+
+      open = question!(placed)
+
+      package =
+        paper("Lump", "2010", [{"t1", ctx.lumped}, {"t2", ctx.species}], [
+          act("a1", "synonymy", %{"name" => "t1", "accepted" => "t2"})
+        ])
+        |> import!()
+
+      assert {:ok, _} =
+               Import.decide_queue_item(test_actor(), question!(package), %{"accept" => true})
+
+      assert Taxa.get_taxon(ctx.lumped.id) == nil
+
+      assert %QueueItem{status: :decided, decision: %{"decline" => true, "reason" => reason}} =
+               Repo.get!(QueueItem, open.id)
+
+      assert reason =~ "was merged into"
+    end
+
     test "decisions are logged as taxonomic decisions; replaying them closes the questions",
          ctx do
       item = question!(moves(ctx, "2001", ctx.other))
