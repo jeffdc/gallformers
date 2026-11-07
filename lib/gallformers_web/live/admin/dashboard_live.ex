@@ -45,11 +45,16 @@ defmodule GallformersWeb.Admin.DashboardLive do
      |> load_tray()}
   end
 
-  # The curator's tray changed: Your changes. Changes were recorded (the
-  # tray applied, the import job took a package on): Recent changes.
+  # The curator's tray changed: Your changes. Changes were recorded (a
+  # curator's change committed, the import job took a package on): Recent
+  # changes, read once for a run of them.
   @impl true
   def handle_info({:change_set, _change}, socket), do: {:noreply, load_tray(socket)}
-  def handle_info({:change_log, :changed}, socket), do: {:noreply, load_changes(socket)}
+
+  def handle_info({:change_log, :changed}, socket) do
+    ChangeLog.flush()
+    {:noreply, load_changes(socket)}
+  end
 
   defp load_changes(socket),
     do: assign(socket, changes: Catalog.changes(limit: 60) |> Enum.take(@recent))

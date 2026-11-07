@@ -16,6 +16,8 @@ defmodule GallformersWeb.Admin.ChangesLiveTest do
   import Gallformers.DataCase, only: [audit_test_metadata: 1]
   import GallformersWeb.AdminLiveHelpers
 
+  alias Gallformers.Audit.ChangeLog
+
   setup %{conn: conn} do
     {conn, _user} = log_in_admin(conn, "Rita Reviewer")
     %{conn: conn}
@@ -90,6 +92,26 @@ defmodule GallformersWeb.Admin.ChangesLiveTest do
   test "nothing matching says so", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/admin/changes?q=nothing-like-this")
     assert has_element?(view, "[data-part=title]", "No changes match")
+  end
+
+  test "keeps up: changes recorded show without a refresh, the search and filters kept", ctx do
+    {:ok, view, _html} = live(ctx.conn, ~p"/admin/changes?who=Adam+Kranz&q=oakyi&period=7d")
+    refute has_element?(view, "#changes li", "Adam Kranz")
+
+    curator_change("Adam Kranz", "catalog.update_gall_editorial", 1, [
+      {"galls", "update", %{id: ctx.oaky.id, name: ctx.oaky.name}}
+    ])
+
+    curator_change("Adam Kranz", "catalog.update_name_parts", 1, [
+      {"galls", "update", %{id: ctx.rosy.id, name: ctx.rosy.name}}
+    ])
+
+    ChangeLog.changed()
+
+    assert has_element?(view, "#changes li", "Andricus oakyi")
+    refute has_element?(view, "#changes li", "Diplolepis rosyi")
+    assert has_element?(view, "#changes-q[value=oakyi]")
+    assert has_element?(view, "nav[aria-label=Period] a[aria-current=page]", "7 days")
   end
 
   test "the sidebar has the page", %{conn: conn} do

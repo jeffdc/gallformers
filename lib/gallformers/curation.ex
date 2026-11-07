@@ -59,7 +59,6 @@ defmodule Gallformers.Curation do
   import Ecto.Query, only: [from: 2]
 
   alias Gallformers.Audit.Actor
-  alias Gallformers.Audit.ChangeLog
   alias Gallformers.Catalog
   alias Gallformers.Curation.Applying
   alias Gallformers.Curation.ChangeSet
@@ -461,9 +460,9 @@ defmodule Gallformers.Curation do
     * an item that is blocked, needs a reason or needs confirmation it was
       not given, or fails, stays in the tray (`held`, with the reason).
 
-  Items already waiting for an outcome are left as they are. When anything
-  was applied or submitted, the pages listing the curators' changes hear
-  of it (`Gallformers.Audit.ChangeLog.changed/0`).
+  Items already waiting for an outcome are left as they are. What is
+  applied, the pages listing the curators' changes hear of as it commits
+  (`Gallformers.Audit`).
   """
   @spec apply(Actor.t(), keyword()) :: {:ok, apply_result()}
   def apply(%Actor{type: :user} = actor, opts \\ []) do
@@ -514,7 +513,6 @@ defmodule Gallformers.Curation do
     changed(actor, Enum.map(items, & &1.subject))
 
     with {:ok, package, _refs} <- submission, do: settle_package(package.id)
-    if applied_now != [] or submitted != [], do: ChangeLog.changed()
 
     %{
       applied: Enum.map(applied, & &1.id),
