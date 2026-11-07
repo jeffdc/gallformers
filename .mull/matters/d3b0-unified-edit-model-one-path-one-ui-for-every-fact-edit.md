@@ -47,6 +47,7 @@ Rules:
 2. ~~Corrections~~: settled. The same act as review, under the original Source's authority; with the package model, a correction is a package of that Source through the one ingestion path.
 3. ~~Review decisions that change the tree~~: settled. Under the reviewed Source's authority: they become that Source's statements in its package.
 4. One edit framework, then rebuild the editors onto it.
+5. **After the editor is settled: a full audit of the whole system** for other sub-agent messes (bespoke code, duplicated logic, divergent mechanics) and design-system violations (Jeff, 2026-11-07).
 
 ## Audit of the current code (2026-11-07)
 
