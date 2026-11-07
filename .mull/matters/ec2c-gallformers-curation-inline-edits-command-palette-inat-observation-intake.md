@@ -165,7 +165,7 @@ Built against this contract, with sample data, in `GallformersWeb.CurationCompon
 
 ## Live-use findings (Jeff, 2026-11-06)
 
-Fixed 2026-11-06 (merges `222dcb2e`, `031154d9`, `9d3ec003` and the Gall page merge): 1–13. Open: 14 (merge review). Left over: direct audited edits outside the tray (taxonomy admin saves) don't refresh the dashboard; `/admin/changes` doesn't update live.
+Fixed 2026-11-06 (merges `222dcb2e`, `031154d9`, `9d3ec003` and the Gall page merge): 1–13; 14 merge tried by Jeff and good (2026-11-06). Left over: direct audited edits outside the tray (taxonomy admin saves) don't refresh the dashboard; `/admin/changes` doesn't update live.
 
 1. "Last updated" on a Gall doesn't change after edits are applied.
 2. Applying from the tray should leave Edit mode.
