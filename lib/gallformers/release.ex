@@ -185,11 +185,8 @@ defmodule Gallformers.Release do
   def replay_log(key) when is_binary(key) do
     result =
       with_storage(fn ->
-        with {:ok, count} <- Import.replay_exported(Actor.system("replay"), key),
-             {:ok, report} <-
-               Import.carry_over_exported(Actor.system("taxonomy_carry_over"), key) do
-          {:ok, count, report}
-        end
+        # Replayed Host decisions add plants from WCVP and check WCVP links.
+        with_wcvp(fn -> replay_and_carry_over(key) end)
       end)
 
     case result do
@@ -200,6 +197,14 @@ defmodule Gallformers.Release do
 
       {:error, reason} ->
         raise "Replay stopped: #{inspect(reason)}"
+    end
+  end
+
+  defp replay_and_carry_over(key) do
+    with {:ok, count} <- Import.replay_exported(Actor.system("replay"), key),
+         {:ok, report} <-
+           Import.carry_over_exported(Actor.system("taxonomy_carry_over"), key) do
+      {:ok, count, report}
     end
   end
 
