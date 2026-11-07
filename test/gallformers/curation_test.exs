@@ -17,12 +17,15 @@ defmodule Gallformers.CurationTest do
   alias Gallformers.Accounts
   alias Gallformers.Audit.Actor
   alias Gallformers.Catalog
+  alias Gallformers.Catalog.Gall
   alias Gallformers.Curation
   alias Gallformers.Curation.ChangeSet
   alias Gallformers.Curation.Item
   alias Gallformers.Curation.PackageListener
   alias Gallformers.Curation.Wording
   alias Gallformers.Facts
+  alias Gallformers.Facts.Attribution
+  alias Gallformers.Facts.Fact
   alias Gallformers.Import
   alias Gallformers.Import.Package
   alias Gallformers.Sources
@@ -793,6 +796,73 @@ defmodule Gallformers.CurationTest do
 
       assert [%{about: "synonyms", text: "per Flora of North America"}] =
                Taxa.list_taxon_notes(plant.id)
+    end
+  end
+
+  describe "the Gall's last update" do
+    # Everything about the Gall is made a while ago, so what the apply
+    # writes is what moves the page's date.
+    @long_ago ~U[2020-01-01 00:00:00Z]
+
+    setup ctx do
+      Repo.update_all(Gall, set: [updated_at: @long_ago])
+
+      Repo.update_all(Fact,
+        set: [inserted_at: @long_ago, updated_at: @long_ago]
+      )
+
+      Repo.update_all(Attribution,
+        set: [inserted_at: @long_ago, updated_at: @long_ago]
+      )
+
+      assert last_updated(ctx.gall) == @long_ago
+      :ok
+    end
+
+    defp last_updated(gall) do
+      {:ok, page} = Catalog.gall_page(gall.id)
+      page.updated_at
+    end
+
+    test "an applied Fact item moves it", ctx do
+      new_host!(ctx)
+      {:ok, _} = Curation.set_evidence(ctx.ada, %{text: "On red oak."})
+
+      assert {:ok, %{submitted: [_]}} = Curation.apply(ctx.ada)
+      assert DateTime.compare(last_updated(ctx.gall), @long_ago) == :gt
+    end
+
+    test "an applied withdrawal moves it", ctx do
+      add!(ctx.ada, %{
+        kind: :fact,
+        gall_id: ctx.gall.id,
+        action: :withdraw,
+        key: {:trait, "season", "Spring"}
+      })
+
+      {:ok, _} = Curation.set_evidence(ctx.ada, %{text: "Galls form in summer here."})
+
+      assert {:ok, %{submitted: [_]}} = Curation.apply(ctx.ada)
+      assert DateTime.compare(last_updated(ctx.gall), @long_ago) == :gt
+    end
+
+    test "an applied note moves it", ctx do
+      add!(ctx.ada, %{kind: :note, gall_id: ctx.gall.id, key: {:host, ctx.oak.id}, text: "Young."})
+
+      assert {:ok, %{applied: [_]}} = Curation.apply(ctx.ada)
+      assert DateTime.compare(last_updated(ctx.gall), @long_ago) == :gt
+    end
+
+    test "an applied editorial item moves it", ctx do
+      add!(ctx.ada, %{
+        kind: :editorial,
+        subject: {:gall, ctx.gall.id},
+        field: :abundance,
+        value: 3
+      })
+
+      assert {:ok, %{applied: [_]}} = Curation.apply(ctx.ada)
+      assert DateTime.compare(last_updated(ctx.gall), @long_ago) == :gt
     end
   end
 

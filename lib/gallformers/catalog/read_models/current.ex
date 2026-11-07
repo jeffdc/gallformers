@@ -141,6 +141,23 @@ defmodule Gallformers.Catalog.ReadModels.Current do
   """
   @spec source_ids_attributing(integer()) :: Ecto.Query.t()
   def source_ids_attributing(gall_id) do
+    from(a in Attribution,
+      join: f in Fact,
+      on: f.id == a.fact_id,
+      where: f.standing == :current and a.fact_id in subquery(fact_ids_about(gall_id)),
+      distinct: true,
+      select: a.source_id
+    )
+  end
+
+  @doc """
+  The IDs of the Facts about Gall `gall_id`, of any standing (a query
+  selecting Fact IDs, possibly repeated): every gall Fact kind of the Gall,
+  each Relationship naming it (subject, object, context), and the
+  qualifiers of those Relationships.
+  """
+  @spec fact_ids_about(integer()) :: Ecto.Query.t()
+  def fact_ids_about(gall_id) do
     relationships =
       from(r in RelationshipFact,
         where:
@@ -152,19 +169,10 @@ defmodule Gallformers.Catalog.ReadModels.Current do
     qualifiers =
       from(q in QualifierFact, where: q.of_fact_id in subquery(relationships), select: q.fact_id)
 
-    fact_ids =
-      for schema <- [TraitFact, RangeFact, OccurrenceFact, AliasFact, DescriptionFact],
-          reduce: union_all(relationships, ^qualifiers) do
-        query ->
-          union_all(query, ^from(t in schema, where: t.gall_id == ^gall_id, select: t.fact_id))
-      end
-
-    from(a in Attribution,
-      join: f in Fact,
-      on: f.id == a.fact_id,
-      where: f.standing == :current and a.fact_id in subquery(fact_ids),
-      distinct: true,
-      select: a.source_id
-    )
+    for schema <- [TraitFact, RangeFact, OccurrenceFact, AliasFact, DescriptionFact],
+        reduce: union_all(relationships, ^qualifiers) do
+      query ->
+        union_all(query, ^from(t in schema, where: t.gall_id == ^gall_id, select: t.fact_id))
+    end
   end
 end

@@ -653,6 +653,17 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
                 },
                 %{id: 2, kind: :fact, text: "Add Season: fall", flags: [%{kind: :new, text: "New"}]},
                 %{
+                  id: 4,
+                  kind: :fact,
+                  text: "Add Recorded in: Virginia",
+                  flags: [%{kind: :new, text: "New"}],
+                  evidence: %{
+                    text: "Seen on iNaturalist.",
+                    observations: [%{provider: "inaturalist", id: "123456"}],
+                    source: nil
+                  }
+                },
+                %{
                   id: 3,
                   kind: :editorial,
                   text: "Gallformers code: q-alba-cup",

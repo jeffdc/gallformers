@@ -10,7 +10,9 @@ defmodule GallformersWeb.TrayLive do
   Review and apply opens a dialog (`review_apply`): each item with the back
   end's flags, taken out singly, confirmed where it needs it, applied
   alone or all together; the evidence for the Fact items is asked once
-  (why, observation links, a Source). Discard asks first.
+  (why, observation links, a Source), for those without evidence of their
+  own (shown under each). Applying leaves the page's Edit mode (the
+  `LeaveEdit` hook drops its `?edit`). Discard asks first.
   """
   use GallformersWeb, :live_view
 
@@ -57,7 +59,7 @@ defmodule GallformersWeb.TrayLive do
         evidence = evidence(set && set.evidence)
 
         assign(socket,
-          items: Enum.map(Curation.preview(curator), &item/1),
+          items: items(Curation.preview(curator)),
           evidence: evidence,
           source: source(evidence.source_id)
         )
@@ -67,15 +69,38 @@ defmodule GallformersWeb.TrayLive do
     end
   end
 
-  defp item(entry) do
-    %{
-      id: entry.id,
-      kind: entry.kind,
-      text: "#{entry.subject_name}: #{entry.text}",
-      flags: entry.flags,
-      state: entry.state
-    }
+  # Each item for Review; a Fact item with evidence of its own (Add from
+  # observation's) carries it, its Source by title.
+  defp items(entries) do
+    sources =
+      entries
+      |> Enum.flat_map(&List.wrap(own_evidence(&1)[:source_id]))
+      |> Sources.list_sources_by_id()
+      |> Map.new(&{&1.id, %{id: &1.id, title: &1.title}})
+
+    Enum.map(entries, fn entry ->
+      %{
+        id: entry.id,
+        kind: entry.kind,
+        text: "#{entry.subject_name}: #{entry.text}",
+        flags: entry.flags,
+        state: entry.state,
+        evidence: entry |> own_evidence() |> with_source(sources)
+      }
+    end)
   end
+
+  defp own_evidence(%{kind: :fact, item: %{evidence: %{} = evidence}}), do: evidence
+  defp own_evidence(_entry), do: nil
+
+  defp with_source(nil, _sources), do: nil
+
+  defp with_source(evidence, sources),
+    do: %{
+      text: evidence.text,
+      observations: evidence.observations,
+      source: sources[evidence.source_id]
+    }
 
   defp no_evidence, do: %{text: "", observations: [], source_id: nil}
 
@@ -191,8 +216,14 @@ defmodule GallformersWeb.TrayLive do
     end
   end
 
-  defp applied(socket, %{held: held}) do
-    socket |> assign(held: held) |> refresh()
+  # Something applied (or submitted to apply): the page leaves Edit mode
+  # (the LeaveEdit hook drops its `?edit`).
+  defp applied(socket, %{held: held} = result) do
+    socket = socket |> assign(held: held) |> refresh()
+
+    if result.applied != [] or result.submitted != [],
+      do: push_event(socket, "leave-edit", %{}),
+      else: socket
   end
 
   # Observation links, separated by commas, spaces or new lines: iNaturalist
@@ -229,7 +260,7 @@ defmodule GallformersWeb.TrayLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="tray">
+    <div id="tray" phx-hook="LeaveEdit">
       <.change_tray summary={@summary} />
 
       <.dialog

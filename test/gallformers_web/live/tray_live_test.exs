@@ -45,6 +45,15 @@ defmodule GallformersWeb.TrayLiveTest do
         key: {:host, ctx.oak.id}
       })
 
+  defp abundance!(ctx),
+    do:
+      add!(ctx.actor, %{
+        kind: :editorial,
+        subject: {:gall, ctx.gall.id},
+        field: :abundance,
+        value: 3
+      })
+
   describe "the bar" do
     test "nothing for someone who isn't a curator", %{conn: conn} do
       conn = Plug.Test.init_test_session(conn, %{})
@@ -167,6 +176,83 @@ defmodule GallformersWeb.TrayLiveTest do
       assert Catalog.get_gall!(ctx.gall.id).gallformers_code == "AWEB"
       assert [%{id: id}] = Curation.open_set(ctx.actor).items
       assert id == other.id
+    end
+
+    test "applying a change alone leaves Edit mode", ctx do
+      item = abundance!(ctx)
+      {:ok, view, _html} = tray(ctx.conn)
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      view |> element("#review-item-#{item.id} button[phx-click=apply_item]") |> render_click()
+
+      assert_push_event(view, "leave-edit", %{})
+    end
+
+    test "applying them all leaves Edit mode", ctx do
+      abundance!(ctx)
+      {:ok, view, _html} = tray(ctx.conn)
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      view |> element("#review-dialog button[phx-click=apply_all]") |> render_click()
+
+      assert_push_event(view, "leave-edit", %{})
+    end
+
+    test "nothing applied (every change held) stays in Edit mode", ctx do
+      withdraw_host!(ctx)
+      {:ok, view, _html} = tray(ctx.conn)
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      view |> element("#review-dialog button[phx-click=apply_all]") |> render_click()
+
+      assert has_element?(view, "#review-dialog", "Not applied")
+      refute_push_event(view, "leave-edit", %{})
+    end
+
+    test "a change's own evidence shows under it; the shared evidence is for the others", ctx do
+      item = withdraw_host!(ctx)
+
+      {:ok, _} =
+        Curation.set_item_evidence(ctx.actor, item.id, %{
+          text: "Misidentified on iNaturalist.",
+          observations: [%{provider: "inaturalist", id: "777"}],
+          source_id: ctx.weld.id
+        })
+
+      other =
+        add!(ctx.actor, %{
+          kind: :fact,
+          gall_id: ctx.gall.id,
+          action: :add,
+          key: {:host, plant_fixture(name: "Quercus testis").id}
+        })
+
+      {:ok, view, _html} = tray(ctx.conn)
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      own = "#review-item-#{item.id} [data-part=evidence]"
+      assert has_element?(view, own, "Misidentified on iNaturalist.")
+      assert has_element?(view, "#{own} a[href='https://www.inaturalist.org/observations/777']")
+      assert has_element?(view, "#{own} a[href='/source/#{ctx.weld.id}']", "Weld")
+      refute has_element?(view, "#review-item-#{other.id} [data-part=evidence]")
+
+      assert has_element?(view, "#review-evidence", "without evidence of their own")
+    end
+
+    test "with every Fact change carrying its own evidence, none is asked for the set", ctx do
+      item = withdraw_host!(ctx)
+
+      {:ok, _} =
+        Curation.set_item_evidence(ctx.actor, item.id, %{
+          observations: [%{provider: "inaturalist", id: "777"}]
+        })
+
+      {:ok, view, _html} = tray(ctx.conn)
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      assert has_element?(view, "#review-item-#{item.id} [data-part=evidence]")
+      refute has_element?(view, "#review-evidence")
+      refute has_element?(view, "#review-evidence-source")
     end
 
     test "a Source as evidence: found by its title", ctx do
