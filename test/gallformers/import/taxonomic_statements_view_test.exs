@@ -184,4 +184,41 @@ defmodule Gallformers.Import.TaxonomicStatementsViewTest do
       assert %{placement: nil, name: nil, disagreeing: []} = Import.taxonomic_position(lone.id)
     end
   end
+
+  describe "taxon_splits/1" do
+    setup ctx do
+      species = taxon_fixture(name: "Viewa alba", parent: ctx.genus)
+      a = taxon_fixture(name: "Viewa beta", parent: ctx.genus)
+      b = taxon_fixture(name: "Viewa gamma", parent: ctx.genus)
+      %{species: species, a: a, b: b}
+    end
+
+    defp split!(taxon, into, source) do
+      key = %{taxon_id: taxon.id, into_taxon_ids: Enum.map(into, & &1.id)}
+      {:ok, %{attribution: attribution}} = Taxa.assert_split(test_actor(), key, confirm(source))
+      attribution
+    end
+
+    test "an accepted split, from the split taxon and from each daughter, with its Source",
+         ctx do
+      paper = source_fixture("Revision", "1990")
+      {:ok, _} = Facts.accept(test_actor(), split!(ctx.species, [ctx.a, ctx.b], paper).id)
+
+      assert [split] = Import.taxon_splits(ctx.species.id)
+      assert split.taxon.taxon_id == ctx.species.id
+      assert Enum.map(split.into, & &1.name) |> Enum.sort() == ["Viewa beta", "Viewa gamma"]
+      assert split.source.source_id == paper.id
+      assert split.source.name =~ "Weld"
+
+      assert [from_a] = Import.taxon_splits(ctx.a.id)
+      assert from_a.taxon.name == "Viewa alba"
+    end
+
+    test "a split awaiting a curator is not history (it disagrees)", ctx do
+      split!(ctx.species, [ctx.a, ctx.b], source_fixture("Revision", "1990"))
+
+      assert Import.taxon_splits(ctx.species.id) == []
+      assert [%{kind: :split}] = Import.taxonomic_position(ctx.species.id).disagreeing
+    end
+  end
 end

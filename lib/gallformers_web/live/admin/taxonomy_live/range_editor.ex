@@ -694,9 +694,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditor do
             disabled={is_nil(@wcvp_nomatch_search.selected) || @wcvp_loading}
           >
             <%= if @wcvp_loading do %>
-              <span class="flex items-center gap-2">
-                <.loading_spinner size="sm" label="Loading..." /> Loading...
-              </span>
+              <.loading_spinner size="sm" tone={:current} label="Loading" /> Loading…
             <% else %>
               Continue
             <% end %>

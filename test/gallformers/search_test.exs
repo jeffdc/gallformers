@@ -92,6 +92,25 @@ defmodule Gallformers.SearchTest do
       assert %{parent_type: "intermediate", parent_rank: "Subfamily"} = tribe
     end
 
+    test "an organism at species rank or below: its taxon ID, name, rank and aliases" do
+      wasp = taxon_fixture(name: "Qxandricus searchii", kingdom: "Animalia")
+      {:ok, _} = Taxa.add_synonym(test_actor(), wasp, "Qxcynips searchii")
+      plant_fixture(name: "Qxandricus searchiiplant")
+
+      assert [species] = Search.global_search("searchii").species
+
+      assert %{
+               id: id,
+               name: "Qxandricus searchii",
+               type: "species",
+               rank: "species",
+               aliases: ["Qxcynips searchii"]
+             } = species
+
+      assert id == wasp.id
+      assert Search.global_search("Qxcynips").species |> names() == ["Qxandricus searchii"]
+    end
+
     test "a family has no parent shown above the family pages' ranks" do
       order = taxon_fixture(rank: :order, name: "Qxorderales", kingdom: "Animalia")
       taxon_fixture(rank: :family, name: "Qxfamilidae", kingdom: "Animalia", parent: order)

@@ -28,12 +28,15 @@ defmodule GallformersWeb.GallLive do
 
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
+  alias Gallformers.Taxa.Rank
   alias GallformersWeb.Admin.PlaceDrillDown
   alias GallformersWeb.GallLive.RangeEdit
   alias GallformersWeb.SEO
   alias GallformersWeb.TaxonomyURL
 
   @sources_initial_limit 8
+  # Names italic in the breadcrumb: genus, section and the Inducer itself.
+  @italic_ranks [:genus, :section, :species, :subspecies, :variety, :form]
 
   @detachable_values %{
     "unknown" => "",
@@ -279,13 +282,20 @@ defmodule GallformersWeb.GallLive do
   defp current_count(entries), do: Enum.count(entries, &(&1.standing in [nil, :current]))
 
   # The breadcrumb: the (first) Inducer's lineage, the ranks that have a
-  # page (family … genus), each linked by its encoded name.
+  # page (family … genus), each linked by its encoded name, then the Inducer
+  # itself at species rank or below, linked to its species page.
   defp crumbs([]), do: []
 
   defp crumbs([%{lineage: lineage} | _]) do
-    for taxon <- lineage, path = TaxonomyURL.public_path(taxon), path != nil do
-      %{name: taxon.name, path: path, italic: taxon.rank in [:genus, :section]}
+    for taxon <- lineage, path = crumb_path(taxon), path != nil do
+      %{name: taxon.name, path: path, italic: taxon.rank in @italic_ranks}
     end
+  end
+
+  defp crumb_path(%{rank: rank} = taxon) do
+    if rank in Rank.species_and_below(),
+      do: TaxonomyURL.species_path(taxon.taxon_id),
+      else: TaxonomyURL.public_path(taxon)
   end
 
   # The names table: the Inducer's synonyms, then the Gall's former labels
@@ -648,9 +658,9 @@ defmodule GallformersWeb.GallLive do
           <.edit_scope
             :if={@gall.inducers != []}
             kind={:elsewhere}
-            href={"/admin/taxonomy/#{hd(@gall.inducers).taxon_id}"}
+            href={TaxonomyURL.inducer_path(hd(@gall.inducers), edit: true)}
           >
-            The lineage and the Inducer's synonyms: on the taxonomy of <i>{hd(@gall.inducers).name}</i>.
+            The lineage and the Inducer's synonyms: on the page of <i>{hd(@gall.inducers).name}</i>.
           </.edit_scope>
           <.edit_scope :if={@related_galls != []} kind={:follows}>
             The other generation follows from the Inducer: Galls with the same Inducer.

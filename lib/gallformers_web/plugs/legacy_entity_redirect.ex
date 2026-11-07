@@ -14,6 +14,8 @@ defmodule GallformersWeb.Plugs.LegacyEntityRedirect do
       (`Gallformers.Taxa.taxon_redirect/1`) → the plant it became (matter
       `ec2c`, "Deletes"), so iNaturalist links and outside references keep
       working. The pages follow the same redirects on live navigation.
+    * `/species/:id` of an organism's taxon merged into another (a lump,
+      `Gallformers.Taxa.merge/3`) → the species page of the taxon it became.
 
   A plug, not the LiveViews, so the redirect is permanent (a LiveView's
   redirect is a 302). Every other request passes through.
@@ -31,7 +33,8 @@ defmodule GallformersWeb.Plugs.LegacyEntityRedirect do
 
   def init(opts), do: opts
 
-  def call(%Plug.Conn{path_info: [kind, id_str]} = conn, _opts) when kind in ["gall", "host"] do
+  def call(%Plug.Conn{path_info: [kind, id_str]} = conn, _opts)
+      when kind in ["gall", "host", "species"] do
     case Integer.parse(id_str) do
       {id, ""} when id in 1..@max_id//1 -> kind |> target(id) |> redirect(conn)
       _ when kind == "gall" -> id_str |> Catalog.gall_redirect() |> gall_path() |> redirect(conn)
@@ -55,11 +58,16 @@ defmodule GallformersWeb.Plugs.LegacyEntityRedirect do
     end
   end
 
+  defp target("species", id), do: id |> Taxa.taxon_redirect() |> species_path()
+
   defp gall_path(nil), do: nil
   defp gall_path(id), do: "/gall/#{id}"
 
   defp host_path(nil), do: nil
   defp host_path(id), do: "/host/#{id}"
+
+  defp species_path(nil), do: nil
+  defp species_path(id), do: TaxonomyURL.species_path(id)
 
   defp redirect(nil, conn), do: conn
 

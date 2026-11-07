@@ -334,17 +334,15 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
             <.button variant="ghost" phx-click="clear_selection">Clear</.button>
           </div>
 
-          <.data_table id="taxa-table" rows={@rows} row_id={&"taxon-#{&1.id}"}>
-            <:col :let={row} :if={@mode == :browse} label="">
-              <input
-                type="checkbox"
-                checked={MapSet.member?(@selected, row.id)}
-                phx-click="toggle_select"
-                phx-value-id={row.id}
-                aria-label={"Select #{row.name}"}
-                class="size-4 align-middle"
-              />
-            </:col>
+          <.data_table
+            id="taxa-table"
+            rows={@rows}
+            row_id={&"taxon-#{&1.id}"}
+            selectable={@mode == :browse}
+            selected={@selected}
+            select_event="toggle_select"
+            select_label={&"Select #{&1.name}"}
+          >
             <:col :let={row} label="Name" grow>
               <.link navigate={~p"/admin/taxonomy/#{row.id}"} class="font-semibold">
                 <.taxon_name name={row.name} rank={name_rank(row.rank)} />

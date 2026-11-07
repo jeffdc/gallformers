@@ -195,6 +195,7 @@ defmodule GallformersWeb.Palette do
     groups =
       for {title, key, limit, to_row} <- [
             {"Galls", :galls, 4, &gall_row/1},
+            {"Gallformers", :species, 3, &species_row/1},
             {"Host plants", :hosts, 4, &host_row/1},
             {"Groups", :taxonomy, 4, &group_row/1},
             {"Places", :places, 3, &place_row/1},
@@ -215,6 +216,9 @@ defmodule GallformersWeb.Palette do
 
   defp gall_row(g), do: named("gf-gall", g.name, "/gall/#{g.id}", also(g))
   defp host_row(h), do: named("gf-host", h.name, "/host/#{h.id}", also(h))
+
+  defp species_row(s),
+    do: named("gf-taxon", s.name, TaxonomyURL.species_path(s.id), also(s))
 
   defp group_row(t),
     do: row("gf-taxon", t.name, TaxonomyURL.public_path(t) || "/", t.rank || t.type)

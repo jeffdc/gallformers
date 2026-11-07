@@ -139,6 +139,15 @@ defmodule GallformersWeb.PaletteTest do
       assert "/host/#{plant.id}" in hrefs(group(groups, "Host plants"))
     end
 
+    test "a Gallformer species: its species page" do
+      wasp =
+        Gallformers.TaxaFixtures.taxon_fixture(name: "Andricus palettei", kingdom: "Animalia")
+
+      assert "/species/#{wasp.id}" in hrefs(
+               group(Palette.groups("palettei", admin?: false), "Gallformers")
+             )
+    end
+
     test "a Gall: its page" do
       gall = gall_fixture(%{name: "Andricus paletteus"})
 

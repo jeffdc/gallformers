@@ -79,7 +79,7 @@ defmodule GallformersWeb.DomainComponentsTest do
                ["/host/40#fact-124", "/host/40?edit#fact-124"]
     end
 
-    test "a taxon with no page of its own is found by search; Edit goes to its taxonomy record" do
+    test "an inducer species links to its species page, and to it in Edit mode" do
       html =
         entry(
           change(%{
@@ -90,8 +90,22 @@ defmodule GallformersWeb.DomainComponentsTest do
           })
         )
 
+      assert attr(html, "[data-part=names] a", "href") == ["/species/5", "/species/5?edit"]
+    end
+
+    test "a taxon with no page of its own is found by search; Edit goes to its taxonomy record" do
+      html =
+        entry(
+          change(%{
+            galls: [],
+            facts: [],
+            counts: %{},
+            names: [%{id: 6, name: "Hymenoptera", rank: "order", kingdom: "Animalia"}]
+          })
+        )
+
       assert attr(html, "[data-part=names] a", "href") ==
-               ["/globalsearch?q=Andricus+kingi", "/admin/taxonomy/5"]
+               ["/globalsearch?q=Hymenoptera", "/admin/taxonomy/6"]
     end
 
     test "the taxa an edit touched, each with View and Edit" do

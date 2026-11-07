@@ -87,6 +87,19 @@ defmodule GallformersWeb.GallLiveTest do
       assert has_element?(view, "h1", "Andricus seedii")
     end
 
+    test "the breadcrumb ends with the Inducer, linked to its species page", %{conn: conn} do
+      {:ok, inducer} = Gallformers.Taxa.resolve_name("Andricus seedii", rank: :species)
+      {:ok, view, _html} = live(conn, ~p"/gall/300")
+
+      assert has_element?(view, "header nav a[href='/species/#{inducer.id}']", "Andricus seedii")
+    end
+
+    test "an undescribed Gall's genus Inducer adds no species crumb", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/gall/304")
+
+      refute has_element?(view, "header nav a[href^='/species/']")
+    end
+
     test "shows Traits and abundance", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")
 

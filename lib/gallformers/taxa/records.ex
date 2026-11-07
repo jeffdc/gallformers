@@ -212,6 +212,59 @@ defmodule Gallformers.Taxa.Records do
   def redirect(id) when is_integer(id),
     do: Repo.one(from(r in TaxonRedirect, where: r.from_taxon_id == ^id, select: r.taxon_id))
 
+  @doc """
+  The taxa merged into `taxon_id` (lumps: the redirects pointing at it,
+  merges into a taxon since merged into it included), by when: each
+  `%{taxon_id, name, at}`, its `name` the accepted name it had, read from
+  the audit trail (its accepted name's row moved onto the survivor, or
+  deleted as one the survivor held already), nil when the trail holds none.
+  """
+  @spec merged_into(integer()) :: [
+          %{taxon_id: integer(), name: String.t() | nil, at: DateTime.t()}
+        ]
+  def merged_into(taxon_id) when is_integer(taxon_id) do
+    redirects =
+      Repo.all(
+        from(r in TaxonRedirect,
+          where: r.taxon_id == ^taxon_id,
+          order_by: [r.inserted_at, r.from_taxon_id]
+        )
+      )
+
+    names = redirects |> Enum.map(& &1.from_taxon_id) |> merged_names()
+
+    for r <- redirects,
+        do: %{taxon_id: r.from_taxon_id, name: names[r.from_taxon_id], at: r.inserted_at}
+  end
+
+  # The last accepted name each merged-away taxon had, from the audit trail
+  # (`Gallformers.Audit.Migration`: updates keep the values they replaced).
+  defp merged_names([]), do: %{}
+
+  defp merged_names(taxon_ids) do
+    %{rows: rows} =
+      Repo.query!(
+        """
+        SELECT DISTINCT ON (named.taxon_id) named.taxon_id, named.name
+        FROM (
+          SELECT c.id,
+                 (coalesce(c.changed_from->>'taxon_id', c.data->>'taxon_id'))::bigint AS taxon_id,
+                 c.data->>'name' AS name
+          FROM carbonite_default.changes c
+          WHERE c.table_prefix = 'public' AND c.table_name = 'taxon_names'
+            AND ((c.op = 'update' AND c.changed_from ? 'taxon_id'
+                  AND coalesce(c.changed_from->>'status', c.data->>'status') = 'accepted')
+              OR (c.op = 'delete' AND c.data->>'status' = 'accepted'))
+        ) named
+        WHERE named.taxon_id = ANY($1)
+        ORDER BY named.taxon_id, named.id DESC
+        """,
+        [taxon_ids]
+      )
+
+    Map.new(rows, fn [id, name] -> {id, name} end)
+  end
+
   defp name(nil), do: "the root"
 
   defp name(taxon_id) do

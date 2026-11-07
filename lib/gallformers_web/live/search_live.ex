@@ -202,6 +202,7 @@ defmodule GallformersWeb.SearchLive do
   defp flatten_results(grouped) do
     galls = Enum.map(grouped.galls, &Map.put(&1, :category, "Gall"))
     hosts = Enum.map(grouped.hosts, &Map.put(&1, :category, "Host"))
+    species = Enum.map(grouped.species, &Map.put(&1, :category, "Gallformer"))
     glossary = Enum.map(grouped.glossary, &Map.put(&1, :category, "Glossary"))
     sources = Enum.map(grouped.sources, &Map.put(&1, :category, "Source"))
 
@@ -221,7 +222,7 @@ defmodule GallformersWeb.SearchLive do
 
     places = Enum.map(grouped.places, &Map.put(&1, :category, "Place"))
 
-    galls ++ hosts ++ glossary ++ sources ++ taxonomy ++ places
+    galls ++ species ++ hosts ++ glossary ++ sources ++ taxonomy ++ places
   end
 
   defp sorted_results(results, sort_by, sort_dir) do
@@ -266,7 +267,7 @@ defmodule GallformersWeb.SearchLive do
     do: Enum.filter(results, &(&1.category == type))
 
   # The result types present, in the page's order, each with its count.
-  @type_order ~w(Gall Host Family Subfamily Tribe Subtribe Genus Section Source Glossary Place)
+  @type_order ~w(Gall Gallformer Host Family Subfamily Tribe Subtribe Genus Section Source Glossary Place)
   defp type_counts(results) do
     counts = Enum.frequencies_by(results, & &1.category)
 
@@ -283,7 +284,9 @@ defmodule GallformersWeb.SearchLive do
     by_type = Enum.group_by(page_results, & &1.type, & &1.id)
     gall_ids = Map.get(by_type, "gall", [])
     host_ids = Map.get(by_type, "host", [])
-    taxon_ids = Enum.flat_map(~w(genus family intermediate section), &Map.get(by_type, &1, []))
+
+    taxon_ids =
+      Enum.flat_map(~w(species genus family intermediate section), &Map.get(by_type, &1, []))
 
     %{
       galls: Catalog.gall_search_details(gall_ids),
@@ -319,6 +322,7 @@ defmodule GallformersWeb.SearchLive do
   @type_icons %{
     "gall" => "gf-gall",
     "host" => "gf-host",
+    "species" => "gf-taxon",
     "glossary" => "gf-entry",
     "source" => "gf-source",
     "genus" => "gf-taxon",
@@ -330,6 +334,7 @@ defmodule GallformersWeb.SearchLive do
 
   defp result_link(%{type: "glossary", name: name}), do: ~p"/glossary##{String.downcase(name)}"
   defp result_link(%{type: "place", code: code}), do: "/place/#{code}"
+  defp result_link(%{type: "species", id: id}), do: TaxonomyURL.species_path(id)
 
   defp result_link(%{type: type} = result)
        when type in ~w(genus family intermediate section) do
@@ -364,6 +369,9 @@ defmodule GallformersWeb.SearchLive do
   # A plant's common names are already among its other names, in brackets.
   defp detail_line(%{type: "host", id: id}, details),
     do: galls_text(Map.get(details.galls_on, id, 0))
+
+  defp detail_line(%{type: "species", id: id}, details),
+    do: galls_text(Map.get(details.induced, id, 0))
 
   defp detail_line(%{type: type, id: id} = result, details)
        when type in ~w(genus family intermediate section) do

@@ -75,6 +75,14 @@ defmodule GallformersWeb.API.SearchControllerTest do
       assert Map.has_key?(response, "places") == true
     end
 
+    test "keeps its categories: the species page's results are not in the API", %{conn: conn} do
+      response = conn |> get(~p"/api/v2/search?q=seedii") |> json_response(200)
+      refute Map.has_key?(response, "species")
+
+      response = build_conn() |> get(~p"/api/v2/search") |> json_response(200)
+      refute Map.has_key?(response, "species")
+    end
+
     test "returns empty results for empty query", %{conn: conn} do
       conn = get(conn, ~p"/api/v2/search?q=")
 

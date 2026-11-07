@@ -348,6 +348,32 @@ defmodule GallformersWeb.Admin.TaxonomyLive.RangeEditorTest do
       refute html =~ "No exact match found"
     end
 
+    test "while the chosen record loads, Continue shows the button's own spinner", %{conn: conn} do
+      plant = alpinus()
+      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/#{plant.id}")
+
+      render_click(view, "refresh_from_wcvp", %{})
+      render_async(view)
+      render_keyup(view, "wcvp_nomatch_search", %{"value" => "Zzyzx"})
+      render_async(view)
+      render_click(view, "select_wcvp_nomatch", %{"id" => "500"})
+
+      # Continue starts loading the record: the page shows it until it arrives.
+      html = render_click(view, "continue_wcvp_search", %{})
+
+      [button] =
+        html
+        |> LazyHTML.from_document()
+        |> LazyHTML.query("#wcvp-nomatch-modal button[disabled]")
+        |> Enum.filter(&(LazyHTML.query(&1, "svg[role=status]") |> Enum.any?()))
+
+      # The spinner takes the button's text colour (`loading_spinner tone={:current}`),
+      # sitting straight in the button beside its words.
+      refute LazyHTML.attribute(LazyHTML.query(button, "svg"), "class") |> hd() =~ "text-brand"
+      assert LazyHTML.query(button, "span.flex") |> Enum.to_list() == []
+      assert LazyHTML.text(button) =~ "Loading"
+    end
+
     test "the no-match search finds a record and continues to the diff", %{conn: conn} do
       plant = alpinus()
       {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/#{plant.id}")

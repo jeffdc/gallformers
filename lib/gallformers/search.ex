@@ -48,6 +48,9 @@ defmodule Gallformers.Search do
       Facts, the Inducer's names;
     * `hosts` — plants (Plantae at species rank or below) from
       `Gallformers.Taxa.search/2`: accepted names, synonyms, common names;
+    * `species` — organisms at species rank or below, not plants, from
+      `Gallformers.Taxa.search/2` (the species pages): accepted names,
+      synonyms, common names;
     * `taxonomy` — taxa at the ranks with a public page (family, subfamily,
       tribe, subtribe, genus, section) from `Gallformers.Taxa.search/2`,
       with their parent when it too has a page;
@@ -74,6 +77,7 @@ defmodule Gallformers.Search do
     %{
       galls: galls(query, place_ids) |> Ranking.add_scores_and_sort(search_terms),
       hosts: hosts(query, place_ids) |> Ranking.add_scores_and_sort(search_terms),
+      species: species(query) |> Ranking.add_scores_and_sort(search_terms),
       glossary: search_glossary(query) |> Ranking.add_scores_and_sort(search_terms),
       sources: search_sources(query) |> Ranking.add_scores_and_sort(search_terms),
       taxonomy: taxonomy(query) |> Ranking.add_scores_and_sort(search_terms),
@@ -100,6 +104,21 @@ defmodule Gallformers.Search do
     |> Enum.map(
       &%{id: &1.id, name: &1.name, type: "host", genus_placeholder: false, aliases: &1.aliases}
     )
+  end
+
+  # Organisms at species rank or below that are not plants (a taxon with no
+  # kingdom recorded is none): the species pages.
+  defp species(query) do
+    for taxon <- Taxa.search(query, ranks: Rank.species_and_below()),
+        taxon.kingdom != "Plantae" do
+      %{
+        id: taxon.id,
+        name: taxon.name,
+        type: "species",
+        rank: Atom.to_string(taxon.rank),
+        aliases: taxon.aliases
+      }
+    end
   end
 
   # The plants with a `host_range` row at one of `place_ids` (all of them for nil).
@@ -162,6 +181,7 @@ defmodule Gallformers.Search do
     %{
       galls: [],
       hosts: [],
+      species: [],
       glossary: [],
       sources: [],
       taxonomy: [],

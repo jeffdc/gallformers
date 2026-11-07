@@ -592,6 +592,48 @@ defmodule Gallformers.Import.FactsView do
     }
   end
 
+  @doc """
+  The splits in effect that taxon `taxon_id` is part of (its split and
+  lump history, matter `803b`, "The species page"): each current split Fact
+  dividing it, or dividing a taxon into it and others, as `%{fact_id,
+  taxon, into, source}` (`taxon` the taxon divided and `into` its
+  daughters, each `%{taxon_id, name, rank}`; `source` the Source deciding
+  the split, `%{source_id, name}`), the newest first. A split awaiting a
+  curator, or declined, is not in effect: it is among the papers that
+  disagree (`position/1`).
+  """
+  @spec splits(integer()) :: [map()]
+  def splits(taxon_id) when is_integer(taxon_id) do
+    splits =
+      Repo.all(
+        from(s in SplitFact,
+          join: f in Fact,
+          on: f.id == s.fact_id,
+          where:
+            f.standing == :current and
+              (s.taxon_id == ^taxon_id or ^taxon_id in s.into_taxon_ids),
+          order_by: [desc: f.id]
+        )
+      )
+
+    attributions = splits |> Enum.map(& &1.fact_id) |> Facts.list_attributions_for_facts()
+    own = Sources.own_source_ids()
+    sources = attributions |> Map.values() |> List.flatten() |> source_names()
+    taxa = splits |> Enum.flat_map(&act_taxa/1) |> Enum.uniq() |> taxon_names()
+
+    for split <- splits do
+      fact = %Fact{id: split.fact_id, kind: SplitFact.kind()}
+      by = deciding(fact, attributions[split.fact_id] || [], own)
+
+      %{
+        fact_id: split.fact_id,
+        taxon: taxon(taxa, split.taxon_id),
+        into: Enum.map(split.into_taxon_ids, &taxon(taxa, &1)),
+        source: by && %{source_id: by.source_id, name: sources[by.source_id]}
+      }
+    end
+  end
+
   # The current Fact of `kind` among the taxon's, with the Source deciding it.
   defp current_position(ctx, kind) do
     Enum.find_value(ctx.facts, fn fact ->
