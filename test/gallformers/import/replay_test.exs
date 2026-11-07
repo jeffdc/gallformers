@@ -110,10 +110,15 @@ defmodule Gallformers.Import.ReplayTest do
     {:ok, revision} = Import.approve_package(test_actor(), revision)
     assert revision.status == :approved
 
-    [disagreement] = Import.list_queue_items(revision, kind: :taxonomy_disagreement)
+    # The synonymy is a taxonomy question (`f923` Task 6), declined: the
+    # decline is replayed, and closes the question the replayed import asks.
+    [question] = Import.list_queue_items(revision, kind: :taxonomy_acceptance)
 
     {:ok, _} =
-      Import.decide_queue_item(test_actor(), disagreement, %{"note" => "left for phase 2"})
+      Import.decide_queue_item(test_actor(), question, %{
+        "decline" => true,
+        "reason" => "Not followed yet."
+      })
 
     # A curator applies part of the revision editorially.
     {:ok, _} =
@@ -263,7 +268,7 @@ defmodule Gallformers.Import.ReplayTest do
   defp attribution_entry(a) do
     {Sources.get_source!(a.source_id).title, a.stance, a.stated_on, a.stated_precision,
      a.value_as_written, a.statement_text, a.when_as_written, a.stage_as_written,
-     a.status_as_written, a.authorship_as_written,
+     a.status_as_written, a.authorship_as_written, a.accepted_at != nil, a.decline_reason,
      a.batch_id && Repo.get!(Batch, a.batch_id).producer_batch_id,
      Enum.sort(
        for e <- a.evidence do
@@ -332,7 +337,7 @@ defmodule Gallformers.Import.ReplayTest do
              :synonym_added,
              :batch_applied,
              :batch_applied,
-             :queue_decision,
+             :taxonomic_decision,
              :taxonomy_edit,
              :queue_decision,
              :batch_applied,

@@ -279,7 +279,7 @@ defmodule Gallformers.Import.TaxonomyCarryOverTest do
       {:ok, _} = Import.approve_package(test_actor(), package)
 
       assert [%QueueItem{statement_ref: "a1"}] =
-               Import.list_queue_items(package, kind: :taxonomy_disagreement)
+               Import.list_queue_items(package, kind: :taxonomy_acceptance)
 
       # Not followed yet: nothing is accepted.
       assert {:ok, %{accepted: 0}} = TaxonomyCarryOver.run(test_actor(), [])
@@ -290,6 +290,11 @@ defmodule Gallformers.Import.TaxonomyCarryOverTest do
 
       assert {:ok, %{accepted: 1, followed: 1}} = TaxonomyCarryOver.run(test_actor(), [])
       assert differences([ctx.andricus]) == []
+
+      # Its question is closed with the acceptance.
+      assert [%QueueItem{status: :decided}] =
+               Import.list_queue_items(package, kind: :taxonomy_acceptance, status: :decided)
+
       assert Taxa.get_taxon!(ctx.andricus.id).parent_id == target.id
     end
   end

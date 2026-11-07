@@ -16,7 +16,10 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
   holds but no batch declares (`Gallformers.Import.UnusedNames.for_package/1`,
   read after the page loads), for a curator to scan for a taxon the
   producer left out. The head links to the Source in Gallformers
-  (`/admin/sources/:id`) once there is one.
+  (`/admin/sources/:id`) once there is one. While any of the Source's
+  taxonomic statements awaits a curator in the taxonomy queue (matter
+  `f923` Task 6; they come after approval and hold none), it says how many
+  and links to them (`/admin/review/taxonomy?source=<id>`).
 
   The Gallformers Source's page (`6611` Task 7, screen 4 of the design)
   shows its notes instead, built for scanning
@@ -286,7 +289,15 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
     )
   end
 
-  defp load_questions(socket), do: socket |> SourcePage.load() |> assign(notes?: false)
+  defp load_questions(socket) do
+    socket = socket |> SourcePage.load() |> assign(notes?: false)
+    id = source_id(socket.assigns.mode, socket.assigns.packages)
+
+    assign(socket,
+      taxonomy_source_id: id,
+      taxonomy_open: if(id, do: Import.count_taxonomy_questions(id), else: 0)
+    )
+  end
 
   # -- what the page shows -------------------------------------------------------
 
@@ -523,6 +534,15 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
         next={@next}
         status={SourcePage.approval_text(@approval)}
       />
+
+      <.notice :if={@taxonomy_open > 0} id="taxonomy-questions-open" kind={:info} class="mt-4">
+        {@taxonomy_open} taxonomy {if @taxonomy_open == 1, do: "question", else: "questions"} open: this Source's taxonomic statements, newer than what the tree follows, to accept or decline. They don't hold approval.
+        <:action>
+          <.link navigate={~p"/admin/review/taxonomy?#{[source: @taxonomy_source_id]}"}>
+            Open them
+          </.link>
+        </:action>
+      </.notice>
 
       <.section
         id="unused-names"

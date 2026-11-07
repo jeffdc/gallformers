@@ -121,6 +121,18 @@ defmodule Gallformers.Facts.Standing do
   @spec undated_period() :: period()
   def undated_period, do: {@before_every_date, @before_every_date}
 
+  @doc """
+  Whether statement `a` is newer than statement `b` (rule 3): `a`'s whole
+  period comes after `b`'s. An undated statement is older than every dated
+  one, and undated ones tie (`undated_period/0`).
+  """
+  @spec newer?(statement(), statement()) :: boolean()
+  def newer?(a, b) do
+    {first, _last} = period(a)
+    {_first, last} = period(b)
+    first > last
+  end
+
   defp own_standing(%{attributions: []}), do: {:unsupported, []}
 
   defp own_standing(%{id: id, previous: previous, attributions: attributions}) do

@@ -19,7 +19,10 @@ defmodule Gallformers.Import.TaxonomyCarryOver do
       batch declares by that name).
     * **Acts a curator followed**: a taxonomic act that differed from the
       tree when its batch was applied (a `:taxonomy_disagreement` question
-      on an act), which phase 1 left to a curator to apply editorially.
+      on an act, or the `:taxonomy_acceptance` question the same import
+      raises when the cutover replays it under phase 2), which phase 1
+      left to a curator to apply editorially. Accepting it closes its
+      question.
 
   Of those, each statement the tree now holds (a placement under the
   taxon's parent; a name, rank and sensu the taxon has, its authorship
@@ -279,7 +282,8 @@ defmodule Gallformers.Import.TaxonomyCarryOver do
       join: s in BatchStatement,
       on: s.batch_id == b.id and s.kind == :act and s.ref == q.statement_ref,
       where:
-        q.kind == :taxonomy_disagreement and like(q.statement_ref, "a%") and
+        q.kind in [:taxonomy_disagreement, :taxonomy_acceptance] and
+          like(q.statement_ref, "a%") and
           b.status == :applied and not is_nil(p.source_id) and not is_nil(s.fact_id),
       select: {s.fact_id, p.source_id},
       distinct: true

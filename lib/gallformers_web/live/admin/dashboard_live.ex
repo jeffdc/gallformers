@@ -1,8 +1,9 @@
 defmodule GallformersWeb.Admin.DashboardLive do
   @moduledoc """
   The admin dashboard (design system, matter bc0d): the Sources to review
-  first (the review index's rows, `ReviewLive.Loader`, with the Gall rename
-  proposals and the questions merges left), then Your changes (the
+  first (the review index's rows, `ReviewLive.Loader`, with the taxonomy
+  questions, the Gall rename proposals and the questions merges left), then
+  Your changes (the
   curator's tray, `Gallformers.Curation`, kept up to date), then the
   curators' recent changes (`Gallformers.Catalog.changes/1`, the same
   `change_entry` as the Changes page, kept up to date through
@@ -35,7 +36,8 @@ defmodule GallformersWeb.Admin.DashboardLive do
        page_title: "Dashboard",
        current_user: session["current_user"],
        waiting:
-         List.wrap(Loader.renames_row()) ++
+         List.wrap(Loader.taxonomy_row()) ++
+           List.wrap(Loader.renames_row()) ++
            List.wrap(Loader.merge_conflicts_row()) ++
            Enum.sort_by(Loader.sources(), & &1.to_decide, :desc)
      )

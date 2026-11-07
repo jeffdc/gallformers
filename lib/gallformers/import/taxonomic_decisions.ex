@@ -17,6 +17,16 @@ defmodule Gallformers.Import.TaxonomicDecisions do
   holds its `"reason"`. Replay finds the statement by the same references
   and makes the decision again, unless the statement is in that state
   already.
+
+  ## The taxonomy queue
+
+  Each decision settles the statement's questions in the taxonomy queue
+  (`Gallformers.Import.TaxonomyQueue.settle/4`) before it is made, in the
+  same transaction: its own question closes (so it doesn't block a lump
+  its acceptance brings about), and an acceptance closes older papers'
+  questions on the same slot as history. A reopened statement is asked
+  again. Replaying a decision settles them the same way, so the questions
+  an import raises again after the cutover close as they did.
   """
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
@@ -24,6 +34,7 @@ defmodule Gallformers.Import.TaxonomicDecisions do
   alias Gallformers.Facts.Attribution
   alias Gallformers.Import.ReplayLog
   alias Gallformers.Import.StableRef
+  alias Gallformers.Import.TaxonomyQueue
   alias Gallformers.Repo
   alias Gallformers.Taxa
 
@@ -49,9 +60,11 @@ defmodule Gallformers.Import.TaxonomicDecisions do
     Audit.transaction(actor, "import.taxonomic_decision", fn ->
       with %Attribution{} = attribution <- Facts.get_attribution(attribution_id),
            {:ok, key} <- replay_key(op, attribution),
+           :ok <- TaxonomyQueue.settle(actor, op, attribution, reason),
            {:ok, result} <- apply_op(actor, op, attribution_id, reason) do
         payload = if op == :decline, do: %{"reason" => String.trim(reason)}, else: %{}
         ReplayLog.append!(:taxonomic_decision, key, payload)
+        :ok = TaxonomyQueue.asked_again(op, attribution_id)
         result
       else
         nil -> Repo.rollback(:not_found)
@@ -179,13 +192,23 @@ defmodule Gallformers.Import.TaxonomicDecisions do
          {:ok, kind} <- Map.fetch(@kinds, kind) |> or_error({:unknown_kind, kind}),
          {:ok, attribution} <- find(kind, key) do
       if done?(op, attribution, payload["reason"]) do
-        :ok
+        settle_only(actor, op, attribution, payload["reason"])
       else
         case decide(actor, op, attribution.id, payload["reason"]) do
           {:ok, _result} -> :ok
           {:error, reason} -> {:error, reason}
         end
       end
+    end
+  end
+
+  # A decision made already: its questions are settled all the same.
+  defp settle_only(actor, op, attribution, reason) do
+    case Audit.transaction(actor, "import.taxonomic_decision", fn ->
+           TaxonomyQueue.settle(actor, op, attribution, reason)
+         end) do
+      {:ok, :ok} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 

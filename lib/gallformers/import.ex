@@ -183,6 +183,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.TaxonomyAdmin
   alias Gallformers.Import.TaxonomyCarryOver
   alias Gallformers.Import.TaxonomyEdits
+  alias Gallformers.Import.TaxonomyQueue
   alias Gallformers.Import.TaxonomyStatements
   alias Gallformers.Import.TermCandidate
   alias Gallformers.Import.TermCandidates
@@ -1075,7 +1076,14 @@ defmodule Gallformers.Import do
   not fit the item.
   """
   @spec decide_queue_item(Actor.t(), QueueItem.t(), map()) ::
-          {:ok, QueueItem.t()} | {:error, :already_decided | :gone | Changeset.t()}
+          {:ok, QueueItem.t()} | {:error, :already_decided | :gone | Changeset.t() | term()}
+  def decide_queue_item(
+        %Actor{} = actor,
+        %QueueItem{kind: :taxonomy_acceptance} = item,
+        decision
+      ),
+      do: decide_taxonomy_question(actor, item, decision)
+
   def decide_queue_item(%Actor{} = actor, %QueueItem{} = item, decision) do
     files = decision_files(item.package_id, [item])
 
@@ -3165,6 +3173,58 @@ defmodule Gallformers.Import do
           {:ok, Gallformers.Facts.attribute_result()} | {:error, term()}
   def reopen_taxonomic_statement(%Actor{} = actor, attribution_id),
     do: TaxonomicDecisions.decide(actor, :reopen, attribution_id)
+
+  # -- the taxonomy queue (matter `f923` Task 6) ----------------------------------
+
+  # A taxonomy question is decided as its statement: accepted or declined
+  # through `TaxonomicDecisions` (which closes the question and logs the
+  # decision for replay), never resolving its package again.
+  defp decide_taxonomy_question(actor, item, decision),
+    do: TaxonomyQueue.decide(actor, item, decision)
+
+  @doc """
+  The taxonomy questions (`Gallformers.Import.TaxonomyQueue`): Sources'
+  taxonomic statements that differ from the tree, newer than what it
+  follows, for a curator to accept or decline, across Sources; oldest
+  first. Options: `:status` (default `:open`; `:all`), `:source_id`.
+  """
+  @spec list_taxonomy_questions(keyword()) :: [QueueItem.t()]
+  def list_taxonomy_questions(opts \\ []), do: TaxonomyQueue.list(opts)
+
+  @doc "How many taxonomy questions are open: every Source's, or `source_id`'s."
+  @spec count_taxonomy_questions(integer() | nil) :: non_neg_integer()
+  def count_taxonomy_questions(source_id \\ nil), do: TaxonomyQueue.count(source_id)
+
+  @doc """
+  What accepting every open taxonomy question of Source `source_id` would
+  do to the tree (`t:Gallformers.Import.TaxonomyQueue.preview/0`): the
+  acceptances made in a transaction always rolled back.
+  """
+  @spec preview_accept_rest(integer(), Actor.t()) ::
+          {:ok, TaxonomyQueue.preview()} | {:error, term()}
+  def preview_accept_rest(source_id, %Actor{} = actor \\ Actor.system("taxonomy preview")),
+    do: TaxonomyQueue.preview_rest(source_id, actor)
+
+  @doc """
+  Accepts every open taxonomy question of Source `source_id` ("Accept the
+  rest of this paper"), all or none; its declined statements stay
+  declined. Each acceptance is logged for replay.
+  `{:error, {item_id, reason}}` when the tree refuses one.
+  """
+  @spec accept_rest(Actor.t(), integer()) ::
+          {:ok, %{accepted: [QueueItem.t()]}} | {:error, term()}
+  def accept_rest(%Actor{} = actor, source_id), do: TaxonomyQueue.accept_rest(actor, source_id)
+
+  @doc """
+  How the tree differs now from the statement a taxonomy question asks
+  about, in words; nil when it agrees now.
+  """
+  @spec taxonomy_tree_now(QueueItem.t()) :: String.t() | nil
+  defdelegate taxonomy_tree_now(item), to: TaxonomyQueue, as: :tree_now
+
+  @doc "Why a taxonomic decision was refused (the tree's reason, most often), in words."
+  @spec taxonomy_refusal(term()) :: String.t()
+  defdelegate taxonomy_refusal(reason), to: TaxonomyQueue, as: :refusal_text
 
   @doc ~S|The PubSub topic deletes and merges are broadcast on: `"catalog:records"`.|
   @spec records_topic() :: String.t()

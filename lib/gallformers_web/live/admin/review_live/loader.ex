@@ -19,6 +19,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
       list.
     * `merge_conflicts/1` and `merge_conflicts_row/0` — the questions merges
       leave (same-date ties, of no package; matter `ec2c`), and their row.
+    * `taxonomy/1` and `taxonomy_row/0` — the taxonomy questions (matter
+      `f923` Task 6: Sources' taxonomic statements to accept or decline,
+      across Sources), by Source, and their row. They are not among a
+      Source's own questions (its steps, its overview, its row): they come
+      after approval and hold none.
     * `entries/3` — each item of a page as the curator reads it
       (`GallformersWeb.Admin.Review.Questions.present/2`), with the quotes
       it rests on. On a step's page (`step:`), the step's open questions
@@ -101,7 +106,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
 
     open =
       Import.list_open_queue_items().entries
-      |> Enum.filter(& &1.package_id)
+      |> Enum.filter(&(&1.package_id && not taxonomy_question?(&1)))
       |> Enum.group_by(& &1.package_id)
 
     sources = packages |> Enum.map(& &1.source_id) |> source_map()
@@ -314,6 +319,93 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
     end
   end
 
+  # -- the taxonomy questions (matter `f923` Task 6) ---------------------------------
+
+  @doc """
+  The taxonomy questions (`Gallformers.Import.list_taxonomy_questions/1`)
+  by Source, the newest Source first: `%{source_id, source, summary, name,
+  entries, open}`, `name` the Source's short name (else its title) and
+  `entries` its questions as `t:entry/0`s, oldest first, each open one
+  reading what the tree holds now (`subject["now"]`). Options: `:status`
+  (default `:open`; `:all`), `:source_id`.
+  """
+  @spec taxonomy(keyword()) :: [map()]
+  def taxonomy(opts \\ []) do
+    items = Import.list_taxonomy_questions(opts)
+    sources = items |> Enum.map(& &1.subject["source_id"]) |> source_map()
+
+    batches =
+      items
+      |> Enum.map(& &1.batch_id)
+      |> Enum.filter(&is_integer/1)
+      |> Enum.uniq()
+      |> Enum.map(&Import.get_batch!/1)
+
+    items
+    |> Enum.group_by(& &1.subject["source_id"])
+    |> Enum.map(fn {source_id, items} ->
+      source = sources[source_id]
+      summary = source && source_summary(source)
+      name = summary && (summary.who || summary.title)
+      items = Enum.map(items, &with_tree_now/1)
+      entries = entries([%{items: items, batches: batches, statements: %{}}], name)
+
+      %{
+        source_id: source_id,
+        source: source,
+        summary: summary,
+        name: name || "A Source",
+        entries: entries,
+        open: Enum.count(entries, &(&1.item.status == :open))
+      }
+    end)
+    |> Enum.sort_by(&{-((&1.summary && &1.summary.year) || 0), &1.name})
+  end
+
+  # An open question reads what the tree holds now, not when it was asked.
+  defp with_tree_now(%QueueItem{status: :open} = item) do
+    now = Import.taxonomy_tree_now(item) || "the tree follows it already"
+    %{item | subject: Map.put(item.subject, "now", now)}
+  end
+
+  defp with_tree_now(item), do: item
+
+  @doc """
+  The Sources list's row for the open taxonomy questions (shaped as
+  `sources/0`'s rows), or nil when none is open.
+  """
+  @spec taxonomy_row() :: map() | nil
+  def taxonomy_row do
+    case Import.count_taxonomy_questions() do
+      0 ->
+        nil
+
+      n ->
+        %{
+          id: "taxonomy-questions",
+          source_id: nil,
+          path: "/admin/review/taxonomy",
+          title: "Taxonomy questions",
+          citation:
+            "Newer papers' placements, names and synonymies, to accept or decline. " <>
+              "They come after a Source's approval and hold none.",
+          kind: nil,
+          year: nil,
+          notes: false,
+          packages: 0,
+          to_decide: n,
+          set_aside: 0,
+          proposed: 0,
+          holding: [],
+          ready: false,
+          status: "Awaiting a decision"
+        }
+    end
+  end
+
+  defp taxonomy_question?(%QueueItem{kind: :taxonomy_acceptance}), do: true
+  defp taxonomy_question?(_item), do: false
+
   # -- one Source's page ----------------------------------------------------------
 
   @doc """
@@ -524,7 +616,10 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
     %{
       package: package,
       batches: batches,
-      items: Import.list_queue_items(package, status: :all),
+      items:
+        package
+        |> Import.list_queue_items(status: :all)
+        |> Enum.reject(&taxonomy_question?/1),
       statements:
         Map.new(batches, fn b -> {b.id, Map.new(Import.list_statements(b), &{&1.ref, &1})} end)
     }
@@ -1156,6 +1251,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   defp picked_text(%{"value" => v}, _names), do: "Changed to #{v}"
   defp picked_text(%{"state" => _}, _names), do: "Stated"
   defp picked_text(%{"skip" => true}, _names), do: "Left out of the import"
+  defp picked_text(%{"decline" => true, "reason" => r}, _names), do: "Declined: #{r}"
+
+  defp picked_text(%{"history" => true}, _names),
+    do: "Closed as history: a newer statement was accepted"
+
   defp picked_text(choice, _names) when map_size(choice) == 0, do: "Acknowledged"
   defp picked_text(_choice, _names), do: "Decided"
 

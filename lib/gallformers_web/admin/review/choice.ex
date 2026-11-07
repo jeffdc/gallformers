@@ -12,7 +12,8 @@ defmodule GallformersWeb.Admin.Review.Choice do
       for each Gall a Trait term covers, `:tree`: what a synonym becomes
       when the Source is right, `:statements`: keep or leave out each of
       the Source's statements a chosen Gall disagrees with, or
-      `:generation`: the generation of a Gall to create, `{:trait_values,
+      `:generation`: the generation of a Gall to create, `:reason`: why a
+      taxonomic statement is declined (a reason, required), `{:trait_values,
       trait}`: several values of a Trait, `:keep_galls`: which Galls a
       group of identical disputes is kept for, `{:parent, rank}`: the
       taxon a new taxon of `rank` goes under, or none, `{:reading, name}`: the
@@ -103,6 +104,7 @@ defmodule GallformersWeb.Admin.Review.Choice do
           | :tree
           | :statements
           | :generation
+          | :reason
           | :keep_galls
           | {:trait_value, String.t()}
           | {:trait_values, String.t()}

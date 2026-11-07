@@ -130,6 +130,8 @@ defmodule GallformersWeb.Router do
       live "/review", Admin.ReviewLive.Sources, :index
       live "/review/renames", Admin.ReviewLive.Renames, :index
       live "/review/merges", Admin.ReviewLive.Merges, :index
+      # The taxonomy queue: Sources' taxonomic statements to accept (f923)
+      live "/review/taxonomy", Admin.ReviewLive.Taxonomy, :index
       live "/changes", Admin.ChangesLive, :index
       live "/observation", Admin.ObservationLive, :index
       live "/review/sources/:id", Admin.ReviewLive.Source, :source

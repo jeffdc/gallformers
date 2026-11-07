@@ -59,6 +59,20 @@ defmodule Gallformers.Facts.StandingTest do
     end
   end
 
+  describe "newer?/2" do
+    test "one statement is newer only when its whole period comes after the other's" do
+      assert Standing.newer?(stmt(:a, :confirm, "1990"), stmt(:b, :confirm, "1989")) == true
+      assert Standing.newer?(stmt(:a, :confirm, "1989"), stmt(:b, :confirm, "1990")) == false
+      assert Standing.newer?(stmt(:a, :confirm, "1990-05"), stmt(:b, :confirm, "1990")) == false
+      assert Standing.newer?(stmt(:a, :confirm, "1990-08"), stmt(:b, :confirm, "1990-03")) == true
+    end
+
+    test "a dated statement is newer than an undated one; undated ones tie" do
+      assert Standing.newer?(stmt(:a, :confirm, "1800"), stmt(:b, :confirm, nil)) == true
+      assert Standing.newer?(stmt(:a, :confirm, nil), stmt(:b, :confirm, nil)) == false
+    end
+  end
+
   describe "resolve/1 for one Fact" do
     test "the newest confirmation makes it current" do
       f = fact(1, [stmt(:a, :deny, "1890"), stmt(:b, :confirm, "1923")])

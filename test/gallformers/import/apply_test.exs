@@ -697,7 +697,7 @@ defmodule Gallformers.Import.ApplyTest do
       assert Import.list_queue_items(package, kind: :taxonomy_disagreement) == []
     end
 
-    test "a disagreeing synonymy is flagged and the tree is unchanged" do
+    test "a disagreeing synonymy is a taxonomy question and the tree is unchanged" do
       callirhytis = taxon_fixture(name: "Callirhytis quercusexempla", kingdom: "Animalia")
       andricus_ex = taxon_fixture(name: "Andricus quercusexempla", kingdom: "Animalia")
 
@@ -731,10 +731,14 @@ defmodule Gallformers.Import.ApplyTest do
       act = fact_statement(package, "taxonomy.json", "a1")
       assert Facts.get_fact!(act.fact_id).standing == :unsupported
 
-      assert [%QueueItem{statement_ref: "a1", status: :open}] =
-               Import.list_queue_items(package, kind: :taxonomy_disagreement)
+      # A question in the taxonomy queue (`f923` Task 6), not holding approval.
+      assert package.status == :approved
+      assert Import.list_queue_items(package, kind: :taxonomy_disagreement) == []
 
-      # The editorial tree still holds both as accepted, separate taxa.
+      assert [%QueueItem{statement_ref: "a1", status: :open}] =
+               Import.list_queue_items(package, kind: :taxonomy_acceptance)
+
+      # The tree still holds both as accepted, separate taxa.
       assert Taxa.accepted_name(callirhytis) == "Callirhytis quercusexempla"
       assert [%{status: :accepted}] = Taxa.get_taxon!(callirhytis.id).names
       assert [%{status: :accepted}] = Taxa.get_taxon!(andricus_ex.id).names
@@ -742,7 +746,7 @@ defmodule Gallformers.Import.ApplyTest do
   end
 
   describe "a taxonomy batch's common names" do
-    test "a first common name is recorded with no item; one beside the tree's is an item", ctx do
+    test "a common name the tree lacks is a taxonomy question, first or not", ctx do
       {:ok, _} = Taxa.add_common_name(test_actor(), ctx.torymus, "torymid wasp")
 
       taxonomy =
@@ -774,15 +778,15 @@ defmodule Gallformers.Import.ApplyTest do
       package =
         package(gall: nil, taxonomy: taxonomy) |> with_review() |> deliver!() |> approve!()
 
-      # The wasp held no common name: its first is recorded, with no item.
+      # Each is recorded, awaiting a curator's acceptance (`f923` Task 6):
+      # the wasp's first common name as much as Torymus's second.
       assert %BatchStatement{fact_id: fact_id} = fact_statement(package, "taxonomy.json", "a2")
       assert is_integer(fact_id)
 
-      # Torymus holds another: that one is for a curator.
-      assert [%QueueItem{statement_ref: "a3"}] =
-               Import.list_queue_items(package, kind: :taxonomy_disagreement)
+      assert [%QueueItem{statement_ref: "a2"}, %QueueItem{statement_ref: "a3"}] =
+               Import.list_queue_items(package, kind: :taxonomy_acceptance)
 
-      # The tree is unchanged.
+      # The tree is unchanged until one is accepted.
       assert Taxa.list_common_names(ctx.wasp.id) == []
     end
   end

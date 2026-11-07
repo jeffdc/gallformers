@@ -588,7 +588,8 @@ defmodule Gallformers.Import.Preview do
     names = FactsView.taxon_names(Map.values(base.taxon_ids))
 
     disagreements =
-      for %{kind: :taxonomy_disagreement} = q <- result.queue,
+      for %{kind: kind} = q <- result.queue,
+          kind in [:taxonomy_disagreement, :taxonomy_acceptance],
           into: %{},
           do: {q.statement_ref, q.reason}
 

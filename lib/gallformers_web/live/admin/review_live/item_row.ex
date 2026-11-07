@@ -73,6 +73,12 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
   search of a question with more candidates than it offers lists those
   first.
 
+  A taxonomic statement to accept or decline (matter `f923` Task 6,
+  `Gallformers.Import.TaxonomyQueue`): Accept is recommended; Decline asks
+  for its reason under itself once chosen, Decide waiting until there is
+  one. A refusal from the tree (a cycle, a rank inversion, a lump it can't
+  make) shows its reason in the row.
+
   Reject sets the recommendation aside (`Gallformers.Import.reject_proposal/2`;
   Undo restores it, `restore_proposal/2`); the page loads again after
   either (`{__MODULE__, {:proposal, item}}`).
@@ -686,6 +692,11 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
     do: {:synonym_of, id}
 
   defp picked(:generation, %{value: value}) when is_binary(value), do: {:generation, value}
+
+  defp picked(:reason, %{value: reason}) when is_binary(reason) do
+    if String.trim(reason) == "", do: nil, else: {:reason, reason}
+  end
+
   defp picked({:parent, _rank}, %{selected: %{id: id}}) when is_integer(id), do: {:taxon, id}
   defp picked({:parent, _rank}, _pick), do: :unplaced
 
@@ -722,6 +733,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
   defp missing(:generation, _pick), do: "Choose its generation."
   defp missing({:reading, _name}, _pick), do: "Pick the plant meant from the search."
   defp missing(:section, _pick), do: "Choose the section from the list."
+  defp missing(:reason, _pick), do: "Write why you decline it."
 
   # What Decide does, or what is missing: `{ok?, text}`.
   defp effect(assigns) do
@@ -863,6 +875,9 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
     do: "These disputes are no longer one question; reload to see them."
 
   defp refusal(:invalid_decision), do: "The decision was refused."
+
+  # A taxonomic decision the tree refused, in its words.
+  defp refusal({:rejected, _listener, _reason} = reason), do: Import.taxonomy_refusal(reason)
   defp refusal(%Ecto.Changeset{} = changeset), do: changeset_error(changeset)
 
   defp changeset_error(changeset) do
@@ -1394,6 +1409,17 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
         target={@target}
       />
     </div>
+    """
+  end
+
+  # Why a taxonomic statement is declined: a reason, required.
+  defp picker(%{picker: :reason} = assigns) do
+    ~H"""
+    <.form for={%{}} id={@id} phx-change="pick_value" phx-target={@target} class="grid gap-1">
+      <label for={"#{@id}-reason"} class="gf-label">Why you decline it</label>
+      <textarea id={"#{@id}-reason"} name="value" rows="3" class="gf-textarea">{@pick.value}</textarea>
+      <p :if={@choice.note} class="text-meta text-muted">{@choice.note}</p>
+    </.form>
     """
   end
 

@@ -38,6 +38,15 @@ defmodule Gallformers.Import.QueueItem do
       covering its Galls. Never blocking.
     * `:set_aside_term` — before `:trait_term`, a Trait term the producer
       set aside. No longer made; kept so that older rows load.
+    * `:taxonomy_acceptance` — a Source's taxonomic statement (placement,
+      name, synonymy, split, common name) that differs from the tree and is
+      newer than the latest accepted statement in its slot: accept it (the
+      tree follows) or decline it with a reason (matter `f923` Task 6,
+      `Gallformers.Import.TaxonomyQueue`). `subject` names the statement
+      (`"fact_id"`, `"attribution_id"`, `"source_id"`) and what it states.
+      One queue across Sources: its package is optional (nil for a
+      statement reopened after its package was applied), it never holds
+      approval, and a statement has at most one open.
 
   `statement_ref` is the batch statement it is about (`t1`, `g1`, `f3`;
   `u:<slot>:<term>` for what was set aside and for a Trait term);
@@ -66,7 +75,8 @@ defmodule Gallformers.Import.QueueItem do
     :gall_rename,
     :set_aside_term,
     :set_aside_statement,
-    :trait_term
+    :trait_term,
+    :taxonomy_acceptance
   ]
 
   @type kind ::
@@ -82,6 +92,7 @@ defmodule Gallformers.Import.QueueItem do
           | :set_aside_term
           | :set_aside_statement
           | :trait_term
+          | :taxonomy_acceptance
 
   @type t :: %__MODULE__{
           id: integer() | nil,
@@ -163,7 +174,8 @@ defmodule Gallformers.Import.QueueItem do
 
   @doc """
   A changeset for a new (open) queue item. Every kind but `:gall_rename`
-  needs its package, but a `:same_date_conflict` a merge brought about.
+  needs its package, but a `:same_date_conflict` a merge brought about and
+  a `:taxonomy_acceptance` (where the package is optional).
   """
   @spec create_changeset(t(), map()) :: Ecto.Changeset.t()
   def create_changeset(item, attrs) do
@@ -173,6 +185,7 @@ defmodule Gallformers.Import.QueueItem do
     |> validate_package()
     |> unique_constraint([:batch_id, :kind, :statement_ref], name: :queue_items_statement_unique)
     |> unique_constraint(:subject, name: :queue_items_open_gall_rename_index)
+    |> unique_constraint(:subject, name: :queue_items_open_taxonomy_acceptance_index)
     |> check_constraint(:package_id, name: :queue_items_package_check)
     |> foreign_key_constraint(:package_id)
     |> foreign_key_constraint(:batch_id)
@@ -183,7 +196,7 @@ defmodule Gallformers.Import.QueueItem do
       :gall_rename ->
         validate_change(changeset, :package_id, fn _, _ -> [package_id: "must be empty"] end)
 
-      :same_date_conflict ->
+      kind when kind in [:same_date_conflict, :taxonomy_acceptance] ->
         changeset
 
       _kind ->
