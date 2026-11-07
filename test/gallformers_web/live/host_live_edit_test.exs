@@ -94,11 +94,70 @@ defmodule GallformersWeb.HostLiveEditTest do
     end
   end
 
+  # Live-use finding 9 (matter ec2c): the panel's name, synonyms and range
+  # are rows of one list, each label beside its value and actions.
+  describe "the panel" do
+    test "the name, synonyms and range are rows, each with its actions", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      for {id, label} <- [name: "Name", synonyms: "Synonyms", range: "Range"] do
+        assert has_element?(view, "#host-editorial dl #host-editor-#{id} dt", label)
+      end
+
+      assert has_element?(view, "#host-editor-name dd button", "Rename…")
+      assert has_element?(view, "#host-editor-synonyms dd button", "Add a synonym")
+      assert has_element?(view, "#host-editor-range dd button", "Range…")
+    end
+  end
+
   describe "the synonyms" do
+    test "Add a synonym opens its fields, Sensu and Based on disclosed as optional", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      refute has_element?(view, "#host-synonym-form")
+
+      view |> element("#host-editor-synonyms button", "Add a synonym") |> render_click()
+
+      assert has_element?(view, "#host-synonym-form #host-synonym-name")
+
+      assert has_element?(
+               view,
+               "#host-synonym-form details:not([open]) summary",
+               "Sensu and based on (optional)"
+             )
+
+      assert has_element?(view, "#host-synonym-form details #host-synonym-sensu")
+      assert has_element?(view, "#host-synonym-form details #host-synonym-based-on")
+
+      view |> element("#host-synonym-form button", "Cancel") |> render_click()
+      refute has_element?(view, "#host-synonym-form")
+    end
+
+    test "a synonym added with sensu and based on goes in the tray; the form closes", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      view |> element("#host-editor-synonyms button", "Add a synonym") |> render_click()
+
+      view
+      |> form("#host-synonym-form", %{
+        "name" => "Quercus misplanta",
+        "sensu" => "auct. non L.",
+        "based_on" => "per FNA"
+      })
+      |> render_submit()
+
+      assert [%{field: :synonyms, value: value, based_on: "per FNA"}] = items(ctx.actor)
+      assert %{name: "Quercus misplanta", sensu: "auct. non L."} in value
+      refute has_element?(view, "#host-synonym-form")
+      assert has_element?(view, "#host-editor-synonyms [data-synonym='Quercus misplanta']")
+    end
+
     test "each synonym can be taken out, and one added; the tray holds the list", ctx do
       {:ok, view, _html} = edit(ctx)
 
       assert has_element?(view, "#host-editor-synonyms", "Quercus oldplanta")
+
+      view |> element("#host-editor-synonyms button", "Add a synonym") |> render_click()
 
       view
       |> form("#host-editor-synonyms form", %{"name" => "Quercus newplanta", "sensu" => ""})
@@ -122,6 +181,39 @@ defmodule GallformersWeb.HostLiveEditTest do
   end
 
   describe "the range" do
+    test "its row sums up the range: the plant's, or the one in the tray", ctx do
+      {:ok, view, _html} = edit(ctx)
+      assert has_element?(view, "#host-editor-range [data-part=summary]", "No range recorded")
+
+      host_range_fixture(ctx.plant, [
+        {"US-CA", "exact"},
+        {"CA-AB", "exact"},
+        {"MX-JAL", "exact", "introduced"}
+      ])
+
+      {:ok, view, _html} = edit(ctx)
+
+      assert has_element?(
+               view,
+               "#host-editor-range [data-part=summary]",
+               "3 places, 1 introduced"
+             )
+
+      view |> element("#host-editor button", "Range…") |> render_click()
+      # A click makes a native place introduced, the next takes it out.
+      render_hook(view, "toggle_region", %{"code" => "CA-AB"})
+      render_hook(view, "toggle_region", %{"code" => "CA-AB"})
+      view |> form("#host-range-tray", %{"based_on" => ""}) |> render_submit()
+
+      assert has_element?(
+               view,
+               "#host-editor-range [data-part=summary]",
+               "2 places, 1 introduced"
+             )
+
+      assert has_element?(view, "#host-editor-range [data-part=pending]")
+    end
+
     test "Range… edits it on the map; Put in tray holds the whole range", ctx do
       {:ok, view, _html} = edit(ctx)
 

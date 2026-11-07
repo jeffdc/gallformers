@@ -447,7 +447,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
             {format_date(@taxon.updated_at, :short)}
           </:meta>
           <:description>
-            A taxon's names, placement and details. Each change is saved as you make it, except the Host range, which is saved with its Save button.
+            A taxon's names, placement and details. Each change is saved as you make it{if @plant?,
+              do: ", except the Host range, which is saved with its Save button"}.
           </:description>
           <:action :if={@public_path}>
             <.button href={@public_path} variant="ghost" size="sm" icon="ph-arrow-square-out">
