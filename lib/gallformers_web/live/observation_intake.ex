@@ -15,14 +15,20 @@ defmodule GallformersWeb.ObservationIntake do
   command palette (`/admin/observation`) it is chosen: among the Galls the
   observation's taxon induces (one is chosen when it is the only one, or
   when the observation's "Gallformers Code" names it), or any Gall by
-  name.
+  name. A Gall chosen links to its page in Edit mode.
+
+  A Host is picked by name ("Add a host", as on the Gall page): one the
+  proposal already holds is ticked; another becomes a ticked item
+  (`{:host, taxon_id}`), so a proposal needing the Host can be given it.
 
   Assigns: `id`, `curator` (an `%Actor{}`), `gall` (`%{id, name}` or nil).
   """
   use GallformersWeb, :live_component
 
+  alias Gallformers.Audit.ChangeLog
   alias Gallformers.Catalog
   alias Gallformers.Curation
+  alias Gallformers.Taxa
   alias GallformersWeb.Admin.InatImportComponent
 
   @impl true
@@ -35,6 +41,8 @@ defmodule GallformersWeb.ObservationIntake do
        chosen: nil,
        gall_query: "",
        gall_results: [],
+       host_query: "",
+       host_results: [],
        selected: MapSet.new(),
        added: nil
      )}
@@ -100,6 +108,24 @@ defmodule GallformersWeb.ObservationIntake do
   def handle_event("clear_gall", _params, socket),
     do: {:noreply, assign(socket, chosen: nil, gall_query: "", gall_results: [])}
 
+  # A Host given by name, as the Gall page's "Add a host" finds one.
+  def handle_event("search_host", %{"value" => query}, socket) do
+    results =
+      if String.length(String.trim(query)) >= 2, do: Taxa.search_plants(query, 20), else: []
+
+    {:noreply, assign(socket, host_query: query, host_results: results)}
+  end
+
+  def handle_event("select_host", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.host_results, &("#{&1.id}" == id)) do
+      nil -> {:noreply, socket}
+      plant -> {:noreply, socket |> give_host(plant) |> assign(host_query: "", host_results: [])}
+    end
+  end
+
+  def handle_event("clear_host", _params, socket),
+    do: {:noreply, assign(socket, host_query: "", host_results: [])}
+
   def handle_event("add", _params, %{assigns: %{chosen: nil}} = socket), do: {:noreply, socket}
 
   def handle_event("add", _params, socket) do
@@ -145,6 +171,51 @@ defmodule GallformersWeb.ObservationIntake do
     |> then(&if(chosen, do: choose(&1, chosen), else: &1))
   end
 
+  # The Host given: ticked if the proposal holds it, else a new ticked item.
+  defp give_host(socket, plant) do
+    %{proposal: proposal, selected: selected} = socket.assigns
+    key = {:host, plant.id}
+
+    case Enum.find_index(proposal.items, &(&1.spec.key == key)) do
+      nil ->
+        spec = %{kind: :fact, gall_id: nil, action: :add, key: key}
+
+        item = %{
+          role: :host,
+          spec: spec,
+          # In the words of the proposal's own Host items (`Curation.Wording`).
+          text: "Add " <> ChangeLog.fact_words({:relationship, "host_of", plant.name}),
+          why: "You gave it.",
+          selected: true
+        }
+
+        assign(socket,
+          proposal: %{proposal | items: proposal.items ++ [item]},
+          selected: MapSet.put(selected, length(proposal.items))
+        )
+
+      index ->
+        assign(socket, selected: MapSet.put(selected, index))
+    end
+  end
+
+  # What the curator must still give: a need is met by the Gall once
+  # chosen, the Host once one is ticked.
+  defp open_needs(%{proposal: nil}), do: []
+
+  defp open_needs(%{proposal: proposal, chosen: chosen, selected: selected}) do
+    host_ticked? =
+      proposal.items
+      |> Enum.with_index()
+      |> Enum.any?(fn {item, i} -> item.role == :host and MapSet.member?(selected, i) end)
+
+    Enum.reject(proposal.needs, fn
+      %{kind: :gall} -> chosen != nil
+      %{kind: :host} -> host_ticked?
+      _need -> false
+    end)
+  end
+
   defp candidate_name(proposal, id) do
     Enum.find_value(proposal.gall.candidates, "Gall #{id}", &(&1.id == id && &1.name))
   end
@@ -177,6 +248,8 @@ defmodule GallformersWeb.ObservationIntake do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, needs: open_needs(assigns))
+
     ~H"""
     <div id={@id} class="flex flex-col gap-block">
       <form
@@ -228,11 +301,7 @@ defmodule GallformersWeb.ObservationIntake do
           </:item>
         </.fact_list>
 
-        <.notice
-          :for={need <- @proposal.needs}
-          :if={need.kind != :gall or @chosen == nil}
-          kind={:warn}
-        >
+        <.notice :for={need <- @needs} kind={:warn}>
           {need.text}
         </.notice>
 
@@ -270,6 +339,14 @@ defmodule GallformersWeb.ObservationIntake do
               display_fn={& &1.name}
               target={@myself}
             />
+            <.link
+              :if={@chosen}
+              id={"#{@id}-open-gall"}
+              navigate={"/gall/#{@chosen.id}?edit"}
+              class="text-meta"
+            >
+              Open this Gall in Edit mode
+            </.link>
           </div>
         </.section>
 
@@ -297,6 +374,21 @@ defmodule GallformersWeb.ObservationIntake do
               </label>
             </li>
           </ul>
+          <.typeahead
+            id={"#{@id}-host"}
+            label="Add a host"
+            placeholder="A plant's name"
+            query={@host_query}
+            results={@host_results}
+            search_event="search_host"
+            select_event="select_host"
+            clear_event="clear_host"
+            display_fn={& &1.name}
+            target={@myself}
+            class="mt-2 max-w-md"
+          >
+            <:result :let={plant}><.taxon_name name={plant.name} /></:result>
+          </.typeahead>
           <div class="mt-block flex flex-wrap items-center gap-3">
             <.button
               id={"#{@id}-add"}

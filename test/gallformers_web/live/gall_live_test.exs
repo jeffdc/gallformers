@@ -224,6 +224,79 @@ defmodule GallformersWeb.GallLiveTest do
     end
   end
 
+  describe "the Gall's Facts (ec2c, finding 5)" do
+    import Gallformers.CatalogFixtures
+
+    setup do
+      load_vocab!()
+      %{gall: gall_fixture()}
+    end
+
+    test "everyone sees them by category, each with its Sources linked", %{
+      conn: conn,
+      gall: gall
+    } do
+      kinsey = source_fixture("Kinsey", "1959")
+      weld = source_fixture("Weld", "1960")
+      trait!(gall, {"color", "red"}, confirm(kinsey))
+      trait!(gall, {"color", "red"}, confirm(weld))
+
+      {:ok, _} =
+        Catalog.assert_alias(
+          DataCase.test_actor(),
+          %{gall_id: gall.id, name: "red knob gall"},
+          confirm(weld)
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+
+      assert has_element?(view, "#gall-facts h2", "Facts")
+      red = "#gall-facts [data-role=current] [data-category=traits] [data-trait=color]"
+      assert has_element?(view, red, "red")
+      assert has_element?(view, "#{red} a[href='/source/#{kinsey.id}']", "Weld 1959")
+      assert has_element?(view, "#{red} a[href='/source/#{weld.id}']", "Weld 1960")
+      assert has_element?(view, "#gall-facts [data-category=aliases]", "red knob gall")
+
+      # Read-only, and the Gall's own name isn't repeated as a header.
+      refute has_element?(view, "#gall-facts [data-role=fact-menu]")
+      refute has_element?(view, "#gall-facts a[href='/gall/#{gall.id}']")
+    end
+
+    test "withdrawn and superseded Facts are collapsed as history, each marked", %{
+      conn: conn,
+      gall: gall
+    } do
+      kinsey = source_fixture("Kinsey", "1959")
+      weld = source_fixture("Weld", "2001")
+      trait!(gall, {"color", "red"}, confirm(kinsey))
+      trait!(gall, {"color", "red"}, deny(weld))
+      trait!(gall, {"detachable", "integral"}, confirm(kinsey))
+      trait!(gall, {"detachable", "detachable"}, confirm(weld))
+
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+
+      current = "#gall-facts [data-role=current]"
+      history = "#gall-facts details[data-role=history]"
+
+      assert has_element?(view, "#{current} [data-trait=detachable]", "detachable")
+      refute has_element?(view, "#{current} [data-trait=color]")
+      refute has_element?(view, "#{current} [data-trait=detachable]", "integral")
+
+      assert has_element?(view, "#{history} summary", "1 withdrawn, 1 superseded")
+      assert has_element?(view, "#{history} [data-trait=color]", "withdrawn")
+      assert has_element?(view, "#{history} [data-trait=color]", "red")
+      assert has_element?(view, "#{history} [data-trait=color]", "denied by")
+      assert has_element?(view, "#{history} [data-trait=color] a[href='/source/#{weld.id}']")
+      assert has_element?(view, "#{history} [data-trait=detachable]", "superseded")
+    end
+
+    test "a Gall with no Facts has no Facts section", %{conn: conn, gall: gall} do
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+
+      refute has_element?(view, "#gall-facts")
+    end
+  end
+
   describe "the admin link" do
     test "an admin gets Edit; a visitor doesn't", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/300")

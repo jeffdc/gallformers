@@ -2201,6 +2201,41 @@ defmodule Gallformers.Import do
     FactsView.group(headers, entries)
   end
 
+  @doc """
+  The gall Facts about Gall `gall_id` (`Gallformers.Catalog.facts_about_galls/1`),
+  grouped by category as `facts_for_source/1` groups a Source's, all under
+  the one Gall: each entry with the Fact's `standing` and its `sources`
+  (`Gallformers.Import.FactsView.gall_entries/1`). Facts never shown
+  (`:unsupported`) are left out. One header, its `facts` empty when the
+  Gall has none.
+  """
+  @spec facts_for_gall(integer()) :: [map()]
+  def facts_for_gall(gall_id) when is_integer(gall_id) do
+    entries =
+      [gall_id]
+      |> Catalog.facts_about_galls()
+      |> Enum.map(& &1.fact_id)
+      |> FactsView.gall_entries()
+      |> Enum.reject(&(&1.standing == :unsupported))
+      |> Enum.map(&(&1 |> Map.put(:gall, gall_id) |> Map.drop([:slot])))
+
+    name = get_in(FactsView.gall_names([gall_id]), [gall_id, :name])
+
+    header = %{
+      key: gall_id,
+      ref: nil,
+      gall_id: gall_id,
+      new: false,
+      name_as_written: nil,
+      name: name,
+      status: :resolved,
+      question: nil,
+      why: nil
+    }
+
+    FactsView.group([header], entries)
+  end
+
   # -- denial ------------------------------------------------------------------
 
   @doc """
