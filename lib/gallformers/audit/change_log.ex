@@ -136,13 +136,30 @@ defmodule Gallformers.Audit.ChangeLog do
 
   @doc """
   Tells the subscribers (`subscribe/0`) that changes were recorded. Called
-  after they commit: by `Gallformers.Curation` when the tray applies, and
-  after the import job takes a package a step on.
+  after they commit: by `Gallformers.Audit` when a curator's audited
+  transaction commits, and after the import job takes a package a step on.
+  Nothing to tell where PubSub is not running (a mix task).
   """
   @spec changed() :: :ok
   def changed do
-    _ = Phoenix.PubSub.broadcast(@pubsub, @topic, {:change_log, :changed})
+    if Process.whereis(@pubsub),
+      do: Phoenix.PubSub.broadcast(@pubsub, @topic, {:change_log, :changed})
+
     :ok
+  end
+
+  @doc """
+  Drops the `{:change_log, :changed}` notices already waiting in the calling
+  process's mailbox, so a subscriber handling one reads the changes once
+  for a run of them (a tray applied item by item).
+  """
+  @spec flush() :: :ok
+  def flush do
+    receive do
+      {:change_log, :changed} -> flush()
+    after
+      0 -> :ok
+    end
   end
 
   @doc """

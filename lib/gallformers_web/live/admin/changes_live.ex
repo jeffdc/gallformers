@@ -4,10 +4,12 @@ defmodule GallformersWeb.Admin.ChangesLive do
   change (`Gallformers.Catalog.changes/1`), newest first, as `change_entry`s
   with View and Edit on each Gall, taxon and Fact. In the URL: `q` (a Gall,
   taxon, Source or value), `who` (a curator), `kind` (an operation) and
-  `period` (7d, 30d or all; 30d by default).
+  `period` (7d, 30d or all; 30d by default). Kept up to date through
+  `Gallformers.Audit.ChangeLog.subscribe/0`, keeping the search and filters.
   """
   use GallformersWeb, :live_view
 
+  alias Gallformers.Audit.ChangeLog
   alias Gallformers.Catalog
 
   @periods [{"7d", "7 days", 7}, {"30d", "30 days", 30}, {"all", "Everything", nil}]
@@ -15,6 +17,7 @@ defmodule GallformersWeb.Admin.ChangesLive do
 
   @impl true
   def mount(_params, session, socket) do
+    if connected?(socket), do: ChangeLog.subscribe()
     {:ok, assign(socket, page_title: "Changes", current_user: session["current_user"])}
   end
 
@@ -27,19 +30,14 @@ defmodule GallformersWeb.Admin.ChangesLive do
       "period" => if(params["period"] in ~w(7d 30d all), do: params["period"], else: "30d")
     }
 
-    groups = Catalog.changes(limit: @read, since: since(filters["period"]))
+    {:noreply, socket |> assign(filters: filters) |> load_changes()}
+  end
 
-    {:noreply,
-     assign(socket,
-       filters: filters,
-       curators: groups |> Enum.map(& &1.who) |> Enum.uniq() |> Enum.sort(),
-       kinds:
-         groups
-         |> Enum.map(&{&1.operation, kind_label(&1)})
-         |> Enum.uniq_by(&elem(&1, 0))
-         |> Enum.sort_by(&elem(&1, 1)),
-       shown: Enum.filter(groups, &matches?(&1, filters))
-     )}
+  # Changes were recorded: read them again, under the same search and filters.
+  @impl true
+  def handle_info({:change_log, :changed}, socket) do
+    ChangeLog.flush()
+    {:noreply, load_changes(socket)}
   end
 
   @impl true
@@ -50,6 +48,20 @@ defmodule GallformersWeb.Admin.ChangesLive do
       |> Map.reject(fn {_key, value} -> value in ["", nil] end)
 
     {:noreply, push_patch(socket, to: ~p"/admin/changes?#{filters}")}
+  end
+
+  defp load_changes(%{assigns: %{filters: filters}} = socket) do
+    groups = Catalog.changes(limit: @read, since: since(filters["period"]))
+
+    assign(socket,
+      curators: groups |> Enum.map(& &1.who) |> Enum.uniq() |> Enum.sort(),
+      kinds:
+        groups
+        |> Enum.map(&{&1.operation, kind_label(&1)})
+        |> Enum.uniq_by(&elem(&1, 0))
+        |> Enum.sort_by(&elem(&1, 1)),
+      shown: Enum.filter(groups, &matches?(&1, filters))
+    )
   end
 
   defp since(period) do

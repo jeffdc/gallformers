@@ -16,6 +16,16 @@ defmodule Gallformers.Audit do
   `Gallformers.Audit.Migration.track_table/2` in the migration that creates
   them.
 
+  ## Telling the pages
+
+  When a curator's (`:user` actor's) audited transaction commits, the pages
+  listing the curators' changes hear of it (`ChangeLog.changed/0`): once,
+  after the outermost transaction commits; not when it rolls back, nor for
+  an audited call inside another transaction (that one's outcome is not
+  known yet; an enclosing audited call tells for both). System work is left
+  out, as the change log leaves it out; the import job tells after each step
+  it takes a package (`Gallformers.Curation.PackageListener`).
+
   ## One actor per database transaction
 
   The audit trail holds one record per database transaction. A nested or
@@ -31,6 +41,7 @@ defmodule Gallformers.Audit do
 
   alias Ecto.Multi
   alias Gallformers.Audit.Actor
+  alias Gallformers.Audit.ChangeLog
   alias Gallformers.Audit.ConflictError
   alias Gallformers.Repo
 
@@ -53,6 +64,7 @@ defmodule Gallformers.Audit do
       record!(Repo, meta)
       fun.()
     end)
+    |> tell(actor)
   end
 
   @doc """
@@ -77,11 +89,20 @@ defmodule Gallformers.Audit do
         end
       end)
 
-    case result do
+    case tell(result, actor) do
       {:ok, changes} -> {:ok, changes}
       {:error, {step, value, changes}} -> {:error, step, value, changes}
     end
   end
+
+  # A curator's change committed, and no transaction encloses it: the pages
+  # listing the curators' changes hear of it (see "Telling the pages").
+  defp tell({:ok, _} = result, %Actor{type: :user}) do
+    if not Repo.in_transaction?(), do: ChangeLog.changed()
+    result
+  end
+
+  defp tell(result, _actor), do: result
 
   @doc """
   The actor the current database transaction is audited as, or `:error`
