@@ -32,7 +32,6 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
   import GallformersWeb.ReviewComponents
 
   alias Gallformers.Import
-  alias Gallformers.Taxa
   alias GallformersWeb.Admin.Review.Steps
   alias GallformersWeb.Admin.ReviewLive.Document
   alias GallformersWeb.Admin.ReviewLive.Loader
@@ -219,7 +218,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
     query = String.trim(query)
     socket = update(socket, :pick, &%{&1 | query: query})
 
-    results = if String.length(query) < 2, do: [], else: plants(query)
+    results = if String.length(query) < 2, do: [], else: Loader.host_choices(query, @results)
     {:noreply, update(socket, :pick, &%{&1 | results: results})}
   end
 
@@ -365,25 +364,6 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
   end
 
   defp current_note(_entry, _kind), do: ""
-
-  # Plants of any rank, and genera and sections, a Host may be.
-  defp plants(query) do
-    species =
-      for p <- Taxa.search_plants(query, @results),
-          do: %{id: p.id, name: p.name, meta: meta(p.rank, p.aliases), group: "Plants"}
-
-    groups =
-      for g <- Taxa.search_genera_and_sections(query, @results, kingdom: "Plantae"),
-          do: %{id: g.id, name: g.name, meta: meta(g.rank, []), group: "Genera and sections"}
-
-    species ++ groups
-  end
-
-  defp meta(rank, aliases) do
-    [rank && to_string(rank), aliases != [] && "also " <> Enum.join(Enum.take(aliases, 3), ", ")]
-    |> Enum.filter(&is_binary/1)
-    |> Enum.join(" · ")
-  end
 
   # -- what the page shows -------------------------------------------------------------
 
@@ -537,7 +517,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
                 on_passage={@on_passage}
               >
                 <:editor :let={entry}>
-                  <.fact_editor
+                  <.edit_form
                     entry={entry}
                     kind={@edit_kind}
                     pick={@pick}
@@ -559,7 +539,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
                 }
               >
                 <:editor :let={entry}>
-                  <.fact_editor
+                  <.edit_form
                     entry={entry}
                     kind={@edit_kind}
                     pick={@pick}
@@ -597,64 +577,23 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
   attr :error, :string, default: nil
   attr :definitions, :map, required: true
 
-  defp fact_editor(assigns) do
+  defp edit_form(assigns) do
     ~H"""
-    <.form
-      for={%{}}
+    <.fact_editor
       id="fact-editor"
-      phx-submit="edit_save"
-      class="grid gap-2 rounded-panel border border-line bg-surface-2 p-2"
-    >
-      <p class="text-caption font-semibold text-ink-2">{editor_title(@kind)}</p>
-      <.typeahead
-        :if={@kind == "host"}
-        id="fact-editor-plant"
-        label="The plant: species and below, genera, sections"
-        placeholder="Type a name…"
-        search_event="search_plant"
-        select_event="select_plant"
-        clear_event="clear_plant"
-        query={@pick.query}
-        results={@pick.results}
-        selected={@pick.selected}
-        display_fn={& &1.name}
-        group_key={:group}
-      >
-        <:result :let={result}>
-          <span class="italic">{result.name}</span>
-          <span :if={result.meta != ""} class="text-caption text-muted ml-1">{result.meta}</span>
-        </:result>
-      </.typeahead>
-      <.review_value_list
-        :if={@kind == "values"}
-        id="fact-editor-values"
-        type="checkbox"
-        values={trait_values(@definitions, @entry.value.trait)}
-        selected={@pick.values}
-        on_pick="toggle_value"
-      />
-      <div class="grid gap-0.5">
-        <label for="fact-editor-note" class="gf-label-sm">
-          Note{if @kind != "note", do: " (optional)"}
-        </label>
-        <textarea id="fact-editor-note" name="note" rows="2" class="gf-textarea text-ui">{@pick.note}</textarea>
-      </div>
-      <p :if={@error} id="fact-editor-error" class="text-caption text-danger">{@error}</p>
-      <div class="flex flex-wrap gap-2">
-        <.button id="fact-editor-save" type="submit" size="sm" variant="primary">
-          {save_text(@kind)}
-        </.button>
-        <.button
-          id="fact-editor-cancel"
-          type="button"
-          phx-click="edit_cancel"
-          size="sm"
-          variant="ghost"
-        >
-          Cancel
-        </.button>
-      </div>
-    </.form>
+      title={editor_title(@kind)}
+      on_submit="edit_save"
+      pick={@pick}
+      search_label={if @kind == "host", do: "The plant: species and below, genera, sections"}
+      search_id="fact-editor-plant"
+      search_event="search_plant"
+      select_event="select_plant"
+      clear_event="clear_plant"
+      values={if @kind == "values", do: trait_values(@definitions, @entry.value.trait)}
+      note_label={if @kind == "note", do: "Note", else: "Note (optional)"}
+      error={@error}
+      save_text={save_text(@kind)}
+    />
     """
   end
 end

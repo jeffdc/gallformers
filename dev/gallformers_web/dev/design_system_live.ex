@@ -24,7 +24,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position segmented_switch data_table-selection progress_bar loading_spinner chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
        sample_view: "photos",
        sample_choice: "0",
        sample_selected: MapSet.new([2]),
@@ -981,6 +981,32 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
 
         <.example
           :let={theme}
+          id="fact_editor"
+          title="fact_editor"
+          code={
+            ~S'''
+            <FactsComponents.fact_editor id="correction-editor" on_submit="correct" target={@myself}
+              title="Change the value: what the Source says, one value or several."
+              pick={@pick} values={trait_values(@definitions, @entry.value.trait)}
+              note_label="Note: why (required)" error={@edit_error} save_text="Save the correction" />
+            '''
+          }
+        >
+          <GallformersWeb.FactsComponents.fact_editor
+            id={"fact-editor-#{theme}"}
+            title="Change the value: what the Source says, one value or several."
+            on_submit="noop"
+            on_toggle="noop"
+            pick={%{query: "", results: [], selected: nil, values: ["brown"], note: ""}}
+            values={[{"red", "Red at maturity."}, {"brown", "Brown, as a dried gall."}]}
+            note_label="Note: why (required)"
+            error="Write the note: say why the Source didn't say this."
+            save_text="Save the correction"
+          />
+        </.example>
+
+        <.example
+          :let={theme}
           id="segmented_switch"
           title="segmented_switch"
           code={
@@ -1715,6 +1741,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
   end
 
   def handle_event("noop", _params, socket), do: {:noreply, socket}
+  def handle_event("edit_cancel", _params, socket), do: {:noreply, socket}
 
   def handle_event("sample_toggle", %{"key" => key}, socket) do
     {:noreply,

@@ -37,6 +37,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
       starts the New Taxon page with.
       Disputes about the same statement are one entry, every one of them
       its `members` (matter `d213`, Disputes step).
+    * `host_choices/2` — the plants a Fact's Host may be, for the Change
+      Host search of the review Facts page and the admin Source page's
+      corrections (`GallformersWeb.FactsComponents.fact_editor/1`).
 
   Nothing here writes.
   """
@@ -1274,6 +1277,36 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   @doc "Whether a curator rejected `item`'s proposal (`Gallformers.Import.reject_proposal/2`)."
   @spec rejected?(QueueItem.t()) :: boolean()
   def rejected?(item), do: match?(%DateTime{}, Map.get(item, :proposal_rejected_at))
+
+  @doc """
+  The plants a Fact's Host may be, matching `query`, as typeahead results
+  (`%{id, name, meta, group}`): plants of any rank (`group` "Plants"), then
+  genera and sections ("Genera and sections"), up to `limit` of each;
+  `meta` is the rank and up to three aliases.
+  """
+  @spec host_choices(String.t(), pos_integer()) :: [map()]
+  def host_choices(query, limit) when is_binary(query) do
+    plants =
+      for p <- Taxa.search_plants(query, limit),
+          do: %{id: p.id, name: p.name, meta: choice_meta(p.rank, p.aliases), group: "Plants"}
+
+    groups =
+      for g <- Taxa.search_genera_and_sections(query, limit, kingdom: "Plantae"),
+          do: %{
+            id: g.id,
+            name: g.name,
+            meta: choice_meta(g.rank, []),
+            group: "Genera and sections"
+          }
+
+    plants ++ groups
+  end
+
+  defp choice_meta(rank, aliases) do
+    [rank && to_string(rank), aliases != [] && "also " <> Enum.join(Enum.take(aliases, 3), ", ")]
+    |> Enum.filter(&is_binary/1)
+    |> Enum.join(" · ")
+  end
 
   @doc "The Trait values' definitions, `%{trait => %{value => definition}}`."
   @spec definitions() :: %{String.t() => %{String.t() => String.t() | nil}}

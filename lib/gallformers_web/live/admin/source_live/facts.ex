@@ -25,15 +25,14 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   The Facts load in the background (`start_async/3`) and stay in place
   while they reload after a correction.
 
-  The plant search and the values list are the review Facts page's
-  (`Gallformers.Taxa.search_plants/2` and genera and sections; the
-  review's `review_value_list`), its edits being for packages before
-  approval.
+  The correction's form is the review Facts page's edit form
+  (`GallformersWeb.FactsComponents.fact_editor/1`), with its plant search
+  (`GallformersWeb.Admin.ReviewLive.Loader.host_choices/2`), its edits
+  being for packages before approval.
   """
   use GallformersWeb, :live_component
 
   import GallformersWeb.FactsComponents
-  import GallformersWeb.ReviewComponents, only: [review_value_list: 1]
 
   alias Gallformers.Import
   alias Gallformers.Sources
@@ -261,17 +260,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
 
   # Plants of any rank, and genera and sections, for a Host; other taxa
   # for a parent or an accepted taxon.
-  defp taxa("host", query) do
-    species =
-      for p <- Taxa.search_plants(query, @results),
-          do: %{id: p.id, name: p.name, meta: meta(p.rank, p.aliases), group: "Plants"}
-
-    groups =
-      for g <- Taxa.search_genera_and_sections(query, @results, kingdom: "Plantae"),
-          do: %{id: g.id, name: g.name, meta: meta(g.rank, []), group: "Genera and sections"}
-
-    species ++ groups
-  end
+  defp taxa("host", query), do: Loader.host_choices(query, @results)
 
   defp taxa(_kind, query) do
     query
@@ -469,43 +458,19 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
 
   defp correction_editor(assigns) do
     ~H"""
-    <.form
-      for={%{}}
+    <.fact_editor
       id="correction-editor"
-      phx-submit="correct"
-      phx-target={@target}
-      class="grid gap-2 rounded-panel border border-line bg-surface-2 p-2"
+      title={editor_title(@kind)}
+      on_submit="correct"
+      target={@target}
+      pick={@pick}
+      search_label={if @kind in ["host", "parent", "accepted"], do: taxon_label(@kind)}
+      values={if @kind == "values", do: trait_values(@definitions, @entry.value.trait)}
+      note_label="Note: why (required)"
+      error={@error}
+      save_text={save_text(@kind)}
+      save_variant={if @kind == "withdraw", do: "danger", else: "primary"}
     >
-      <p class="text-caption font-semibold text-ink-2">{editor_title(@kind)}</p>
-      <.typeahead
-        :if={@kind in ["host", "parent", "accepted"]}
-        id="correction-editor-taxon"
-        label={taxon_label(@kind)}
-        placeholder="Type a name…"
-        search_event="search_taxon"
-        select_event="select_taxon"
-        clear_event="clear_taxon"
-        query={@pick.query}
-        results={@pick.results}
-        selected={@pick.selected}
-        display_fn={& &1.name}
-        group_key={:group}
-        target={@target}
-      >
-        <:result :let={result}>
-          <span class="italic">{result.name}</span>
-          <span :if={result.meta != ""} class="text-caption text-muted ml-1">{result.meta}</span>
-        </:result>
-      </.typeahead>
-      <.review_value_list
-        :if={@kind == "values"}
-        id="correction-editor-values"
-        type="checkbox"
-        values={trait_values(@definitions, @entry.value.trait)}
-        selected={@pick.values}
-        on_pick="toggle_value"
-        target={@target}
-      />
       <.input
         :if={@acceptance}
         type="checkbox"
@@ -514,32 +479,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
         value={@pick.accept}
         label="Accept it now: the tree follows it where it wins (else it awaits a curator in the taxonomy queue)"
       />
-      <div class="grid gap-0.5">
-        <label for="correction-editor-note" class="gf-label-sm">Note: why (required)</label>
-        <textarea id="correction-editor-note" name="note" rows="2" class="gf-textarea text-ui">{@pick.note}</textarea>
-      </div>
-      <p :if={@error} id="correction-editor-error" class="text-caption text-danger">{@error}</p>
-      <div class="flex flex-wrap gap-2">
-        <.button
-          id="correction-editor-save"
-          type="submit"
-          size="sm"
-          variant={if @kind == "withdraw", do: "danger", else: "primary"}
-        >
-          {save_text(@kind)}
-        </.button>
-        <.button
-          id="correction-editor-cancel"
-          type="button"
-          phx-click="edit_cancel"
-          phx-target={@target}
-          size="sm"
-          variant="ghost"
-        >
-          Cancel
-        </.button>
-      </div>
-    </.form>
+    </.fact_editor>
     """
   end
 end

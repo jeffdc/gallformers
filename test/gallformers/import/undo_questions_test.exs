@@ -226,7 +226,28 @@ defmodule Gallformers.Import.UndoQuestionsTest do
       [item] =
         Enum.filter(Import.list_split_questions(), &(&1.subject["gall_id"] == gall.id))
 
-      %{split: split, beta: beta, gall: gall, item: item}
+      %{split: split, beta: beta, gall: gall, item: item, weld: weld}
+    end
+
+    # The Sources stating each of the Gall's Inducers, by Inducer.
+    defp inducer_sources(gall) do
+      from(r in Gallformers.Catalog.Facts.RelationshipFact,
+        where: r.type == "inducer_of" and r.object_gall_id == ^gall.id
+      )
+      |> Repo.all()
+      |> Map.new(fn r ->
+        {r.subject_taxon_id,
+         r.fact_id |> Facts.list_attributions() |> Enum.map(& &1.source_id) |> Enum.sort()}
+      end)
+    end
+
+    defp state_inducer!(gall, taxon, source) do
+      {:ok, _} =
+        Catalog.assert_relationship(
+          test_actor(),
+          %{type: "inducer_of", subject_taxon_id: taxon.id, object_gall_id: gall.id},
+          confirm(source)
+        )
     end
 
     defp inducer_ids(gall) do
@@ -248,6 +269,57 @@ defmodule Gallformers.Import.UndoQuestionsTest do
 
       assert Enum.filter(Import.list_gall_renames(), &(&1.subject["gall_id"] == ctx.gall.id)) ==
                []
+    end
+
+    test "a daughter answer moves back only what it moved, not the daughter's own statements",
+         ctx do
+      other = source_fixture("Otherinducer", "1990")
+      state_inducer!(ctx.gall, ctx.beta, other)
+
+      decided = decide!(ctx.item, %{"taxon_id" => ctx.beta.id})
+      assert inducer_sources(ctx.gall) == %{ctx.beta.id => Enum.sort([other.id, ctx.weld.id])}
+
+      assert {:ok, %QueueItem{status: :open}} = Import.undo_decision(test_actor(), decided)
+
+      assert inducer_sources(ctx.gall) == %{
+               ctx.split.id => [ctx.weld.id],
+               ctx.beta.id => [other.id]
+             }
+    end
+
+    test "a daughter answer that moved a note moves it back", ctx do
+      [fact_id] =
+        from(r in Gallformers.Catalog.Facts.RelationshipFact,
+          where: r.type == "inducer_of" and r.object_gall_id == ^ctx.gall.id,
+          select: r.fact_id
+        )
+        |> Repo.all()
+
+      {:ok, _} = Catalog.add_fact_note(test_actor(), fact_id, "Weld's type series.")
+      decided = decide!(ctx.item, %{"taxon_id" => ctx.beta.id})
+
+      {:ok, _} = Import.undo_decision(test_actor(), decided)
+
+      [back] =
+        from(r in Gallformers.Catalog.Facts.RelationshipFact,
+          where: r.type == "inducer_of" and r.object_gall_id == ^ctx.gall.id,
+          select: r.fact_id
+        )
+        |> Repo.all()
+
+      assert [%{text: "Weld's type series."}] =
+               Repo.all(from(n in Gallformers.Catalog.FactNote, where: n.fact_id == ^back))
+    end
+
+    test "a daughter answer that joined a Source's two statements is not undone", ctx do
+      state_inducer!(ctx.gall, ctx.beta, ctx.weld)
+      decided = decide!(ctx.item, %{"taxon_id" => ctx.beta.id})
+
+      assert {:error, {:cannot_undo, :joined} = reason} =
+               Import.undo_decision(test_actor(), decided)
+
+      assert Import.undo_refusal(reason).text =~ "Gall's page"
+      assert inducer_sources(ctx.gall) == %{ctx.beta.id => [ctx.weld.id]}
     end
 
     test "not known yet: the broad-sense mark goes", ctx do
@@ -288,6 +360,26 @@ defmodule Gallformers.Import.UndoQuestionsTest do
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
       assert inducer_ids(ctx.gall) == [ctx.split.id]
+      assert %QueueItem{status: :open} = Repo.get!(QueueItem, ctx.item.id)
+    end
+
+    test "replays to the same state on a Gall already naming the daughter", ctx do
+      other = source_fixture("Otherinducer", "1990")
+      state_inducer!(ctx.gall, ctx.beta, other)
+
+      {entries, _} =
+        logged_and_undone(fn ->
+          decided = decide!(ctx.item, %{"taxon_id" => ctx.beta.id})
+          {:ok, _} = Import.undo_decision(test_actor(), decided)
+        end)
+
+      assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+
+      assert inducer_sources(ctx.gall) == %{
+               ctx.split.id => [ctx.weld.id],
+               ctx.beta.id => [other.id]
+             }
+
       assert %QueueItem{status: :open} = Repo.get!(QueueItem, ctx.item.id)
     end
   end

@@ -131,6 +131,30 @@ defmodule Gallformers.Facts.ContestTest do
     assert standing(ctx.synonymy) == :superseded
   end
 
+  describe "recompute_contests/1, for Facts written before contests" do
+    # As migration `20261107140000_add_fact_contests` left them: the
+    # contests filled in, the standings not recomputed.
+    defp written_before_contests!(ctx) do
+      {:ok, _} = Facts.accept(test_actor(), ctx.statement.id)
+
+      Repo.update_all(from(f in Facts.Fact, where: f.id == ^ctx.synonymy.id),
+        set: [standing: :current]
+      )
+    end
+
+    test "supersedes the older synonymy, and only once", ctx do
+      {:ok, before} = Facts.recompute_contests(test_actor())
+      written_before_contests!(ctx)
+
+      assert {:ok, %{changed: 1} = result} = Facts.recompute_contests(test_actor())
+      assert result.contests == before.contests
+      assert standing(ctx.synonymy) == :superseded
+      assert standing(ctx.name) == :current
+
+      assert {:ok, %{changed: 0}} = Facts.recompute_contests(test_actor())
+    end
+  end
+
   test "deleting the name Fact lets the synonymy count again", ctx do
     {:ok, _} = Facts.accept(test_actor(), ctx.statement.id)
     {:ok, _} = Facts.delete_facts(test_actor(), [ctx.name.id])

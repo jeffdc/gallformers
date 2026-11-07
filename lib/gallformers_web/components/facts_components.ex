@@ -30,16 +30,21 @@ defmodule GallformersWeb.FactsComponents do
 
   Also here: the line saying whether the Source is ready to approve
   (`facts_readiness/1`), the counts as filter chips (`facts_filter/1`),
-  and the taxonomy changes (`facts_taxonomy/1`): once applied, each
+  the taxonomy changes (`facts_taxonomy/1`): once applied, each
   taxonomic statement with the curator's mark (accepted, declined with the
-  reason, or awaiting a curator; matter `f923`).
+  reason, or awaiting a curator; matter `f923`), and the form of an edit
+  or correction open on a Fact (`fact_editor/1`).
   """
   use Phoenix.Component
 
+  import GallformersWeb.ActionComponents, only: [button: 1]
   import GallformersWeb.CoreComponents, only: [icon: 1]
   import GallformersWeb.DataComponents, only: [fact_list: 1]
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
-  import GallformersWeb.ReviewComponents, only: [review_quote: 1, review_passage: 1]
+  import GallformersWeb.FormComponents, only: [typeahead: 1]
+
+  import GallformersWeb.ReviewComponents,
+    only: [review_quote: 1, review_passage: 1, review_value_list: 1]
 
   alias Gallformers.Catalog.RelationshipTypes
   alias Phoenix.LiveView.JS
@@ -647,6 +652,106 @@ defmodule GallformersWeb.FactsComponents do
         </div>
       </div>
     </section>
+    """
+  end
+
+  # -- an edit's form -----------------------------------------------------------------------
+
+  @doc """
+  The form of an edit open on a Fact, in the `editor` slot of
+  `facts_view/1` and `facts_taxonomy/1`: the review Facts page's edits
+  (Drop, Change Host, Change value, Note) and the admin Source page's
+  corrections (Withdraw, Change Host, value, parent, accepted taxon). Its
+  title says what the edit does; then, as the edit needs, a taxon search
+  (`search_label` given: a `typeahead`, its results grouped by `:group`,
+  each with its `meta` muted), the Trait's values to tick (`values` given:
+  `review_value_list`), the caller's own fields (the inner block), the
+  note, the refusal (`error`), and Save and Cancel (`edit_cancel`).
+
+  `pick` holds the open edit's choices (`query`, `results`, `selected`,
+  `values`, `note`). Parts' ids are `<id>-note`, `<id>-values`, `<id>-error`,
+  `<id>-save`, `<id>-cancel`, and the search's `search_id` (default
+  `<id>-taxon`).
+  """
+  attr :id, :string, required: true
+  attr :title, :string, required: true, doc: "what the edit does, in words"
+  attr :on_submit, :string, required: true
+  attr :target, :any, default: nil, doc: "where the form sends its events (`@myself`)"
+  attr :pick, :map, required: true, doc: "`%{query, results, selected, values, note}`"
+  attr :search_label, :string, default: nil, doc: "the taxon search's label; nil for none"
+  attr :search_id, :string, default: nil
+  attr :search_event, :string, default: "search_taxon"
+  attr :select_event, :string, default: "select_taxon"
+  attr :clear_event, :string, default: "clear_taxon"
+  attr :values, :list, default: nil, doc: "the Trait's `{value, definition}` pairs; nil for none"
+  attr :on_toggle, :string, default: "toggle_value"
+  attr :note_label, :string, required: true
+  attr :error, :string, default: nil
+  attr :save_text, :string, required: true
+  attr :save_variant, :string, default: "primary"
+  slot :inner_block, doc: "the edit's own fields, before the note"
+
+  def fact_editor(assigns) do
+    ~H"""
+    <.form
+      for={%{}}
+      id={@id}
+      phx-submit={@on_submit}
+      phx-target={@target}
+      class="grid gap-2 rounded-panel border border-line bg-surface-2 p-2"
+    >
+      <p class="text-caption font-semibold text-ink-2">{@title}</p>
+      <.typeahead
+        :if={@search_label}
+        id={@search_id || "#{@id}-taxon"}
+        label={@search_label}
+        placeholder="Type a name…"
+        search_event={@search_event}
+        select_event={@select_event}
+        clear_event={@clear_event}
+        query={@pick.query}
+        results={@pick.results}
+        selected={@pick.selected}
+        display_fn={& &1.name}
+        group_key={:group}
+        target={@target}
+      >
+        <:result :let={result}>
+          <span class="italic">{result.name}</span>
+          <span :if={result.meta != ""} class="text-caption text-muted ml-1">{result.meta}</span>
+        </:result>
+      </.typeahead>
+      <.review_value_list
+        :if={@values}
+        id={"#{@id}-values"}
+        type="checkbox"
+        values={@values}
+        selected={@pick.values}
+        on_pick={@on_toggle}
+        target={@target}
+      />
+      {render_slot(@inner_block)}
+      <div class="grid gap-0.5">
+        <label for={"#{@id}-note"} class="gf-label-sm">{@note_label}</label>
+        <textarea id={"#{@id}-note"} name="note" rows="2" class="gf-textarea text-ui">{@pick.note}</textarea>
+      </div>
+      <p :if={@error} id={"#{@id}-error"} class="text-caption text-danger">{@error}</p>
+      <div class="flex flex-wrap gap-2">
+        <.button id={"#{@id}-save"} type="submit" size="sm" variant={@save_variant}>
+          {@save_text}
+        </.button>
+        <.button
+          id={"#{@id}-cancel"}
+          type="button"
+          phx-click="edit_cancel"
+          phx-target={@target}
+          size="sm"
+          variant="ghost"
+        >
+          Cancel
+        </.button>
+      </div>
+    </.form>
     """
   end
 

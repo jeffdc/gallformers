@@ -66,7 +66,7 @@ Toggle buttons sending `on_toggle`. Used nowhere but its own docs.
 | `id_live.ex:1062, 1138` | `plant_parts`, `textures` | `multi_select_typeahead`. |
 | `admin/images_component.ex:610` | source picker | The only `target={@myself}`. |
 | `admin/review_live/item_row.ex:1580` | dynamic | `target`, `group_key` for plants. |
-| `admin/review_live/facts.ex:604` | `fact-editor-plant` | `group_key={:group}`. |
+| `facts_components.ex` (`fact_editor`) | `fact-editor-plant` (review Facts), `correction-editor-taxon` (admin Source Facts) | `group_key={:group}`; `target` on the Source page. |
 | `admin/taxonomy_live/{index:348, new:569/636, edit:530/592}`, `source_live/edit.ex:421`, `gall_live/edit.ex:590` | various | Plain single typeahead. |
 
 **Host results** read "Accepted (synonyms…, common names…)" (`format_host_display`, id_live.ex:965-972; synonyms then common names), rendered with `taxon_name` (binomial italic, bracket upright), plus "(incomplete)" when not datacomplete. Ranking: exact, then prefix, then the rest; every word must appear in one name or the accepted name. A selected Host shows only its accepted name.

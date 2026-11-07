@@ -39,7 +39,8 @@ defmodule Gallformers.Import.SplitQuestions do
 
   Through `Gallformers.Import.decide_queue_item/3`: `%{"taxon_id" => id}`
   (a daughter) re-points the Gall's Inducer from A to it and proposes the
-  rename (A itself keeps it, unmarked); `%{"not_known" => true}` keeps it
+  rename (A itself keeps it, unmarked), the decision keeping what moved
+  (`moved/5`) so that Undo moves back exactly that; `%{"not_known" => true}` keeps it
   on A, marked as following the name in its old broad sense
   (`Gallformers.Catalog.mark_broad_sense/4`), until a later Source settles
   it. Refused when the Gall's Inducer is no longer A. Audited with the
@@ -236,16 +237,19 @@ defmodule Gallformers.Import.SplitQuestions do
   @doc """
   Carries out answer `decision` on split question `item`, inside
   `Gallformers.Import.decide_queue_item/3`'s transaction (see the module
-  doc). `{:error, changeset}` (on `:decision`) when the Gall's Inducer is
-  no longer the split taxon.
+  doc), with what it moved for Undo to keep (`"carried_out"`): for a
+  daughter, one `"inducer_moved"` entry (`moved/5`); else none.
+  `{:error, changeset}` (on `:decision`) when the Gall's Inducer is no
+  longer the split taxon.
   """
-  @spec carry_out(Actor.t(), QueueItem.t(), map()) :: {:ok, map()} | {:error, Changeset.t()}
+  @spec carry_out(Actor.t(), QueueItem.t(), map()) ::
+          {:ok, map(), [map()]} | {:error, Changeset.t()}
   def carry_out(%Actor{} = actor, %QueueItem{subject: subject} = item, decision) do
     %{"gall_id" => gall_id, "taxon_id" => split_id} = subject
 
     if gall_id in Catalog.galls_on_inducer(split_id) do
-      :ok = answer(actor, subject, item.reason, decision)
-      {:ok, decision}
+      {:ok, carried_out} = answer(actor, subject, item.reason, decision)
+      {:ok, decision, carried_out}
     else
       {:error,
        item
@@ -261,20 +265,67 @@ defmodule Gallformers.Import.SplitQuestions do
   defp answer(actor, subject, _reason, %{"not_known" => true}) do
     %{"gall_id" => gall_id, "taxon_id" => split_id} = subject
     {:ok, _} = Catalog.mark_broad_sense(actor, gall_id, split_id, subject["fact_id"])
-    :ok
+    {:ok, []}
   end
 
   # The split taxon in its narrow sense: it stays, unmarked.
   defp answer(actor, %{"taxon_id" => id} = subject, _reason, %{"taxon_id" => id}) do
     {:ok, _} = Catalog.mark_broad_sense(actor, subject["gall_id"], id, nil)
-    :ok
+    {:ok, []}
   end
 
   defp answer(actor, subject, reason, %{"taxon_id" => daughter}) do
     %{"gall_id" => gall_id, "taxon_id" => split_id} = subject
-    {:ok, _} = Catalog.repoint_inducer(actor, gall_id, split_id, daughter)
-    GallRenames.propose_for_galls([gall_id], reason || "The Gall's Inducer changed.")
+    reason = reason || "The Gall's Inducer changed."
+    facts = Catalog.inducer_facts(gall_id, split_id)
+    {:ok, %{moves: moves}} = Catalog.repoint_inducer(actor, gall_id, split_id, daughter)
+    :ok = GallRenames.propose_for_galls([gall_id], reason)
+    entry = moved(gall_id, split_id, daughter, facts, moves)
+    {:ok, [put_in(entry, ["payload", "reason"], reason)]}
   end
+
+  @doc """
+  What re-pointing Gall `gall_id`'s Inducer from `split_id` to `daughter`
+  moved (`moves`), as a `"carried_out"` entry by stable reference, which
+  Undo moves back exactly (`Gallformers.Import.Undo`): keyed by the Gall
+  and the two taxa (`"gall"`, `"from"`, `"to"`); its payload's
+  `"statements"` are the Facts moved (`facts`, read before the move:
+  `Gallformers.Catalog.inducer_facts/2`), each the Fact itself or a
+  qualifier of it (`"qualifier"`: `%{"qualifier", "value"}`, else nil),
+  with the Gall it is stated in the context of (`"context"`), the Sources
+  whose attributions moved (`"sources"`), those whose attribution was
+  joined to the one they held on the daughter's Fact already
+  (`"joined"`), and its notes (`"notes"`: `%{"text", "author_name"}`).
+  """
+  @spec moved(integer(), integer(), integer(), [map()], [map()]) :: map()
+  def moved(gall_id, split_id, daughter, facts, moves) do
+    by_from = Map.new(moves, &{&1.from, &1})
+
+    statements =
+      for fact <- facts, %{} = move <- [by_from[fact.fact_id]] do
+        %{
+          "qualifier" => qualifier_ref(fact.qualifier),
+          "context" => fact.gall_context_id && StableRef.gall(fact.gall_context_id),
+          "sources" => for(%{outcome: :moved, id: id} <- move.sources, do: StableRef.source(id)),
+          "joined" =>
+            for(%{outcome: :already_held, id: id} <- move.sources, do: StableRef.source(id)),
+          "notes" => Enum.map(fact.notes, &%{"text" => &1.text, "author_name" => &1.author_name})
+        }
+      end
+
+    %{
+      "kind" => "inducer_moved",
+      "key" => %{
+        "gall" => StableRef.gall(gall_id),
+        "from" => StableRef.taxon(split_id),
+        "to" => StableRef.taxon(daughter)
+      },
+      "payload" => %{"statements" => statements}
+    }
+  end
+
+  defp qualifier_ref(nil), do: nil
+  defp qualifier_ref({qualifier, value}), do: %{"qualifier" => qualifier, "value" => value}
 
   # -- the replay log ----------------------------------------------------------
 

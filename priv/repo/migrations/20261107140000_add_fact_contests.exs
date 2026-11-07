@@ -9,8 +9,10 @@ defmodule Gallformers.Repo.Migrations.AddFactContests do
       `contest_holder` (e.g. `"taxon:<id>"`), set when the Fact is made and
       never changed, like `slot`; indexed for the recompute's lookups.
     * The existing name and synonymy Facts get theirs from their details.
-      Their standings are recomputed by the next write touching them, or
-      by `Gallformers.Facts.recompute_for_source/2`.
+      Their standings are not recomputed here (a data step, not a schema
+      one): run `Gallformers.Facts.recompute_contests/1` once after this
+      migration (`mix gallformers.facts.recompute_contests`, or
+      `Gallformers.Release.recompute_contests/0` on a release).
   """
   use Ecto.Migration
 

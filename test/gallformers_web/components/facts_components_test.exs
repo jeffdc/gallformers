@@ -3,7 +3,8 @@ defmodule GallformersWeb.FactsComponentsTest do
   The Facts view's taxonomy parts (matter `f923` Task 10): an applied
   taxonomic statement's curator mark in the taxonomy changes, and a
   taxon's position (`taxonomic_position/1`): the Source its placement and
-  name come from, and the papers that disagree.
+  name come from, and the papers that disagree. And the form of an edit
+  open on a Fact (`fact_editor/1`).
   """
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
@@ -189,6 +190,69 @@ defmodule GallformersWeb.FactsComponentsTest do
         """)
 
       assert String.trim(html) == ""
+    end
+  end
+
+  describe "fact_editor" do
+    defp pick(attrs),
+      do: Map.merge(%{query: "", results: [], selected: nil, values: [], note: ""}, attrs)
+
+    test "the title, the note and Save and Cancel; no search or values unless asked" do
+      assigns = %{pick: pick(%{note: "As written"})}
+
+      html =
+        rendered_to_string(~H"""
+        <.fact_editor
+          id="ed"
+          title="Drop this Fact."
+          on_submit="save"
+          target="#here"
+          pick={@pick}
+          note_label="Note (optional)"
+          save_text="Drop it"
+        />
+        """)
+
+      assert count(html, "form#ed[phx-submit=save][phx-target='#here']") == 1
+      assert count(html, "#ed-cancel[phx-target='#here']") == 1
+      assert text(html, "form#ed > p") == "Drop this Fact."
+      assert text(html, "label[for=ed-note]") == "Note (optional)"
+      assert text(html, "textarea#ed-note[name=note]") == "As written"
+      assert text(html, "#ed-save") == "Drop it"
+      assert count(html, "#ed-cancel[phx-click=edit_cancel]") == 1
+      assert count(html, "#ed-taxon") == 0
+      assert count(html, "#ed-values") == 0
+      assert count(html, "#ed-error") == 0
+    end
+
+    test "a taxon search, the values to tick, the caller's fields and the refusal" do
+      assigns = %{pick: pick(%{values: ["red"]})}
+
+      html =
+        rendered_to_string(~H"""
+        <.fact_editor
+          id="ed"
+          title="Change it."
+          on_submit="save"
+          pick={@pick}
+          search_label="The plant"
+          search_event="search_plant"
+          values={[{"red", "Red."}, {"brown", nil}]}
+          note_label="Note: why (required)"
+          error="Write the note."
+          save_text="Save"
+          save_variant="danger"
+        >
+          <input id="ed-extra" type="checkbox" name="accept" />
+        </.fact_editor>
+        """)
+
+      assert count(html, "#ed-taxon") == 1
+      assert html =~ "search_plant"
+      assert count(html, "#ed-values-red[checked]") == 1
+      assert count(html, "#ed-values-brown[checked]") == 0
+      assert count(html, "#ed-extra") == 1
+      assert text(html, "#ed-error") == "Write the note."
     end
   end
 end

@@ -349,6 +349,22 @@ defmodule Gallformers.Import.UndoTest do
       assert %QueueItem{status: :open} = synonym_item(package)
     end
 
+    test "the name given back keeps its authorship, and replays so", ctx do
+      [synonym] = Taxa.list_synonyms(ctx.held)
+      synonym |> Ecto.Changeset.change(authorship: "Beutenmüller, 1910") |> Repo.update!()
+      package = synonym_package("Fixtandricus wisliceni")
+
+      {entries, _} =
+        logged_and_undone(fn ->
+          item = decide!(synonym_item(package), %{"split" => true})
+          {:ok, _} = Import.undo_decision(test_actor(), item)
+          assert [%{authorship: "Beutenmüller, 1910"}] = Taxa.list_synonyms(ctx.held)
+        end)
+
+      assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert [%{authorship: "Beutenmüller, 1910"}] = Taxa.list_synonyms(ctx.held)
+    end
+
     test "synonym_of: moves the name back", ctx do
       package = synonym_package("Fixtandricus wisliceni")
       item = decide!(synonym_item(package), %{"synonym_of" => ctx.other.id})

@@ -30,10 +30,11 @@ defmodule Gallformers.Import.Undo do
       or move) are what it logged for replay before itself; the decision's
       `:queue_decision` entry keeps them (`"carried_out"`), and undo makes
       the reverse edits (`reversal/1`), the newest first: a synonym added
-      is removed, a synonym removed is added back (its sensu kept), a taxon
-      created is deleted (its range cleared first; refused while anything
-      else names it, `Gallformers.Import.TaxonomyEdits`). A decision made
-      before decisions kept them, which may have changed the tree, can't be
+      is removed, a synonym removed is added back (its sensu and
+      authorship kept), a taxon created is deleted (its range cleared
+      first; refused while anything else names it,
+      `Gallformers.Import.TaxonomyEdits`). A decision made before
+      decisions kept them, which may have changed the tree, can't be
       undone here.
     * A dispute dropped: the Trait words it kept as text go.
     * The Source's identity: the package's Source is unset (resolving
@@ -43,9 +44,15 @@ defmodule Gallformers.Import.Undo do
     * A rename proposal: an accepted one's Gall takes back the name it
       showed and loses the former-label alias; a rejected one's name
       override goes.
-    * A split question's answer: a daughter's Gall goes back to the split
-      taxon (and its rename proposal is worked out again); "not known yet"
-      loses its broad-sense mark.
+    * A split question's answer: a daughter's answer keeps what it moved
+      (`"carried_out"`, `Gallformers.Import.SplitQuestions.moved/5`), and
+      exactly that goes back to the split taxon, by its reverse edit
+      (`"return_inducer"`): each attribution and note it moved, not the
+      statements the Gall's Fact naming the daughter held before; then the
+      rename proposal is worked out again. Refused when the answer joined
+      a Source's statement of the split taxon to its statement of the
+      daughter (`{:cannot_undo, :joined}`). "Not known yet" loses its
+      broad-sense mark.
     * A taxonomic statement accepted or declined is reopened
       (`Gallformers.Import.TaxonomicDecisions`): the tree follows the
       statements that count again, and its question opens again
@@ -172,8 +179,19 @@ defmodule Gallformers.Import.Undo do
 
   def tree_changing?(_decision), do: false
 
-  @doc "Whether `item`'s decision may have changed the tree (`tree_changing?/1`)."
+  @doc """
+  Whether `item`'s decision may have changed the tree (`tree_changing?/1`),
+  or (a split question's answer naming a daughter) re-pointed a Gall's
+  Inducer: either keeps what it changed (`"carried_out"`).
+  """
   @spec tree_item?(QueueItem.t()) :: boolean()
+  def tree_item?(%QueueItem{kind: :split_inducer, subject: subject, decision: decision}) do
+    case decision do
+      %{"taxon_id" => id} -> id != subject["taxon_id"]
+      _ -> false
+    end
+  end
+
   def tree_item?(%QueueItem{decision: decision} = item) do
     (HostDecisions.host?(item) or GallDecisions.gall?(item) or Disputes.host?(item) or
        SynonymDecisions.synonym?(item)) and tree_changing?(decision)
@@ -317,9 +335,17 @@ defmodule Gallformers.Import.Undo do
   The reverse tree edits of `carried_out` (the entries a decision logged
   before itself, as `%{"kind", "key", "payload"}`), the newest first, by
   stable reference: `%{"op" => "remove_synonym" | "add_synonym", "taxon",
-  "name", "sensu"}` and `%{"op" => "delete_taxon", "taxon"}`. A taxon's
-  range or WCVP link set when it was created goes with it. `{:error,
-  {:cannot_undo, :edit}}` for an edit with no reverse here.
+  "name", "sensu"}` (`"add_synonym"` with the synonym's `"authorship"`
+  too) and `%{"op" => "delete_taxon", "taxon"}`. A taxon's range or WCVP
+  link set when it was created goes with it. A split's answer
+  (`"inducer_moved"`, `Gallformers.Import.SplitQuestions.moved/5`) is
+  reversed by `%{"op" => "return_inducer", "gall", "from", "to",
+  "statements", "reason"}`: exactly the attributions and notes it moved
+  go back (the daughter's own statements stay). `{:error, {:cannot_undo,
+  :edit}}` for an edit with no reverse here; `{:error, {:cannot_undo,
+  :joined}}` for a split's answer that joined a Source's statement of the
+  split taxon to its statement of the daughter (what it joined is not
+  kept apart).
   """
   @spec reversal([map()]) :: {:ok, [map()]} | {:error, refusal()}
   def reversal(carried_out) when is_list(carried_out) do
@@ -333,6 +359,7 @@ defmodule Gallformers.Import.Undo do
         :skip -> {:cont, {:ok, ops}}
         {:ok, op} -> {:cont, {:ok, ops ++ [op]}}
         :error -> {:halt, {:error, {:cannot_undo, :edit}}}
+        {:error, why} -> {:halt, {:error, {:cannot_undo, why}}}
       end
     end)
   end
@@ -374,8 +401,29 @@ defmodule Gallformers.Import.Undo do
             "op" => "add_synonym",
             "taxon" => key["taxon"],
             "name" => key["name"],
-            "sensu" => entry["payload"]["sensu"]
+            "sensu" => entry["payload"]["sensu"],
+            "authorship" => entry["payload"]["authorship"]
           }}
+
+  # A split's answer moved the Inducer from the split taxon to the daughter:
+  # back, from the daughter to the split taxon.
+  defp reverse(%{"kind" => "inducer_moved", "key" => key, "payload" => payload}, _created) do
+    statements = List.wrap(payload["statements"])
+
+    if Enum.any?(statements, &(List.wrap(&1["joined"]) != [])) do
+      {:error, :joined}
+    else
+      {:ok,
+       %{
+         "op" => "return_inducer",
+         "gall" => key["gall"],
+         "from" => key["to"],
+         "to" => key["from"],
+         "statements" => statements,
+         "reason" => payload["reason"]
+       }}
+    end
+  end
 
   defp reverse(%{"kind" => "taxonomy_edit", "key" => %{"op" => op} = key}, created)
        when op in ["set_host_range", "set_wcvp"] do
@@ -422,7 +470,9 @@ defmodule Gallformers.Import.Undo do
   defp run_op(actor, %{"op" => "add_synonym", "taxon" => ref, "name" => name} = op) do
     with {:ok, taxon_id} <- StableRef.resolve_taxon(ref),
          nil <- held(taxon_id, name, op["sensu"]) do
-      actor |> Taxa.add_synonym(taxon_id, name, sensu: op["sensu"]) |> ok_or_rollback()
+      actor
+      |> Taxa.add_synonym(taxon_id, name, sensu: op["sensu"], authorship: op["authorship"])
+      |> ok_or_rollback()
     end
   end
 
@@ -431,6 +481,61 @@ defmodule Gallformers.Import.Undo do
       {:ok, _} = Ranges.update_taxon_places(actor, taxon_id, [])
       actor |> TaxonomyEdits.run({:delete_taxon, taxon_id}) |> ok_or_rollback()
     end
+  end
+
+  # The Gall's Inducer goes back to the split taxon (exactly what moved),
+  # and its rename proposal is worked out again.
+  defp run_op(actor, %{"op" => "return_inducer"} = op) do
+    with {:ok, gall_id} <- StableRef.resolve_gall(op["gall"]),
+         {:ok, from_id} <- StableRef.resolve_taxon(op["from"]),
+         {:ok, to_id} <- StableRef.resolve_taxon(op["to"]),
+         {:ok, facts} <- inducer_facts(op["statements"]) do
+      actor |> Catalog.return_inducer(gall_id, from_id, to_id, facts) |> ok_or_rollback()
+      GallRenames.propose_for_galls([gall_id], op["reason"] || "The Gall's Inducer changed.")
+    else
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
+
+  # The statements a split's answer moved, as `Gallformers.Catalog.return_inducer/5` takes them.
+  defp inducer_facts(statements) do
+    statements
+    |> List.wrap()
+    |> Enum.reduce_while({:ok, []}, fn statement, {:ok, facts} ->
+      with {:ok, context_id} <- optional_gall(statement["context"]),
+           {:ok, source_ids} <- source_ids(statement["sources"]) do
+        fact = %{
+          qualifier:
+            statement["qualifier"] &&
+              {statement["qualifier"]["qualifier"], statement["qualifier"]["value"]},
+          gall_context_id: context_id,
+          source_ids: source_ids,
+          notes:
+            for(
+              n <- List.wrap(statement["notes"]),
+              do: %{text: n["text"], author_name: n["author_name"]}
+            )
+        }
+
+        {:cont, {:ok, facts ++ [fact]}}
+      else
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp optional_gall(nil), do: {:ok, nil}
+  defp optional_gall(ref), do: StableRef.resolve_gall(ref)
+
+  defp source_ids(refs) do
+    refs
+    |> List.wrap()
+    |> Enum.reduce_while({:ok, []}, fn ref, {:ok, ids} ->
+      case StableRef.resolve_source(ref) do
+        {:ok, id} -> {:cont, {:ok, ids ++ [id]}}
+        error -> {:halt, error}
+      end
+    end)
   end
 
   defp held(taxon_id, name, sensu) do
@@ -508,6 +613,8 @@ defmodule Gallformers.Import.Undo do
     end
   end
 
+  # A daughter's answer is put back by its reverse tree edit
+  # (`"return_inducer"`), after the item is reopened.
   def put_back(actor, %QueueItem{kind: :split_inducer, subject: subject} = item, _package) do
     %{"gall_id" => gall_id, "taxon_id" => split_id} = subject
 
@@ -515,12 +622,8 @@ defmodule Gallformers.Import.Undo do
       %{"not_known" => true} ->
         {:ok, _} = Catalog.mark_broad_sense(actor, gall_id, split_id, nil)
 
-      %{"taxon_id" => ^split_id} ->
+      %{"taxon_id" => _taxon_id} ->
         :ok
-
-      %{"taxon_id" => daughter} ->
-        {:ok, _} = Catalog.repoint_inducer(actor, gall_id, daughter, split_id)
-        GallRenames.propose_for_galls([gall_id], item.reason || "The Gall's Inducer changed.")
     end
 
     :ok
@@ -673,6 +776,14 @@ defmodule Gallformers.Import.Undo do
       text(
         "Can't undo: this decision was made before decisions kept what they change in the " <>
           "tree. Change it in the taxonomy admin."
+      )
+
+  def refusal({:cannot_undo, :joined}),
+    do:
+      text(
+        "Can't undo: answering joined a Source's statement of the split taxon to its " <>
+          "statement of the daughter, and they can't be told apart now. " <>
+          "Change the Inducer on the Gall's page."
       )
 
   def refusal({:cannot_undo, :edit}),

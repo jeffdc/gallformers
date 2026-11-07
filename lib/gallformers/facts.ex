@@ -109,6 +109,9 @@ defmodule Gallformers.Facts do
   # yields.
   @contest_roles %{"taxon_name" => :claimant, "taxon_synonymy" => :rival}
 
+  # How many contests `recompute_contests/1` recomputes in one transaction.
+  @contest_chunk 500
+
   @typedoc "Why a curator's decision on a statement was refused."
   @type decision_error :: :not_found | :not_taxonomic | :own_source | :reason_required
 
@@ -356,6 +359,75 @@ defmodule Gallformers.Facts do
       |> Repo.all()
       |> recompute()
     end)
+  end
+
+  @typedoc "What `recompute_contests/1` did."
+  @type contests_recomputed :: %{
+          contests: non_neg_integer(),
+          changed: non_neg_integer(),
+          conflicts: [Conflict.t()]
+        }
+
+  @doc """
+  Recomputes the standings of the Facts in every contest held by more than
+  one holder (a taxon's name Fact and a synonymy of the name into another
+  taxon, "A revalidated name outranks an older synonymy of it"), with
+  their slot siblings, telling the listeners what changed (so the tree
+  follows). For data written before Facts had contests: migration
+  `20261107140000_add_fact_contests` gave the existing Facts theirs
+  without recomputing, so an older synonymy that a revalidated name
+  outranks still counted. Each `@contest_chunk` contests are one audited
+  transaction. Idempotent: run again, it changes nothing.
+
+  Returns how many contests it recomputed, how many Facts' standings
+  changed, and the conflicts found; or why a listener refused a chunk
+  (`{:rejected, listener, reason}`: that chunk changes nothing, the ones
+  before it stay recomputed).
+  """
+  @spec recompute_contests(Actor.t()) :: {:ok, contests_recomputed()} | {:error, term()}
+  def recompute_contests(%Actor{} = actor) do
+    contests =
+      from(f in Fact,
+        where: not is_nil(f.contest),
+        group_by: f.contest,
+        having: count(f.contest_holder, :distinct) > 1,
+        order_by: f.contest,
+        select: f.contest
+      )
+      |> Repo.all()
+
+    contests
+    |> Enum.chunk_every(@contest_chunk)
+    |> Enum.reduce_while(
+      {:ok, %{contests: length(contests), changed: 0, conflicts: []}},
+      fn chunk, {:ok, acc} ->
+        Audit.transaction(actor, "facts.recompute_contests", fn ->
+          from(f in Fact, where: f.contest in ^chunk, select: f.id)
+          |> Repo.all()
+          |> recompute_changed()
+        end)
+        |> case do
+          {:ok, {changed, conflicts}} ->
+            {:cont,
+             {:ok,
+              %{
+                acc
+                | changed: acc.changed + length(changed),
+                  conflicts: acc.conflicts ++ conflicts
+              }}}
+
+          {:error, reason} ->
+            {:halt, {:error, reason}}
+        end
+      end
+    )
+  end
+
+  @doc "What `recompute_contests/1` did, in words."
+  @spec format_contests_recomputed(contests_recomputed()) :: String.t()
+  def format_contests_recomputed(%{contests: contests, changed: changed, conflicts: conflicts}) do
+    "Contests recomputed: #{contests}; Facts whose standing changed: #{changed}; " <>
+      "conflicts found: #{length(conflicts)}"
   end
 
   @doc """
@@ -864,7 +936,11 @@ defmodule Gallformers.Facts do
 
   # Recomputes and stores the standings of `fact_ids`, their slot siblings
   # and their contest siblings (`lock_facts/1`); returns the conflicts found.
-  defp recompute(fact_ids) do
+  defp recompute(fact_ids), do: fact_ids |> recompute_changed() |> elem(1)
+
+  # As `recompute/1`, returning the IDs of the Facts whose standing changed
+  # too.
+  defp recompute_changed(fact_ids) do
     facts = lock_facts(fact_ids)
     ids = Enum.map(facts, & &1.id)
 
@@ -933,12 +1009,10 @@ defmodule Gallformers.Facts do
 
     standings = Standing.settle_contests(contesters, standings)
 
-    case store_standings(facts, standings) do
-      [] -> :ok
-      changed -> Events.dispatch(changed)
-    end
+    changed = store_standings(facts, standings)
+    if changed != [], do: :ok = Events.dispatch(changed)
 
-    conflicts
+    {changed, conflicts}
   end
 
   # Stores the standings that changed; returns those Facts' IDs.
