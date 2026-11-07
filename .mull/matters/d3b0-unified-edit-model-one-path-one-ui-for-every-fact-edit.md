@@ -44,8 +44,8 @@ Rules:
 ## Open (to settle in this order, proposed)
 
 1. ~~Structure of the Gallformers Source~~: settled above.
-2. Corrections (rule 7): a third act outside ingestion (audited, replayed), or a corrected re-ingestion of that Source?
-3. Review decisions that change the non-plant tree (`SynonymDecisions` split / synonym_of) must become statements: under whose authority (the reviewed Source's, accepted)?
+2. ~~Corrections~~: settled. The same act as review, under the original Source's authority; with the package model, a correction is a package of that Source through the one ingestion path.
+3. ~~Review decisions that change the tree~~: settled. Under the reviewed Source's authority: they become that Source's statements in its package.
 4. One edit framework, then rebuild the editors onto it.
 
 ## Audit of the current code (2026-11-07)
