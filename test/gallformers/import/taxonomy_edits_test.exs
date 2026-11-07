@@ -86,12 +86,16 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
              ),
              link &&
                {link.wcvp_id, link.powo_id, link.wcvp_match_status, link.range_confirmed,
-                link.wcvp_synced_at}}
+                link.wcvp_synced_at}, Enum.map(taxon.names, &{&1.name, &1.authorship})}
         end
       end
 
     %{taxa: taxa, log: for(e <- Import.list_replay_entries(), do: {e.kind, e.key, e.payload})}
   end
+
+  # A taxon's names with their authorship, in a snapshot.
+  defp names_of(snapshot, name),
+    do: snapshot.taxa |> Enum.find(&(elem(&1, 0) == name)) |> Tuple.to_list() |> List.last()
 
   defp edit!(edit), do: {:ok, _} = Import.record_taxonomy_edit(test_actor(), edit)
 
@@ -103,6 +107,7 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
     [common, _kept] = Taxa.list_common_names(t.alpha)
 
     edit!({:update_editorial, t.alpha, %{datacomplete: true, abundance_id: 2}})
+    edit!({:set_authorship, t.alpha, "(L.) Replay"})
     edit!({:remove_synonym, synonym})
     edit!({:remove_common_name, common.id})
     edit!({:delete_taxon, t.doomed})
@@ -125,6 +130,10 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
 
     assert {"Replayus doomed", :none} in before.taxa
 
+    # The editorial authorship, and WCVP's for the plant the sync linked.
+    assert {"Replayus alpha", "(L.) Replay"} in names_of(before, "Replayus alpha")
+    assert [{"Wcvptestus alpinus", "Test"}] = names_of(before, "Wcvptestus alpinus")
+
     assert Enum.find(before.taxa, &(elem(&1, 0) == "Replayus alpha")) |> elem(5) == [
              {"RO", "country", "introduced"},
              {"US-CA", "exact", "native"}
@@ -132,11 +141,12 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
 
     ops = for {:taxonomy_edit, key, _payload} <- before.log, do: key["op"]
 
-    assert ops == ~w(update_editorial remove_synonym remove_common_name delete_taxon
-                     set_host_range set_host_range set_wcvp set_wcvp set_wcvp set_wcvp)
+    assert ops == ~w(update_editorial set_authorship remove_synonym remove_common_name
+                     delete_taxon set_host_range set_host_range set_wcvp set_wcvp set_wcvp
+                     set_wcvp)
 
     # Logged by name: no database IDs.
-    {:taxonomy_edit, key, payload} = Enum.at(before.log, 4)
+    {:taxonomy_edit, key, payload} = Enum.at(before.log, 5)
 
     assert key["taxon"] == %{
              "name" => "Replayus alpha",
@@ -151,7 +161,7 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
 
     # Audited: the log's rows, and the taxa and link rows the edits changed.
     changes = Repo.all(from(c in test_audit_changes(), select: {c.table_name, c.op}))
-    assert Enum.count(changes, &(&1 == {"replay_log", :insert})) == 10
+    assert Enum.count(changes, &(&1 == {"replay_log", :insert})) == 11
     assert {"taxa", :delete} in changes
     assert {"taxon_wcvp", :insert} in changes
 
@@ -159,7 +169,7 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
     wipe!()
     seed!()
 
-    assert {:ok, 10} = Replay.run(entries, actor: test_actor())
+    assert {:ok, 11} = Replay.run(entries, actor: test_actor())
     assert snapshot() == before
   end
 

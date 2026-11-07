@@ -18,8 +18,9 @@ defmodule Gallformers.Curation.Spec do
       ID or nil), `:code` (text or nil), `:name_parts` (a map of
       `:form_label`, `:descriptor`, `:host_qualifier_taxon_id`,
       `:name_override`), `:default_source_id` (a Source ID or nil). Plant
-      fields: `:name` (text), `:synonyms` (the synonyms it should have:
-      names, or `%{name, sensu}`), `:range` (its Host range:
+      fields: `:name` (text), `:authorship` (its accepted name's, text or
+      nil), `:synonyms` (the synonyms it should have: names, or
+      `%{name, sensu}`), `:range` (its Host range:
       `{place_id, precision, distribution_type}` entries).
   """
   alias Gallformers.Catalog
@@ -29,7 +30,7 @@ defmodule Gallformers.Curation.Spec do
   alias Gallformers.Taxa
 
   @gall_fields [:completeness, :abundance, :code, :name_parts, :default_source_id]
-  @plant_fields [:name, :synonyms, :range]
+  @plant_fields [:name, :authorship, :synonyms, :range]
   @name_parts [:form_label, :descriptor, :host_qualifier_taxon_id, :name_override]
   @providers ["inaturalist", "bugguide"]
 
@@ -192,6 +193,9 @@ defmodule Gallformers.Curation.Spec do
   defp value(:name, name) when is_binary(name) do
     if String.trim(name) == "", do: {:error, :invalid_value}, else: {:ok, String.trim(name)}
   end
+
+  defp value(:authorship, nil), do: {:ok, nil}
+  defp value(:authorship, text) when is_binary(text), do: {:ok, blank_nil(text)}
 
   defp value(:synonyms, synonyms) when is_list(synonyms) do
     normalized =

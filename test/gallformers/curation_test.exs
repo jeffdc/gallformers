@@ -797,6 +797,42 @@ defmodule Gallformers.CurationTest do
       assert [%{about: "synonyms", text: "per Flora of North America"}] =
                Taxa.list_taxon_notes(plant.id)
     end
+
+    test "a plant's authorship is an editorial item, logged for replay; blank clears it", ctx do
+      plant = plant_fixture(name: "Quercus auctorum")
+
+      item =
+        add!(ctx.ada, %{
+          kind: :editorial,
+          subject: {:plant, plant.id},
+          field: :authorship,
+          value: " (L.) Sm. ",
+          based_on: "per IPNI"
+        })
+
+      assert item.text == "Authorship: (L.) Sm."
+      assert {:ok, %{applied: [_], held: []}} = Curation.apply(ctx.ada)
+
+      assert [%{authorship: "(L.) Sm."}] = Taxa.get_taxon!(plant.id).names
+      assert [%{about: "authorship", text: "per IPNI"}] = Taxa.list_taxon_notes(plant.id)
+
+      assert [%{payload: %{"authorship" => "(L.) Sm."}}] =
+               for(
+                 e <- Import.list_replay_entries(),
+                 e.key["op"] == "set_authorship",
+                 do: e
+               )
+
+      add!(ctx.ada, %{
+        kind: :editorial,
+        subject: {:plant, plant.id},
+        field: :authorship,
+        value: ""
+      })
+
+      assert {:ok, %{applied: [_]}} = Curation.apply(ctx.ada)
+      assert [%{authorship: nil}] = Taxa.get_taxon!(plant.id).names
+    end
   end
 
   describe "the Gall's last update" do

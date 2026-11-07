@@ -253,6 +253,34 @@ defmodule Gallformers.Taxa do
   def set_sensu(%Actor{} = actor, taxon, sensu),
     do: set_accepted_field(actor, "taxa.set_sensu", taxon, :sensu, sensu)
 
+  @doc """
+  Sets the authorship of one name of a taxon, accepted or synonym, by its
+  row (`%TaxonName{}` or ID); nil or blank for none. For a plant's names,
+  which are editorial (WCVP's authors, `Gallformers.Ranges.WcvpAuthorship`).
+  Calls no listener. `{:error, :not_found}` when there is no such name.
+  """
+  @spec set_name_authorship(Actor.t(), TaxonName.t() | integer(), String.t() | nil) ::
+          {:ok, TaxonName.t()} | {:error, Changeset.t() | :not_found}
+  def set_name_authorship(%Actor{} = actor, name, authorship) do
+    value =
+      if is_binary(authorship) and String.trim(authorship) != "", do: String.trim(authorship)
+
+    id = if is_struct(name, TaxonName), do: name.id, else: name
+
+    Audit.transaction(actor, "taxa.set_name_authorship", fn ->
+      case Repo.one(from(n in TaxonName, where: n.id == ^id, lock: "FOR UPDATE")) do
+        nil ->
+          Repo.rollback(:not_found)
+
+        %TaxonName{authorship: ^value} = row ->
+          row
+
+        row ->
+          row |> Changeset.change(authorship: value) |> Repo.update() |> unwrap_or_rollback()
+      end
+    end)
+  end
+
   defp set_accepted_field(actor, operation, taxon, field, value) do
     value = if is_binary(value) and String.trim(value) != "", do: String.trim(value)
 

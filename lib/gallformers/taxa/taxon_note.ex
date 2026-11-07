@@ -6,7 +6,8 @@ defmodule Gallformers.Taxa.TaxonNote do
   curator knows why it differs from WCVP (`Gallformers.Taxa.add_taxon_note/5`).
   Not evidence in the Fact sense.
 
-  `about` is what the edit changed: `"name"`, `"synonyms"` or `"range"`.
+  `about` is what the edit changed: `"name"`, `"authorship"`, `"synonyms"`
+  or `"range"`.
   `author_user_id` and `author_name` record who wrote it; `inserted_at` is
   its date. The table is `taxon_notes`.
   """
@@ -16,7 +17,7 @@ defmodule Gallformers.Taxa.TaxonNote do
   alias Gallformers.Audit.Actor
   alias Gallformers.Taxa.Taxon
 
-  @abouts ~w(name synonyms range)
+  @abouts ~w(name authorship synonyms range)
 
   @type t :: %__MODULE__{
           id: integer() | nil,

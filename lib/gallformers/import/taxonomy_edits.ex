@@ -13,6 +13,9 @@ defmodule Gallformers.Import.TaxonomyEdits do
     * `{:update_editorial, taxon, attrs}` — `"update_editorial"`, payload
       the flags given (`"datacomplete"`, `"abundance_id"`; abundance IDs are
       kept by the data migration)
+    * `{:set_authorship, taxon, authorship}` — `"set_authorship"`, payload
+      the accepted name's `"authorship"` (nil for none): a plant's,
+      editorially (`Gallformers.Taxa.set_authorship/3`)
     * `{:remove_synonym, name}` — `"remove_synonym"`, keyed by the taxon and
       the synonym's name, payload its `"sensu"`
     * `{:remove_common_name, name}` — `"remove_common_name"`, keyed by the
@@ -58,6 +61,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
   @typedoc "An edit `Gallformers.Import.record_taxonomy_edit/2` takes here."
   @type edit ::
           {:update_editorial, Taxa.taxon_ref(), map()}
+          | {:set_authorship, Taxa.taxon_ref(), String.t() | nil}
           | {:remove_synonym, TaxonName.t() | integer()}
           | {:remove_common_name, CommonName.t() | integer()}
           | {:delete_taxon, Taxa.taxon_ref()}
@@ -73,7 +77,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
           | {:clear_match_status, [integer()]}
           | {:confirm_ranges, [integer()]}
 
-  @ops ~w(update_editorial remove_synonym remove_common_name delete_taxon set_host_range set_wcvp)
+  @ops ~w(update_editorial set_authorship remove_synonym remove_common_name delete_taxon set_host_range set_wcvp)
   @link_fields [:wcvp_id, :powo_id, :wcvp_match_status, :range_confirmed, :wcvp_synced_at]
 
   @doc "Whether `Gallformers.Import.record_taxonomy_edit/2` takes `edit` here."
@@ -96,6 +100,9 @@ defmodule Gallformers.Import.TaxonomyEdits do
 
     {key("update_editorial", taxon), payload}
   end
+
+  def entry({:set_authorship, taxon, authorship}),
+    do: {key("set_authorship", taxon), %{"authorship" => authorship}}
 
   def entry({:remove_synonym, name}) do
     %TaxonName{} = found = Repo.get(TaxonName, row_id(name)) || Repo.rollback(:not_found)
@@ -120,6 +127,9 @@ defmodule Gallformers.Import.TaxonomyEdits do
   @spec run(Actor.t(), edit()) :: {:ok, term()} | {:error, term()}
   def run(actor, {:update_editorial, taxon, attrs}),
     do: Taxa.update_editorial(actor, taxon, attrs)
+
+  def run(actor, {:set_authorship, taxon, authorship}),
+    do: Taxa.set_authorship(actor, taxon, authorship)
 
   def run(actor, {:remove_synonym, name}), do: Taxa.remove_synonym(actor, name)
   def run(actor, {:remove_common_name, name}), do: Taxa.remove_common_name(actor, name)
@@ -154,6 +164,11 @@ defmodule Gallformers.Import.TaxonomyEdits do
       attrs = for {field, value} <- payload, into: %{}, do: {editorial_field(field), value}
       {:ok, {:update_editorial, id, attrs}}
     end
+  end
+
+  def decode(%{"op" => "set_authorship", "taxon" => taxon}, payload) do
+    with {:ok, id} <- StableRef.resolve_taxon(taxon),
+         do: {:ok, {:set_authorship, id, payload["authorship"]}}
   end
 
   def decode(%{"op" => "remove_synonym", "taxon" => taxon, "name" => name}, payload) do

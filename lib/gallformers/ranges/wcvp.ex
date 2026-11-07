@@ -23,6 +23,7 @@ defmodule Gallformers.Ranges.Wcvp do
   alias Gallformers.Ranges
   alias Gallformers.Ranges.HostRange
   alias Gallformers.Ranges.TaxonWcvp
+  alias Gallformers.Ranges.WcvpAuthorship
   alias Gallformers.Repo
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Rank
@@ -60,7 +61,9 @@ defmodule Gallformers.Ranges.Wcvp do
   @doc """
   Sets fields of a plant taxon's WCVP link (`Gallformers.Ranges.TaxonWcvp`),
   creating it when there is none. A new `wcvp_id` clears a `no_match`
-  status but keeps `ignored`, unless `attrs` gives the status.
+  status but keeps `ignored`, unless `attrs` gives the status, and brings
+  the plant's authorship from the new record
+  (`Gallformers.Ranges.WcvpAuthorship.follow_link/3`).
   """
   @spec put_link(Actor.t(), Taxa.taxon_ref(), map()) ::
           {:ok, TaxonWcvp.t()} | {:error, Ecto.Changeset.t()}
@@ -69,10 +72,16 @@ defmodule Gallformers.Ranges.Wcvp do
       taxon_id = taxon_id(taxon)
       link = get_link(taxon_id) || %TaxonWcvp{taxon_id: taxon_id}
 
-      link
-      |> TaxonWcvp.changeset(link_attrs(link, attrs))
-      |> Repo.insert_or_update()
-      |> unwrap_or_rollback()
+      saved =
+        link
+        |> TaxonWcvp.changeset(link_attrs(link, attrs))
+        |> Repo.insert_or_update()
+        |> unwrap_or_rollback()
+
+      if saved.wcvp_id not in [nil, link.wcvp_id],
+        do: :ok = WcvpAuthorship.follow_link(actor, taxon_id, link.wcvp_id)
+
+      saved
     end)
   end
 

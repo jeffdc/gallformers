@@ -15,6 +15,7 @@ defmodule Gallformers.Ranges.WcvpTest do
   alias Gallformers.Ranges
   alias Gallformers.Ranges.TaxonWcvp
   alias Gallformers.Ranges.Wcvp
+  alias Gallformers.Taxa
 
   setup :audit_test_metadata
 
@@ -101,6 +102,57 @@ defmodule Gallformers.Ranges.WcvpTest do
                Wcvp.put_link(test_actor(), plant, %{wcvp_match_status: "maybe"})
 
       assert %{wcvp_match_status: [_]} = errors_on(changeset)
+    end
+  end
+
+  # `Gallformers.Ranges.WcvpAuthorship`: the stub holds "Wcvphomonymus
+  # dubius" as 910 ("Smith") and 911 ("Jones"), and its "var. minor" as a
+  # synonym of 910 ("Brown") and of 700 ("Green").
+  describe "authorship follows the link" do
+    defp authorships(taxon),
+      do: for(n <- Taxa.get_taxon!(taxon.id).names, do: {n.name, n.authorship})
+
+    test "matching a plant gives its blank names WCVP's authors" do
+      plant = plant_fixture(name: "Wcvptestus alpinus")
+
+      assert {:ok, :linked} = Wcvp.match(test_actor(), plant)
+      assert authorships(plant) == [{"Wcvptestus alpinus", "Test"}]
+    end
+
+    test "a new link replaces the authorship the old link gave, not a curator's" do
+      plant = plant_fixture(name: "Wcvphomonymus dubius")
+      {:ok, _} = Taxa.add_synonym(test_actor(), plant, "Wcvphomonymus dubius var. minor")
+
+      {:ok, _} = Wcvp.put_link(test_actor(), plant, %{wcvp_id: "910"})
+
+      assert authorships(plant) == [
+               {"Wcvphomonymus dubius", "Smith"},
+               {"Wcvphomonymus dubius var. minor", "Brown"}
+             ]
+
+      # The synonym keeps what it has: only blank synonyms are filled.
+      {:ok, _} = Wcvp.put_link(test_actor(), plant, %{wcvp_id: "911"})
+
+      assert authorships(plant) == [
+               {"Wcvphomonymus dubius", "Jones"},
+               {"Wcvphomonymus dubius var. minor", "Brown"}
+             ]
+
+      {:ok, _} = Taxa.set_authorship(test_actor(), plant, "Curator, 2026")
+      {:ok, _} = Wcvp.put_link(test_actor(), plant, %{wcvp_id: "910"})
+
+      assert [{"Wcvphomonymus dubius", "Curator, 2026"}, _] = authorships(plant)
+    end
+
+    test "a link's other fields, or the same link again, change no authorship" do
+      plant = plant_fixture(name: "Wcvptestus alpinus")
+      {:ok, _} = Wcvp.put_link(test_actor(), plant, %{wcvp_id: "700"})
+      {:ok, _} = Taxa.set_authorship(test_actor(), plant, nil)
+
+      {:ok, _} = Wcvp.put_link(test_actor(), plant, %{wcvp_id: "700", range_confirmed: true})
+      {:ok, _} = Wcvp.put_link(test_actor(), plant, %{wcvp_match_status: "ignored"})
+
+      assert authorships(plant) == [{"Wcvptestus alpinus", nil}]
     end
   end
 

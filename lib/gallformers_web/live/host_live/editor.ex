@@ -1,14 +1,18 @@
 defmodule GallformersWeb.HostLive.Editor do
   @moduledoc """
   Edit mode's Editorial panel on a plant's page (matter `ec2c`: plant pages
-  are editorial): the plant's name, its synonyms and its range, each edit
-  an editorial item in the curator's tray (`Gallformers.Curation`), with
-  what it is "based on" when it departs from WCVP. Each is a row of one
+  are editorial): the plant's name, its authorship, its synonyms and its
+  range, each edit an editorial item in the curator's tray
+  (`Gallformers.Curation`), with what it is "based on" when it departs
+  from WCVP. Each is a row of one
   list, its label beside its value and actions (as the Gall page's Edit
   mode sets its rows).
 
     * **Name:** Rename… gives the new accepted name (the old one stays a
       synonym when it applies, as in the taxonomy admin).
+    * **Authorship:** the accepted name's authority (WCVP's authors,
+      `Gallformers.Ranges.WcvpAuthorship`, unless a curator changed it);
+      Change… gives another, or none.
     * **Synonyms:** each a row with Take out; Add a synonym opens its
       fields: the name, and behind a disclosure the optional "sensu" (for
       a misapplied name) and "based on". The tray holds the whole list the
@@ -28,7 +32,8 @@ defmodule GallformersWeb.HostLive.Editor do
   alias Gallformers.{Curation, Ranges}
 
   @impl true
-  def mount(socket), do: {:ok, assign(socket, name_dialog: false, synonym_form: false)}
+  def mount(socket),
+    do: {:ok, assign(socket, name_dialog: false, authorship_dialog: false, synonym_form: false)}
 
   @impl true
   def update(%{refresh: true}, socket), do: {:ok, load_pending(socket)}
@@ -102,6 +107,17 @@ defmodule GallformersWeb.HostLive.Editor do
     end
   end
 
+  def handle_event("open_authorship", _params, socket),
+    do: {:noreply, assign(socket, authorship_dialog: true)}
+
+  def handle_event("close_authorship", _params, socket),
+    do: {:noreply, assign(socket, authorship_dialog: false)}
+
+  def handle_event("set_authorship", params, socket) do
+    socket = tray(socket, :authorship, blank_nil(params["authorship"]), params["based_on"])
+    {:noreply, assign(socket, authorship_dialog: false)}
+  end
+
   def handle_event("open_synonym", _params, socket),
     do: {:noreply, assign(socket, synonym_form: true)}
 
@@ -171,7 +187,17 @@ defmodule GallformersWeb.HostLive.Editor do
     assigns =
       assign(assigns,
         synonyms: working_synonyms(assigns),
-        name_item: in_tray(assigns.pending, :name)
+        name_item: in_tray(assigns.pending, :name),
+        authorship_item: in_tray(assigns.pending, :authorship)
+      )
+
+    assigns =
+      assign(assigns,
+        authorship:
+          if(assigns.authorship_item,
+            do: assigns.authorship_item.spec.value,
+            else: assigns.host.authorship
+          )
       )
 
     ~H"""
@@ -189,6 +215,22 @@ defmodule GallformersWeb.HostLive.Editor do
               <.tray_mark item={@name_item} />
               <.button variant="ghost" size="sm" phx-click="open_name" phx-target={@myself}>
                 Rename…
+              </.button>
+            </dd>
+          </div>
+
+          <div
+            id="host-editor-authorship"
+            class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5"
+          >
+            <dt class="w-24 shrink-0 text-meta text-muted">Authorship</dt>
+            <dd class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span class={["min-w-0 flex-1", !@authorship && "text-muted"]}>
+                {@authorship || "None"}
+              </span>
+              <.tray_mark item={@authorship_item} />
+              <.button variant="ghost" size="sm" phx-click="open_authorship" phx-target={@myself}>
+                Change…
               </.button>
             </dd>
           </div>
@@ -355,6 +397,52 @@ defmodule GallformersWeb.HostLive.Editor do
             Cancel
           </.button>
           <.button type="submit" form="host-name-form" variant="primary">Put in tray</.button>
+        </:actions>
+      </.dialog>
+
+      <.dialog
+        :if={@authorship_dialog}
+        id="host-authorship-dialog"
+        title={"Authorship of #{@host.name}"}
+        size={:sm}
+        show
+        on_cancel={JS.push("close_authorship", target: @myself)}
+      >
+        <form
+          id="host-authorship-form"
+          phx-submit="set_authorship"
+          phx-target={@myself}
+          class="flex flex-col gap-block"
+        >
+          <.field label="Authorship" for="host-authorship" help="Blank for none.">
+            <input
+              id="host-authorship"
+              name="authorship"
+              type="text"
+              value={@authorship}
+              placeholder="(L.) Sm."
+              aria-describedby="host-authorship-help"
+              class="gf-input"
+            />
+          </.field>
+          <.field label="Based on" for="host-authorship-based-on" help="When it departs from WCVP">
+            <input
+              id="host-authorship-based-on"
+              name="based_on"
+              type="text"
+              value={@authorship_item && @authorship_item.spec.based_on}
+              aria-describedby="host-authorship-based-on-help"
+              class="gf-input"
+            />
+          </.field>
+        </form>
+        <:actions>
+          <.button type="button" variant="ghost" phx-click="close_authorship" phx-target={@myself}>
+            Cancel
+          </.button>
+          <.button type="submit" form="host-authorship-form" variant="primary">
+            Put in tray
+          </.button>
         </:actions>
       </.dialog>
     </div>

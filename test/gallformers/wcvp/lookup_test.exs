@@ -14,6 +14,7 @@ defmodule Gallformers.Wcvp.LookupTest do
     CREATE TABLE wcvp_names (
       plant_name_id TEXT PRIMARY KEY,
       taxon_name TEXT NOT NULL,
+      taxon_rank TEXT,
       taxon_status TEXT NOT NULL DEFAULT 'Accepted',
       accepted_plant_name_id TEXT,
       family TEXT NOT NULL,
@@ -71,6 +72,11 @@ defmodule Gallformers.Wcvp.LookupTest do
         [id, name, status, accepted, family, genus, species, authors, powo]
       )
     end
+
+    Repo.WCVP.query!("""
+    UPDATE wcvp_names
+    SET taxon_rank = CASE WHEN taxon_name LIKE '% subsp. %' THEN 'Subspecies' ELSE 'Species' END
+    """)
 
     # Insert test distributions
     distributions = [
@@ -316,6 +322,48 @@ defmodule Gallformers.Wcvp.LookupTest do
 
     test "returns nil for nonexistent plant_name_id" do
       assert Lookup.get_accepted_name("999") == nil
+    end
+  end
+
+  describe "get_names/1" do
+    test "returns the records with those IDs, whatever their status, with rank and authors" do
+      results = Lookup.get_names(["400", "100", "999"])
+
+      assert [
+               %WcvpName{
+                 plant_name_id: "100",
+                 taxon_name: "Quercus alba",
+                 taxon_rank: "Species",
+                 taxon_status: "Accepted",
+                 accepted_plant_name_id: "100",
+                 taxon_authors: "L."
+               },
+               %WcvpName{
+                 plant_name_id: "400",
+                 taxon_status: "Synonym",
+                 accepted_plant_name_id: "101",
+                 taxon_authors: "F.Michx."
+               }
+             ] = Enum.sort_by(results, & &1.plant_name_id)
+    end
+
+    test "returns nothing for no IDs" do
+      assert Lookup.get_names([]) == []
+    end
+  end
+
+  describe "find_names/1" do
+    test "returns every record of those exact names, ignoring case, whatever their status" do
+      results =
+        Lookup.find_names(["quercus ALBA", "Quercus borealis", "Alnus alnobetula", "Nope"])
+
+      assert ["100", "400"] == results |> Enum.map(& &1.plant_name_id) |> Enum.sort()
+      assert Enum.find(results, &(&1.plant_name_id == "400")).taxon_status == "Synonym"
+    end
+
+    test "gives an infraspecific record its rank" do
+      assert [%WcvpName{taxon_rank: "Subspecies", taxon_authors: "(Regel) Raus"}] =
+               Lookup.find_names(["Alnus alnobetula subsp. sinuata"])
     end
   end
 end

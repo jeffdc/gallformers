@@ -46,7 +46,10 @@ defmodule Gallformers.Taxa.HostPageTest do
 
     test "has its common names and synonyms", %{page: page} do
       assert page.common_names == ["tanoak"]
-      assert page.synonyms == [%{name: "Lithocarpus densiflorus", sensu: nil}]
+
+      assert page.synonyms == [
+               %{name: "Lithocarpus densiflorus", sensu: nil, authorship: nil}
+             ]
     end
 
     test "has its editorial data-complete flag and abundance", %{page: page} do
@@ -71,9 +74,19 @@ defmodule Gallformers.Taxa.HostPageTest do
     assert page.common_names == ["apple oak", "zebra oak"]
 
     assert page.synonyms == [
-             %{name: "Quercus applei", sensu: "auct. non Smith"},
-             %{name: "Quercus zebrina", sensu: nil}
+             %{name: "Quercus applei", sensu: "auct. non Smith", authorship: nil},
+             %{name: "Quercus zebrina", sensu: nil, authorship: nil}
            ]
+  end
+
+  test "the accepted name and synonyms carry their authorship" do
+    plant = plant_fixture(name: "Quercus auctorpagei", authorship: "(L.) Sm.")
+    {:ok, _} = Taxa.add_synonym(test_actor(), plant, "Quercus vetuspagei", authorship: "Mill.")
+
+    page = page!(plant.id)
+
+    assert {page.name, page.authorship} == {"Quercus auctorpagei", "(L.) Sm."}
+    assert page.synonyms == [%{name: "Quercus vetuspagei", sensu: nil, authorship: "Mill."}]
   end
 
   test "an infraspecific plant has a host page" do

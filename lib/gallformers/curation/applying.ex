@@ -6,7 +6,7 @@ defmodule Gallformers.Curation.Applying do
     * **Editorial items** apply at once through the functions the admin
       screens use: a Gall's fields through `Gallformers.Catalog.update_gall_editorial/3`
       and `Gallformers.Catalog.update_name_parts/3`; a plant's name,
-      synonyms and range through the taxonomy admin's replay-logged edits
+      authorship, synonyms and range through the taxonomy admin's replay-logged edits
       (`Gallformers.Import.record_taxonomy_edit/2`,
       `Gallformers.Import.record_synonym_added/4`,
       `Gallformers.Import.record_host_range_saved/4`), with its "based on"
@@ -102,6 +102,9 @@ defmodule Gallformers.Curation.Applying do
 
   defp plant_edit(actor, id, :name, name),
     do: Import.record_taxonomy_edit(actor, {:rename, id, name})
+
+  defp plant_edit(actor, id, :authorship, authorship),
+    do: Import.record_taxonomy_edit(actor, {:set_authorship, id, authorship})
 
   defp plant_edit(actor, id, :range, entries),
     do: Import.record_host_range_saved(actor, id, entries, %{})

@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS meta;
 CREATE TABLE wcvp_names (
   plant_name_id TEXT PRIMARY KEY,
   taxon_name TEXT NOT NULL,
+  taxon_rank TEXT,
   taxon_status TEXT NOT NULL DEFAULT 'Accepted',
   accepted_plant_name_id TEXT,
   family TEXT NOT NULL,
