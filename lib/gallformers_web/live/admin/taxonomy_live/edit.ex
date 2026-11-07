@@ -22,6 +22,14 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
 
   Every write goes through `Gallformers.Import` as the signed-in admin (the
   `:admin` live session's actor), so it is audited and in the replay log.
+
+  Outside Plantae the tree follows the Sources' accepted statements (matter
+  `f923`), so a move, a name (with its rank and authorship), a synonym or a
+  common name asks "Based on which Source?"
+  (`GallformersWeb.Admin.TaxonomyLive.BasisPicker`) and is made as that
+  Source's statement, accepted at once
+  (`Gallformers.Import.record_taxonomy_change/3`). A plant's are edited
+  directly, as before.
   """
   use GallformersWeb, :live_view
   use GallformersWeb.Admin.FormHelpers
@@ -33,6 +41,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
   alias Gallformers.Taxa.Rank
   alias Gallformers.Taxa.Taxon
   alias GallformersWeb.Admin.ImagesComponent
+  alias GallformersWeb.Admin.TaxonomyLive.BasisPicker
   alias GallformersWeb.Admin.TaxonomyLive.Errors
   alias GallformersWeb.Admin.TaxonomyLive.RangeEditor
   alias GallformersWeb.TaxonomyURL
@@ -47,6 +56,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
       {:ok,
        socket
        |> init_form_state()
+       |> BasisPicker.init()
        |> RangeEditor.init()
        |> assign(:abundances, Taxa.abundance_options())
        |> assign(parent_query: "", parent_results: [], selected_parent: nil)
@@ -77,10 +87,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
     |> assign(:page_title, name)
     |> assign(:lineage, Enum.reject(lineage, &(&1.taxon_id == taxon.id)))
     |> assign(:plant?, plant?)
+    |> assign(:follows_facts?, Taxa.follows_facts?(taxon))
     |> assign(:public_path, public_path(taxon, name, plant?))
     |> assign(:synonyms, Taxa.list_synonyms(taxon))
     |> assign(:common_names, Taxa.list_common_names(taxon))
-    |> assign(:rename_form, to_form(%{"name" => name}, as: :rename))
+    |> assign(:rename_form, rename_form(taxon, name))
     |> assign(:synonym_form, to_form(%{"name" => "", "sensu" => ""}, as: :synonym))
     |> assign(:common_name_form, to_form(%{"name" => ""}, as: :common_name))
     |> assign(:editorial_form, editorial_form(taxon))
@@ -89,6 +100,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
   end
 
   defp reload(socket), do: load_taxon(socket, Taxa.get_taxon!(socket.assigns.taxon.id))
+
+  defp rename_form(taxon, name) do
+    to_form(
+      %{
+        "name" => name,
+        "rank" => Atom.to_string(taxon.rank),
+        "authorship" => accepted_authorship(taxon) || ""
+      },
+      as: :rename
+    )
+  end
+
+  defp accepted_authorship(taxon),
+    do: Enum.find_value(taxon.names, &(&1.status == :accepted && &1.authorship))
 
   defp plant?(%Taxon{kingdom: "Plantae", rank: rank}), do: rank in Rank.species_and_below()
   defp plant?(_taxon), do: false
@@ -164,12 +189,15 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
 
   # -- names -------------------------------------------------------------------
 
-  def handle_event("rename", %{"rename" => %{"name" => new_name}}, socket) do
+  def handle_event("rename", %{"rename" => %{"name" => new_name} = params}, socket) do
     new_name = String.trim(new_name)
 
     cond do
       new_name == "" ->
         {:noreply, put_flash(socket, :error, "Enter the new name")}
+
+      socket.assigns.follows_facts? ->
+        {:noreply, ask_name(socket, new_name, params)}
 
       new_name == socket.assigns.name ->
         {:noreply, socket}
@@ -186,17 +214,45 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
     sensu = params |> Map.get("sensu", "") |> String.trim()
     opts = if sensu == "", do: [], else: [sensu: sensu]
 
-    if name == "" do
-      {:noreply, put_flash(socket, :error, "Enter the synonym")}
-    else
-      result = Import.record_synonym_added(socket.assigns.actor, socket.assigns.taxon, name, opts)
-      {:noreply, after_write(socket, result, "Synonym #{name} added")}
+    cond do
+      name == "" ->
+        {:noreply, put_flash(socket, :error, "Enter the synonym")}
+
+      socket.assigns.follows_facts? ->
+        {:noreply,
+         BasisPicker.ask(
+           socket,
+           {:add_synonym, socket.assigns.taxon.id, name},
+           "Add #{name} as a synonym of #{socket.assigns.name}.",
+           "Add synonym",
+           "Synonym #{name} added"
+         )}
+
+      true ->
+        result =
+          Import.record_synonym_added(socket.assigns.actor, socket.assigns.taxon, name, opts)
+
+        {:noreply, after_write(socket, result, "Synonym #{name} added")}
     end
   end
 
   def handle_event("remove_synonym", %{"id" => id}, socket) do
-    edit = {:remove_synonym, String.to_integer(id)}
-    {:noreply, edit(socket, edit, "Synonym removed")}
+    id = String.to_integer(id)
+
+    if socket.assigns.follows_facts? do
+      synonym = Enum.find(socket.assigns.synonyms, &(&1.id == id))
+
+      {:noreply,
+       BasisPicker.ask(
+         socket,
+         {:remove_synonym, id},
+         "Remove #{synonym && synonym.name} as a synonym of #{socket.assigns.name}.",
+         "Remove synonym",
+         "Synonym removed"
+       )}
+    else
+      {:noreply, edit(socket, {:remove_synonym, id}, "Synonym removed")}
+    end
   end
 
   def handle_event("add_common_name", %{"common_name" => %{"name" => name}}, socket) do
@@ -205,14 +261,40 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
     if name == "" do
       {:noreply, put_flash(socket, :error, "Enter the common name")}
     else
-      edit = {:add_common_name, socket.assigns.taxon, name}
-      {:noreply, edit(socket, edit, "Common name #{name} added")}
+      edit = {:add_common_name, socket.assigns.taxon.id, name}
+
+      if socket.assigns.follows_facts? do
+        {:noreply,
+         BasisPicker.ask(
+           socket,
+           edit,
+           "Give #{socket.assigns.name} the common name #{name}.",
+           "Add common name",
+           "Common name #{name} added"
+         )}
+      else
+        {:noreply, edit(socket, edit, "Common name #{name} added")}
+      end
     end
   end
 
   def handle_event("remove_common_name", %{"id" => id}, socket) do
-    edit = {:remove_common_name, String.to_integer(id)}
-    {:noreply, edit(socket, edit, "Common name removed")}
+    id = String.to_integer(id)
+
+    if socket.assigns.follows_facts? do
+      common = Enum.find(socket.assigns.common_names, &(&1.id == id))
+
+      {:noreply,
+       BasisPicker.ask(
+         socket,
+         {:remove_common_name, id},
+         "Remove the common name #{common && common.name} of #{socket.assigns.name}.",
+         "Remove common name",
+         "Common name removed"
+       )}
+    else
+      {:noreply, edit(socket, {:remove_common_name, id}, "Common name removed")}
+    end
   end
 
   # -- placement ---------------------------------------------------------------
@@ -239,6 +321,16 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
       nil ->
         {:noreply, put_flash(socket, :error, "Pick the new parent")}
 
+      parent when socket.assigns.follows_facts? ->
+        {:noreply,
+         BasisPicker.ask(
+           socket,
+           {:place, socket.assigns.taxon.id, parent.id},
+           "Move #{socket.assigns.name} under #{parent.name}.",
+           "Move",
+           "Moved under #{parent.name}"
+         )}
+
       parent ->
         socket
         |> assign(:selected_parent, nil)
@@ -246,6 +338,9 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
         |> then(&{:noreply, &1})
     end
   end
+
+  def handle_event("cancel_basis", _params, socket),
+    do: {:noreply, BasisPicker.cancel(socket)}
 
   def handle_event("set_section", %{"section_id" => section_id}, socket) do
     %{taxon: taxon, genus: genus} = socket.assigns
@@ -322,6 +417,16 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
   # -- messages ----------------------------------------------------------------
 
   @impl true
+  def handle_info({BasisPicker, {:chosen, basis}}, socket) do
+    case BasisPicker.run(socket, basis) do
+      {:ok, socket, _result, done} ->
+        {:noreply, socket |> assign(:selected_parent, nil) |> reload() |> put_flash(:info, done)}
+
+      {:error, socket} ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_info(message, socket) do
     if RangeEditor.handles_info?(message),
       do: {:noreply, RangeEditor.handle_info(message, socket)},
@@ -353,6 +458,34 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
 
       {:error, reason} ->
         put_flash(socket, :error, "Could not save the range: #{Errors.text(reason)}")
+    end
+  end
+
+  # A non-plant's name: its accepted name, rank and authorship are one
+  # statement of the Source it follows. Nothing to ask when none changed.
+  defp ask_name(socket, new_name, params) do
+    %{taxon: taxon, name: name} = socket.assigns
+    rank = Enum.find(Rank.all(), taxon.rank, &(Atom.to_string(&1) == params["rank"]))
+    authorship = params |> Map.get("authorship", "") |> String.trim()
+    renamed? = new_name != name
+
+    if not renamed? and rank == taxon.rank and authorship == (accepted_authorship(taxon) || "") do
+      socket
+    else
+      written = Enum.join([new_name, authorship], " ") |> String.trim()
+
+      summary =
+        if renamed?,
+          do: "Rename #{name} to #{written} (#{rank_label(rank)}).",
+          else: "Name it #{written} (#{rank_label(rank)})."
+
+      BasisPicker.ask(
+        socket,
+        {:name, taxon.id, %{name: new_name, rank: rank, authorship: authorship}},
+        summary,
+        if(renamed?, do: "Rename", else: "Save name"),
+        if(renamed?, do: "Renamed to #{new_name}", else: "Name updated")
+      )
     end
   end
 
@@ -408,6 +541,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
 
   defp rank_label(rank), do: rank |> Atom.to_string() |> String.capitalize()
 
+  defp rank_options, do: Enum.map(Rank.all(), &{rank_label(&1), Atom.to_string(&1)})
+
   # Names at species rank and below are italicized like a species.
   defp name_rank(rank) do
     if rank in Rank.species_and_below(), do: "species", else: Atom.to_string(rank)
@@ -448,7 +583,9 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
           </:meta>
           <:description>
             A taxon's names, placement and details. Each change is saved as you make it{if @plant?,
-              do: ", except the Host range, which is saved with its Save button"}.
+              do: ", except the Host range, which is saved with its Save button"}.{if @follows_facts?,
+              do:
+                " The tree follows the Sources: a change to its names or placement is credited to the Source it follows."}
           </:description>
           <:action :if={@public_path}>
             <.button href={@public_path} variant="ghost" size="sm" icon="ph-arrow-square-out">
@@ -470,7 +607,24 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
                   <div class="flex-1">
                     <.input field={@rename_form[:name]} label="Accepted name" />
                   </div>
-                  <.button type="submit" variant="secondary">Rename</.button>
+                  <div :if={@follows_facts?} class="w-36">
+                    <.input
+                      field={@rename_form[:rank]}
+                      type="select"
+                      label="Rank"
+                      options={rank_options()}
+                    />
+                  </div>
+                  <div :if={@follows_facts?} class="flex-1">
+                    <.input
+                      field={@rename_form[:authorship]}
+                      label="Authorship"
+                      placeholder="(Weld, 1959)"
+                    />
+                  </div>
+                  <.button type="submit" variant="secondary">
+                    {if @follows_facts?, do: "Change…", else: "Rename"}
+                  </.button>
                 </.form>
                 <p class="gf-hint">
                   The old name is kept as a synonym. Galls whose names it changes get <.link navigate={
@@ -583,7 +737,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
                       size="sm"
                       phx-click="remove_synonym"
                       phx-value-id={synonym.id}
-                      data-confirm={"Remove the synonym #{synonym.name}?"}
+                      data-confirm={!@follows_facts? && "Remove the synonym #{synonym.name}?"}
                     >
                       Remove
                     </.button>
@@ -599,7 +753,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
                   class="flex items-end gap-2"
                 >
                   <div class="flex-1"><.input field={@synonym_form[:name]} label="Synonym" /></div>
-                  <div class="flex-1">
+                  <div :if={!@follows_facts?} class="flex-1">
                     <.input field={@synonym_form[:sensu]} label="Sensu (misapplied names only)" />
                   </div>
                   <.button type="submit" variant="secondary">Add</.button>
@@ -810,6 +964,18 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.live_component
+          :if={@pending}
+          module={BasisPicker}
+          id="basis-picker"
+          change={@pending.summary}
+          confirm_label={@pending.confirm}
+          error={@basis_error}
+          error_kind={@basis_error_kind}
+          remembered={@last_source}
+          cancel_event="cancel_basis"
+        />
       </div>
     </Layouts.admin>
     """

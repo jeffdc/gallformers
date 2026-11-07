@@ -29,6 +29,14 @@ defmodule Gallformers.Import.TaxonomicDecisions do
 
   @type op :: :accept | :decline | :reopen
 
+  @kinds %{
+    "placement" => :placement,
+    "name" => :name,
+    "synonymy" => :synonymy,
+    "split" => :split,
+    "common_name" => :common_name
+  }
+
   @doc """
   Makes decision `op` on attribution `attribution_id` (a decline with
   `reason`) and logs it for replay. Returns what `Gallformers.Facts` does;
@@ -73,6 +81,21 @@ defmodule Gallformers.Import.TaxonomicDecisions do
   end
 
   # -- stable keys -----------------------------------------------------------------
+
+  @doc """
+  An act's natural key (as `Gallformers.Taxa.find_act_fact/2` takes it)
+  with its taxa as stable references, for a replay log entry's `"fact"`.
+  """
+  @spec encode_key(Taxa.act_kind(), map()) :: map()
+  def encode_key(kind, key), do: encode(kind, key)
+
+  @doc "The natural key `encode_key/2` gave, its taxa found by their stable references."
+  @spec decode_key(Taxa.act_kind(), map()) :: {:ok, map()} | {:error, term()}
+  def decode_key(kind, fact), do: decode(kind, fact)
+
+  @doc "The act kind a replay log entry names (`\"placement\"`), or `:error`."
+  @spec kind(String.t()) :: {:ok, Taxa.act_kind()} | :error
+  def kind(name), do: Map.fetch(@kinds, name)
 
   defp encode(:placement, key),
     do: %{"taxon" => ref(key.taxon_id), "parent" => ref(key.parent_id)}
@@ -143,13 +166,6 @@ defmodule Gallformers.Import.TaxonomicDecisions do
 
   # -- replay ----------------------------------------------------------------------
 
-  @kinds %{
-    "placement" => :placement,
-    "name" => :name,
-    "synonymy" => :synonymy,
-    "split" => :split,
-    "common_name" => :common_name
-  }
   @ops %{"accept" => :accept, "decline" => :decline, "reopen" => :reopen}
 
   @doc """

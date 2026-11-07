@@ -85,7 +85,17 @@ defmodule GallformersWeb.Admin.TaxonomyLive.IndexTest do
       render_click(view, "open_move_modal", %{})
       render_keyup(view, "search_move_target", %{"value" => Taxa.accepted_name(to)})
       render_click(view, "select_move_target", %{"id" => "#{to.id}"})
-      html = view |> element("#move-selected") |> render_click()
+      view |> element("#move-selected") |> render_click()
+
+      # Not plants: the move is credited to what it follows (here, no Source:
+      # Gallformers' own position, `f923`).
+      view |> element("#basis-picker-choice-gallformers") |> render_click()
+
+      view
+      |> form("#basis-picker-form", basis: %{reason: "No paper places them yet."})
+      |> render_submit()
+
+      html = render(view)
 
       assert html =~ "Moved 2 taxa under #{Taxa.accepted_name(to)}"
       assert Taxa.get_taxon!(a.id).parent_id == to.id
@@ -93,7 +103,10 @@ defmodule GallformersWeb.Admin.TaxonomyLive.IndexTest do
       assert Taxa.get_taxon!(c.id).parent_id == from.id
 
       assert 2 ==
-               Enum.count(Import.list_replay_entries(), &(&1.key["op"] == "place"))
+               Enum.count(
+                 Import.list_replay_entries(),
+                 &(&1.kind == :taxonomic_statement and &1.key["kind"] == "placement")
+               )
     end
 
     test "the new parent must rank above the selected taxa", %{conn: conn} do

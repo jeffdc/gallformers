@@ -66,6 +66,12 @@ defmodule Gallformers.Import.Replay do
       `"reason"`) or reopened, found by the Source's title and the act's
       natural key by stable references, and decided again unless it is in
       that state already (`Gallformers.Import.TaxonomicDecisions`).
+    * `:taxonomic_statement` (`%{"source", "kind", "fact"}`) — a statement
+      the taxonomy admin credited to a Source (or Gallformers), recorded
+      again on the Source found by title and the act's taxa by stable
+      references (`Gallformers.Import.TaxonomyStatements`); its acceptance
+      is the `:taxonomic_decision` entry after it. A citation the curator
+      entered is a `:source_edit` `"create"` entry before it.
     * `:vocab_requests_decided` — 6611's vocabulary backlog, replaced by
       the superadmin vocabulary page (`d213`); no longer written, and not
       replayed.
@@ -93,6 +99,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.SynonymDecisions
   alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Import.TaxonomyEdits
+  alias Gallformers.Import.TaxonomyStatements
   alias Gallformers.Import.VocabEdits
 
   @typedoc "A log entry: a `ReplayEntry` or a map with its `kind`, `key` and `payload`."
@@ -315,6 +322,9 @@ defmodule Gallformers.Import.Replay do
 
   defp replay(actor, %{kind: :taxonomic_decision, key: key, payload: payload}),
     do: TaxonomicDecisions.replay(actor, key, payload)
+
+  defp replay(actor, %{kind: :taxonomic_statement, key: key, payload: payload}),
+    do: TaxonomyStatements.replay(actor, key, payload)
 
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
 

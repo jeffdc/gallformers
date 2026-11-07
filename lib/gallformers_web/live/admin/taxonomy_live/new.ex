@@ -17,7 +17,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
   name, the same WCVP record — as the old Host admin did. Writes go
   through `Gallformers.Import` as the signed-in admin
   (`Gallformers.Import.TaxonomyAdmin`), so they are audited and in the
-  replay log, each all or nothing.
+  replay log, each all or nothing. A taxon outside Plantae is its Source's
+  placement and name (matter `f923`): Create asks "Based on which Source?"
+  (`GallformersWeb.Admin.TaxonomyLive.BasisPicker`) and the new taxon, and
+  any children moved under it, are that Source's accepted statements
+  (`Gallformers.Import.record_taxonomy_change/3`).
 
   A link may start the by-name form (`?name=…&rank=…&kingdom=…&parent_id=…`,
   each optional): a review's Host question that neither Gallformers nor
@@ -32,6 +36,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
   alias Gallformers.Ranges.Wcvp
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Rank
+  alias GallformersWeb.Admin.TaxonomyLive.BasisPicker
   alias GallformersWeb.Admin.TaxonomyLive.Errors
   alias GallformersWeb.Admin.TaxonomyLive.RangeEditor
   alias Phoenix.HTML.Form, as: HtmlForm
@@ -46,6 +51,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
     {:ok,
      socket
      |> init_form_state()
+     |> BasisPicker.init()
      |> RangeEditor.init()
      |> assign(:page_title, "New Taxon")
      |> assign(:wcvp_available, wcvp_lookup().available?())
@@ -244,25 +250,15 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
 
     case validate_create(socket) do
       {:ok, attrs} ->
-        entries = if plant?(socket), do: RangeEditor.entries_for_save(socket), else: []
-        children = MapSet.to_list(socket.assigns.selected_children)
-
-        case Import.record_taxon_created(socket.assigns.actor, attrs, children, entries) do
-          {:ok, taxon} ->
-            {:noreply,
-             socket
-             |> reset_dirty()
-             |> put_flash(:info, "#{attrs.name} added")
-             |> push_navigate(to: ~p"/admin/taxonomy/#{taxon.id}")}
-
-          {:error, reason} ->
-            {:noreply, put_flash(socket, :error, "Not added: #{Errors.text(reason)}")}
-        end
+        {:noreply, create(socket, attrs)}
 
       {:error, message} ->
         {:noreply, put_flash(socket, :error, message)}
     end
   end
+
+  def handle_event("cancel_basis", _params, socket),
+    do: {:noreply, BasisPicker.cancel(socket)}
 
   # -- the range editor (a plant added by name) --------------------------------
 
@@ -278,10 +274,71 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
   end
 
   @impl true
+  def handle_info({BasisPicker, {:chosen, basis}}, socket) do
+    case BasisPicker.run(socket, basis) do
+      {:ok, socket, taxon, done} ->
+        {:noreply,
+         socket
+         |> reset_dirty()
+         |> put_flash(:info, done)
+         |> push_navigate(to: ~p"/admin/taxonomy/#{taxon.id}")}
+
+      {:error, socket} ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_info(message, socket) do
     if RangeEditor.handles_info?(message),
       do: {:noreply, RangeEditor.handle_info(message, socket)},
       else: {:noreply, socket}
+  end
+
+  # A taxon outside Plantae is its Source's placement and name (`f923`):
+  # ask which Source first. A plant, or a higher plant taxon, is added
+  # directly.
+  defp create(socket, attrs) do
+    children = MapSet.to_list(socket.assigns.selected_children)
+
+    if Taxa.follows_facts?(attrs.kingdom) do
+      under =
+        case socket.assigns.selected_parent do
+          %{name: parent} -> " under #{parent}"
+          nil -> " at the root"
+        end
+
+      moved =
+        case length(children) do
+          0 -> ""
+          1 -> ", moving 1 child under it"
+          n -> ", moving #{n} children under it"
+        end
+
+      BasisPicker.ask(
+        socket,
+        {:create_taxon, attrs, children},
+        "Add #{attrs.name} (#{rank_label(attrs.rank)})#{under}#{moved}.",
+        "Create",
+        "#{attrs.name} added"
+      )
+    else
+      create_directly(socket, attrs, children)
+    end
+  end
+
+  defp create_directly(socket, attrs, children) do
+    entries = if plant?(socket), do: RangeEditor.entries_for_save(socket), else: []
+
+    case Import.record_taxon_created(socket.assigns.actor, attrs, children, entries) do
+      {:ok, taxon} ->
+        socket
+        |> reset_dirty()
+        |> put_flash(:info, "#{attrs.name} added")
+        |> push_navigate(to: ~p"/admin/taxonomy/#{taxon.id}")
+
+      {:error, reason} ->
+        put_flash(socket, :error, "Not added: #{Errors.text(reason)}")
+    end
   end
 
   # -- async WCVP lookups ------------------------------------------------------
@@ -719,6 +776,18 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.live_component
+          :if={@pending}
+          module={BasisPicker}
+          id="basis-picker"
+          change={@pending.summary}
+          confirm_label={@pending.confirm}
+          error={@basis_error}
+          error_kind={@basis_error_kind}
+          remembered={@last_source}
+          cancel_event="cancel_basis"
+        />
       </div>
     </Layouts.admin>
     """

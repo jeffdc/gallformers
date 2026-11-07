@@ -194,11 +194,19 @@ Each taxon's page (`/admin/taxonomy/:id`) has sections for:
 
 Every taxonomy edit is audited and kept in the replay log.
 
+**Taxa that aren't plants follow their Sources.** The tree of Gallformers, Inducers and every other taxon outside Plantae follows the Sources' accepted taxonomic statements, so a move, a name (with its rank and authorship), a synonym or a common name, added or removed, and a new taxon first ask **Based on which Source?**:
+
+- **A Source in Gallformers** (recommended) — search by title or author. The change is recorded as that paper's statement, accepted by you, and competes by the paper's date. When the backscan later imports the paper, its statement matches and raises no question. The dialog starts with the Source you last used on the page.
+- **A new citation** — the paper's title, authors (separated by semicolons) and date (DOI optional) make it a Source on the spot; complete it later in the Source editor.
+- **No Source: Gallformers' own position** — only when no paper supports it (an undescribed Gall's Inducer, say). It needs a reason, and is recorded as Gallformers' statement dated today.
+
+If an accepted newer paper already decides it ("Weld 2019 already places Basa under Otherbasisidae: this 2008 Source won't change the tree"), the dialog says so and nothing changes. A synonym that was the taxon's accepted name in an earlier statement stays a synonym. Plants are edited directly, as above.
+
 ---
 
 ## How Do I Edit a Source?
 
-Sources arrive with imports; there is no "new" and no delete (Facts and citations refer to them).
+Sources arrive with imports, or as a citation entered when a taxonomy change follows a paper Gallformers doesn't hold yet (see [A Taxon's Page](#a-taxons-page)); there is no delete (Facts and citations refer to them).
 
 1. Go to **Sources** (`/admin/sources`) and search by title or author — or click the pencil next to a Source's title on its public page.
 2. On the Source editor (`/admin/sources/:id`), edit its **details**: title, authors, date, DOI, URL, ISBN, license (a license with a canonical link fills the link in), citation and the data complete flag. Save.

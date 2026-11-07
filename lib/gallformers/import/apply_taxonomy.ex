@@ -13,7 +13,11 @@ defmodule Gallformers.Import.ApplyTaxonomy do
        the name act's `authorship_as_written`, and the taxa it names
        (`attribution_names`). A name the tree holds as a synonym while this
        Source treats it as valid is recorded against the tree's taxon.
-       Attributions are diffed like a gall batch's (`Gallformers.Import.Diff`).
+       Attributions are diffed like a gall batch's (`Gallformers.Import.Diff`),
+       except that replacing the Source's statements leaves those no import
+       wrote: a curator's statement credited to the Source in the taxonomy
+       admin (`Gallformers.Import.TaxonomyStatements`) stays until the
+       paper restates it.
     3. **Disagreements are flagged, never applied.** An act that disagrees
        with the tree — a synonymy the tree does not hold, a placement under
        another parent, a name or rank other than the tree's, a common name
@@ -71,7 +75,8 @@ defmodule Gallformers.Import.ApplyTaxonomy do
 
       with {:ok, outcomes, disagreements} <- write_all(ctx, diff, acts, refs),
            stated = for({_ref, %{fact_id: id}} <- outcomes, is_integer(id), do: id),
-           {:ok, removal_conflicts} <- Diff.remove_unstated(diff, ctx.batch.mode, stated) do
+           {:ok, removal_conflicts} <-
+             Diff.remove_unstated(imported_only(diff), ctx.batch.mode, stated) do
         {:ok,
          %{
            statements: Enum.map(outcomes, &statement_row/1),
@@ -81,6 +86,12 @@ defmodule Gallformers.Import.ApplyTaxonomy do
       end
     end
   end
+
+  # A batch replacing the Source's statements removes only what an import
+  # wrote: a curator's statement credited to the Source in the taxonomy
+  # admin (no batch, `f923` Task 8) stays until the paper restates it.
+  defp imported_only(diff),
+    do: %{diff | existing: Map.reject(diff.existing, fn {_id, a} -> is_nil(a.batch_id) end)}
 
   # The parent each taxon's (confirmed) placement act names, by ref.
   defp placements(acts) do

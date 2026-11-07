@@ -180,6 +180,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Import.TaxonomyAdmin
   alias Gallformers.Import.TaxonomyEdits
+  alias Gallformers.Import.TaxonomyStatements
   alias Gallformers.Import.TermCandidate
   alias Gallformers.Import.TermCandidates
   alias Gallformers.Import.TraitTerms
@@ -2855,6 +2856,39 @@ defmodule Gallformers.Import do
     do: Taxa.create_taxon(actor, Map.put_new(attrs, :origin, :curated))
 
   defp run_edit(actor, edit), do: TaxonomyEdits.run(actor, edit)
+
+  @doc """
+  A taxonomy admin's change to a non-plant taxon, credited to the Source it
+  follows (matter `f923` Task 8; `Gallformers.Import.TaxonomyStatements`):
+  recorded as `basis`'s taxonomic statement, accepted at once by `actor`,
+  so the tree follows it where it wins. `basis` is `{:source, source_id}`,
+  `{:citation, attrs}` (a Source made on the spot: title, authors, date,
+  optional DOI) or `{:gallformers, reason}` (no Source: Gallformers' own
+  position, with its reason). `change`: `{:place, taxon, parent}`,
+  `{:name, taxon, %{name, rank, authorship}}`, `{:add_synonym, taxon,
+  name}`, `{:remove_synonym, synonym}`, `{:add_common_name, taxon, name}`,
+  `{:remove_common_name, common}`, `{:create_taxon, attrs, child_ids}`,
+  `{:move_all, taxon_ids, parent}`.
+
+  `{:error, {:outranked, message}}` when an accepted newer statement
+  already decides it (nothing changes); `{:error, :plant}` for a plant,
+  whose edits stay editorial (`record_taxonomy_edit/2`).
+  """
+  @spec record_taxonomy_change(
+          Actor.t(),
+          TaxonomyStatements.basis(),
+          TaxonomyStatements.change()
+        ) :: {:ok, term()} | {:error, term()}
+  defdelegate record_taxonomy_change(actor, basis, change), to: TaxonomyStatements, as: :record
+
+  @doc """
+  Creates a Source from a citation entered on the spot (`title`,
+  `authors`, `authored`, optional `doi`), audited and logged for replay
+  (`Gallformers.Import.SourceEdits.record_create/2`).
+  """
+  @spec record_source_created(Actor.t(), map()) ::
+          {:ok, Gallformers.Sources.Source.t()} | {:error, Changeset.t()}
+  defdelegate record_source_created(actor, attrs), to: SourceEdits, as: :record_create
 
   @doc """
   A WCVP action of the taxonomy admin or the bulk range review, made

@@ -252,6 +252,27 @@ defmodule Gallformers.Sources do
   end
 
   @doc """
+  Creates a Source from a citation a curator enters on the spot (`title`,
+  `authors`, `authored`, optional `doi`:
+  `Gallformers.Sources.Source.citation_changeset/2`), in a transaction
+  audited as `actor`. The replay log is
+  `Gallformers.Import.record_source_created/2`'s, which calls this.
+  """
+  @spec create_citation(Actor.t(), map()) :: {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
+  def create_citation(%Actor{} = actor, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "sources.create_citation", fn ->
+      case %Source{} |> Source.citation_changeset(attrs) |> Repo.insert() do
+        {:ok, source} -> source
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc "A changeset for a citation entered on the spot, for its form (`create_citation/2`)."
+  @spec change_citation(map()) :: Ecto.Changeset.t()
+  def change_citation(attrs \\ %{}), do: Source.citation_changeset(%Source{}, attrs)
+
+  @doc """
   Edits a Source's details as the Source editor does
   (`Gallformers.Sources.Source.changeset/2`): today's columns (`title`,
   `author`, `pubyear`, `link`, `citation`, `datacomplete`, `license`,

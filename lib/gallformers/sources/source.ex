@@ -200,6 +200,88 @@ defmodule Gallformers.Sources.Source do
   end
 
   @doc """
+  Creates a changeset for a citation a curator enters on the spot, as the
+  Source a taxonomic change follows (matter `f923` Task 8): `title`,
+  `authors` (a list, each as written, "Smith, J."), `authored` (a partial
+  date, `"2008"`, `"2008-05"`, `"2008-05-14"`) and optionally `doi`, with
+  atom or string keys. All but the DOI are required.
+
+  A publication. Today's columns follow from these, under the Source
+  editor's rules (`changeset/2`): `author` is the authors joined by "; ",
+  `pubyear` the year, `citation` "Authors (date). Title.", the license
+  "All Rights Reserved" (nothing of the Source is quoted) and `link` the
+  DOI's. The Source editor completes the rest.
+  """
+  @spec citation_changeset(t(), map()) :: Ecto.Changeset.t()
+  def citation_changeset(source, attrs) do
+    title = text(attrs, :title)
+    authored = text(attrs, :authored)
+    doi = text(attrs, :doi)
+
+    authors =
+      attrs
+      |> value(:authors)
+      |> List.wrap()
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    year =
+      case PartialDate.parse(authored || "") do
+        {:ok, {date, _precision}} -> Integer.to_string(date.year)
+        :error -> nil
+      end
+
+    source
+    |> changeset(%{
+      title: title,
+      author: Enum.join(authors, "; "),
+      pubyear: year,
+      citation: citation_text(authors, authored, title),
+      license: "All Rights Reserved",
+      link: doi && "https://doi.org/#{doi}",
+      kind: :publication,
+      authors: authors,
+      authored: authored,
+      doi: doi
+    })
+    |> citation_errors(authors, authored, year)
+  end
+
+  defp value(attrs, key), do: Map.get(attrs, key, Map.get(attrs, Atom.to_string(key)))
+
+  defp text(attrs, key) do
+    case value(attrs, key) do
+      text when is_binary(text) -> if String.trim(text) == "", do: nil, else: String.trim(text)
+      _ -> nil
+    end
+  end
+
+  defp citation_text(authors, authored, title),
+    do: "#{Enum.join(authors, ", ")} (#{authored}). #{title}."
+
+  # The citation's errors are on what the curator entered: the authors and
+  # the date, not the columns that follow from them.
+  defp citation_errors(changeset, authors, authored, year) do
+    errors = Keyword.drop(changeset.errors, [:author, :pubyear, :citation])
+
+    errors =
+      errors ++
+        if(authors == [], do: [authors: {"can't be blank", [validation: :required]}], else: []) ++
+        cond do
+          authored == nil ->
+            [authored: {"can't be blank", [validation: :required]}]
+
+          year == nil and not Keyword.has_key?(errors, :authored) ->
+            [authored: {"is invalid", []}]
+
+          true ->
+            []
+        end
+
+    %{changeset | errors: errors, valid?: errors == []}
+  end
+
+  @doc """
   Creates a changeset marking `source` as retracted by the Source `notice`
   on `retracted_on`.
   """
