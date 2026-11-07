@@ -179,7 +179,7 @@ defmodule Gallformers.Import.TaxonomyCarryOverTest do
       assert again.unmatched == []
     end
 
-    test "what the Source's statements don't carry is reported for a curator", ctx do
+    test "what the Source's statements don't carry is reported for a curator", _ctx do
       # No statement that the name is not C. clarkei's synonym.
       package = deliver(revalidation([name_act(), placement_act()]))
       taxon_id = decided_and_approved(package, %{"split" => true})
