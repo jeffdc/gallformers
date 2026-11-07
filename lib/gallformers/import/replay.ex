@@ -31,6 +31,11 @@ defmodule Gallformers.Import.Replay do
       (`"kind" => "split_inducer"`, no package) is found by its Gall and
       the split taxon (`Gallformers.Import.SplitQuestions.find/2`):
       replaying the split's acceptance asked it again.
+    * `:queue_decision_undone` (keyed as the decision's `:queue_decision`)
+      — the item is found as the decision's is (resolving the package
+      again; none, when no item asks for it any more), reopened if it is
+      decided, the reverse tree edits the entry holds made where not done
+      already, and the package resolved again (`Gallformers.Import.Undo`).
     * `:synonym_added`, `:plant_added`, `:taxonomy_edit` — the Host-name
       step's and the taxonomy admin's edits, made again on the taxa found
       by name (the newer ops, and WCVP actions logged as the state they
@@ -236,6 +241,14 @@ defmodule Gallformers.Import.Replay do
         {:error, reason} ->
           {:error, reason}
       end
+    end
+  end
+
+  # An undo: its item found as its decision's is (none, when no item asks
+  # any more), reopened, the tree edits it logged reversed where not done.
+  defp replay(actor, %{kind: :queue_decision_undone, key: key, payload: payload}) do
+    with {:ok, item, package} <- undone_item(actor, key) do
+      ok(Import.replay_undo(actor, item, package, key, payload))
     end
   end
 
@@ -489,6 +502,34 @@ defmodule Gallformers.Import.Replay do
       end)
     else
       _ -> false
+    end
+  end
+
+  # The item an undo entry's key names, as its decision's entry finds it,
+  # with its package (nil for a question of no package).
+  defp undone_item(_actor, %{"kind" => "gall_rename"} = key) do
+    with {:ok, gall_id} <- StableRef.resolve_gall(key["gall"]),
+         do: {:ok, GallRenames.find(gall_id, key["to"]), nil}
+  end
+
+  defp undone_item(_actor, %{"kind" => "split_inducer"} = key) do
+    with {:ok, gall_id} <- StableRef.resolve_gall(key["gall"]),
+         {:ok, taxon_id} <- StableRef.resolve_taxon(key["taxon"]),
+         do: {:ok, SplitQuestions.find(gall_id, taxon_id), nil}
+  end
+
+  defp undone_item(_actor, %{"kind" => "same_date_conflict", "merge" => true} = key) do
+    with {:ok, gall_id} <- optional_gall(key["gall"]),
+         do: {:ok, Merge.find_conflict(gall_id, key["statement_ref"]), nil}
+  end
+
+  defp undone_item(actor, key) do
+    with {:ok, package} <- ensure_package(actor, key["package"]) do
+      case find_item(actor, package, key) do
+        {:ok, item} -> {:ok, item, package}
+        {:error, {:no_queue_item, _key}} -> {:ok, nil, Import.get_package!(package.id)}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 

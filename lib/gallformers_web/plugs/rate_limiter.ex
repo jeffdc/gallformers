@@ -2,13 +2,14 @@ defmodule GallformersWeb.Plugs.RateLimiter do
   @moduledoc """
   Rate limiting plug for API routes.
 
-  Limits requests to 100 per minute per IP address.
+  Limits requests to 100 per minute per IP address (`:limit` in the
+  plug's config; the tests, all from one address, raise it).
   Returns 429 Too Many Requests with Retry-After header when exceeded.
   """
 
   import Plug.Conn
 
-  @rate_limit 100
+  @rate_limit Application.compile_env(:gallformers, [__MODULE__, :limit], 100)
   @scale_ms :timer.minutes(1)
 
   def init(opts), do: opts

@@ -79,6 +79,14 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
   one. A refusal from the tree (a cycle, a rank inversion, a lump it can't
   make) shows its reason in the row.
 
+  A decided row, opened, offers Undo beside what it was decided as
+  (matter `f14c`, "Undo rule"; `Gallformers.Import.undo_decision/2`, a
+  group of disputes all together, `undo_decisions/2`): the question opens
+  again and the page loads again (`{__MODULE__, {:undone, item}}`). When
+  something since depends on the decision (the Source approved, a record
+  it changed edited by someone), the row says why under it, with a link to
+  the record in the taxonomy admin (or the Gall's page) where there is one.
+
   Reject sets the recommendation aside (`Gallformers.Import.reject_proposal/2`;
   Undo restores it, `restore_proposal/2`); the page loads again after
   either (`{__MODULE__, {:proposal, item}}`).
@@ -122,6 +130,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
        settled: %{},
        host: nil,
        error: nil,
+       undo_refusal: nil,
        document: nil
      )}
   end
@@ -173,6 +182,12 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
 
   defp members(_entry), do: []
 
+  # The decided disputes of a grouped question, undone together.
+  defp decided_members(%{members: [_ | _] = members}),
+    do: for(m <- members, m.item.status == :decided, do: m.item)
+
+  defp decided_members(_entry), do: []
+
   defp visible_choices(entry), do: Enum.reject(entry.question.choices, & &1.pending)
 
   defp chosen(%{choice: i, choices: choices}) when is_integer(i), do: Enum.at(choices, i)
@@ -182,7 +197,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
 
   @impl true
   def handle_event("toggle", _params, socket) do
-    socket = assign(socket, open: not socket.assigns.open, error: nil)
+    socket = assign(socket, open: not socket.assigns.open, error: nil, undo_refusal: nil)
     {:noreply, read_host(socket)}
   end
 
@@ -209,6 +224,29 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
 
       {:error, reason} ->
         {:noreply, assign(socket, error: refusal(reason))}
+    end
+  end
+
+  # Undo of a decided question (matter `f14c`): refused with why, inline.
+  def handle_event("undo", _params, socket) do
+    %{actor: actor, entry: entry} = socket.assigns
+
+    result =
+      case decided_members(entry) do
+        [_, _ | _] = items ->
+          with {:ok, [item | _]} <- Import.undo_decisions(actor, items), do: {:ok, item}
+
+        _one ->
+          Import.undo_decision(actor, entry.item)
+      end
+
+    case result do
+      {:ok, item} ->
+        send(self(), {__MODULE__, {:undone, item}})
+        {:noreply, assign(socket, open: false, undo_refusal: nil)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, undo_refusal: Import.undo_refusal(reason))}
     end
   end
 
@@ -867,6 +905,13 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
     end
   end
 
+  # Where a refused Undo points to change the record instead.
+  defp record_path({:taxon, id}), do: ~p"/admin/taxonomy/#{id}"
+  defp record_path({:gall, id}), do: ~p"/gall/#{id}"
+
+  defp record_label({:taxon, _id}), do: "Open in the taxonomy admin"
+  defp record_label({:gall, _id}), do: "Open the Gall's page"
+
   defp refusal(:already_decided), do: "This item has been decided already; reload to see it."
   defp refusal(:gone), do: "Another decision settled this item; reload to see what is left."
   defp refusal(:no_proposal), do: "This item has no proposal to reject."
@@ -953,7 +998,27 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
               id={"item-#{@item.id}-decided"}
               text={@entry.decided || "Decided"}
               by={@item.decided_by_name}
-            />
+            >
+              <:action>
+                <.button
+                  id={"item-#{@item.id}-undo"}
+                  phx-click="undo"
+                  phx-target={@myself}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Undo
+                </.button>
+              </:action>
+            </.review_decided>
+            <.notice :if={@undo_refusal} id={"item-#{@item.id}-undo-refusal"} kind={:warn}>
+              {@undo_refusal.text}
+              <:action :if={@undo_refusal.link}>
+                <.button size="sm" navigate={record_path(@undo_refusal.link)}>
+                  {record_label(@undo_refusal.link)}
+                </.button>
+              </:action>
+            </.notice>
           <% else %>
             <.review_ask question={@q.question} scope={scope(@q)}>
               <:action :if={@document}>

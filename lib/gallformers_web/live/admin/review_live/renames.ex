@@ -44,6 +44,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Renames do
   def handle_info({ItemRow, {:decided, _item}}, socket),
     do: {:noreply, socket |> put_flash(:info, "Decision recorded.") |> load()}
 
+  def handle_info({ItemRow, {:undone, _item}}, socket),
+    do: {:noreply, socket |> put_flash(:info, "Decision undone.") |> load()}
+
   def handle_info({ItemRow, {:proposal, _item}}, socket), do: {:noreply, load(socket)}
 
   defp load(socket) do

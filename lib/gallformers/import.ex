@@ -189,6 +189,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.TermCandidate
   alias Gallformers.Import.TermCandidates
   alias Gallformers.Import.TraitTerms
+  alias Gallformers.Import.Undo
   alias Gallformers.Import.Validator
   alias Gallformers.Import.Validator.Problem
   alias Gallformers.Import.VocabEdits
@@ -1444,7 +1445,9 @@ defmodule Gallformers.Import do
       |> Queue.validate_decision(item, decision)
 
     if changeset.valid? do
-      decision = actor |> carry_out(item, decision) |> unwrap_or_rollback()
+      # What carrying it out logged, kept with the decision for Undo.
+      {decision, carried_out} =
+        ReplayLog.collect(fn -> actor |> carry_out(item, decision) |> unwrap_or_rollback() end)
 
       item =
         changeset
@@ -1458,7 +1461,7 @@ defmodule Gallformers.Import do
           _kind -> tap(item, &honour(actor, &1, package, files))
         end
 
-      log_decision(item)
+      log_decision(item, carried_out)
       {:ok, item}
     else
       {:error, changeset}
@@ -1791,51 +1794,247 @@ defmodule Gallformers.Import do
 
   defp refresh_batch_status(_batch), do: :ok
 
-  defp log_decision(%QueueItem{kind: :gall_rename} = item) do
-    ReplayLog.append!(:queue_decision, GallRenames.replay_key(item), %{
-      "decision" => StableRef.encode_decision(item.decision),
-      "from" => item.proposal["from"]
-    })
+  # The decision, keyed by stable references (`decision_key/1`); a decision
+  # that may have changed the tree keeps the entries carrying it out
+  # logged before it (`"carried_out"`), for Undo (`Gallformers.Import.Undo`).
+  defp log_decision(%QueueItem{} = item, carried_out) do
+    payload = %{"decision" => StableRef.encode_decision(item.decision)}
+
+    payload =
+      case item.kind do
+        :gall_rename -> Map.put(payload, "from", item.proposal["from"])
+        _kind -> payload
+      end
+
+    payload =
+      if Undo.tree_item?(item),
+        do: Map.put(payload, "carried_out", Enum.map(carried_out, &entry_json/1)),
+        else: payload
+
+    ReplayLog.append!(:queue_decision, decision_key(item), payload)
   end
 
-  # A split question comes from no package: found again by its Gall and taxon.
-  defp log_decision(%QueueItem{kind: :split_inducer} = item) do
-    ReplayLog.append!(:queue_decision, SplitQuestions.replay_key(item), %{
-      "decision" => StableRef.encode_decision(item.decision)
-    })
-  end
+  defp entry_json(%ReplayEntry{kind: kind, key: key, payload: payload}),
+    do: %{"kind" => Atom.to_string(kind), "key" => key, "payload" => payload || %{}}
+
+  # A decision's `:queue_decision` key. A rename proposal and a split
+  # question come from no package: found again by their Gall (and the name
+  # decided for, the split taxon).
+  defp decision_key(%QueueItem{kind: :gall_rename} = item), do: GallRenames.replay_key(item)
+  defp decision_key(%QueueItem{kind: :split_inducer} = item), do: SplitQuestions.replay_key(item)
 
   # A same-date conflict a merge brought about comes from no package
   # (`Gallformers.Import.Merge`): found again by its Gall and statement ref.
-  defp log_decision(%QueueItem{kind: :same_date_conflict, package_id: nil} = item) do
+  defp decision_key(%QueueItem{kind: :same_date_conflict, package_id: nil} = item) do
     gall_id = item.subject["gall_id"]
 
-    ReplayLog.append!(
-      :queue_decision,
-      %{
-        "kind" => "same_date_conflict",
-        "merge" => true,
-        "gall" => gall_id && StableRef.gall(gall_id),
-        "statement_ref" => item.statement_ref
-      },
-      %{"decision" => StableRef.encode_decision(item.decision)}
-    )
+    %{
+      "kind" => "same_date_conflict",
+      "merge" => true,
+      "gall" => gall_id && StableRef.gall(gall_id),
+      "statement_ref" => item.statement_ref
+    }
   end
 
-  defp log_decision(%QueueItem{} = item) do
+  defp decision_key(%QueueItem{} = item) do
     package = get_package!(item.package_id)
     batch = item.batch_id && get_batch!(item.batch_id)
 
-    ReplayLog.append!(
-      :queue_decision,
-      %{
-        "package" => package.key,
-        "batch_id" => batch && batch.producer_batch_id,
-        "kind" => Atom.to_string(item.kind),
-        "statement_ref" => item.statement_ref
-      },
-      %{"decision" => StableRef.encode_decision(item.decision)}
+    %{
+      "package" => package.key,
+      "batch_id" => batch && batch.producer_batch_id,
+      "kind" => Atom.to_string(item.kind),
+      "statement_ref" => item.statement_ref
+    }
+  end
+
+  # -- undo ------------------------------------------------------------------
+
+  @doc """
+  Undoes `actor`'s or anyone's decision on `item` (matter `f14c`, "Undo
+  rule"; `Gallformers.Import.Undo` says what each kind puts back): allowed
+  only while nothing depends on it — the Source isn't approved yet, and
+  nothing the decision changed has been edited since, per the audit log.
+  The tree edits it made are reversed, the item opens again (its ID and
+  notes kept) and its package is resolved again, in one audited
+  transaction, logged for replay (`:queue_decision_undone`; a taxonomic
+  statement's is its reopening, `reopen_taxonomic_statement/2`).
+
+  Returns the item, open again (or the question resolving again asks in
+  its place; nil when none is needed any more). Refused (nothing
+  changes) with why (`undo_refusal/1` says it in words): `:not_decided`, `:gone`,
+  `:source_approved`, `:package_denied`, `:no_trail` (the audit trail
+  holds no record of the decision), `{:edited, edit}` (who changed what
+  since, and when), `{:cannot_undo, why}`, `{:referenced, references}` (a
+  taxon it created is used since).
+  """
+  @spec undo_decision(Actor.t(), QueueItem.t()) ::
+          {:ok, QueueItem.t() | nil} | {:error, Undo.refusal() | term()}
+  def undo_decision(%Actor{} = actor, %QueueItem{kind: :taxonomy_acceptance} = item) do
+    Audit.transaction(actor, "import.undo_decision", fn ->
+      item = item.id |> lock_item() |> undoable(nil)
+
+      case TaxonomicDecisions.decide(actor, :reopen, item.subject["attribution_id"]) do
+        {:ok, _result} -> Repo.get!(QueueItem, item.id)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  def undo_decision(%Actor{} = actor, %QueueItem{} = item) do
+    files = item.package_id && undo_files(get_package!(item.package_id))
+
+    Audit.transaction(actor, "import.undo_decision", fn ->
+      # The package first, as resolving locks it before its items.
+      package = item.package_id && lock_package(item.package_id)
+      item = item.id |> lock_item() |> undoable(package)
+      ops = item |> carried_out() |> Undo.reversal() |> unwrap_or_rollback()
+      key = decision_key(item)
+      undo(actor, item, package, ops, files, key)
+    end)
+  end
+
+  @doc """
+  Undoes the decisions on `items` (a group of disputes decided together,
+  `decide_group/3`), each as `undo_decision/2` undoes it, all or none: the
+  first refusal rolls them all back. Returns the items as they are now.
+  """
+  @spec undo_decisions(Actor.t(), [QueueItem.t()]) ::
+          {:ok, [QueueItem.t() | nil]} | {:error, Undo.refusal() | term()}
+  def undo_decisions(%Actor{} = actor, items) when is_list(items) do
+    Audit.transaction(actor, "import.undo_decision", fn ->
+      for item <- items do
+        case undo_decision(actor, item) do
+          {:ok, undone} -> undone
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end
+    end)
+  end
+
+  @doc "Why `undo_decision/2` refused, in words, with the record to change instead (`Gallformers.Import.Undo.refusal/1`)."
+  @spec undo_refusal(term()) :: %{text: String.t(), link: {:taxon | :gall, integer()} | nil}
+  defdelegate undo_refusal(reason), to: Undo, as: :refusal
+
+  @doc """
+  Replays a logged undo (`Gallformers.Import.Replay`): `item` (found by
+  the entry's key, or nil when no item asks any more) is reopened if
+  decided, the logged reverse tree edits made where not done already, and
+  `package` (or nil) resolved again, logged again with `key`.
+  """
+  @spec replay_undo(Actor.t(), QueueItem.t() | nil, Package.t() | nil, map(), map()) ::
+          {:ok, QueueItem.t() | nil} | {:error, term()}
+  def replay_undo(%Actor{} = actor, item, package, key, payload) do
+    files = package && undo_files(package)
+
+    Audit.transaction(actor, "import.undo_decision", fn ->
+      package = package && lock_package(package.id)
+      item = item && lock_item(item.id)
+      undo(actor, item, package, List.wrap(payload["reverse"]), files, key)
+    end)
+  end
+
+  defp lock_item(id), do: Repo.one(from(q in QueueItem, where: q.id == ^id, lock: "FOR UPDATE"))
+
+  # The locked `item`, if the rule lets it be undone; else rolls back with why.
+  defp undoable(nil, _package), do: Repo.rollback(:gone)
+  defp undoable(%QueueItem{status: :open}, _package), do: Repo.rollback(:not_decided)
+
+  defp undoable(%QueueItem{} = item, package) do
+    batch_status = item.batch_id && get_batch!(item.batch_id).status
+    :ok = item |> Undo.check(package, batch_status) |> or_rollback()
+
+    case Undo.decision_transaction(item.id) do
+      nil ->
+        Repo.rollback(:no_trail)
+
+      transaction_id ->
+        :ok = item |> Undo.reversible(transaction_id) |> or_rollback()
+
+        case Undo.edited_since(transaction_id) do
+          nil -> item
+          edit -> Repo.rollback({:edited, edit})
+        end
+    end
+  end
+
+  defp or_rollback(:ok), do: :ok
+  defp or_rollback({:error, reason}), do: Repo.rollback(reason)
+
+  # What the decision's carrying out logged before it, from its latest
+  # `:queue_decision` entry. A decision that may have changed the tree and
+  # kept nothing was made before decisions kept them.
+  defp carried_out(%QueueItem{} = item) do
+    if Undo.tree_item?(item) do
+      key = decision_key(item)
+
+      entry =
+        Repo.one(
+          from(e in ReplayEntry,
+            where: e.kind == :queue_decision and e.key == ^key,
+            order_by: [desc: e.id],
+            limit: 1
+          )
+        )
+
+      case entry do
+        %ReplayEntry{payload: %{"carried_out" => entries}} when is_list(entries) -> entries
+        _ -> Repo.rollback({:cannot_undo, :no_record})
+      end
+    else
+      []
+    end
+  end
+
+  # The package's files when an undo will resolve it again; nil otherwise,
+  # or when the bucket cannot be read (the next resolution does it then).
+  defp undo_files(%Package{status: status} = package) when status in @resolvable do
+    case read_package_files(package) do
+      {:ok, files} -> files
+      _error -> nil
+    end
+  end
+
+  defp undo_files(_package), do: nil
+
+  # Inside the caller's transaction (the package locked): puts back what
+  # decided `item` changed, reopens it, makes the reverse tree edits `ops`,
+  # resolves the package again and logs the undo under `key`.
+  defp undo(actor, item, package, ops, files, key) do
+    item =
+      case item do
+        %QueueItem{status: :decided} ->
+          :ok = Undo.put_back(actor, item, package)
+          Undo.reopen(item)
+
+        other ->
+          other
+      end
+
+    if package, do: Undo.clear_statements(package, Undo.deleted_taxa(ops))
+    :ok = Undo.run(actor, ops)
+
+    if package && files && package.status in @resolvable,
+      do: resolve(Repo.get!(Package, package.id), files)
+
+    ReplayLog.append!(:queue_decision_undone, key, %{"reverse" => ops})
+    item && (Repo.get(QueueItem, item.id) || asked_now(item))
+  end
+
+  # The open item resolving again queued about `item`'s statement in its
+  # place (another kind of question now), or nil when none is needed.
+  defp asked_now(%QueueItem{package_id: nil}), do: nil
+
+  defp asked_now(%QueueItem{} = item) do
+    from(q in QueueItem,
+      where:
+        q.package_id == ^item.package_id and q.status == :open and
+          q.statement_ref == ^item.statement_ref,
+      order_by: [desc: q.id],
+      limit: 1
     )
+    |> in_batch(item.batch_id)
+    |> Repo.one()
   end
 
   @doc """

@@ -695,6 +695,15 @@ defmodule Gallformers.Catalog do
           | {:error, GallRenames.accept_error()}
   defdelegate accept_gall_rename(actor, gall_id), to: GallRenames, as: :accept
 
+  @doc """
+  Undoes an accepted rename of Gall `gall_id` back to `former`, the name it
+  showed before, and drops the `former_label` alias the rename added
+  (`Gallformers.Catalog.GallRenames.revert/3`).
+  """
+  @spec revert_gall_rename(Actor.t(), integer(), String.t()) ::
+          {:ok, Gall.t()} | {:error, :collision | term()}
+  defdelegate revert_gall_rename(actor, gall_id, former), to: GallRenames, as: :revert
+
   # -- legacy citations --------------------------------------------------------
 
   @doc """

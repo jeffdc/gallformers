@@ -156,6 +156,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Step do
   def handle_info({ItemRow, {:decided, _item}}, socket),
     do: {:noreply, socket |> put_flash(:info, "Decision recorded.") |> SourcePage.load()}
 
+  def handle_info({ItemRow, {:undone, _item}}, socket),
+    do: {:noreply, socket |> put_flash(:info, "Decision undone.") |> SourcePage.load()}
+
   def handle_info({ItemRow, {:proposal, _item}}, socket), do: {:noreply, SourcePage.load(socket)}
 
   defp section_key(entry), do: Atom.to_string(entry.question.section.id)

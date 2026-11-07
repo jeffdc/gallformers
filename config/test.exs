@@ -10,6 +10,11 @@ config :gallformers, tiles_url: "/data/boundaries.pmtiles"
 # Run async tasks synchronously to avoid sandbox connection issues
 config :gallformers, async_tasks: false
 
+# Every test's requests come from 127.0.0.1, so the API's per-IP limit (100
+# a minute) would deny the suite's later API requests, whichever tests the
+# seed runs last.
+config :gallformers, GallformersWeb.Plugs.RateLimiter, limit: 1_000_000
+
 # This checkout's test databases (config/test_db_names.exs): a worktree gets
 # its own, so it never shares one with another checkout.
 {test_db_names, _binding} = Code.eval_file(Path.join(__DIR__, "test_db_names.exs"))

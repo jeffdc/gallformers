@@ -13,7 +13,8 @@ defmodule Gallformers.Import.TaxonomyCarryOver do
     * **Synonym decisions** (`Gallformers.Import.SynonymDecisions`): a
       split (the name a species of its own again) or a move (the name a
       synonym of another taxon), found in the replay log (`:queue_decision`
-      entries) and among the decided queue items. The matching statements
+      entries, less those undone since: `:queue_decision_undone`) and
+      among the decided queue items. The matching statements
       are those the same package's applied taxonomy batches recorded about
       the name (acts whose taxon, name or accepted taxon is a taxon the
       batch declares by that name).
@@ -145,8 +146,7 @@ defmodule Gallformers.Import.TaxonomyCarryOver do
       end)
 
     logged =
-      for e <- Enum.map(entries, &normalize/1),
-          e.kind == :queue_decision,
+      for e <- standing(entries),
           %{"kind" => "taxonomy_disagreement", "statement_ref" => "t" <> _} = key <- [e.key],
           decision = e.payload["decision"],
           is_map(decision) and SynonymDecisions.changes_tree?(decision) do
@@ -158,6 +158,26 @@ defmodule Gallformers.Import.TaxonomyCarryOver do
       end
 
     Enum.uniq_by(items ++ logged, & &1.key)
+  end
+
+  # The log's `:queue_decision` entries still standing: an undo
+  # (`:queue_decision_undone`, keyed alike) takes the one before it back.
+  defp standing(entries) do
+    entries
+    |> Enum.map(&normalize/1)
+    |> Enum.reduce({[], %{}}, fn
+      %{kind: :queue_decision, key: key} = e, {order, by_key} ->
+        {[key | order], Map.put(by_key, key, e)}
+
+      %{kind: :queue_decision_undone, key: key}, {order, by_key} ->
+        {order, Map.delete(by_key, key)}
+
+      _e, acc ->
+        acc
+    end)
+    |> then(fn {order, by_key} ->
+      order |> Enum.reverse() |> Enum.uniq() |> Enum.flat_map(&List.wrap(by_key[&1]))
+    end)
   end
 
   defp normalize(%ReplayEntry{kind: kind, key: key, payload: payload}),

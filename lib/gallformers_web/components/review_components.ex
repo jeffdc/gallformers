@@ -1477,15 +1477,21 @@ defmodule GallformersWeb.ReviewComponents do
     """
   end
 
-  @doc "What a decided question was decided as, and by whom."
+  @doc """
+  What a decided question was decided as, and by whom; `action` at the
+  right (Undo, on a review row).
+  """
   attr :id, :string, required: true
   attr :text, :string, required: true
   attr :by, :string, default: nil
+
+  slot :action, doc: "an action at the right: Undo"
 
   def review_decided(assigns) do
     ~H"""
     <.notice id={@id} kind={:ok} icon="ph-check">
       Decided: {@text}<span :if={@by}>, by {@by}</span>.
+      <:action :if={@action != []}>{render_slot(@action)}</:action>
     </.notice>
     """
   end
