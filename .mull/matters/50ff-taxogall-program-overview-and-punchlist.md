@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-24
-updated: 2026-11-06
+updated: 2026-11-07
 epic: taxonomy
 relates: [8567, 9449, 3272, 803b, a856, 2c8c, d213, f14c, 20e5, bc0d]
 ---
@@ -53,3 +53,19 @@ Key references: domain language `docs/domain/domain-model.md`; design and rules 
 - Scope of the curated taxonomy; Traits that vary by Host (`8567`).
 - Notes: whether undescribed notes' "observed in…" become occurrence Facts; the judgement notes by LLM or curator; whether a note's taxonomic position becomes a Gallformers taxonomic Fact (`20e5`).
 - Production bugs found along the way (on `main`, fixed on their own branches): `2c8c`.
+
+
+## For Jeff's review (the 2026-11-06/07 build; was only in a session summary)
+
+**Decisions made during the build** (details in f923, f14c, ec2c):
+- Phase 2: a non-plant's first common name raises a taxonomy question; taxa an import creates have their name and placement accepted as created; a paper agreeing with the tree raises no question but stays "awaiting"; a split may keep A among its daughters; split questions suggest a daughter from shared Hosts (a suggestion, never bulk-accepted); a retracted split or lump leaves moved Galls where they are; a revalidated name keeps outranking the old synonymy even after a later rename (one-line change if Jeff meant "only while current"); a Gallformers taxonomy batch moves the tree without acceptance; lumping B declines real Sources' statements about B ("B was merged into A"); the cutover carry-over records no curator on its acceptances; a re-import keeps statements a curator credited to the paper (superseded by the d3b0 model: no crediting curator edits to papers).
+- Curation: applying from the tray leaves Edit mode unless every item is held; any admin can undo anyone's decision; Undo refuses decisions made before decisions recorded their tree edits, accepted splits, lumps, and vocabulary-changing trait-term decisions; a correction to a taxonomic statement awaits a curator unless "Accept it now"; creating a citation is logged as a Source edit (no row audit on `source`); imports and migrations don't refresh the dashboard live.
+- WCVP authorship: only blank plant authorships are filled (ambiguous names listed); replaying a WCVP link change reads WCVP to fill authorship.
+- Look changes from the component build: host range "select all" in the table header (bulk row only while something is selected); image manager copy-mode "select all" in the header; review options' Recommended chip after the tags.
+
+**Open questions:**
+- `file_drop` can't be reached by keyboard (as before); fixing it changes the upload hooks: approve?
+- Undo of split answers decided before `90a55ef0` is refused, and a pre-fix undo replays without moving the Inducer back: a compatibility path only matters if split undos ran on preview.
+- f14c ergonomics (fewer clicks, density): after the edit design (d3b0).
+- Superseded by the d3b0 model, to rework with the edit framework: `cited_source_id` / `cites_as_written` (remove), the taxonomy admin's and species page's "Based on which Source?" (`BasisPicker`), the two Gallformers Sources (legacy data and Source 58) becoming one Source with changes as packages, ID notes leaving Source 58.
+
