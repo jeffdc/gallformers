@@ -164,6 +164,20 @@ defmodule Gallformers.INaturalistTest do
     end
   end
 
+  describe "an observation's quality grade" do
+    test "is iNaturalist's: research, needs_id or casual; nil when not given" do
+      obs = fn grade ->
+        %{"results" => [%{"id" => 8, "quality_grade" => grade, "photos" => []}]}
+        |> INaturalist.parse_observation_response()
+        |> elem(1)
+      end
+
+      assert obs.("research").quality_grade == "research"
+      assert obs.("needs_id").quality_grade == "needs_id"
+      assert obs.(nil).quality_grade == nil
+    end
+  end
+
   describe "fetch_places/1" do
     test "each place's name and admin level" do
       Req.Test.stub(INaturalist, fn conn ->

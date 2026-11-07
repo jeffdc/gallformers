@@ -4,7 +4,8 @@ defmodule Gallformers.INaturalist.Observation do
   seen (`observed_on`), where (`place_ids`, the iNat places containing it,
   and `place_guess`, the observer's words), its `description` and its
   observation field values (`field_values`: `%{name, value, taxon_name}`,
-  `taxon_name` for a taxon field such as "Host Plant ID").
+  `taxon_name` for a taxon field such as "Host Plant ID"), and its
+  `quality_grade` ("research", "needs_id" or "casual").
   """
 
   alias Gallformers.INaturalist.Photo
@@ -20,6 +21,7 @@ defmodule Gallformers.INaturalist.Observation do
     :observed_on,
     :place_guess,
     :description,
+    :quality_grade,
     place_ids: [],
     field_values: [],
     photos: []
@@ -35,6 +37,7 @@ defmodule Gallformers.INaturalist.Observation do
           observed_on: Date.t() | nil,
           place_guess: String.t() | nil,
           description: String.t() | nil,
+          quality_grade: String.t() | nil,
           place_ids: [integer()],
           field_values: [
             %{name: String.t() | nil, value: String.t() | nil, taxon_name: String.t() | nil}

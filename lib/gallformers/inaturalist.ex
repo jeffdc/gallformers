@@ -117,6 +117,7 @@ defmodule Gallformers.INaturalist do
       place_guess: raw["place_guess"],
       place_ids: Enum.filter(raw["place_ids"] || [], &is_integer/1),
       description: raw["description"],
+      quality_grade: raw["quality_grade"],
       field_values: Enum.map(raw["ofvs"] || [], &field_value/1),
       photos: photos
     }
