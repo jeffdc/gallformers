@@ -3,6 +3,7 @@ status: raw
 created: 2026-11-07
 updated: 2026-11-07
 epic: taxogall
+relates: [87a1]
 ---
 
 # Unified edit model: one path, one UI for every Fact edit
@@ -63,4 +64,38 @@ Rules:
 - **UI duplication:** five editor shapes (`GallLive.Editor`, `HostLive.Editor`, `SpeciesLive.Editor`, `RangeEdit`/`RangeEditor`, `TaxonomyLive.Edit`); two Fact-row UIs (`CurationComponents.fact_row`/`fact_chip` vs `FactsComponents.facts_view`/`fact_menu`/`fact_editor`; the Gall page shows both); six plant searches (Gall page can't add a genus/section Host; review and corrections can); taxon/parent, Gall and Source searches each several times with different filters; four rename dialogs; six "why/evidence" inputs; three observation-link parsers; four Fact-key encodings; two place pickers; duplicated tray marks and Source short labels; `Curation.Review` re-implements the import preview rules; validation repeated (`Curation.Spec` vs `Import.Validator`/Resolver; code/name checks three times).
 - **Bug:** name/authorship comparison differs by path (`TaxonChanges.name` raw strings vs `NameNormalizer.normalize_authorship` in `TaxonomyQueue`): a curator's "(Weld 1959)" vs "(Weld, 1959)" makes a new name statement.
 - **Gaps:** no UI anywhere for a Gall's Inducer, generation, descriptions, creating a Gall, range "only"; rank pages have no Edit mode; plant lineage, common names, WCVP link and completeness/abundance flags only in the taxonomy admin; species page photos and delete only in the admin.
+
+
+## The Fact inspector (Jeff, 2026-11-07)
+
+The Fact viewer and the Fact editor are one thing. Every Fact-backed value on a page (each Host, trait value, range place, Inducer, alias) reads as it does today, with a quiet mark that it has Sources. Selecting it opens the **Fact inspector**: the Fact in words, its standing (counts, disputed, withdrawn, superseded), and each Source's statement (date, as written, quotes).
+
+- **Readers get the inspector** (decided): provenance on demand is "every claim has a Source" made visible. One component, not a reader's and a curator's.
+- **A side panel on wide screens, a bottom sheet on phones** (decided), beside the page, not replacing it.
+- **Edit mode adds actions to the same inspector, grouped by authority:** "Gallformers says" (withdraw, change, note: a Gallformers change) first; corrections of a Source's statement ("we read this wrong", under that Source's authority) a level deeper, since they are **less common than Gallformers changes** (decided).
+- No edit forms in the page body and no verb on every row: actions exist only for the selected Fact. Adding is one "Add" per group, opening the inspector on a new Fact.
+- Editorial fields (completeness, abundance, ID notes, photos) stay in-place fields, styled apart from Facts.
+- The Facts panel becomes the full record (history, withdrawn, superseded), not where editing must happen.
+- Next: a mockup on Gall 5076, reading (inspector on a Host) and editing (actions, one Add a host).
+
+
+### The inspector, round two (Jeff, 2026-11-07; mockup `/dev/mockups/fact-inspector/5076`)
+
+- **One template for every Source:** each Source is a block, "{Source} says so" (or "says it isn't so") · its date, then its words as written, its quotes, and the actions that belong to that Source. Gallformers is one of the Sources: the old site's data reads as Gallformers' own statement, "original data, undated" (the merge decided above).
+- **No empty "Gallformers says" section.** Reading: every block newest first. Editing: Gallformers' block first, where the curator acts (Change, Deny, Add a note); when Gallformers hasn't stated the Fact, its block says so and adds Confirm.
+- **Corrections stay a level deeper, per Source:** a toggle reveals a fix on every other Source's block. Wording still to settle; drafts in the mockup: toggle "Did we misread a Source?", per block "Fix our reading…", form "What {Source} actually says".
+- **Discoverability:** the dotted underline alone isn't discoverable. Readers get a dismissible hint ("Underlined values show the Sources that state them") and the hover text "Who says so?".
+- **Adding:** each group has one Add; Traits not recorded are each an add in Edit mode.
+- Still to design: the phone sheet hiding the selected value, the shared plant search in Add and Change, history (withdrawn, superseded), disputed Facts, the editorial fields, the Inducer (taxonomy, on the taxon's page).
+
+
+### Round three (Jeff, 2026-11-07)
+
+- **Gallformers is pinned first in the inspector, reading and editing alike**, then the other Sources newest first. (Changing order between modes was odd.) Bottom is the alternative if readers should see the literature first.
+- **Toggle wording:** "Found an error in a Source reading?"; per Source "Fix our reading…".
+- **Proposed domain term "Reading"** (needs Jeff's confirmation before it goes in `docs/domain/domain-model.md`): how Gallformers read a Source, the Facts it took the Source to state with its words as written. A misreading is fixed under the Source's authority, at its date, with no Gallformers position. It is not a **Correction**, which the domain model already defines as a Source's published erratum (a newer Source); this matter, the tray ("Corrections to …") and the code have been using "correction" for fixing a reading, a collision to remove.
+- Jeff: "so much better than other designs I have tried." The inspector is the direction.
+
+
+**Captured for the build in `87a1`** (Jeff, 2026-11-07: "I think we have our design").
 

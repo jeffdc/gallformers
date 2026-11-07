@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-11-04
-updated: 2026-11-06
+updated: 2026-11-07
 epic: design
-relates: [f14c, 6611, 9119]
+relates: [f14c, 6611, 9119, 87a1]
 ---
 
 # Design system: denser, consistent UI across public site and admin
@@ -817,4 +817,3 @@ taxogall merged again (through 2539dc67: Add from observation back end; no reaso
 - **Dark mode on for admin**, with the theme switch in its top bar; the sidebar logo swaps to white.
 - **Behaviour/look changes made during the migration, for Jeff to review:** image manager copy-mode controls moved above the table, row tints gone, table rows lost `data-image-id`, hover actions also on keyboard focus, info tips shown as help lines, "Delete image" wording; host range select-all above the table (not in the header); country drill-down Native/Introduced as a switch, rows marked by swatch and hatch rather than green/amber; the discard dialog's wording ("Discard your changes?", "Keep editing", "Discard changes"); Retracted/Complete chips on the Source edit page; notices now carry role status/alert; card titles no longer on a sky band.
 - **Components the agents needed and hand-built from tokens (candidates to build):** a segmented switch (three hand copies of `view_switch`); a progress bar; `file_drop` (approved, unbuilt); `data_table` per-row attributes and state, header select-all, and a `select` event that can target a LiveComponent; a `loading_spinner` colour for primary buttons; a "recommended" chip variant; radio-card options for the review.
-

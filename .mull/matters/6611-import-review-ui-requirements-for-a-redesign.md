@@ -1,9 +1,9 @@
 ---
 status: active
 created: 2026-10-30
-updated: 2026-11-04
+updated: 2026-11-07
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d]
+relates: [a856, 20e5, e381, d213, bc0d, c8c3]
 ---
 
 # Import review UI: requirements for a redesign
@@ -224,3 +224,54 @@ All eight tasks are built; `mix precommit` passes (2,764 tests). The local revie
 
 
 **Host rows fixed (2026-11-02, Jeff's review of Aphis rubifolii):** each section now heads its columns "The Source wrote" → "Gallformers proposes". A variety's species is only ever a suggestion, never the firm proposal, and comes after a WCVP record for the variety itself (Rubus ursinus var. loganobaccus had been proposed as R. ursinus; WCVP sinks it into Rubus × loganobaccus, the loganberry). A suggested plant Gallformers doesn't hold says "Not in Gallformers yet: accepting adds it from WCVP". Side effect: varieties whose species was firmly proposed before (Ashmead's Q. chrysolepis var. vaccinifolia) are now suggestions to accept one by one.
+
+
+## Redesign, round two (Jeff and Claude, 2026-11-07)
+
+Mockup: `dev/gallformers_web/dev/mockups/source_reading_live.ex`, `/dev/mockups/source-reading/:package_id` (package 97, Nastasi & Davis 2022), on the real questions (`ReviewLive.SourcePage.load/1`, the Traits step's context for trait terms) and the real reading (`Import.preview_package/2`). Deciding is mocked.
+
+**The critique of the built pages:** organised around the pipeline's stages, not the curator's question ("did we read this Source right?"); the Facts, the result, an optional last tab; about 380px of chrome before the first question and the step named three times; deciding takes three clicks (open, pick, Decide) and an open item is ~750px; five phrasings for a recommendation; Hedges is 80 identical decisions; the Sources list's "Holding approval" column is a wall of section names. (Also: the admin sidebar's background stops after the first screen.)
+
+**Direction (Jeff: "directionally better"):** one view of the Source's review, questions in pipeline order, the reading (its Facts by Gall) as context. But all of it at once is overwhelming (Adam's first fear: walls of things to do; small type adds to it). So the default is **one thing at a time**:
+- One unit of work at a time, in the admin shell at the **Reading sizes** (proposed `gf-density-reading` class in `tokens.css`, marked PROPOSED, uncommitted). "See everything at once" keeps the full list.
+- **One honest count, the same everywhere:** "N of M questions settled. K left, H of them hold approval." Set-aside statements are counted apart ("80 hedged statements were set aside: they stay out unless you state one"). The earlier counts mixed set-aside items into the total and split "need you / to confirm", which read as contradictory.
+- Stages as a quiet line (Names · Galls · Disputes · Traits: done ticked, current dotted). "Up next" shows three. "Skip for now" on every unit.
+- **"This decides" first** on each card (the Galls and which of their Facts the answer settles), then the question, the Source's quotes, the answers (each with its own button).
+- **Batches:** a group's firm proposals as one card, "Accept all N". An item can be set to "Decide on its own" and stays visible in the batch ("you'll decide this one next", Undo); the earlier "Not this one" made items vanish. **Never batched:** "create a new Gall" and a Trait term's "it depends on the Gall" (not an answer until each Gall has its value; batching it is what made the Traits step opaque).
+- **A Host nothing matches: three answers, in order:** Search…, Add a new plant… (the New taxon page, prefilled, new tab), Leave this Host out.
+- **A Trait term used in several senses is one card listing every Gall it covers:** each Gall's name, the Source's sentence, the candidate values as buttons with the readers' choice picked, "What the readers said" folded away, the values' definitions once at the top, "Settle these N Galls". The curator always sees which Gall they are on.
+
+**Finding: undescribed Galls are mis-proposed as new.** The resolver proposes "Create it as a new Gall" firmly for Galls Gallformers holds: "Toothed rosinweed cryptic stem gall (Antistrophus sp.)" is *Antistrophus s-dentatum-cryptic-stem-gall* (toothed rosinweed is Silphium dentatum; the Source's text says "(S. dentatum)"); "Horkelia stem gall" is likely *Diastrophus p-congesta-stem-gall* (Horkelia congesta, formerly Potentilla congesta; its Host question is open too); "Southern dewberry stem gall" sits beside *Diastrophus r-trivialis-root-gall* (Rubus trivialis). The Source names Galls by the Host's common name; undescribed Galls are coded by the Host's epithet. Accepting such a batch would create duplicates.
+- To fix in the matcher: match undescribed Galls on Inducer genus + resolved Host (re-match after Host questions are answered); never propose "create new" firmly while a Gall of that genus on that Host exists.
+- In the UI (mocked): the genus's undescribed Galls as quick picks, "Is it one Gallformers already holds?", the one whose Host epithet the Source's text names first and marked ("Its Host, S. dentatum, is the one the Source names"); "Create it as a new Gall" demoted to Check below them.
+
+**Still open:** the reading's place (as context on each card now; Jeff to judge whether "here's what approving writes" should be the last step before Approve); keyboard; the dispute comparison drawn in the card; how the notes Source and the Sources list take this shape.
+
+
+**Round three (Jeff, 2026-11-07):** the status moves to a rail on the right (sticky on wide screens; below the card on phones): the Source's title, "N of M settled" with a progress bar, "K left, H hold approval", the stages as a vertical list each with what's left ("Names · 4 left", "Disputes · done"), the set-aside line, Up next, Approve and "See everything at once". The card takes the main column's width. **The stages are navigation:** shown in order, but any stage can be chosen to work through next (its units first; skipped units still go to the end).
+
+
+**Round four (Jeff, 2026-11-07):**
+- **Wording, plainly.** Jeff found the copy stiff and "LLM-written" ("Decide on its own", "Approve opens when nothing holds it"). Rewritten as people say it: "0 of 46 answered", "46 to go. 25 of them must be answered before you can approve", "You can approve once the 25 marked questions are answered", "Affects" (was "This decides"), "Suggested" / "Best guess" (were "Proposed" / "Check"), "Is it one of these Galls we already have?", "Why the AI chose this", "Save these 3". The batch card uses checkboxes: "We have suggested answers for these 9. They look right to us. Untick any you want to check yourself; you'll see those next, one at a time." → "Accept all 9" / "Accept the 8 ticked". Each batch row names its trait ("texture: lumpy → Keep as text").
+- **One switch between the views,** "One at a time | Everything" (`segmented_switch`), at the top of both.
+- **The hedged statements are reachable from the rail:** "80 hedged statements were left out. Review them" opens them in the main column, grouped, each with "Add it…", and "Back to the questions".
+- **Headings in cards wrap normally** (`text-wrap`): the base stylesheet's `text-wrap: balance` split long questions into two short lines with a gap, and `text-pretty` isn't supported in Firefox, so it doesn't override it.
+
+
+**Round five: Trait terms (Jeff, 2026-11-07):**
+- **Any valid value, and several of them.** Most Traits take more than one value per Gall ("on the leaf or petiole, occasionally on the stem" is leaf, petiole and stem), and the curator can choose any of the Trait's values, not only those the pipeline mentioned. The per-Gall data already allows a set.
+- **The card, per Gall:** the Gall's name and the Source's sentence; one plain line on what the pipeline made of it ("The import pipeline couldn't agree how to map “lumpy” to a texture value." / "…suggests keeping the words as text." / "…suggests: leafy."), with "What each AI said" folded away; then **two choices**: "Keep “lumpy” as text" (the Gall shows the Source's words; the ID tool can't filter on them) or "Map it to texture values", which opens every value of the Trait as a checkbox, the pipeline's suggestions first and marked. With no consensus neither is chosen and Save waits until each Gall has one.
+- **The counts say how a batch fits its stage:** "9 of the 21 Traits questions have suggested answers… After these, the other 12 come up one at a time, along with any you untick."
+- **Found:** the same words can be asked twice: as a Trait term ("what does “on the leaf or petiole” mean?") and as a dispute about the same statement ("Should “on the leaf or petiole” go in as Ground-ivy gall's plant part?"). The build should ask once.
+- **LiveView note for the build:** a checkbox's click sends its own `value` ("on") as `value`, overriding `phx-value-value`; name the parameter something else.
+
+- **Trait disputes use the same card** (Jeff: "the very next one is the old style"). A dispute where the pipeline's AIs disagreed about one Gall's Trait ("single-chambered or have many chambers" for the Lettuce node gall's cells) is the same decision as a Trait term for one Gall: "The import pipeline's AIs disagreed about whether “…” is a cells value", then Keep as text or Map it to cells values (any of them; here monothalamous and polythalamous). Nothing preselected. The old "Keep it / Drop it" wording ("the Gall gets the cells value “…” is placed under") goes.
+
+- **A dispute must say what each side chose, as data.** Nastasi & Davis's "fleshy" (Cinquefoil bud gall's texture): the producer's one-line summary ("The vocabulary's texture value for 'fleshy' is defined by juicy walls…") reads as if "fleshy" were a value; its full reasoning says it mapped "fleshy" to the existing value **succulent** (an existing term mapping). The card now says "The producer mapped “fleshy” to succulent. A checker disagreed: …" and marks succulent as suggested; the mockup reads the value out of the producer's reasoning, the build should carry the producer's (and each checker's) value in the dispute item.
+- **Vocabulary question for Jeff:** the checker's rule "texture is the surface" conflicts with our own *succulent* ("The walls of the gall (when fresh) are juicy if cut"), an interior property. Is texture surface-only, and does succulent belong under walls?
+
+- **"X or Y" Trait terms are asked needlessly (pipeline rule, 2026-11-07).** `priv/import/PRODUCER_GUIDE.md` (line ~199) and `VERIFY_GUIDE.md` (line ~37): "Never guess between values. A term that offers a choice or leaves it open names none of them… one Fact with category `null`". So "Green or yellowish" and "single-chambered or have many chambers" become null, a checker objects (two colours), and the curator is asked to tick green and yellow by hand. In Gallformers several values for a Trait already mean the Gall can be any of them, so a term naming alternatives the Gall varies between names each of them (one Fact per value); `null` fits only wording that leaves the value open or that the Source says is unknown. Proposed guide change awaits Jeff. Meanwhile the review card should pre-tick each side's values on a dispute, and a curator's mapping of a term should become a term mapping so no Source asks again (the open item above).
+
+
+**Next (Jeff, 2026-11-07):** work through `c8c3` first (its Gallformers-side fixes, then the guide change once worded), then return to this design with re-resolved data (Nastasi & Davis, package 97) and keep pushing the UI.
+

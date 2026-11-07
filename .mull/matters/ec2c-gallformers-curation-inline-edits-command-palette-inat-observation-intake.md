@@ -1,8 +1,9 @@
 ---
 status: raw
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-07
 epic: taxogall
+relates: [87a1]
 ---
 
 # Gallformers curation: inline edits, command palette, iNat observation intake
@@ -185,4 +186,17 @@ Fixed 2026-11-06 (merges `222dcb2e`, `031154d9`, `9d3ec003` and the Gall page me
 Look changes from the migration (bc0d): the host range view is fine; the discard dialog's wording is good; the copy-metadata panel above the table is good.
 
 Answers (Jeff, 2026-11-06): the feature LiveComponents (`RecordRemoval`, `ObservationIntake`, `HostLive.Editor`) need no approval; the components the migration hand-built (bc0d) are approved to be built properly; f14c's ergonomics after these and the last back end.
+
+
+## Add from observation in the Fact inspector (Jeff, 2026-11-07; matter d3b0)
+
+The observation is evidence, so it opens in the Fact inspector beside the page, not a modal: paste the link; the observation's card (photo, identified as, Research Grade or not, seen, where, by, license); what it shows as proposals previewed in place on the page and listed with ticks, each New or Already held (adds the observation as evidence); a missing Host asked for in the panel; one "Add N to your tray", each with the observation as evidence. Once applied, the Fact's inspector shows Gallformers' statement "based on iNaturalist observation …".
+
+- **Photos go through the tray** (decided): its photo is a tick, an editorial tray item, not saved at once.
+- **An observation identified as another taxon than the Gall's Inducer: warn, don't block** (decided), unmissably, offering that taxon's Gall.
+- **Non-Research-Grade observations are allowed, made clear** (decided): their grade shows in the panel and in the inspector's "based on" line.
+- Found while testing the current dialog: an observation identified as Aphis rubifolii, pasted on the Diplolepis rosae page, gave no warning and offered "recorded in Indiana" for Diplolepis rosae.
+
+
+**Captured for the build in `87a1`** (with the Fact inspector).
 
