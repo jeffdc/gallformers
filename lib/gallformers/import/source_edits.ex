@@ -19,6 +19,11 @@ defmodule Gallformers.Import.SourceEdits do
     * `{:retract, source, notice, date}` — `%{"op" => "retract"}`, payload
       the notice's stable reference and the ISO date.
     * `{:unretract, source}` — `%{"op" => "unretract"}`.
+
+  Creating a Source from a citation entered on the spot (`record_create/2`,
+  matter `f923` Task 8) is `%{"op" => "create"}`, keyed by the new title,
+  payload `%{"attrs" => %{"title", "authors", "authored", "doi"}}`; replay
+  creates it again unless a Source has that title.
   """
 
   alias Gallformers.Audit
@@ -42,8 +47,14 @@ defmodule Gallformers.Import.SourceEdits do
   # Fields set from others, left out of the logged changes.
   @derived [:authored_date, :authored_precision, :license_value]
 
-  @doc "Makes `edit` and records it in the replay log, in one transaction."
-  @spec record(Actor.t(), edit()) :: {:ok, Source.t()} | {:error, Ecto.Changeset.t() | term()}
+  @doc """
+  Makes `edit` and records it in the replay log, in one transaction
+  (`{:create, attrs}` is `record_create/2`).
+  """
+  @spec record(Actor.t(), edit() | {:create, map()}) ::
+          {:ok, Source.t()} | {:error, Ecto.Changeset.t() | term()}
+  def record(%Actor{} = actor, {:create, attrs}), do: record_create(actor, attrs)
+
   def record(%Actor{} = actor, edit) do
     Audit.transaction(actor, "import.record_source_edit", fn ->
       source = fetch(elem(edit, 1))
@@ -57,6 +68,36 @@ defmodule Gallformers.Import.SourceEdits do
 
         {:error, reason} ->
           Repo.rollback(reason)
+      end
+    end)
+  end
+
+  @citation_fields ~w(title authors authored doi)
+
+  @doc """
+  Creates a Source from a citation (`Gallformers.Sources.create_citation/2`:
+  title, authors, date, optional DOI) and records it in the replay log, in
+  one transaction audited as `actor`.
+  """
+  @spec record_create(Actor.t(), map()) :: {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
+  def record_create(%Actor{} = actor, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "import.record_source_created", fn ->
+      case Sources.create_citation(actor, attrs) do
+        {:ok, source} ->
+          payload = %{
+            "attrs" => %{
+              "title" => source.title,
+              "authors" => source.authors,
+              "authored" => Source.authored(source),
+              "doi" => source.doi
+            }
+          }
+
+          ReplayLog.append!(:source_edit, key("create", source), payload)
+          source
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
       end
     end)
   end
@@ -89,6 +130,12 @@ defmodule Gallformers.Import.SourceEdits do
         %Source{} -> {:ok, {:unretract, id}}
       end
     end
+  end
+
+  def from_entry(%{"op" => "create", "source" => %{"title" => title}}, %{"attrs" => attrs}) do
+    if Sources.get_source_by_title(title),
+      do: :done,
+      else: {:ok, {:create, Map.take(attrs, @citation_fields)}}
   end
 
   def from_entry(key, _payload), do: {:error, {:unknown_source_edit, key}}

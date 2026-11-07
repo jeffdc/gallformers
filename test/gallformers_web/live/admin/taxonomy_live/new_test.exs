@@ -35,6 +35,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.NewTest do
     render_click(view, "select_parent", %{"id" => "#{parent.id}"})
   end
 
+  # The "Based on which Source?" dialog sends the page its choice, which the
+  # page makes (and redirects) after the submit returns: wait for it.
+  @made_after_submit 5_000
+
+  # A taxon outside Plantae is credited to what it follows (`f923`): here,
+  # no Source, Gallformers' own position.
+  defp own_position(view) do
+    view |> element("#basis-picker-choice-gallformers") |> render_click()
+
+    view
+    |> form("#basis-picker-form", basis: %{reason: "No paper names it yet."})
+    |> render_submit()
+  end
+
   defp resolve(name) do
     case Taxa.resolve_name(name, kingdom: "Plantae") do
       {:ok, taxon} -> taxon
@@ -186,6 +200,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.NewTest do
       |> form("#taxon-form", taxon: %{name: name, rank: "family", kingdom: "Animalia"})
       |> render_submit()
 
+      own_position(view)
+      assert_redirect(view, @made_after_submit)
       assert {:ok, %{kingdom: "Animalia", parent_id: nil}} = Taxa.resolve_name(name)
     end
 
@@ -238,12 +254,15 @@ defmodule GallformersWeb.Admin.TaxonomyLive.NewTest do
 
       render_click(view, "toggle_child", %{"id" => "#{moved.id}"})
       view |> form("#taxon-form", taxon: %{name: name, rank: "tribe"}) |> render_submit()
+      own_position(view)
+      assert_redirect(view, @made_after_submit)
 
       {:ok, tribe} = Taxa.resolve_name(name)
       assert tribe.parent_id == family.id
       assert Taxa.get_taxon!(moved.id).parent_id == tribe.id
       assert Taxa.get_taxon!(stayed.id).parent_id == family.id
-      assert {:taxonomy_edit, "place"} in ops()
+      assert {:taxonomy_edit, "create_taxon"} in ops()
+      assert {:taxonomic_statement, nil} in ops()
     end
 
     test "starts from the link's name, rank, kingdom and parent", %{conn: conn} do

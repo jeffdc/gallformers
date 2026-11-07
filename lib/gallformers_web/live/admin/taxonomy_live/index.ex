@@ -7,7 +7,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
 
   Browsing a taxon's children, several can be selected and moved under
   another parent at once (the old "move genera"), each move through
-  `Gallformers.Import.record_taxonomy_edit/2` as the signed-in admin.
+  `Gallformers.Import.record_taxonomy_edit/2` as the signed-in admin. Taxa
+  outside Plantae move by a Source's word (matter `f923`): the move asks
+  "Based on which Source?" (`GallformersWeb.Admin.TaxonomyLive.BasisPicker`)
+  and is made as that Source's accepted placements
+  (`Gallformers.Import.record_taxonomy_change/3`).
   """
   use GallformersWeb, :live_view
 
@@ -15,6 +19,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Rank
   alias Gallformers.Taxa.Taxon
+  alias GallformersWeb.Admin.TaxonomyLive.BasisPicker
   alias GallformersWeb.Admin.TaxonomyLive.Errors
 
   @search_limit 200
@@ -23,7 +28,9 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
-     assign(socket,
+     socket
+     |> BasisPicker.init()
+     |> assign(
        page_title: "Taxonomy",
        selected: MapSet.new(),
        show_move_modal: false,
@@ -172,7 +179,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
     do: {:noreply, assign(socket, move_target: nil, move_query: "", move_results: [])}
 
   def handle_event("move_selected", _params, socket) do
-    %{selected: selected, move_target: target, actor: actor} = socket.assigns
+    %{selected: selected, move_target: target} = socket.assigns
 
     cond do
       is_nil(target) ->
@@ -182,17 +189,61 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
         {:noreply, put_flash(socket, :error, "Select the taxa to move")}
 
       true ->
-        case Import.record_taxa_moved(actor, MapSet.to_list(selected), target.id) do
-          {:ok, count} ->
-            {:noreply,
-             socket
-             |> assign(show_move_modal: false, selected: MapSet.new())
-             |> load()
-             |> put_flash(:info, "Moved #{count} #{taxa_word(count)} under #{target.name}")}
+        move(socket, MapSet.to_list(selected), target)
+    end
+  end
 
-          {:error, reason} ->
-            {:noreply, put_flash(socket, :error, "Not moved: #{Errors.text(reason)}")}
-        end
+  def handle_event("cancel_basis", _params, socket),
+    do: {:noreply, BasisPicker.cancel(socket)}
+
+  @impl true
+  def handle_info({BasisPicker, {:chosen, basis}}, socket) do
+    case BasisPicker.run(socket, basis) do
+      {:ok, socket, _count, done} ->
+        {:noreply, socket |> assign(:selected, MapSet.new()) |> load() |> put_flash(:info, done)}
+
+      {:error, socket} ->
+        {:noreply, socket}
+    end
+  end
+
+  # Taxa outside Plantae move by a Source's placement statements (`f923`):
+  # ask which Source first. Plants move directly.
+  defp move(socket, ids, target) do
+    %{actor: actor} = socket.assigns
+    count = length(ids)
+
+    case Enum.split_with(ids, &Taxa.follows_facts?(Taxa.get_taxon!(&1))) do
+      {[], _plants} ->
+        move_directly(socket, actor, ids, target)
+
+      {_followed, []} ->
+        {:noreply,
+         socket
+         |> assign(show_move_modal: false)
+         |> BasisPicker.ask(
+           {:move_all, ids, target.id},
+           "Move #{count} #{taxa_word(count)} under #{target.name}.",
+           "Move",
+           "Moved #{count} #{taxa_word(count)} under #{target.name}"
+         )}
+
+      _mixed ->
+        {:noreply, put_flash(socket, :error, "Move plants and other taxa separately")}
+    end
+  end
+
+  defp move_directly(socket, actor, ids, target) do
+    case Import.record_taxa_moved(actor, ids, target.id) do
+      {:ok, count} ->
+        {:noreply,
+         socket
+         |> assign(show_move_modal: false, selected: MapSet.new())
+         |> load()
+         |> put_flash(:info, "Moved #{count} #{taxa_word(count)} under #{target.name}")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Not moved: #{Errors.text(reason)}")}
     end
   end
 
@@ -371,6 +422,18 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
           </.button>
         </:actions>
       </.dialog>
+
+      <.live_component
+        :if={@pending}
+        module={BasisPicker}
+        id="basis-picker"
+        change={@pending.summary}
+        confirm_label={@pending.confirm}
+        error={@basis_error}
+        error_kind={@basis_error_kind}
+        remembered={@last_source}
+        cancel_event="cancel_basis"
+      />
     </Layouts.admin>
     """
   end

@@ -171,6 +171,16 @@ defmodule Gallformers.Taxa do
   # Accepted name first, then synonyms in the order added.
   defp names_order, do: from(n in TaxonName, order_by: [n.status, n.id])
 
+  @doc """
+  Whether the tree follows the taxonomic Facts for a taxon of `kingdom`
+  (matter `f923`): every taxon outside Plantae (`Gallformers.Taxa.Sync`),
+  whose names and placement change only through a Source's accepted
+  statement. Plant data is editorial.
+  """
+  @spec follows_facts?(Taxon.t() | String.t() | nil) :: boolean()
+  def follows_facts?(%Taxon{kingdom: kingdom}), do: follows_facts?(kingdom)
+  def follows_facts?(kingdom), do: kingdom != "Plantae"
+
   @doc "A taxon's accepted name."
   @spec accepted_name(taxon_ref()) :: String.t()
   def accepted_name(%Taxon{names: names}) when is_list(names) do
