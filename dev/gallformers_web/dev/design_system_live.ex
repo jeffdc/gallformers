@@ -24,7 +24,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card segmented_switch data_table-selection progress_bar loading_spinner chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position segmented_switch data_table-selection progress_bar loading_spinner chrome),
        sample_view: "photos",
        sample_choice: "0",
        sample_selected: MapSet.new([2]),
@@ -901,6 +901,86 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
 
         <.example
           :let={theme}
+          id="review_option"
+          title="review_option"
+          code={
+            ~S'''
+            <ReviewComponents.review_option id="ro-0" name="ro" value="0" checked={@choice == "0"}
+              recommended by="2 of 3 readers" label="Follow Weld 1959"
+              summary="The tree moves Andricus foo under Callirhytis." tags={[%{text: "newest", kind: :best}]}
+              on_pick="pick" />
+            <ReviewComponents.review_option id="ro-1" name="ro" value="1" checked={@choice == "1"}
+              label="Decline" summary="The tree stays; a reason is required." on_pick="pick">
+              <:follow>…the reason…</:follow>
+            </ReviewComponents.review_option>
+            '''
+          }
+        >
+          <div role="radiogroup" aria-label="Follow the paper?" class="grid gap-1.5">
+            <GallformersWeb.ReviewComponents.review_option
+              id={"ro-#{theme}-0"}
+              name={"ro-#{theme}"}
+              value="0"
+              checked={@sample_choice == "0"}
+              recommended
+              by="2 of 3 readers"
+              label="Follow Weld 1959"
+              summary="The tree moves Andricus foo under Callirhytis."
+              tags={[%{text: "newest", kind: :best}]}
+              on_pick="sample_choice"
+            />
+            <GallformersWeb.ReviewComponents.review_option
+              id={"ro-#{theme}-1"}
+              name={"ro-#{theme}"}
+              value="1"
+              checked={@sample_choice == "1"}
+              label="Decline"
+              summary="The tree stays; a reason is required."
+              on_pick="sample_choice"
+            >
+              <:follow>
+                <span class="text-meta text-muted">The reason goes here.</span>
+              </:follow>
+            </GallformersWeb.ReviewComponents.review_option>
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="taxonomic_position"
+          title="taxonomic_position"
+          code={
+            ~S'''
+            <FactsComponents.taxonomic_position id="position"
+              position={Import.taxonomic_position(@taxon.id)} />
+            '''
+          }
+        >
+          <GallformersWeb.FactsComponents.taxonomic_position
+            id={"position-#{theme}"}
+            position={
+              %{
+                placement: %{
+                  fact_id: 1,
+                  parent: %{name: "Callirhytis", rank: :genus},
+                  source: %{source_id: 1, name: "Weld 1959"}
+                },
+                name: %{
+                  fact_id: 2,
+                  name: "Callirhytis quercuspunctata",
+                  rank: :species,
+                  authorship: "(Bassett, 1863)",
+                  sensu: nil,
+                  source: %{source_id: 1, name: "Weld 1959"}
+                },
+                disagreeing: []
+              }
+            }
+          />
+        </.example>
+
+        <.example
+          :let={theme}
           id="segmented_switch"
           title="segmented_switch"
           code={
@@ -968,7 +1048,9 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
         >
           <.data_table
             id={"dt-select-#{theme}"}
-            rows={@sample_sources |> Enum.with_index(1) |> Enum.map(fn {s, i} -> Map.put(s, :id, i) end)}
+            rows={
+              @sample_sources |> Enum.with_index(1) |> Enum.map(fn {s, i} -> Map.put(s, :id, i) end)
+            }
             row_attrs={&%{"data-source-id" => &1.id}}
             row_state={&if(&1.status == nil, do: :warn)}
             selectable
