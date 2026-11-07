@@ -100,6 +100,8 @@ defmodule Gallformers.Import do
   """
   use Boundary,
     deps: [
+      # Curators' names on their decisions (`Gallformers.Import.FactsView`).
+      Gallformers.Accounts,
       Gallformers.Audit,
       Gallformers.Catalog,
       Gallformers.Facts,
@@ -179,6 +181,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.SynonymDecisions
   alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Import.TaxonomyAdmin
+  alias Gallformers.Import.TaxonomyCarryOver
   alias Gallformers.Import.TaxonomyEdits
   alias Gallformers.Import.TaxonomyStatements
   alias Gallformers.Import.TermCandidate
@@ -2150,23 +2153,21 @@ defmodule Gallformers.Import do
   defdelegate list_fact_edits(package), to: FactEdits, as: :list
 
   @doc """
-  The gall Facts Source `source_id` states (its attributions), grouped by
-  Gall and category as the preview shows them
-  (`Gallformers.Import.FactsView`): each entry with the Fact's `standing`
-  and its statement ref where an import batch wrote it.
+  What Source `source_id` states (its attributions), as the Facts page
+  shows it (`Gallformers.Import.FactsView`): `galls`, its gall Facts
+  grouped by Gall and category, each entry with the Fact's `standing`; and
+  `taxonomy`, `%{new_taxa: [], acts}`, its taxonomic statements
+  (`FactsView.act_entries/1`), each with the Fact's standing and the
+  curator's mark (accepted, declined with the reason, or awaiting a
+  curator; matter `f923`). Every entry has its statement ref where an
+  import batch wrote it.
   """
-  @spec facts_for_source(integer()) :: [map()]
+  @spec facts_for_source(integer()) :: %{galls: [map()], taxonomy: map()}
   def facts_for_source(source_id) when is_integer(source_id) do
     attributions = Facts.list_source_attributions(source_id, "gall_")
     fact_ids = attributions |> Map.keys() |> Enum.sort()
-
-    refs =
-      from(s in BatchStatement,
-        where: s.kind == :fact and s.fact_id in ^fact_ids,
-        select: {s.fact_id, {s.batch_id, s.ref}}
-      )
-      |> Repo.all()
-      |> Map.new()
+    taxonomic = Facts.list_source_attributions(source_id, "taxon_")
+    refs = statement_refs(fact_ids ++ Map.keys(taxonomic))
 
     entries =
       for e <- FactsView.entries(source_id, fact_ids) do
@@ -2199,8 +2200,39 @@ defmodule Gallformers.Import do
         }
       end
 
-    FactsView.group(headers, entries)
+    acts =
+      for e <- taxonomic |> Map.values() |> FactsView.act_entries() do
+        {batch_id, ref} = Map.get(refs, e.fact_id, {e.batch_id, nil})
+        %{e | ref: ref, batch_id: batch_id} |> Map.drop([:slot])
+      end
+      |> Enum.sort_by(&{&1.batch_id || 0, ref_order(&1.ref), &1.fact_id})
+
+    %{galls: FactsView.group(headers, entries), taxonomy: %{new_taxa: [], acts: acts}}
   end
+
+  # The batch and statement ref that wrote each of `fact_ids`.
+  defp statement_refs(fact_ids) do
+    from(s in BatchStatement,
+      where: s.kind in [:fact, :act] and s.fact_id in ^fact_ids,
+      select: {s.fact_id, {s.batch_id, s.ref}}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  @doc """
+  Where taxon `taxon_id` stands in the taxonomic Facts, and on whose word
+  (matter `f923` Task 10; `Gallformers.Import.FactsView.position/1`): its
+  current placement and name, each with the Source whose statement decides
+  it, and the papers that disagree (awaiting a curator, or declined with
+  the reason), newest first. For a taxon's page.
+  """
+  @spec taxonomic_position(integer()) :: %{
+          placement: map() | nil,
+          name: map() | nil,
+          disagreeing: [map()]
+        }
+  def taxonomic_position(taxon_id) when is_integer(taxon_id), do: FactsView.position(taxon_id)
 
   @doc """
   The gall Facts about Gall `gall_id` (`Gallformers.Catalog.facts_about_galls/1`),
@@ -2694,6 +2726,35 @@ defmodule Gallformers.Import do
       Replay.run(entries, actor: actor)
     end
   end
+
+  @doc """
+  At cutover, after the replay: carries phase 1's taxonomy decisions over
+  as `actor` (`Gallformers.Import.TaxonomyCarryOver`, matter `f923` Task
+  9): each "change the tree" decision on a synonym question, in replay-log
+  `entries` or among the decided queue items, and each act a curator
+  followed, becomes the acceptance of the Source's statements the tree
+  holds. Returns the report; what couldn't be carried is in its
+  `unmatched`, for a curator. Running it again accepts nothing new.
+  """
+  @spec carry_over_taxonomy_decisions(Actor.t(), [ReplayEntry.t() | map()]) ::
+          {:ok, TaxonomyCarryOver.report()}
+  defdelegate carry_over_taxonomy_decisions(actor, entries), to: TaxonomyCarryOver, as: :run
+
+  @doc """
+  `carry_over_taxonomy_decisions/2` with the entries of the exported
+  replay log `key` (the one `replay_exported/2` replayed).
+  """
+  @spec carry_over_exported(Actor.t(), String.t()) ::
+          {:ok, TaxonomyCarryOver.report()} | {:error, term()}
+  def carry_over_exported(%Actor{} = actor, key) do
+    with {:ok, entries} <- ReplayExport.read(key) do
+      TaxonomyCarryOver.run(actor, entries)
+    end
+  end
+
+  @doc "A carry-over report (`carry_over_taxonomy_decisions/2`) as text."
+  @spec format_carry_over(TaxonomyCarryOver.report()) :: String.t()
+  defdelegate format_carry_over(report), to: TaxonomyCarryOver, as: :format
 
   @doc false
   # Replay (`Gallformers.Import.Replay`): applies the batch with producer

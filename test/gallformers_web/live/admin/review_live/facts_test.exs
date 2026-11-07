@@ -411,5 +411,25 @@ defmodule GallformersWeb.Admin.ReviewLive.FactsTest do
       refute has_element?(view, "[data-role=fact-menu]")
       refute has_element?(view, "#facts-readiness")
     end
+
+    test "shows its taxonomic statements with their marks", %{conn: conn} do
+      %{package: package} = ready!()
+      {:ok, _} = Import.approve_package(test_actor(), package)
+      source_id = Import.get_package!(package.id).source_id
+      family = taxon_fixture(name: "Factidae", rank: :family, kingdom: "Animalia")
+      genus = taxon_fixture(name: "Facta", rank: :genus, kingdom: "Animalia")
+
+      {:ok, _} =
+        Taxa.assert_placement(
+          test_actor(),
+          %{taxon_id: genus.id, parent_id: family.id},
+          confirm(Gallformers.Sources.get_source(source_id))
+        )
+
+      view = facts(conn, package)
+
+      assert has_element?(view, "#facts-taxonomy [data-decision=awaiting]", "Factidae")
+      assert has_element?(view, "#facts-taxonomy [data-decision=awaiting]", "awaiting a curator")
+    end
   end
 end

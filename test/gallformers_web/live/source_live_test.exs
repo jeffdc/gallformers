@@ -160,6 +160,48 @@ defmodule GallformersWeb.SourceLiveTest do
       refute has_element?(view, "#source-facts .gf-mark-new")
     end
 
+    test "its taxonomic statements, each with the curator's mark", %{conn: conn} do
+      {_admin_conn, _user} = GallformersWeb.AdminLiveHelpers.log_in_admin(conn, "Ada Curator")
+      actor = DataCase.test_actor()
+      source = source_fixture("Revises things", "1990")
+      family = Gallformers.TaxaFixtures.taxon_fixture(rank: :family, name: "Saidae")
+      other = Gallformers.TaxaFixtures.taxon_fixture(rank: :family, name: "Othersaidae")
+      genus = Gallformers.TaxaFixtures.taxon_fixture(rank: :genus, name: "Saida", parent: family)
+
+      {:ok, %{attribution: moved}} =
+        Gallformers.Taxa.assert_placement(
+          actor,
+          %{taxon_id: genus.id, parent_id: other.id},
+          confirm(source)
+        )
+
+      {:ok, %{attribution: renamed}} =
+        Gallformers.Taxa.assert_name(
+          actor,
+          %{taxon_id: genus.id, name: "Saidella", rank: :genus},
+          confirm(source)
+        )
+
+      {:ok, _} = Gallformers.Facts.accept(actor, moved.id)
+      {:ok, _} = Gallformers.Facts.decline(actor, renamed.id, "A misspelling")
+
+      {:ok, view, _html} = live(conn, ~p"/source/#{source.id}")
+
+      refute has_element?(view, "#source-facts", "No facts from this Source yet.")
+      assert has_element?(view, "#source-facts h3", "Taxonomy changes")
+
+      assert has_element?(
+               view,
+               "#source-facts [data-category=acts] [data-decision=accepted]",
+               "Othersaidae"
+             )
+
+      assert has_element?(view, "#source-facts [data-decision=accepted]", "Ada Curator")
+      assert has_element?(view, "#source-facts [data-decision=declined]", "Saidella")
+      assert has_element?(view, "#source-facts [data-decision=declined]", "A misspelling")
+      refute has_element?(view, "#source-facts [data-role=fact-menu]")
+    end
+
     test "a Source that says nothing says so", %{conn: conn} do
       source = source_fixture("Silent", "2000")
 

@@ -23,7 +23,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
 
   Once approved (nothing awaiting review, a Source Gallformers holds), the
   page shows the Source's applied Facts (`Gallformers.Import.facts_for_source/1`),
-  read-only.
+  read-only: its taxonomic statements, each marked accepted, declined (with
+  the reason) or awaiting a curator (matter `f923`), then its Facts by Gall.
   """
   use GallformersWeb, :live_view
 
@@ -117,8 +118,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
     |> start_async(:facts, fn -> load_facts(view, actor) end)
   end
 
-  defp load_facts({:applied, source_id}, _actor),
-    do: {:ok, %{galls: Import.facts_for_source(source_id), taxonomy: %{new_taxa: [], acts: []}}}
+  defp load_facts({:applied, source_id}, _actor), do: {:ok, Import.facts_for_source(source_id)}
 
   # The preview runs as the curator viewing it (its transaction is
   # audited, then rolled back).
@@ -573,13 +573,16 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
             <.notice id="facts-applied" kind={:ok} class="mt-4">
               This Source is approved and applied: these are its Facts in Gallformers. Read-only.
             </.notice>
-            <.facts_view
-              galls={@facts.galls}
-              mode={:applied}
-              passages={@passages}
-              on_passage={@on_passage}
-              empty="This Source states no Facts about Galls."
-            />
+            <div class="mt-3 grid gap-3">
+              <.facts_taxonomy taxonomy={@facts.taxonomy} mode={:applied} />
+              <.facts_view
+                galls={@facts.galls}
+                mode={:applied}
+                passages={@passages}
+                on_passage={@on_passage}
+                empty="This Source states no Facts about Galls."
+              />
+            </div>
           <% :none -> %>
         <% end %>
       <% end %>

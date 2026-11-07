@@ -95,12 +95,28 @@ defmodule Gallformers.Release do
   Prints and returns how many entries were replayed; raises naming the
   first entry that could not be. Entries already done are skipped, so a
   stopped replay can be fixed and run again.
+
+  Once replayed, phase 1's taxonomy decisions are carried over
+  (`Gallformers.Import.carry_over_taxonomy_decisions/2`, matter `f923`):
+  each becomes the acceptance of its Source's statements, and the report
+  printed lists what a curator must still settle. Running it again
+  accepts nothing new.
   """
   @spec replay_log(String.t()) :: non_neg_integer()
   def replay_log(key) when is_binary(key) do
-    case with_storage(fn -> Import.replay_exported(Actor.system("replay"), key) end) do
-      {:ok, count} ->
+    result =
+      with_storage(fn ->
+        with {:ok, count} <- Import.replay_exported(Actor.system("replay"), key),
+             {:ok, report} <-
+               Import.carry_over_exported(Actor.system("taxonomy_carry_over"), key) do
+          {:ok, count, report}
+        end
+      end)
+
+    case result do
+      {:ok, count, report} ->
         IO.puts("Replayed #{count} entries from #{key}")
+        IO.puts(Import.format_carry_over(report))
         count
 
       {:error, reason} ->

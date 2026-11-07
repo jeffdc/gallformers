@@ -25,11 +25,14 @@ defmodule GallformersWeb.FactsComponents do
 
   Also here: the line saying whether the Source is ready to approve
   (`facts_readiness/1`), the counts as filter chips (`facts_filter/1`),
-  and the taxonomy changes (`facts_taxonomy/1`).
+  and the taxonomy changes (`facts_taxonomy/1`): once applied, each
+  taxonomic statement with the curator's mark (accepted, declined with the
+  reason, or awaiting a curator; matter `f923`).
   """
   use Phoenix.Component
 
   import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.DataComponents, only: [fact_list: 1]
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
   import GallformersWeb.ReviewComponents, only: [review_quote: 1, review_passage: 1]
 
@@ -523,7 +526,10 @@ defmodule GallformersWeb.FactsComponents do
 
   @doc """
   The taxonomy changes: the taxa approving creates (each under its parent,
-  or unplaced) and the taxonomic acts, each a Fact row.
+  or unplaced) and the taxonomic acts, each a Fact row. Applied (`:applied`,
+  `:public`), each act carries its `decision`
+  (`Gallformers.Import.FactsView.act_entries/1`): accepted, declined (with
+  the reason) or awaiting a curator, who and when.
   """
   attr :id, :string, default: "facts-taxonomy"
   attr :taxonomy, :map, required: true, doc: "`%{new_taxa, acts}`"
@@ -548,7 +554,9 @@ defmodule GallformersWeb.FactsComponents do
       <header class="px-3 py-2 bg-surface-2 border-b border-line">
         <h3 class="gf-facts-title text-ink">Taxonomy changes</h3>
         <p class="text-caption text-muted">
-          The taxa approving adds to the tree, and what the Source says of names.
+          {if @mode == :preview,
+            do: "The taxa approving adds to the tree, and what the Source says of names.",
+            else: "What the Source says of names, and whether Gallformers follows it."}
         </p>
       </header>
       <div class="px-3 py-2 lg:columns-2 lg:gap-6">
@@ -611,6 +619,90 @@ defmodule GallformersWeb.FactsComponents do
     """
   end
 
+  # -- a taxon's position ----------------------------------------------------------------
+
+  @doc """
+  Where a taxon stands, compactly (matter `f923` Task 10), for a taxon's
+  page: its placement and its name, each with the Source it comes from,
+  and the papers that disagree (each marked declined, with the reason, or
+  awaiting a curator), linking only to public pages. `position` is
+  `Gallformers.Import.taxonomic_position/1`'s. Renders nothing when no
+  current Fact places or names the taxon and no paper disagrees.
+  """
+  attr :id, :string, required: true
+  attr :position, :map, required: true, doc: "`%{placement, name, disagreeing}`"
+
+  def taxonomic_position(assigns) do
+    p = assigns.position
+
+    assigns =
+      assign(assigns,
+        placement: p.placement,
+        name: p.name,
+        disagreeing: p.disagreeing,
+        any: p.placement != nil or p.name != nil or p.disagreeing != []
+      )
+
+    ~H"""
+    <.fact_list :if={@any} id={@id} layout={:inline} missing_label={nil}>
+      <:item :if={@placement} label="Placed">
+        <span data-part="placement">
+          <%= if @placement.parent do %>
+            under <.taxon_name name={@placement.parent.name} rank={rank(@placement.parent.rank)} />
+          <% else %>
+            at the root
+          <% end %>
+          <.from source={@placement.source} />
+        </span>
+      </:item>
+      <:item :if={@name} label="Name">
+        <span data-part="name">
+          <.taxon_name name={@name.name} rank={rank(@name.rank)} />
+          <span :if={@name.authorship}>{@name.authorship}</span>
+          <span :if={@name.sensu} class="text-muted">sensu {@name.sensu}</span>
+          <.from source={@name.source} />
+        </span>
+      </:item>
+      <:item :if={@disagreeing != []} label="Papers that disagree">
+        <ul data-part="disagreeing" class="grid gap-0.5">
+          <li
+            :for={e <- @disagreeing}
+            data-decision={e.decision.state}
+            class="flex flex-wrap items-baseline gap-x-2"
+          >
+            <.link navigate={"/source/#{e.source.source_id}"} class="hover:underline">
+              {e.source.name}
+            </.link>
+            <.decision_mark decision={e.decision} />
+            <span :if={e.stance == :deny} class="text-caption font-semibold text-danger">not</span>
+            <span class="inline-flex min-w-0 flex-wrap items-baseline gap-x-1 text-ink">
+              <.fact_value entry={e} />
+            </span>
+            <span
+              :if={e.decision.state == :declined and e.decision.reason}
+              class="text-caption text-ink-2"
+            >
+              Declined: {e.decision.reason}
+            </span>
+          </li>
+        </ul>
+      </:item>
+    </.fact_list>
+    """
+  end
+
+  # The Source a position comes from, linked.
+  attr :source, :map, required: true
+
+  defp from(assigns) do
+    ~H"""
+    <span class="text-caption text-muted">
+      · from
+      <.link navigate={"/source/#{@source.source_id}"} class="hover:underline">{@source.name}</.link>
+    </span>
+    """
+  end
+
   # -- one Fact ------------------------------------------------------------------------------
 
   attr :entry, :map, required: true
@@ -635,13 +727,20 @@ defmodule GallformersWeb.FactsComponents do
         quotes: Enum.with_index(entry.words.evidence),
         sources: Map.get(entry, :sources, []),
         editable: assigns.editable and is_binary(entry.ref) and assigns.mode == :preview,
-        dropped_by_edit: Enum.any?(entry.edits, &(&1.kind == :drop))
+        dropped_by_edit: Enum.any?(entry.edits, &(&1.kind == :drop)),
+        decision: assigns.mode != :preview && Map.get(entry, :decision)
       )
 
     ~H"""
-    <li id={@row_id} class="py-1 text-meta scroll-mt-32" data-status={@entry.status}>
+    <li
+      id={@row_id}
+      class="py-1 text-meta scroll-mt-32"
+      data-status={@entry.status}
+      data-decision={@decision && @decision.state}
+    >
       <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <.fact_mark entry={@entry} mode={@mode} />
+        <.fact_mark :if={not undecided?(@decision)} entry={@entry} mode={@mode} />
+        <.decision_mark :if={@decision} decision={@decision} />
         <span :if={@entry.stance == :deny} class="text-caption font-semibold text-danger">not</span>
         <span class={[
           "inline-flex min-w-0 flex-wrap items-baseline gap-x-1 text-ink",
@@ -651,6 +750,13 @@ defmodule GallformersWeb.FactsComponents do
         </span>
         <span :if={@written != []} class="text-caption text-muted" title="The Source's words">
           {Enum.map_join(@written, " · ", &"“#{&1}”")}
+        </span>
+        <span
+          :if={@decision && @decision.state != :awaiting}
+          class="text-caption text-muted"
+          data-part="decided"
+        >
+          {decided_text(@decision)}
         </span>
         <span :if={@sources != []} class="text-caption text-muted" data-part="sources">
           <span :for={{source, i} <- Enum.with_index(@sources)}>
@@ -695,6 +801,12 @@ defmodule GallformersWeb.FactsComponents do
         class={["text-caption", if(@entry.status == :conflict, do: "text-danger", else: "text-ink-2")]}
       >
         {@entry.why}
+      </p>
+      <p
+        :if={@decision && @decision.state == :declined && @decision.reason}
+        class="text-caption text-ink-2"
+      >
+        Declined: {@decision.reason}
       </p>
       <p :if={@entry.words.statement_text} class="text-caption text-ink-2">
         The Source: {@entry.words.statement_text}
@@ -864,6 +976,42 @@ defmodule GallformersWeb.FactsComponents do
 
   defp fact_mark(assigns), do: ~H""
 
+  @decision_marks %{
+    accepted:
+      {"accepted", "gf-mark-held",
+       "A curator accepted this statement: it counts, and the tree follows it while it is the newest"},
+    declined:
+      {"declined", "gf-mark-standing",
+       "A curator declined this statement: it does not count unless reopened"},
+    awaiting:
+      {"awaiting a curator", "gf-mark-waiting",
+       "No curator has accepted this statement yet: until one does, it does not count"}
+  }
+
+  # A taxonomic statement's mark: whether a curator follows it.
+  attr :decision, :map, required: true
+
+  defp decision_mark(assigns) do
+    {text, class, title} = Map.fetch!(@decision_marks, assigns.decision.state)
+    assigns = assign(assigns, text: text, class: class, title: title)
+
+    ~H"""
+    <span class={["gf-mark", @class]} title={@title}>{@text}</span>
+    """
+  end
+
+  # An undecided statement's standing (unsupported) says nothing its mark doesn't.
+  defp undecided?(%{state: state}), do: state in [:awaiting, :declined]
+  defp undecided?(_decision), do: false
+
+  defp decided_text(%{by: by, at: at}) do
+    date = at && Calendar.strftime(at, "%b %-d, %Y")
+
+    [by && "by #{by}", date]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(", ")
+  end
+
   # -- a Fact's value, in Gallformers' terms ----------------------------------------------
 
   attr :entry, :map, required: true
@@ -967,6 +1115,12 @@ defmodule GallformersWeb.FactsComponents do
     <.endpoint :if={@v[:taxon]} value={@v.taxon} show_rank />
     <span :if={@v[:name]} class="text-ink-2">as <em>{@v.name}</em></span>
     <span :if={@v[:parent]} class="text-ink-2">under <.endpoint value={@v.parent} /></span>
+    <span
+      :if={@kind == :placement and Map.has_key?(@v, :parent) and is_nil(@v.parent)}
+      class="text-ink-2"
+    >
+      at the root
+    </span>
     <span :if={@v[:accepted]} class="text-ink-2">
       synonym of <.endpoint value={@v.accepted} />
     </span>
