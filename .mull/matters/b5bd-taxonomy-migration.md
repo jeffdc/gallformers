@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-02
-updated: 2026-11-05
+updated: 2026-11-07
 epic: taxonomy
 relates: [8567, 803b, a856, 9119]
 ---
@@ -290,4 +290,14 @@ Read-only queries against a production copy restored into local `gallformers_dev
 ### Gall synonyms in the new model (found 2026-11-05, design-system work)
 
 Production's Gall page synonymy lists the Gall's own aliases (old `alias`/`alias_species`, 2,196 scientific on Galls; 283 common). The new Gall page reads the Inducer's synonyms (`taxon_names` not accepted) plus the Gall's current former labels and codes (`alias_facts`). Comparing names exactly, **224 of the 2,196 old scientific aliases appear nowhere in the new model** (209 on described Galls, 15 on undescribed). Some are formatting: a generation qualifier dropped or added ("Callirhytis furva (agamic)", "Andricus lustrans" without "(agamic)"). Some look genuinely lost: misapplied names with authority ("Callaspidia confluens Fitch, non Harris" on 582), and common names filed as scientific ("Blue Gum Chalcid Wasp" on 607). Jeff (2026-11-05): the Gall page's "Also known as" must include **all** the synonyms, old common names included. Needs a migration check: map each old alias to a synonym, a former label or a common name.
+
+
+## Dev cutover rehearsal (2026-11-07)
+
+Ran the cutover on dev (`gallformers_taxogall`): export the replay log, `mix gallformers.catalog.migrate --no-s3`, `Release.replay_log/1`, then re-submit packages still in review. It found six cutover bugs, all fixed on taxogall: a trait-term decision whose question is no longer asked (`96c6c456`); a stopped replay couldn't be re-run, now every kind is idempotent (`6244ab3b`); the import step needed Oban in the release task (`b0a6e27b`) and the Oban check raised when Oban wasn't started (`b4f715e6`, `03dc23bb`); adding a plant from WCVP ignored the record's rank (`51a90d6a`); the replay didn't start WCVP (`dff79486`).
+
+**Data to settle before cutover:**
+- Seven old-site plants are one-word "species" under a genus of the same name, linked to WCVP genus records: Justicia, Myrceugenia, Bersama, Tiliacora, Neoboutonia, Malacantha, Echinops. Mark the old rows `genus_placeholder` (or add curated decisions) so the migration makes them the genus, not a species.
+- Preview likely holds a bogus species "Stephanomeria" under the genus Stephanomeria (the WCVP rank bug, from the Nastasi & Davis review); fold it into the genus. Query to find such taxa: accepted plant names at species rank or below with no space, or equal to their parent's name, then check each linked `wcvp_id`'s `taxon_rank`.
+- In dev, private storage is per checkout (`tmp/private_storage` under each worktree): packages made while a server runs in a worktree lose their files when the worktree is removed. Dev only; production uses S3.
 
