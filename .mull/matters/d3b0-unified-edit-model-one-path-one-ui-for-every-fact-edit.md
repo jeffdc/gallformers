@@ -41,6 +41,12 @@ Rules:
   - Accepted trade-off: earlier Gallformers positions on a Fact are history one click away, not separate voices.
 - Rejected for the structure: a Source record per change (thousands of tiny Sources would swamp search and Source views without condensing code); one Source with several statements per Fact (wide change); replace-only with history only in the audit. Structure still being explored (below).
 
+## The edit framework (in design)
+
+- **One tray, items grouped by authority (Jeff, 2026-11-07: required whichever entry point).** An ordinary edit is a Gallformers change; a correction is under the corrected Source's authority. Applying makes one package per group (one Gallformers change, one correction package per Source), all through the one ingestion path.
+- **Breadth:** Fact-bearing pages are the Gall page and all of Gallformers' taxonomy (species, genus, family, every intermediate rank, section), plus a Source's own page and the review Facts page.
+- **Open:** whether every Fact edit begins and ends in the Facts panel (`facts_view`, with each Fact's Sources, standing, history), the main view becoming presentation with links to the Fact (Jeff raised it, not a wish; Claude leans yes), editorial fields edited in place.
+
 ## Open (to settle in this order, proposed)
 
 1. ~~Structure of the Gallformers Source~~: settled above.
