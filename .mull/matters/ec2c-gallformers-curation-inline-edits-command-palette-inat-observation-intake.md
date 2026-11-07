@@ -161,3 +161,28 @@ Split agreed with Jeff: **the ingestion agent builds the change-set back end** (
 ### UI side: what the components take (design-system worktree, 2026-11-06)
 
 Built against this contract, with sample data, in `GallformersWeb.CurationComponents` (`edit_toggle`, `edit_scope`, `fact_row`, `change_tray`, `review_apply`) and `GallformersWeb.FactKey` (keys as strings for page events: `host:7`, `trait:season:spring`, `range:exclude:31`). One shape assumption, for the back end to confirm or adjust: **each preview flag reaches the UI as `%{kind: atom, text: String.t()}`**: `kind` one of the contract's flag names (`:new`, `:held`, `:supersedes`, `:changed_since`, `:needs_confirmation`, `:editorial`, `:needs_reason`, `:blocked`), `text` the back end's words for it ("Supersedes Weld 1959's 'spring'"). The UI picks only the look from `kind`. An item: `%{id, kind: :fact | :note | :editorial, text, flags, state: :in_tray | :waiting}`; `summary/1` as in the contract. If the back end returns the tuples instead, the UI maps them in one place; tell the UI side which.
+
+
+## Live-use findings (Jeff, 2026-11-06)
+
+Fixed 2026-11-06 (merges `222dcb2e`, `031154d9`, `9d3ec003` and the Gall page merge): 1–13. Open: 14 (merge review). Left over: direct audited edits outside the tray (taxonomy admin saves) don't refresh the dashboard; `/admin/changes` doesn't update live.
+
+1. "Last updated" on a Gall doesn't change after edits are applied.
+2. Applying from the tray should leave Edit mode.
+3. Add from observation is hard to find (foot of the Gall page's editorial panel).
+4. Review and apply doesn't show an item's own evidence (an observation item's iNat link): show it per row; the shared evidence form applies only to items without their own, and says so.
+5. A Gall's Facts can't be seen from the Gall page (with their Sources and standing).
+6. The palette doesn't find "Add from observation…" when typing "observation": only Sources match; commands should match typed text.
+7. The palette's text cursor sometimes jumps to the start while typing.
+8. `/admin/observation`: when it says to give the Host, there's no clear way to add one; and no link to the chosen Gall (open it in Edit mode).
+9. The plant page's Edit panel layout is rough: one Editorial card stacking name, an always-open add-synonym form (Synonym / Sensu / Based on / Add, labels misaligned) and a lone Range… button.
+10. The taxonomy admin's edit page intro says "Each change is saved as you make it, except the Host range, which is saved with its Save button" on pages with no Host range (e.g. genus Quercus): say it only where the Host range card shows.
+11. The palette doesn't show the curator's open changes.
+12. The admin dashboard (and recent changes) don't update after applying; they need a manual refresh.
+13. The image manager's list view needs horizontal scrolling even on a wide screen, which hides the row actions (Copy metadata, Delete…): fit the table to the panel.
+14. Merge not yet tried by Jeff: ask again once these are fixed.
+
+Look changes from the migration (bc0d): the host range view is fine; the discard dialog's wording is good; the copy-metadata panel above the table is good.
+
+Answers (Jeff, 2026-11-06): the feature LiveComponents (`RecordRemoval`, `ObservationIntake`, `HostLive.Editor`) need no approval; the components the migration hand-built (bc0d) are approved to be built properly; f14c's ergonomics after these and the last back end.
+
