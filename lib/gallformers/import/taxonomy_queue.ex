@@ -34,8 +34,10 @@ defmodule Gallformers.Import.TaxonomyQueue do
   (`%{"history" => true}`), whichever Source they came from. A refusal
   from the tree (a cycle, a rank inversion, a lump the tree can't make)
   rolls it all back; `refusal_text/1` says why in words. Reopening a
-  statement asks its question again where the rules still call for one,
-  from no package.
+  statement (an Undo of its decision, `Gallformers.Import.Undo`) asks its
+  question again where the rules still call for one: its latest question
+  opens again, or one is asked from no package; the older papers'
+  questions its acceptance closed as history are asked again the same way.
 
   "Accept the rest of this paper" (`accept_rest/2`) accepts every open
   question of a Source, in one transaction, after `preview_rest/2` has
@@ -347,7 +349,9 @@ defmodule Gallformers.Import.TaxonomyQueue do
   defp stated(%Attribution{stated_on: date}), do: Date.to_iso8601(date)
 
   # Asks again about a reopened statement, where the rules still call for
-  # it: from no package (the package was applied), under its act's ref.
+  # it: its latest question opens again (Undo, `Gallformers.Import.Undo`),
+  # or, when it had none, one is asked from no package (the package was
+  # applied), under its act's ref.
   defp ask_again(attribution_id) do
     with %Attribution{} = attribution <- Facts.get_attribution(attribution_id),
          {kind, key} <- Taxa.act_fact(attribution.fact_id),
@@ -356,14 +360,51 @@ defmodule Gallformers.Import.TaxonomyQueue do
          %{} = item <- question(attribution_id, reason, act_ref(attribution)) do
       now = DateTime.utc_now(:second)
 
-      Repo.insert_all(
-        QueueItem,
-        [Map.merge(item, %{status: :open, inserted_at: now, updated_at: now})],
-        on_conflict: :nothing
-      )
+      case latest_decided(attribution_id) do
+        %QueueItem{} = decided ->
+          decided
+          |> Ecto.Changeset.change(
+            status: :open,
+            decision: nil,
+            decided_by_user_id: nil,
+            decided_by_name: nil,
+            decided_at: nil,
+            subject: item.subject,
+            reason: item.reason
+          )
+          |> Repo.update!()
+
+        nil ->
+          Repo.insert_all(
+            QueueItem,
+            [Map.merge(item, %{status: :open, inserted_at: now, updated_at: now})],
+            on_conflict: :nothing
+          )
+      end
     end
 
     :ok
+  end
+
+  defp latest_decided(attribution_id) do
+    Repo.one(
+      from(q in QueueItem,
+        where:
+          q.kind == @kind and q.status == :decided and
+            fragment("(?->>'attribution_id')::bigint", q.subject) == ^attribution_id,
+        order_by: [desc: q.id],
+        limit: 1
+      )
+    )
+  end
+
+  # The older statements in `attribution_id`'s slot whose questions its
+  # acceptance closed as history: asked again once it is reopened.
+  defp closed_as_history(attribution_id) do
+    for s <- Facts.slot_statements(attribution_id),
+        s.id != attribution_id,
+        match?(%QueueItem{decision: %{"history" => true}}, latest_decided(s.id)),
+        do: s.id
   end
 
   # The act's ref in the batch that stated it, when it can be found.
@@ -545,9 +586,19 @@ defmodule Gallformers.Import.TaxonomyQueue do
     end)
   end
 
-  @doc "After `op` on attribution `attribution_id`: a reopened statement is asked again."
+  @doc """
+  After `op` on attribution `attribution_id`: a reopened statement is asked
+  again (its latest question reopened), and so are the older statements in
+  its slot whose questions its acceptance closed as history, where the
+  rules call for them now.
+  """
   @spec asked_again(op(), integer()) :: :ok
-  def asked_again(:reopen, attribution_id), do: ask_again(attribution_id)
+  def asked_again(:reopen, attribution_id) do
+    history = closed_as_history(attribution_id)
+    :ok = ask_again(attribution_id)
+    Enum.each(history, &ask_again/1)
+  end
+
   def asked_again(_op, _attribution_id), do: :ok
 
   # The statements in the slot that `attribution_id`'s is newer than.

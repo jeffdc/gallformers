@@ -39,6 +39,8 @@ defmodule Gallformers.Catalog.GallRenames do
   alias Gallformers.Catalog.GallName
   alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.ReadModels.GallIndex
+  alias Gallformers.Catalog.Records
+  alias Gallformers.Facts
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Taxa
@@ -196,6 +198,42 @@ defmodule Gallformers.Catalog.GallRenames do
 
     :ok = GallIndex.enqueue_refresh([gall.id])
     %{gall: renamed, from: from, to: to}
+  end
+
+  @doc """
+  Undoes an accepted rename of Gall `gall_id` (`accept/2`): its `name`
+  becomes `from` again, the name it showed before, and the `former_label`
+  alias Fact naming `from` goes when only the Gallformers Source states it.
+  The ID tool's lookup table row is refreshed. Refused (nothing changes)
+  when `from` is another Gall's name shown now (`:collision`).
+  """
+  @spec revert(Actor.t(), integer(), String.t()) ::
+          {:ok, Gall.t()} | {:error, :collision | term()}
+  def revert(%Actor{} = actor, gall_id, former) when is_integer(gall_id) and is_binary(former) do
+    Audit.transaction(actor, "catalog.revert_gall_rename", fn ->
+      gall = Repo.one!(from(g in Gall, where: g.id == ^gall_id, lock: "FOR UPDATE"))
+      if name_taken_by_other?(former, gall.id), do: Repo.rollback(:collision)
+
+      reverted = gall |> Gall.rename_changeset(former) |> Repo.update() |> ok_or_rollback()
+      gallformers = Sources.get_gallformers_source()
+
+      aliases =
+        Repo.all(
+          from(a in AliasFact,
+            where: a.gall_id == ^gall_id and a.kind == :former_label and a.name == ^former,
+            select: a.fact_id
+          )
+        )
+
+      ours =
+        for {fact_id, source_ids} <- Facts.source_ids_by_fact(aliases),
+            gallformers && Enum.uniq(source_ids) == [gallformers.id],
+            do: fact_id
+
+      {:ok, _} = Records.delete_facts(actor, ours)
+      :ok = GallIndex.enqueue_refresh([gall.id])
+      reverted
+    end)
   end
 
   defp ok_or_rollback({:ok, value}), do: value
