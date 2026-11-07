@@ -10,7 +10,12 @@ defmodule GallformersWeb.FactsComponents do
       (a link to it) or dropped, with the curator's edits and, when
       `editable`, a small menu of edits on each;
     * `:applied` — the same page once the Source is approved: its applied
-      Facts, read-only, each Fact's standing marked when not current;
+      Facts, read-only, each Fact's standing marked when not current; and,
+      with `corrections`, the admin Source page
+      (`GallformersWeb.Admin.SourceLive.Facts`): a small menu of
+      corrections on each Fact that can be corrected (withdraw the
+      Source's statement, or move it to another Host, Trait value, parent
+      or accepted taxon), its form in the `editor` slot;
     * `:public` — the public Source page (`GallformersWeb.SourceLive`):
       as `:applied`, linking only to public pages; and the public Gall
       page (`GallformersWeb.GallLive`, `Gallformers.Import.facts_for_gall/1`),
@@ -247,6 +252,12 @@ defmodule GallformersWeb.FactsComponents do
     default: false,
     doc: "the Facts not current (withdrawn, superseded, retracted) collapsed under the rest"
 
+  attr :corrections, :boolean,
+    default: false,
+    doc: "(`:applied`) a menu of corrections on each Fact that can be corrected"
+
+  attr :target, :any, default: nil, doc: "where the menus send their events (`@myself`)"
+
   slot :editor, doc: "the open edit's form, given the entry"
 
   def facts_view(assigns) do
@@ -274,6 +285,8 @@ defmodule GallformersWeb.FactsComponents do
         editor={@editor}
         header={@gall_header}
         history={@history}
+        corrections={@corrections}
+        target={@target}
       />
     </div>
     """
@@ -315,6 +328,8 @@ defmodule GallformersWeb.FactsComponents do
   attr :editor, :list, default: []
   attr :header, :boolean, default: true
   attr :history, :boolean, default: false
+  attr :corrections, :boolean, default: false
+  attr :target, :any, default: nil
 
   defp facts_gall(assigns) do
     {facts, past} =
@@ -396,6 +411,8 @@ defmodule GallformersWeb.FactsComponents do
           passages={@passages}
           on_passage={@on_passage}
           editor={@editor}
+          corrections={@corrections}
+          target={@target}
         />
         <p :if={@categories == []} class="text-caption italic text-muted">
           {if @past == [], do: "No Facts.", else: "No current Facts."}
@@ -465,6 +482,8 @@ defmodule GallformersWeb.FactsComponents do
   attr :passages, :map, required: true
   attr :on_passage, :any, default: nil
   attr :editor, :list, default: []
+  attr :corrections, :boolean, default: false
+  attr :target, :any, default: nil
 
   defp facts_category(assigns) do
     ~H"""
@@ -492,6 +511,8 @@ defmodule GallformersWeb.FactsComponents do
               passages={@passages}
               on_passage={@on_passage}
               editor={@editor}
+              corrections={@corrections}
+              target={@target}
             />
           </ul>
         </div>
@@ -507,6 +528,8 @@ defmodule GallformersWeb.FactsComponents do
             passages={@passages}
             on_passage={@on_passage}
             editor={@editor}
+            corrections={@corrections}
+            target={@target}
           />
         </ul>
       <% end %>
@@ -540,6 +563,12 @@ defmodule GallformersWeb.FactsComponents do
   attr :editing, :string, default: nil
   attr :passages, :map, default: %{}
   attr :on_passage, :any, default: nil
+
+  attr :corrections, :boolean,
+    default: false,
+    doc: "(`:applied`) a menu of corrections on each statement"
+
+  attr :target, :any, default: nil, doc: "where the menus send their events (`@myself`)"
   slot :editor
 
   def facts_taxonomy(assigns) do
@@ -611,6 +640,8 @@ defmodule GallformersWeb.FactsComponents do
               passages={@passages}
               on_passage={@on_passage}
               editor={@editor}
+              corrections={@corrections}
+              target={@target}
             />
           </ul>
         </div>
@@ -713,10 +744,26 @@ defmodule GallformersWeb.FactsComponents do
   attr :passages, :map, required: true
   attr :on_passage, :any, default: nil
   attr :editor, :list, default: []
+  attr :corrections, :boolean, default: false
+  attr :target, :any, default: nil
 
   defp fact_row(assigns) do
     entry = assigns.entry
     key = fact_key(entry)
+    editable = assigns.editable and is_binary(entry.ref) and assigns.mode == :preview
+    dropped_by_edit = Enum.any?(entry.edits, &(&1.kind == :drop))
+
+    {menu, kinds} =
+      cond do
+        editable ->
+          {"Edit", edit_kinds(entry, dropped_by_edit)}
+
+        assigns.corrections and assigns.mode == :applied and is_integer(entry.fact_id) ->
+          {"Correct", correction_kinds(entry)}
+
+        true ->
+          {nil, []}
+      end
 
     assigns =
       assign(assigns,
@@ -726,8 +773,10 @@ defmodule GallformersWeb.FactsComponents do
         written: written(entry),
         quotes: Enum.with_index(entry.words.evidence),
         sources: Map.get(entry, :sources, []),
-        editable: assigns.editable and is_binary(entry.ref) and assigns.mode == :preview,
-        dropped_by_edit: Enum.any?(entry.edits, &(&1.kind == :drop)),
+        editable: editable,
+        dropped_by_edit: dropped_by_edit,
+        menu: menu,
+        kinds: kinds,
         decision: assigns.mode != :preview && Map.get(entry, :decision)
       )
 
@@ -777,11 +826,12 @@ defmodule GallformersWeb.FactsComponents do
             {quotes_text(length(@quotes))}
           </button>
           <.fact_menu
-            :if={@editable}
+            :if={@kinds != []}
             row_id={@row_id}
-            entry={@entry}
             key={@key}
-            dropped={@dropped_by_edit}
+            label={@menu}
+            kinds={@kinds}
+            target={@target}
           />
         </span>
       </div>
@@ -858,14 +908,16 @@ defmodule GallformersWeb.FactsComponents do
   defp quotes_text(1), do: "Quote"
   defp quotes_text(n), do: "#{n} quotes"
 
-  # The edits a Fact takes, in a small menu.
+  # The edits (or corrections) a Fact takes, in a small menu.
   attr :row_id, :string, required: true
-  attr :entry, :map, required: true
   attr :key, :string, required: true
-  attr :dropped, :boolean, default: false
+  attr :label, :string, required: true
+  attr :kinds, :list, required: true, doc: "`{kind, label}`s"
+  attr :target, :any, default: nil
 
   defp fact_menu(assigns) do
-    assigns = assign(assigns, kinds: edit_kinds(assigns.entry, assigns.dropped))
+    push_opts = if assigns.target, do: [target: assigns.target], else: []
+    assigns = assign(assigns, push_opts: push_opts)
 
     ~H"""
     <span class="relative" data-role="fact-menu">
@@ -877,7 +929,7 @@ defmodule GallformersWeb.FactsComponents do
         aria-controls={"#{@row_id}-menu"}
         phx-click={JS.toggle_class("hidden", to: "##{@row_id}-menu")}
       >
-        Edit <.icon name="ph-caret-down" class="size-3" />
+        {@label} <.icon name="ph-caret-down" class="size-3" />
       </button>
       <span
         id={"#{@row_id}-menu"}
@@ -892,7 +944,7 @@ defmodule GallformersWeb.FactsComponents do
           role="menuitem"
           class="px-3 py-1 text-left text-caption text-ink-2 hover:bg-surface-2"
           phx-click={
-            JS.push("edit_open", value: %{key: @key, kind: kind})
+            JS.push("edit_open", [value: %{key: @key, kind: kind}] ++ @push_opts)
             |> JS.add_class("hidden", to: "##{@row_id}-menu")
           }
         >
@@ -913,6 +965,32 @@ defmodule GallformersWeb.FactsComponents do
     |> Enum.filter(&elem(&1, 2))
     |> Enum.map(fn {kind, label, _} -> {kind, label} end)
   end
+
+  # The corrections an applied Fact takes
+  # (`Gallformers.Import.correct_source_fact/6`): withdrawing the Source's
+  # statement, for those with a stable key, and moving it where the kind
+  # allows. Descriptions, qualifiers and other Relationships take none.
+  defp correction_kinds(%{category: :taxonomy, kind: kind}) do
+    case kind do
+      :placement -> [{"withdraw", "Withdraw"}, {"parent", "Change parent"}]
+      :synonymy -> [{"withdraw", "Withdraw"}, {"accepted", "Change accepted taxon"}]
+      _ -> [{"withdraw", "Withdraw"}]
+    end
+  end
+
+  defp correction_kinds(%{kind: :relationship, value: %{type: "host_of"}}),
+    do: [{"withdraw", "Withdraw"}, {"host", "Change Host"}]
+
+  defp correction_kinds(%{kind: :relationship, value: %{type: "inducer_of"}}),
+    do: [{"withdraw", "Withdraw"}]
+
+  defp correction_kinds(%{kind: :trait}),
+    do: [{"withdraw", "Withdraw"}, {"values", "Change value"}]
+
+  defp correction_kinds(%{kind: kind}) when kind in [:alias, :range, :occurrence],
+    do: [{"withdraw", "Withdraw"}]
+
+  defp correction_kinds(_entry), do: []
 
   @doc "Whether a Fact entry is a Host (`host_of`) Relationship."
   @spec host?(map()) :: boolean()

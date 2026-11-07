@@ -79,7 +79,8 @@ defmodule Gallformers.Import do
   taxonomy admin's edits
   (`record_synonym_added/4`, `record_plant_added/2`,
   `record_taxonomy_edit/2`, `record_wcvp_edit/2`), curators' notes on
-  Facts and plant edits (`record_fact_note/5`, `record_taxon_note/5`), and
+  Facts and plant edits (`record_fact_note/5`, `record_taxon_note/5`),
+  corrections to a Source's applied Facts (`correct_source_fact/6`), and
   deletes and merges of Galls, taxa and plants (`record_deletion/2`,
   `record_merge/2`).
   `Gallformers.Import.Replay` replays it after the cutover data migration:
@@ -131,6 +132,7 @@ defmodule Gallformers.Import do
       ReviewContext,
       Replay,
       ReplayEntry,
+      SourceCorrection,
       StatementEdit,
       TermCandidate,
       UnusedNames,
@@ -174,6 +176,8 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.ReplayLog
   alias Gallformers.Import.Resolver
   alias Gallformers.Import.SetAside
+  alias Gallformers.Import.SourceCorrection
+  alias Gallformers.Import.SourceCorrections
   alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.SourceStep
   alias Gallformers.Import.StableRef
@@ -2169,11 +2173,15 @@ defmodule Gallformers.Import do
   curator's mark (accepted, declined with the reason, or awaiting a
   curator; matter `f923`). Every entry has its statement ref where an
   import batch wrote it.
+
+  Options: `gall_ids` keeps the gall Facts to those resting on these Galls
+  (`Gallformers.Catalog.facts_about_galls/1`), for a Source stating Facts
+  about thousands of Galls (the legacy data); its taxonomic statements are
+  all there either way.
   """
-  @spec facts_for_source(integer()) :: %{galls: [map()], taxonomy: map()}
-  def facts_for_source(source_id) when is_integer(source_id) do
-    attributions = Facts.list_source_attributions(source_id, "gall_")
-    fact_ids = attributions |> Map.keys() |> Enum.sort()
+  @spec facts_for_source(integer(), keyword()) :: %{galls: [map()], taxonomy: map()}
+  def facts_for_source(source_id, opts \\ []) when is_integer(source_id) do
+    fact_ids = source_gall_fact_ids(source_id, opts[:gall_ids])
     taxonomic = Facts.list_source_attributions(source_id, "taxon_")
     refs = statement_refs(fact_ids ++ Map.keys(taxonomic))
 
@@ -2217,6 +2225,71 @@ defmodule Gallformers.Import do
 
     %{galls: FactsView.group(headers, entries), taxonomy: %{new_taxa: [], acts: acts}}
   end
+
+  # The gall Facts the Source states, in ID order; only those resting on
+  # `gall_ids` when given.
+  defp source_gall_fact_ids(source_id, gall_ids) do
+    query =
+      from(a in Facts.Attribution,
+        join: f in Facts.Fact,
+        on: f.id == a.fact_id,
+        where: a.source_id == ^source_id and like(f.kind, "gall_%"),
+        order_by: a.fact_id,
+        select: a.fact_id
+      )
+
+    case gall_ids do
+      nil ->
+        Repo.all(query)
+
+      ids ->
+        resting = for row <- Catalog.facts_about_galls(ids), do: row.fact_id
+        Repo.all(from([a] in query, where: a.fact_id in ^resting))
+    end
+  end
+
+  # -- corrections to a Source's Facts (matter `f14c`) ---------------------------
+
+  @doc """
+  Corrects Source `source_id`'s statement of Fact `fact_id` after approval
+  (`Gallformers.Import.SourceCorrections`): `:withdraw` (the Source didn't
+  say it), or the Fact it did state instead, `{:host, plant_id}`,
+  `{:values, [value]}`, `{:parent, taxon_id | nil}` or
+  `{:accepted, taxon_id}`, its words carried over. The Fact is never
+  edited; other Sources' statements of it stay. `note` (why) is required.
+  Audited, recorded (`list_source_corrections/1`, moving the Source's
+  Updated date) and logged for replay. Options: `accept: true` accepts a
+  taxonomic statement stated anew in the same step (else it awaits a
+  curator, asked in the taxonomy queue).
+  """
+  @spec correct_source_fact(
+          Actor.t(),
+          integer(),
+          integer(),
+          SourceCorrections.correction(),
+          String.t() | nil,
+          keyword()
+        ) :: {:ok, SourceCorrections.result()} | {:error, SourceCorrections.error()}
+  defdelegate correct_source_fact(actor, source_id, fact_id, correction, note, opts \\ []),
+    to: SourceCorrections,
+    as: :correct
+
+  @doc "Source `source_id`'s corrections to its Facts, newest first."
+  @spec list_source_corrections(integer()) :: [SourceCorrection.t()]
+  defdelegate list_source_corrections(source_id), to: SourceCorrections, as: :list
+
+  @doc "How many gall Facts Source `source_id` states."
+  @spec source_fact_count(integer()) :: non_neg_integer()
+  defdelegate source_fact_count(source_id), to: SourceCorrections, as: :gall_fact_count
+
+  @doc """
+  The Galls Source `source_id` states Facts about matching `query` (as the
+  site's Gall search), at most `limit`: `%{id, name}`.
+  """
+  @spec search_source_galls(integer(), String.t(), pos_integer()) :: [map()]
+  defdelegate search_source_galls(source_id, query, limit),
+    to: SourceCorrections,
+    as: :search_galls
 
   # The batch and statement ref that wrote each of `fact_ids`.
   defp statement_refs(fact_ids) do

@@ -47,6 +47,7 @@ private           batch_unmapped
 private           queue_items
 private           queue_item_notes
 private           package_statement_edits
+private           source_corrections
 private           trait_term_candidates
 private           replay_log
 

@@ -5,20 +5,23 @@ defmodule Gallformers.Import.SourceDates do
 
     * **Ingested** — when the first batch of its packages was applied.
     * **Updated** — when its data was last edited: the latest of its
-      applied batches, a later write to an attribution of it (a curator's
-      correction to its Facts; `Gallformers.Facts.last_attribution_changes/1`)
-      and a later edit of the Source itself (its details, a retraction —
-      which changes the standing of the Facts it supports).
+      applied batches, a later write to an attribution of it
+      (`Gallformers.Facts.last_attribution_changes/1`), a curator's
+      correction to its Facts (`Gallformers.Import.SourceCorrection`) and a
+      later edit of the Source itself (its details, a retraction — which
+      changes the standing of the Facts it supports).
 
   A Source **from the old data** (`legacy?`) is one no package brought: it
   has no applied package, or it was in Gallformers before the first
   package that applied a batch of it (an import creates a new Source when
   it applies it). It has no Ingested date. Its Updated date is only of
-  applied packages and what came after the first of them, so a Source
-  with no applied package has no date at all: the pages show "From the
-  original Gallformers data" instead.
+  applied packages and what came after the first of them, and of the
+  curators' corrections, so a Source with no applied package and no
+  correction has no date at all: the pages show "From the original
+  Gallformers data" instead.
 
-  A removed attribution leaves no time, so it does not move Updated.
+  A removed attribution leaves no time of its own; a correction that
+  withdraws one moves Updated by the correction's.
   """
 
   import Ecto.Query, only: [from: 2]
@@ -26,6 +29,7 @@ defmodule Gallformers.Import.SourceDates do
   alias Gallformers.Facts
   alias Gallformers.Import.Batch
   alias Gallformers.Import.Package
+  alias Gallformers.Import.SourceCorrection
   alias Gallformers.Repo
   alias Gallformers.Sources.Source
 
@@ -65,16 +69,26 @@ defmodule Gallformers.Import.SourceDates do
 
     attributions = applied |> Map.keys() |> Facts.last_attribution_changes()
 
-    Map.new(ids, fn id -> {id, dates(applied[id], attributions[id])} end)
+    corrections =
+      from(c in SourceCorrection,
+        where: c.source_id in ^ids,
+        group_by: c.source_id,
+        select: {c.source_id, max(c.inserted_at)}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    Map.new(ids, fn id -> {id, dates(applied[id], attributions[id], corrections[id])} end)
   end
 
-  defp dates(nil, _attribution), do: %{ingested: nil, updated: nil, legacy?: true}
+  defp dates(nil, _attribution, corrected),
+    do: %{ingested: nil, updated: corrected, legacy?: true}
 
-  defp dates(applied, attribution) do
+  defp dates(applied, attribution, corrected) do
     legacy? = DateTime.compare(applied.source_inserted, applied.first_package) == :lt
 
     updated =
-      [applied.last, attribution, applied.source_updated]
+      [applied.last, attribution, applied.source_updated, corrected]
       |> Enum.reject(&is_nil/1)
       |> Enum.max(DateTime)
 
