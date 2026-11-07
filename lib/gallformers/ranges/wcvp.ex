@@ -58,6 +58,41 @@ defmodule Gallformers.Ranges.Wcvp do
     )
   end
 
+  # WCVP's `taxon_rank`s Gallformers has a rank for (a nothotaxon at its
+  # rank). Others (Subvariety, Subform, proles, lusus…) have none.
+  @wcvp_ranks %{
+    "genus" => :genus,
+    "species" => :species,
+    "subspecies" => :subspecies,
+    "nothosubsp." => :subspecies,
+    "variety" => :variety,
+    "nothovar." => :variety,
+    "form" => :form,
+    "nothof." => :form
+  }
+
+  @doc """
+  The rank a WCVP record is at: its `taxon_rank` (WCVP's Genus, Species,
+  Subspecies, Variety, Form, and their nothotaxa), nil for a WCVP rank
+  Gallformers has none for (Subvariety, say). A record without one, or a
+  name alone (`%{taxon_name: name}`), is read by its infraspecific marker:
+  variety, subspecies, form, else species.
+  """
+  @spec rank(map()) :: Rank.t() | nil
+  def rank(%{taxon_rank: rank}) when is_binary(rank) and rank != "",
+    do: Map.get(@wcvp_ranks, String.downcase(rank))
+
+  def rank(%{taxon_name: name}) do
+    words = String.split(name)
+
+    cond do
+      "var." in words -> :variety
+      "subsp." in words -> :subspecies
+      "f." in words -> :form
+      true -> :species
+    end
+  end
+
   @doc """
   Sets fields of a plant taxon's WCVP link (`Gallformers.Ranges.TaxonWcvp`),
   creating it when there is none. A new `wcvp_id` clears a `no_match`

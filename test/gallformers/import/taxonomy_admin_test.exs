@@ -74,21 +74,25 @@ defmodule Gallformers.Import.TaxonomyAdminTest do
     end
   end
 
-  describe "record_plant_added_from_wcvp/4" do
-    test "makes the WCVP family and genus, the plant, its range and its link" do
-      record = %{
-        taxon_name: "Adminwcvp#{uniq()} alba",
-        taxon_authors: "",
-        family: "Adminwcvpaceae#{uniq()}",
-        genus: nil,
-        plant_name_id: "admin-#{uniq()}",
-        powo_id: "powo-x"
-      }
+  defp wcvp_record(name, rank) do
+    %{
+      taxon_name: name,
+      taxon_rank: rank,
+      taxon_authors: "",
+      family: "Adminwcvpaceae#{uniq()}",
+      genus: nil,
+      plant_name_id: "admin-#{uniq()}",
+      powo_id: "powo-x"
+    }
+  end
 
+  describe "record_plant_added_from_wcvp/3" do
+    test "makes the WCVP family and genus, the plant, its range and its link" do
+      record = wcvp_record("Adminwcvp#{uniq()} alba", "Species")
       entries = [{place_id("US-CA"), "exact", "native"}]
 
-      assert {:ok, plant} =
-               Import.record_plant_added_from_wcvp(test_actor(), record, :species, entries)
+      assert {:ok, plant} = Import.record_plant_added_from_wcvp(test_actor(), record, entries)
+      assert plant.rank == :species
 
       assert [%{rank: :family, name: family}, %{rank: :genus, name: genus} | _] =
                Taxa.lineage(plant)
@@ -97,6 +101,42 @@ defmodule Gallformers.Import.TaxonomyAdminTest do
       assert genus == record.taxon_name |> String.split() |> hd()
       assert Wcvp.get_link(plant.id).wcvp_id == record.plant_name_id
       assert [%{code: "US-CA"}] = Ranges.get_places_for_taxon_with_precision(plant.id)
+    end
+
+    test "a genus record is the genus, under its family" do
+      record = %{wcvp_record("Adminwcvpgenus#{uniq()}", "Genus") | taxon_authors: "Nutt."}
+      record = %{record | genus: record.taxon_name}
+
+      assert {:ok, genus} = Import.record_plant_added_from_wcvp(test_actor(), record, [])
+      assert genus.rank == :genus
+      assert [%{rank: :family}, %{rank: :genus}] = Taxa.lineage(genus)
+      assert {:ok, %{id: id}} = Taxa.resolve_name(record.taxon_name)
+      assert id == genus.id
+      assert Wcvp.get_link(genus.id).wcvp_id == record.plant_name_id
+    end
+
+    test "a record is at its WCVP rank, a nothotaxon at its own" do
+      for {rank, name, expected} <- [
+            {"Variety", "Adminwcvp#{uniq()} alba var. minor", :variety},
+            {"nothosubsp.", "Adminwcvp#{uniq()} × alba nothosubsp. minor", :subspecies},
+            {"Form", "Adminwcvp#{uniq()} alba f. minor", :form}
+          ] do
+        assert {:ok, plant} =
+                 Import.record_plant_added_from_wcvp(test_actor(), wcvp_record(name, rank), [])
+
+        assert plant.rank == expected
+        assert [%{rank: :family}, %{rank: :genus} | _] = Taxa.lineage(plant)
+      end
+    end
+
+    test "a record at a rank Gallformers has none for is refused" do
+      record = wcvp_record("Adminwcvp#{uniq()} alba subvar. minor", "Subvariety")
+      before = log_size()
+
+      assert {:error, "WCVP's rank Subvariety has no rank in Gallformers"} =
+               Import.record_plant_added_from_wcvp(test_actor(), record, [])
+
+      assert log_size() == before
     end
   end
 

@@ -371,6 +371,7 @@ defmodule Gallformers.Wcvp.Lookup do
       select: %WcvpName{
         plant_name_id: n.plant_name_id,
         taxon_name: n.taxon_name,
+        taxon_rank: n.taxon_rank,
         family: n.family,
         genus: n.genus,
         species: n.species,

@@ -3312,24 +3312,23 @@ defmodule Gallformers.Import do
     as: :create_taxon
 
   @doc """
-  Adds a plant from its WCVP record under its WCVP genus and family, with
-  its range and WCVP link (`Gallformers.Import.TaxonomyAdmin.add_plant_from_wcvp/4`).
+  Adds a plant from its WCVP record at the record's rank, a genus under its
+  WCVP family, anything below under its WCVP genus and family, with its
+  range and WCVP link (`Gallformers.Import.TaxonomyAdmin.add_plant_from_wcvp/3`).
   """
-  @spec record_plant_added_from_wcvp(
-          Actor.t(),
-          map(),
-          Taxa.Rank.t(),
-          [TaxonomyAdmin.range_entry()]
-        ) :: {:ok, Taxa.Taxon.t()} | {:error, term()}
-  defdelegate record_plant_added_from_wcvp(actor, wcvp, rank, entries),
+  @spec record_plant_added_from_wcvp(Actor.t(), map(), [TaxonomyAdmin.range_entry()]) ::
+          {:ok, Taxa.Taxon.t()} | {:error, term()}
+  defdelegate record_plant_added_from_wcvp(actor, wcvp, entries),
     to: TaxonomyAdmin,
     as: :add_plant_from_wcvp
 
   @doc """
-  The rank a plant's name is at, read from its infraspecific marker
-  (`%{taxon_name: name}`; `Gallformers.Import.TaxonomyAdmin.wcvp_rank/1`).
+  The rank a WCVP record is at, its `taxon_rank` (nil for one Gallformers
+  has no rank for); a record without one, or a name alone
+  (`%{taxon_name: name}`), read from its infraspecific marker
+  (`Gallformers.Import.TaxonomyAdmin.wcvp_rank/1`).
   """
-  @spec wcvp_rank(map()) :: Taxa.Rank.t()
+  @spec wcvp_rank(map()) :: Taxa.Rank.t() | nil
   defdelegate wcvp_rank(record), to: TaxonomyAdmin
 
   @doc "Moves each of `taxon_ids` under `parent_id` (`Gallformers.Import.TaxonomyAdmin.move_all/3`)."

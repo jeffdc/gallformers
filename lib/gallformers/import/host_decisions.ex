@@ -10,9 +10,12 @@ defmodule Gallformers.Import.HostDecisions do
       spells it so resolves on its own.
     * `%{"wcvp_id" => id}` — the plant of WCVP record `id`: its accepted
       record (the record itself when accepted). The plant the tree links to
-      that record, or holds by its name, when there is one; else it is added
-      as the taxonomy admin adds one (`Gallformers.Import.record_plant_added_from_wcvp/4`:
-      under its WCVP genus and family, its native range, its WCVP link).
+      that record, or holds by its name at the record's rank, when there is
+      one; else it is added as the taxonomy admin adds one
+      (`Gallformers.Import.record_plant_added_from_wcvp/3`: at the record's
+      rank, a genus under its WCVP family, a species or below under its
+      WCVP genus and family, its native range, its WCVP link). A record at
+      a rank Gallformers has none for (WCVP's Subvariety) is refused.
       The Source's spelling is added as its synonym when it differs. The
       decision is stored with the plant it resolved to, `"taxon_id"`.
 
@@ -28,7 +31,7 @@ defmodule Gallformers.Import.HostDecisions do
   is not added again.
 
   The synonym and the plant go through `Gallformers.Import.record_synonym_added/4`
-  and `record_plant_added_from_wcvp/4`, so they are in the replay log before
+  and `record_plant_added_from_wcvp/3`, so they are in the replay log before
   the decision. Replaying them first may resolve the Host before its
   decision replays; the decision is then done (`Gallformers.Import.Replay`).
   Replaying the decision itself adds nothing again: the synonym is held,
@@ -77,9 +80,15 @@ defmodule Gallformers.Import.HostDecisions do
   end
 
   def check(_item, %{"wcvp_id" => id} = choice) when map_size(choice) == 1 do
-    if is_binary(id) and accepted_record(id) != nil,
-      do: :ok,
-      else: {:error, "wcvp_id must be a WCVP record with an accepted name"}
+    case accepted_record(id) do
+      nil ->
+        {:error, "wcvp_id must be a WCVP record with an accepted name"}
+
+      record ->
+        if TaxonomyAdmin.wcvp_rank(record),
+          do: :ok,
+          else: {:error, "WCVP's rank #{record.taxon_rank} has no rank in Gallformers"}
+    end
   end
 
   def check(_item, %{"wcvp_id" => id, "taxon_id" => taxon_id} = choice)
@@ -184,29 +193,44 @@ defmodule Gallformers.Import.HostDecisions do
     {entries, _native, _introduced} = WcvpLinks.range_entries(record)
     native = Enum.filter(entries, &(elem(&1, 2) == "native"))
 
-    with {:ok, plant} <-
-           Import.record_plant_added_from_wcvp(
-             actor,
-             record,
-             TaxonomyAdmin.wcvp_rank(record),
-             native
-           ),
+    with {:ok, plant} <- Import.record_plant_added_from_wcvp(actor, record, native),
          do: {:ok, plant.id}
   end
 
   # The tree's plant for an accepted WCVP record: linked to it, else by name.
   defp held_plant(record) do
     case WcvpLinks.linked_taxon_ids(record.plant_name_id) do
-      [id | _] ->
-        id
-
-      [] ->
-        case Taxa.resolve_name(record.taxon_name, kingdom: @plantae) do
-          {:ok, %{matched_name: %{status: :accepted}} = taxon} -> taxon.id
-          _ -> nil
-        end
+      [id | _] -> id
+      [] -> named_plant(record)
     end
   end
+
+  # The plant holding the record's name as its accepted name, at the
+  # record's rank: a genus record is the genus, not a species of its name.
+  defp named_plant(record) do
+    case Taxa.resolve_name(record.taxon_name,
+           rank: TaxonomyAdmin.wcvp_rank(record),
+           kingdom: @plantae
+         ) do
+      {:ok, %{matched_name: %{status: :accepted}} = taxon} -> taxon.id
+      _ -> nil
+    end
+  end
+
+  @doc """
+  The tree's plants for WCVP record `wcvp_id`'s accepted record: those
+  linked to it, and the one holding its name at its rank. None when WCVP
+  has no accepted record for it (or cannot be read).
+  """
+  @spec plant_ids(String.t()) :: [integer()]
+  def plant_ids(wcvp_id) do
+    case accepted_record(wcvp_id) do
+      nil -> []
+      record -> Enum.uniq(WcvpLinks.linked_taxon_ids(record.plant_name_id) ++ named_ids(record))
+    end
+  end
+
+  defp named_ids(record), do: record |> named_plant() |> List.wrap()
 
   # WCVP records are read as maps (Import's boundary does not reach
   # Gallformers.Wcvp's structs).
