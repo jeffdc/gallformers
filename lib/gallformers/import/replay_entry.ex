@@ -19,8 +19,9 @@ defmodule Gallformers.Import.ReplayEntry do
   `:taxonomic_decision` (a Source's taxonomic statement accepted, declined
   or reopened: `Gallformers.Import.TaxonomicDecisions`) and
   `:taxonomic_statement` (a statement the taxonomy admin credits to a
-  Source: `Gallformers.Import.TaxonomyStatements`). The log is ordered by
-  `id`.
+  Source: `Gallformers.Import.TaxonomyStatements`), and `:source_correction`
+  (a curator's correction to a Source's applied Facts:
+  `Gallformers.Import.SourceCorrections`). The log is ordered by `id`.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -45,7 +46,8 @@ defmodule Gallformers.Import.ReplayEntry do
     :deletion,
     :merge,
     :taxonomic_decision,
-    :taxonomic_statement
+    :taxonomic_statement,
+    :source_correction
   ]
 
   @type kind ::
@@ -69,6 +71,7 @@ defmodule Gallformers.Import.ReplayEntry do
           | :merge
           | :taxonomic_decision
           | :taxonomic_statement
+          | :source_correction
 
   @type t :: %__MODULE__{
           id: integer() | nil,

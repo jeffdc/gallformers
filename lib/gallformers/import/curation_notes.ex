@@ -135,27 +135,29 @@ defmodule Gallformers.Import.CurationNotes do
   def fact_key({:occurrence, place_id}),
     do: %{"kind" => "occurrence", "place" => Places.get_place!(place_id).code}
 
-  defp decode_fact_key(%{"kind" => role, "taxon" => taxon}) when role in ["inducer", "host"] do
+  @doc "The Gall page key a stable key (`fact_key/1`) names, its taxon and place found again."
+  @spec decode_fact_key(map()) :: {:ok, Catalog.gall_fact_key()} | {:error, term()}
+  def decode_fact_key(%{"kind" => role, "taxon" => taxon}) when role in ["inducer", "host"] do
     with {:ok, id} <- StableRef.resolve_taxon(taxon),
          do: {:ok, {String.to_existing_atom(role), id}}
   end
 
-  defp decode_fact_key(%{"kind" => "trait", "trait" => trait, "value" => value}),
+  def decode_fact_key(%{"kind" => "trait", "trait" => trait, "value" => value}),
     do: {:ok, {:trait, trait, value}}
 
-  defp decode_fact_key(%{"kind" => "alias", "name" => name}), do: {:ok, {:alias, name}}
+  def decode_fact_key(%{"kind" => "alias", "name" => name}), do: {:ok, {:alias, name}}
 
-  defp decode_fact_key(%{"kind" => "range", "adjustment" => adjustment, "place" => code})
-       when adjustment in ["exclude", "only"] do
+  def decode_fact_key(%{"kind" => "range", "adjustment" => adjustment, "place" => code})
+      when adjustment in ["exclude", "only"] do
     with {:ok, place_id} <- place_id(code),
          do: {:ok, {:range, String.to_existing_atom(adjustment), place_id}}
   end
 
-  defp decode_fact_key(%{"kind" => "occurrence", "place" => code}) do
+  def decode_fact_key(%{"kind" => "occurrence", "place" => code}) do
     with {:ok, place_id} <- place_id(code), do: {:ok, {:occurrence, place_id}}
   end
 
-  defp decode_fact_key(key), do: {:error, {:unknown_fact_key, key}}
+  def decode_fact_key(key), do: {:error, {:unknown_fact_key, key}}
 
   defp place_id(code) do
     case Places.get_place_by_code(code) do

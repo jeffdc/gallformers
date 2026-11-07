@@ -11,7 +11,8 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   It shows when the Source was added to Gallformers and last updated
   (`Gallformers.Import.source_dates/1`), and, while a package of it is
   under review, a link to its review with the questions left (matter
-  `f14c`).
+  `f14c`). Under the form, the Source's applied Facts, with corrections
+  for errors from its ingestion (`GallformersWeb.Admin.SourceLive.Facts`).
 
   Every write goes through `Gallformers.Import.record_source_edit/2` as the
   signed-in admin (the `:admin` live session's actor), which recomputes the
@@ -162,6 +163,15 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
       when event in ~w(request_cancel cancel_discard confirm_discard) do
     handle_form_event(event, params, socket)
   end
+
+  # A correction to the Source's Facts (`GallformersWeb.Admin.SourceLive.Facts`)
+  # moves its Updated date.
+  @impl true
+  def handle_info({:source_corrected, id}, %{assigns: %{source: %{id: id}}} = socket) do
+    {:noreply, assign(socket, :dates, Map.fetch!(Import.source_dates([id]), id))}
+  end
+
+  def handle_info(_message, socket), do: {:noreply, socket}
 
   # -- helpers -----------------------------------------------------------------
 
@@ -475,6 +485,13 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
             </.panel>
           </.rail>
         </div>
+
+        <.live_component
+          module={GallformersWeb.Admin.SourceLive.Facts}
+          id="source-facts-corrections"
+          source={@source}
+          actor={@actor}
+        />
 
         <.discard_confirm_modal show={@show_discard_confirm} />
       </div>

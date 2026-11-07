@@ -63,6 +63,7 @@ defmodule Gallformers.Audit.ChangeLog do
     "import.record_plant_added" => "Added a plant",
     "import.record_wcvp_edit" => "Edited a plant's WCVP record",
     "import.record_source_edit" => "Edited a Source",
+    "import.correct_source_fact" => "Corrected a Source's Facts",
     "import.record_deletion" => "Deleted a record",
     "import.record_merge" => "Merged two records",
     "catalog.create_gall" => "Created a Gall",

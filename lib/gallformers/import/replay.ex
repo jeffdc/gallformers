@@ -75,6 +75,13 @@ defmodule Gallformers.Import.Replay do
       references (`Gallformers.Import.TaxonomyStatements`); its acceptance
       is the `:taxonomic_decision` entry after it. A citation the curator
       entered is a `:source_edit` `"create"` entry before it.
+    * `:source_correction` (`%{"source", "gall", "fact"}` for a gall Fact,
+      `%{"source", "kind", "fact"}` for a taxonomic act) — a curator's
+      correction to a Source's applied Facts, made again on the Fact found
+      by those keys, the Source's words found there carried over, unless
+      the Source no longer states it (`Gallformers.Import.SourceCorrections`).
+      An acceptance in the same step is the `:taxonomic_decision` entry
+      after it.
     * `:vocab_requests_decided` — 6611's vocabulary backlog, replaced by
       the superadmin vocabulary page (`d213`); no longer written, and not
       replayed.
@@ -97,6 +104,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.Package
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.ReplayEntry
+  alias Gallformers.Import.SourceCorrections
   alias Gallformers.Import.SourceEdits
   alias Gallformers.Import.SplitQuestions
   alias Gallformers.Import.StableRef
@@ -351,6 +359,9 @@ defmodule Gallformers.Import.Replay do
 
   defp replay(actor, %{kind: :taxonomic_statement, key: key, payload: payload}),
     do: TaxonomyStatements.replay(actor, key, payload)
+
+  defp replay(actor, %{kind: :source_correction, key: key, payload: payload}),
+    do: SourceCorrections.replay(actor, key, payload)
 
   defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
 
