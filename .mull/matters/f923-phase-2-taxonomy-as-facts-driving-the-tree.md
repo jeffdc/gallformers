@@ -112,3 +112,6 @@ Tasks 1–5 built and merged (`55ed22b7`, merge `49a08c51`; precommit 3,817 test
 - A Gallformers-Source taxonomy batch counts without acceptance and moves the tree (consistent with Gallformers' own statements); keep it the rare exception.
 - Retracting a lump's paper removes the synonym but leaves B's Galls on A; splitting back is curator work.
 
+
+- **A revalidated name outranks an older synonymy of it (Jeff, 2026-11-06; option b).** A paper revalidating a name usually states only its name and placement, not "N is not a synonym of X". Rule: once a name is a taxon's accepted name by a dated, accepted statement, an older statement making that name a synonym of another taxon (legacy undated included) stops counting. Recency applied across name and synonymy statements; fixes the carry-over's "synonym missing" differences and the lump hazard (a later sync treating N as lumped into X). A curator who disagrees declines the paper. Rejected (a): relying on curators to record the denial each time.
+
