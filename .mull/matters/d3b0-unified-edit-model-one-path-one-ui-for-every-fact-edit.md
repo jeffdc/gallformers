@@ -34,7 +34,9 @@ Rules:
 - **Corrections are the same act as review**, lower ceremony: under the original Source's authority. No second code path that creates Facts.
 - **ID notes are 100% editorial.**
 - **One edit framework** first, then rebuild the editors onto it (open point 4: agreed).
-- The Gallformers Source's structure is still being explored (below).
+- **Gallformers Source dating:** an undated base (the old site's data, so the literature outranks it and the backscan can correct it, as f923 chose) plus dated **changes** (a curator's edits; timestamped, since several happen a day), which outrank older statements. Audit records who. The name is "change".
+- **Old ID notes** are processed into changes carrying the notes' own dates.
+- **Not acceptable:** a Source record per change (thousands of tiny Sources would swamp search and Source views without condensing code); one Source with several statements per Fact (wide change); replace-only with history only in the audit. Structure still being explored (below).
 
 ## Open (to settle in this order, proposed)
 
