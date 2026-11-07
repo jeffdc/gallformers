@@ -4,10 +4,12 @@ defmodule Gallformers.Taxa.ReadModels.HostPage do
   Task 5): a Plantae taxon at species rank or below (today's plants keep
   their IDs).
 
-    * `name` — the accepted name; `rank`;
+    * `name` — the accepted name, with its `authorship` (WCVP's authors,
+      `Gallformers.Ranges.WcvpAuthorship`, or a curator's); `rank`;
     * `lineage` — the taxon and the taxa above it, root first
       (`Gallformers.Taxa.lineage/1`), for the taxonomy breadcrumb;
-    * `synonyms` (`%{name, sensu}`) and `common_names`, each by name;
+    * `synonyms` (`%{name, sensu, authorship}`) and `common_names`, each by
+      name;
     * `datacomplete` and `abundance` (its name, or nil) — the plant's
       editorial flags (`803b` decision 6).
 
@@ -29,9 +31,12 @@ defmodule Gallformers.Taxa.ReadModels.HostPage do
   @type t :: %__MODULE__{
           id: integer(),
           name: String.t(),
+          authorship: String.t() | nil,
           rank: Rank.t(),
           lineage: [Taxa.lineage_entry()],
-          synonyms: [%{name: String.t(), sensu: String.t() | nil}],
+          synonyms: [
+            %{name: String.t(), sensu: String.t() | nil, authorship: String.t() | nil}
+          ],
           common_names: [String.t()],
           datacomplete: boolean(),
           abundance: String.t() | nil,
@@ -44,6 +49,7 @@ defmodule Gallformers.Taxa.ReadModels.HostPage do
     :id,
     :name,
     :rank,
+    :authorship,
     :abundance,
     :inserted_at,
     :updated_at,
@@ -69,15 +75,17 @@ defmodule Gallformers.Taxa.ReadModels.HostPage do
   end
 
   defp build(%Taxon{} = taxon) do
+    %{names: names} = Repo.preload(taxon, :names)
+    accepted = Enum.find(names, &(&1.status == :accepted))
+
     %__MODULE__{
       id: taxon.id,
-      name: Taxa.accepted_name(taxon.id),
+      name: accepted.name,
+      authorship: accepted.authorship,
       rank: taxon.rank,
       lineage: Taxa.lineage(taxon.id),
       synonyms:
-        taxon.id
-        |> Taxa.list_synonyms()
-        |> Enum.map(&%{name: &1.name, sensu: &1.sensu})
+        for(n <- names, n.status == :synonym, do: Map.take(n, [:name, :sensu, :authorship]))
         |> Enum.sort_by(&{&1.name, &1.sensu}),
       common_names: taxon.id |> Taxa.list_common_names() |> Enum.map(& &1.name) |> Enum.sort(),
       datacomplete: taxon.datacomplete,

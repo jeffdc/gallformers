@@ -8,6 +8,7 @@ defmodule Gallformers.Release do
       Gallformers.Audit,
       Gallformers.CatalogMigration,
       Gallformers.Import,
+      Gallformers.Ranges,
       Gallformers.Repo,
       Gallformers.Taxa
     ],
@@ -17,6 +18,8 @@ defmodule Gallformers.Release do
   alias Gallformers.CatalogMigration
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.Import
+  alias Gallformers.Ranges.WcvpAuthorship
+  alias Gallformers.Repo.WCVP
   alias Gallformers.Taxa.Sync
 
   @app :gallformers
@@ -42,14 +45,15 @@ defmodule Gallformers.Release do
 
       bin/gallformers eval "Gallformers.Release.migrate_catalog()"
 
-  Only the repo and the S3 client are started (not the endpoint, Oban or
-  the health watchdog). Returns the report, or raises.
+  Only the repos (the WCVP database's too: plants take its authorship)
+  and the S3 client are started (not the endpoint, Oban or the health
+  watchdog). Returns the report, or raises.
   """
   @spec migrate_catalog() :: Report.t()
   def migrate_catalog do
     # Strict: a curated row awaiting a decision, or a duplicate taxon key,
     # stops the run with nothing written. There is no lenient mode here.
-    case with_storage(fn -> CatalogMigration.run(pending: :fail) end) do
+    case with_storage(fn -> with_wcvp(fn -> CatalogMigration.run(pending: :fail) end) end) do
       {:ok, report} ->
         IO.puts(Report.format(report))
         report
@@ -60,6 +64,43 @@ defmodule Gallformers.Release do
 
       {:error, reason} ->
         raise "Catalog migration not run: #{inspect(reason)}"
+    end
+  end
+
+  @doc """
+  Gives plants' names WCVP's authorship where they have none and WCVP holds
+  the name unambiguously (`Gallformers.Ranges.WcvpAuthorship.backfill/2`,
+  matter `f14c`), as the system actor `"wcvp_authorship"`, and prints what
+  it found (filled, ambiguous, not in WCVP). The catalog migration does
+  this itself; run it on a database migrated before it did, or after WCVP
+  was unreadable during the migration:
+
+      bin/gallformers eval "Gallformers.Release.backfill_wcvp_authorship()"
+
+  Idempotent: a curator's authorship is kept, and running it again fills
+  nothing more. Starts only the repo and the WCVP repo. Returns the
+  summary, or raises when WCVP cannot be read.
+  """
+  @spec backfill_wcvp_authorship() :: WcvpAuthorship.summary()
+  def backfill_wcvp_authorship do
+    load_app()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(
+        Gallformers.Repo,
+        fn _repo ->
+          with_wcvp(fn -> WcvpAuthorship.backfill(Actor.system("wcvp_authorship")) end)
+        end,
+        pool_size: 2
+      )
+
+    case result do
+      {:ok, summary} ->
+        IO.puts(WcvpAuthorship.format(summary))
+        summary
+
+      {:error, :wcvp_unavailable} ->
+        raise "WCVP authorship not filled: the WCVP database cannot be read"
     end
   end
 
@@ -155,6 +196,18 @@ defmodule Gallformers.Release do
       Ecto.Migrator.with_repo(Gallformers.Repo, fn _repo -> fun.() end, pool_size: 2)
 
     result
+  end
+
+  # Runs `fun` with the WCVP repo started (read-only reference data on the
+  # same cluster); when it cannot start, `fun` finds WCVP unavailable.
+  defp with_wcvp(fun) do
+    case WCVP.start_link(pool_size: 2) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, reason} -> IO.puts("WCVP repo not started: #{inspect(reason)}")
+    end
+
+    fun.()
   end
 
   defp repos do

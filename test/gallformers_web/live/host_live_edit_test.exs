@@ -94,6 +94,39 @@ defmodule GallformersWeb.HostLiveEditTest do
     end
   end
 
+  describe "the authorship" do
+    test "shows the name's authority; Change… puts a new one in the tray, with what it is based on",
+         ctx do
+      {:ok, _} = Taxa.set_authorship(ctx.actor, ctx.plant, "L.")
+      {:ok, view, _html} = edit(ctx)
+
+      assert has_element?(view, "#host-editor-authorship dt", "Authorship")
+      assert has_element?(view, "#host-editor-authorship dd", "L.")
+
+      view |> element("#host-editor-authorship button", "Change…") |> render_click()
+      assert has_element?(view, "#host-authorship-dialog input[name=authorship][value='L.']")
+
+      view
+      |> form("#host-authorship-dialog form", %{
+        "authorship" => "(L.) Sm.",
+        "based_on" => "per IPNI"
+      })
+      |> render_submit()
+
+      assert [%{kind: :editorial, field: :authorship, value: "(L.) Sm.", based_on: "per IPNI"}] =
+               items(ctx.actor)
+
+      assert has_element?(view, "#host-editor-authorship dd", "(L.) Sm.")
+      assert has_element?(view, "#host-editor-authorship [data-part=pending]")
+    end
+
+    test "a name with no authority says so", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      assert has_element?(view, "#host-editor-authorship dd", "None")
+    end
+  end
+
   # Live-use finding 9 (matter ec2c): the panel's name, synonyms and range
   # are rows of one list, each label beside its value and actions.
   describe "the panel" do

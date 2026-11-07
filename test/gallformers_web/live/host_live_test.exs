@@ -95,6 +95,29 @@ defmodule GallformersWeb.HostLiveTest do
       refute html =~ "Abundance:"
     end
 
+    test "shows the name's authority upright after the italic name, a synonym's too",
+         %{conn: conn} do
+      plant = plant_fixture(name: "Quercus auctoria", authorship: "(L.) Sm.")
+      {:ok, _} = Taxa.add_synonym(test_actor(), plant, "Quercus veteria", authorship: "Mill.")
+
+      {:ok, view, _html} = live(conn, ~p"/host/#{plant.id}")
+
+      assert has_element?(view, "h1 .taxon-name", "Quercus auctoria")
+      assert has_element?(view, "h1 [data-part=authorship]:not(.taxon-name)", "(L.) Sm.")
+      assert page_title(view) =~ "Quercus auctoria"
+      refute page_title(view) =~ "Sm."
+
+      assert has_element?(view, "#host-names .taxon-name", "Quercus veteria")
+      assert has_element?(view, "#host-names [data-part=authorship]", "Mill.")
+    end
+
+    test "a name with no authority shows none", %{conn: conn} do
+      plant = plant_fixture(name: "Quercus sineauctoria")
+      {:ok, view, _html} = live(conn, ~p"/host/#{plant.id}")
+
+      refute has_element?(view, "h1 [data-part=authorship]")
+    end
+
     test "has no Sources block", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/host/10")
 

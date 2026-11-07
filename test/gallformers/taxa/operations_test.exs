@@ -91,6 +91,22 @@ defmodule Gallformers.Taxa.OperationsTest do
     end
   end
 
+  describe "set_name_authorship/3" do
+    test "sets any one name's authorship, a synonym's too; blank is none, audited", ctx do
+      {:ok, synonym} = Taxa.add_synonym(test_actor(), ctx.species, "Cynips alba")
+
+      assert {:ok, %{authorship: "Ashmead"}} =
+               Taxa.set_name_authorship(test_actor(), synonym.id, " Ashmead ")
+
+      assert [%{authorship: nil}, %{name: "Cynips alba", authorship: "Ashmead"}] =
+               Taxa.get_taxon!(ctx.species.id).names
+
+      assert {:ok, %{authorship: nil}} = Taxa.set_name_authorship(test_actor(), synonym, "  ")
+      assert [_ | _] = changes_for("taxon_names")
+      assert {:error, :not_found} = Taxa.set_name_authorship(test_actor(), -1, "Ashmead")
+    end
+  end
+
   describe "synonym events" do
     test "add_synonym emits :add_synonym and remove_synonym :remove_synonym", ctx do
       {:ok, synonym} = Taxa.add_synonym(test_actor(), ctx.species, "Cynips alba")

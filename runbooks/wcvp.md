@@ -93,6 +93,21 @@ pg_restore --clean --if-exists --no-owner --no-acl \
 # 4. Same for preview if needed
 ```
 
+## Plant Authorship from WCVP
+
+Plants take their names' authorship (`taxon_names.authorship`, accepted names and synonyms) from WCVP (`Gallformers.Ranges.WcvpAuthorship`). A name takes WCVP's authors only when it has none and WCVP holds it unambiguously: the accepted name by the plant's WCVP link when the linked record is of the same name, otherwise by exact name and rank (several records with different authors are narrowed to the linked record's synonymy; if that still leaves more than one, the name is ambiguous and stays blank). A curator's authorship (the plant page's Edit mode) is never overwritten.
+
+- The catalog migration fills them as one of its steps and reports the counts (filled, ambiguous with each name listed, not in WCVP). `Gallformers.Release.migrate_catalog/0` starts the WCVP repo for it; if WCVP cannot be read, the report says so and nothing is filled.
+- A WCVP link change (adding a plant from WCVP, a match, a sync, replay) fills the plant's blank names from the new record, and moves its accepted name's authorship along when it was the old record's.
+- To fill them on a database already migrated (idempotent; prints the counts):
+
+```bash
+MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.wcvp.authorship   # local
+bin/gallformers eval "Gallformers.Release.backfill_wcvp_authorship()"         # preview/prod
+```
+
+After a WCVP data refresh, running it again fills only names that are still blank.
+
 ## First-Time Setup (New Environment)
 
 For a new Fly Postgres cluster or local dev machine:

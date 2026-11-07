@@ -2963,13 +2963,14 @@ defmodule Gallformers.Import do
     * `{:create_taxon, attrs}` — `Gallformers.Taxa.create_taxon/2`
       (`:name`, `:rank`, `:parent_id`, `:kingdom`, `:origin`)
     * `{:update_editorial, taxon, attrs}` — `Gallformers.Taxa.update_editorial/3`
+    * `{:set_authorship, taxon, authorship}` — `Gallformers.Taxa.set_authorship/3`
     * `{:remove_synonym, name}` — `Gallformers.Taxa.remove_synonym/2`
     * `{:remove_common_name, name}` — `Gallformers.Taxa.remove_common_name/2`
     * `{:delete_taxon, taxon}` — `Gallformers.Taxa.delete_taxon/2`
     * `{:set_host_range, taxon, entries}` — `Gallformers.Ranges.update_taxon_places/3`
     * `{:set_wcvp, taxon, attrs}` — `Gallformers.Ranges.Wcvp.put_link/3`
 
-  The last six are `Gallformers.Import.TaxonomyEdits`'s, which says how
+  The last seven are `Gallformers.Import.TaxonomyEdits`'s, which says how
   each is logged.
   """
   @spec record_taxonomy_edit(Actor.t(), taxonomy_edit()) :: {:ok, term()} | {:error, term()}

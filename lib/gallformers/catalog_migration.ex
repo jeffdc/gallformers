@@ -72,6 +72,11 @@ defmodule Gallformers.CatalogMigration do
         tree (placements, accepted names, synonyms, common names) as
         undated statements of the legacy data Source (`f923`), made with
         the legacy Facts once the tree is built; plants get none.
+    11b. `Gallformers.Ranges.WcvpAuthorship` — plants' names take WCVP's
+        authorship where WCVP holds the name unambiguously (`f14c`); the
+        report counts those filled, ambiguous (listed as problems) and not
+        in WCVP. With WCVP unreadable, a problem says so and nothing is
+        filled (`Gallformers.Release.backfill_wcvp_authorship/0` later).
     12. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
         rebuilt from all of the above. During the run no lookup-table
         refresh is enqueued (`Gallformers.Catalog.without_gall_index_refresh/1`):
@@ -106,6 +111,7 @@ defmodule Gallformers.CatalogMigration do
       Gallformers.Articles,
       Gallformers.Audit,
       Gallformers.Catalog,
+      Gallformers.Ranges,
       Gallformers.Repo,
       Gallformers.Sources,
       Gallformers.Taxa
@@ -137,6 +143,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Taxa, as: MigrationTaxa
   alias Gallformers.CatalogMigration.TaxonMerges
   alias Gallformers.CatalogMigration.UndescribedGalls
+  alias Gallformers.Ranges.WcvpAuthorship
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Taxa.NameNormalizer
@@ -255,8 +262,33 @@ defmodule Gallformers.CatalogMigration do
         |> then(&Ranges.reconcile(curated_facts, &1))
         |> then(&Aliases.reconcile(curated_facts, &1))
         |> then(&LegacyTaxonomy.reconcile(taxonomy, plan.source_id, &1))
+        |> then(&wcvp_authorship(actor, &1))
         |> rebuild_gall_index()
       end)
+    end
+  end
+
+  @ambiguous_authorship "Plant names WCVP holds ambiguously (authorship left blank)"
+
+  # Step 11b: plants' names take WCVP's authorship (`f14c`).
+  defp wcvp_authorship(actor, report) do
+    case WcvpAuthorship.backfill(actor) do
+      {:ok, summary} ->
+        report
+        |> Report.count("Plant names given WCVP's authorship", summary.filled)
+        |> Report.count("Plant names WCVP holds with no authorship", summary.no_authorship)
+        |> Report.count(@ambiguous_authorship, length(summary.ambiguous))
+        |> Report.count("Plant names WCVP does not hold", summary.not_in_wcvp)
+        |> Report.problems(
+          @ambiguous_authorship,
+          for(a <- summary.ambiguous, do: "#{a.name} (taxon #{a.taxon_id})")
+        )
+
+      {:error, :wcvp_unavailable} ->
+        Report.problems(report, "WCVP unavailable", [
+          "Plants' authorship not filled from WCVP: run " <>
+            "Gallformers.Release.backfill_wcvp_authorship() once WCVP can be read"
+        ])
     end
   end
 

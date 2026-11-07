@@ -69,6 +69,7 @@ defmodule Gallformers.Curation.Wording do
   defp field_label(:name_parts), do: "Name parts"
   defp field_label(:default_source_id), do: "Default Source"
   defp field_label(:name), do: "Name"
+  defp field_label(:authorship), do: "Authorship"
   defp field_label(:synonyms), do: "Synonyms"
   defp field_label(:range), do: "Range"
 

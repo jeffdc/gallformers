@@ -12,6 +12,10 @@ defmodule Gallformers.Wcvp.LookupStub do
       (as WCVP holds the loganberry), native in California; "901" is its synonym
     - "902" / "Wcvpunplacedus vagus" — unplaced, with no accepted name; "903" is
       its synonym (as WCVP holds Rubus villosus var. frondosus)
+    - "910" / "Wcvphomonymus dubius" — a name WCVP holds twice, with different
+      authors: accepted "Smith" and "911", illegitimate "Jones"; and
+      "Wcvphomonymus dubius var. minor" twice, both synonyms: "912" of 910
+      ("Brown"), "913" of 700 ("Green") — for authorship by name
 
   Like `Gallformers.Wcvp.Lookup`, `search/2` leaves out records that are not
   Accepted unless asked for synonyms, and `get_accepted_name/1` returns the
@@ -117,6 +121,54 @@ defmodule Gallformers.Wcvp.LookupStub do
       accepted_plant_name_id: "902",
       native_distribution: [],
       introduced_distribution: []
+    },
+    "910" => %WcvpName{
+      plant_name_id: "910",
+      taxon_name: "Wcvphomonymus dubius",
+      family: "Homonymaceae",
+      genus: "Wcvphomonymus",
+      species: "dubius",
+      taxon_authors: "Smith",
+      taxon_status: "Accepted",
+      accepted_plant_name_id: "910",
+      native_distribution: [],
+      introduced_distribution: []
+    },
+    "911" => %WcvpName{
+      plant_name_id: "911",
+      taxon_name: "Wcvphomonymus dubius",
+      family: "Homonymaceae",
+      genus: "Wcvphomonymus",
+      species: "dubius",
+      taxon_authors: "Jones",
+      taxon_status: "Illegitimate",
+      accepted_plant_name_id: "",
+      native_distribution: [],
+      introduced_distribution: []
+    },
+    "912" => %WcvpName{
+      plant_name_id: "912",
+      taxon_name: "Wcvphomonymus dubius var. minor",
+      family: "Homonymaceae",
+      genus: "Wcvphomonymus",
+      species: "dubius",
+      taxon_authors: "Brown",
+      taxon_status: "Synonym",
+      accepted_plant_name_id: "910",
+      native_distribution: [],
+      introduced_distribution: []
+    },
+    "913" => %WcvpName{
+      plant_name_id: "913",
+      taxon_name: "Wcvphomonymus dubius var. minor",
+      family: "Homonymaceae",
+      genus: "Wcvphomonymus",
+      species: "dubius",
+      taxon_authors: "Green",
+      taxon_status: "Synonym",
+      accepted_plant_name_id: "700",
+      native_distribution: [],
+      introduced_distribution: []
     }
   }
 
@@ -189,5 +241,23 @@ defmodule Gallformers.Wcvp.LookupStub do
       nil ->
         nil
     end
+  end
+
+  @impl true
+  def get_names(plant_name_ids) do
+    @names
+    |> Map.take(plant_name_ids)
+    |> Map.values()
+    |> Enum.map(&%{&1 | native_distribution: [], introduced_distribution: []})
+  end
+
+  @impl true
+  def find_names(names) do
+    wanted = MapSet.new(names, &String.downcase/1)
+
+    @names
+    |> Map.values()
+    |> Enum.filter(&MapSet.member?(wanted, String.downcase(&1.taxon_name)))
+    |> Enum.map(&%{&1 | native_distribution: [], introduced_distribution: []})
   end
 end

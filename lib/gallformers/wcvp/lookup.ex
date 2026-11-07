@@ -16,6 +16,9 @@ defmodule Gallformers.Wcvp.Lookup do
   alias Gallformers.Repo
   alias Gallformers.Wcvp.{WcvpDistribution, WcvpName}
 
+  # Names or IDs per query in the bulk lookups.
+  @bulk_chunk 1000
+
   @doc """
   Returns the built_at timestamp from the WCVP database meta table.
   Returns nil if the repo is unavailable or the meta table doesn't exist.
@@ -308,6 +311,57 @@ defmodule Gallformers.Wcvp.Lookup do
     _ -> nil
   catch
     :exit, _ -> nil
+  end
+
+  @doc """
+  The records with these `plant_name_id`s, whatever their status (no
+  distributions): each with its `taxon_name`, `taxon_rank`, `taxon_status`,
+  `accepted_plant_name_id` and `taxon_authors`. Raises when the repo is
+  unavailable (check `available?/0` first), so a bulk caller never takes
+  "unavailable" for "not held".
+  """
+  @impl true
+  @spec get_names([String.t()]) :: [WcvpName.t()]
+  def get_names(plant_name_ids) when is_list(plant_name_ids) do
+    plant_name_ids
+    |> Enum.uniq()
+    |> Enum.chunk_every(@bulk_chunk)
+    |> Enum.flat_map(fn ids ->
+      Repo.WCVP.all(from(n in authorship_query(), where: n.plant_name_id in ^ids))
+    end)
+  end
+
+  @doc """
+  Every record whose `taxon_name` is one of `names`, ignoring case,
+  whatever its status (homonyms, synonyms and illegitimate names
+  included), as `get_names/1` gives them. Raises when the repo is
+  unavailable.
+  """
+  @impl true
+  @spec find_names([String.t()]) :: [WcvpName.t()]
+  def find_names(names) when is_list(names) do
+    names
+    |> Enum.map(&String.downcase/1)
+    |> Enum.uniq()
+    |> Enum.chunk_every(@bulk_chunk)
+    |> Enum.flat_map(fn lowered ->
+      Repo.WCVP.all(
+        from(n in authorship_query(), where: fragment("lower(?)", n.taxon_name) in ^lowered)
+      )
+    end)
+  end
+
+  defp authorship_query do
+    from(n in WcvpName,
+      select: %WcvpName{
+        plant_name_id: n.plant_name_id,
+        taxon_name: n.taxon_name,
+        taxon_rank: n.taxon_rank,
+        taxon_status: n.taxon_status,
+        accepted_plant_name_id: n.accepted_plant_name_id,
+        taxon_authors: n.taxon_authors
+      }
+    )
   end
 
   # Base query selecting core name fields as a WcvpName struct.

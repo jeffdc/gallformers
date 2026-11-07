@@ -2,7 +2,8 @@ defmodule GallformersWeb.HostLive do
   @moduledoc """
   The Host page, on the design system (matter bc0d; behavior in
   docs/design-system/inventory/host-and-source-pages.md): a plant from
-  `Gallformers.Taxa.host_page/1` (its names and lineage), "Identify a gall
+  `Gallformers.Taxa.host_page/1` (its names, each with its authority
+  upright after the italic name, and lineage), "Identify a gall
   on …", the Galls on it as the rank pages' list (`GallformersWeb.RankGalls`,
   photos or a table with facets; for admins each links to its Gall's range
   exclusions), a pointer to the Galls on its genus as a whole, its photos,
@@ -11,8 +12,8 @@ defmodule GallformersWeb.HostLive do
   has no Sources (`803b`, decision 1). An unknown or malformed ID, a Gall or
   a plant above species rank is a 404.
 
-  Edit mode (`?edit`, curators; matter `ec2c`): the plant's name, synonyms
-  and range are edited into the curator's tray (`GallformersWeb.HostLive.Editor`;
+  Edit mode (`?edit`, curators; matter `ec2c`): the plant's name, its
+  authorship, synonyms and range are edited into the curator's tray (`GallformersWeb.HostLive.Editor`;
   the range on the Host range editor,
   `GallformersWeb.Admin.TaxonomyLive.RangeEditor`, in a dialog), delete and
   merge sit at the foot of the rail (`GallformersWeb.RecordRemoval`), and
@@ -300,7 +301,16 @@ defmodule GallformersWeb.HostLive do
           <:crumb :for={c <- crumbs(@host.lineage)} navigate={c.path} italic={c.italic}>
             {c.name}
           </:crumb>
-          <:title name><.taxon_name name={@host.name} /></:title>
+          <:title name>
+            <.taxon_name name={@host.name} />
+            <span
+              :if={@host.authorship}
+              data-part="authorship"
+              class="font-normal not-italic text-ink-2"
+            >
+              {@host.authorship}
+            </span>
+          </:title>
           <:chip variant={:rank}>{String.capitalize(to_string(@host.rank))}</:chip>
           <:chip>Host plant</:chip>
           <:chip variant={if @host.datacomplete, do: :ok, else: :warn}>
@@ -421,6 +431,7 @@ defmodule GallformersWeb.HostLive do
                 <dd id="host-names" class="text-ink-2">
                   <span :for={{s, i} <- Enum.with_index(@host.synonyms)}>
                     {if i > 0, do: " · "}<.taxon_name name={s.name} />
+                    <span :if={s.authorship} data-part="authorship">{s.authorship}</span>
                     <span
                       :if={s.sensu}
                       class="text-meta text-muted"

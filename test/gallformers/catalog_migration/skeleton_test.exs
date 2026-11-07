@@ -442,6 +442,18 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
     assert entry.new >= 1
   end
 
+  # The WCVP lookup is the stub: seed plant 6, Thymus alpinus, is its "L.".
+  test "plants take WCVP's authorship, reported" do
+    report = run!()
+
+    assert [%{authorship: "L."}] = Taxa.get_taxon!(6).names
+
+    counts = Map.new(report.counts)
+    assert counts["Plant names given WCVP's authorship"] >= 1
+    assert is_integer(counts["Plant names WCVP does not hold"])
+    assert Report.format(report) =~ "Plant names given WCVP's authorship"
+  end
+
   test "a genus placeholder's species ID maps to its genus, for its old /host/:id URL", ctx do
     report = run!()
 
