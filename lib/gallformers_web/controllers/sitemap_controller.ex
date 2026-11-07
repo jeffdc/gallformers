@@ -7,6 +7,7 @@ defmodule GallformersWeb.SitemapController do
   - Static pages (home, about, glossary, etc.)
   - Every Gall page (`Gallformers.Catalog`)
   - Every plant page (`Gallformers.Taxa`)
+  - Every species page, the organisms that induce Galls (`Gallformers.Taxa`)
   - Every rank page: family, intermediate ranks, genus, section
     (`Gallformers.Taxa`, through `GallformersWeb.TaxonomyURL`)
   - Every place page (`Gallformers.Places`)
@@ -34,6 +35,7 @@ defmodule GallformersWeb.SitemapController do
     static_urls() ++
       gall_urls() ++
       host_urls() ++
+      species_urls() ++
       rank_urls() ++
       place_urls() ++
       source_urls()
@@ -65,6 +67,17 @@ defmodule GallformersWeb.SitemapController do
   defp host_urls do
     for id <- Taxa.list_plant_ids() do
       %{loc: "#{@base_url}/host/#{id}", changefreq: "weekly", priority: "0.7"}
+    end
+  end
+
+  # Every species page (an organism at species rank or below, not a plant)
+  defp species_urls do
+    for id <- Taxa.list_species_ids() do
+      %{
+        loc: "#{@base_url}#{TaxonomyURL.species_path(id)}",
+        changefreq: "monthly",
+        priority: "0.6"
+      }
     end
   end
 

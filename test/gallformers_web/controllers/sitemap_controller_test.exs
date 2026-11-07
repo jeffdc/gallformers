@@ -1,7 +1,7 @@
 defmodule GallformersWeb.SitemapControllerTest do
   @moduledoc """
-  The sitemap (`803b` Task 12): every Gall, plant, rank page, place and
-  Source URL, read through `Gallformers.Catalog`, `Gallformers.Taxa`,
+  The sitemap (`803b` Task 12): every Gall, plant, species, rank page,
+  place and Source URL, read through `Gallformers.Catalog`, `Gallformers.Taxa`,
   `Gallformers.Places` and `Gallformers.Sources`.
 
   Uses the converted seeds (`priv/repo/test_seeds.sql`): Gall 300, plant
@@ -42,6 +42,17 @@ defmodule GallformersWeb.SitemapControllerTest do
     assert "#{@base}/host/10" in urls
     refute "#{@base}/host/11" in urls
     refute "#{@base}/host/#{genus.id}" in urls
+  end
+
+  test "lists every Gallformer species page, not plants or higher taxa", %{conn: conn} do
+    {:ok, inducer} = Gallformers.Taxa.resolve_name("Andricus seedii", rank: :species)
+    genus = inducer.parent_id
+
+    urls = conn |> get("/sitemap.xml") |> locs()
+
+    assert "#{@base}/species/#{inducer.id}" in urls
+    refute "#{@base}/species/10" in urls
+    refute "#{@base}/species/#{genus}" in urls
   end
 
   test "lists the rank pages of the taxa, each once", %{conn: conn} do

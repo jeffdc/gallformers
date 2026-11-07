@@ -35,6 +35,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `photo_viewer` | DomainComponents | Domain | Built | `image_gallery` and the ImageGallery hook (retired) |
 | `range_map` | DomainComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
 | `source_quote` | DomainComponents | Domain | Built | `blockquote` styling, review "The Source wrote" text |
+| `taxonomic_position` | FactsComponents | Domain | Built | — |
 | `button` | ActionComponents | Actions | Built | `button`, `edit_button`, `action_button`, `admin_edit_link`, 122 raw buttons |
 | `menu` | ActionComponents | Actions | Built | the header dropdowns, row-action menus |
 | `segmented_switch` | ActionComponents | Actions | Built | three hand copies of the rank pages' `view_switch` (rank pages, the image manager, the country drill-down) |
@@ -47,6 +48,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `typeahead` | FormComponents | Forms | Approved (consolidate) | `typeahead`, `multi_select`, `multi_select_dropdown`, `multi_select_typeahead` |
 | `file_drop` | FormComponents | Forms | Built | `file_dropzone`, the image managers' hand-built drop boxes |
 | `radio_card` | FormComponents | Forms | Built | the review's hand-built option cards (`review_option`, `review_value_list`) |
+| `review_option` | ReviewComponents | Forms | Built | — |
 | `save_bar` | FormComponents | Forms | Approved (pending the save model) | per-section Save buttons |
 | `filter_select` | FormComponents | Forms | Built | the ID page's filter dropdowns |
 | `category_tile` | DomainComponents | Domain | Built | home page group and Host genus rows |
@@ -96,7 +98,7 @@ The admin frame.
 
 ### `command_palette`
 
-Search and go anywhere, on every page, public and admin (`GallformersWeb.PaletteLive`, rendered once from the root layout; the Palette hook). Opened by a `palette_trigger` (the header's, the admin top bar's) or the keys `/` and `s` while not typing in a field (not ⌘K: browsers bind it). With nothing typed: for a curator whose tray holds changes, Your changes first (Review and apply with the count, then up to five of the changes, from `Curation.summary/1`; each opens the tray's own Review and apply, `tray_review` pushed to `TrayLive`); then the fixed Go to list (Identify a gall, Browse galls / host plants / places, Articles, Identification keys, Glossary) and, for a curator, their commands (Edit this page, Add from observation… (`/admin/observation`), Sources to review, Changes). Typing matches the commands too (each word typed starts a word of the command's name, description or synonyms; Review and apply while the tray holds changes), in their own Commands group: first when the words match a command's name, else after the results, just before "See every result". Typing searches (`GallformersWeb.Palette`: `Search.global_search/2` and `Articles.search_published/2`): Go to shortcuts into the ID tool ("Galls on *Quercus alba*", "… in Virginia", "Galls in Virginia"), for a curator "Review: <Source>" for each Source found with an import under review, then Galls, Host plants, Groups, Places, Sources, Glossary, Articles, and last "See every result" (the search page). ↑ ↓ move the selection, Enter follows it, Esc or a click outside closes; following a row closes the palette. A panel near the top of the screen (`gf-palette`); full screen on phones. Keys are shown with `gf-kbd`.
+Search and go anywhere, on every page, public and admin (`GallformersWeb.PaletteLive`, rendered once from the root layout; the Palette hook). Opened by a `palette_trigger` (the header's, the admin top bar's) or the keys `/` and `s` while not typing in a field (not ⌘K: browsers bind it). With nothing typed: for a curator whose tray holds changes, Your changes first (Review and apply with the count, then up to five of the changes, from `Curation.summary/1`; each opens the tray's own Review and apply, `tray_review` pushed to `TrayLive`); then the fixed Go to list (Identify a gall, Browse galls / host plants / places, Articles, Identification keys, Glossary) and, for a curator, their commands (Edit this page, Add from observation… (`/admin/observation`), Sources to review, Changes). Typing matches the commands too (each word typed starts a word of the command's name, description or synonyms; Review and apply while the tray holds changes), in their own Commands group: first when the words match a command's name, else after the results, just before "See every result". Typing searches (`GallformersWeb.Palette`: `Search.global_search/2` and `Articles.search_published/2`): Go to shortcuts into the ID tool ("Galls on *Quercus alba*", "… in Virginia", "Galls in Virginia"), for a curator "Review: <Source>" for each Source found with an import under review, then Galls, Gallformers (organisms at species rank and below, to their species pages), Host plants, Groups, Places, Sources, Glossary, Articles, and last "See every result" (the search page). ↑ ↓ move the selection, Enter follows it, Esc or a click outside closes; following a row closes the palette. A panel near the top of the screen (`gf-palette`); full screen on phones. Keys are shown with `gf-kbd`.
 
 ## Page structure
 
@@ -267,6 +269,18 @@ The possible-range map, as a card that opens a large map in a dialog, with full 
 
 What a Source wrote, in Source Serif: a quote or excerpt, with a page reference. Used inside `source_entry` and in review. (Named `source_quote` because `quote` is reserved in Elixir.)
 
+### `taxonomic_position`
+
+Where a taxon stands in the Sources, compactly (matter `f923` Task 10), for a taxon's page: a `fact_list` (`:inline`) of **Placed** (under its parent, or at the root), **Name** (the accepted name with its authorship and any sensu), each followed by "· from" the Source whose statement decides it, and **Papers that disagree**: each Source linked, its mark (accepted, declined with the curator's reason, awaiting a curator), "not" for a denial, and what it says. Links go to public pages only. Renders nothing when no current Fact places or names the taxon and no paper disagrees.
+
+```heex
+<.taxonomic_position id="species-position" position={Import.taxonomic_position(taxon.id)} />
+```
+
+- Attributes: `id` (required), `position` (required: `Gallformers.Import.taxonomic_position/1`'s `%{placement, name, disagreeing}`).
+- Parts carry `data-part` (`placement`, `name`, `disagreeing`) and each disagreeing paper `data-decision`.
+- Used by the species page (`SpeciesLive`, in its Taxonomy section).
+
 ## Actions and navigation
 
 ### `button`
@@ -367,6 +381,24 @@ One option of a question as a card: a radio (or a checkbox, `type="checkbox"`) w
 - Slots: `label` (required; chips may follow the name), `aside` (right of the label on wide screens: who recommends it, who chose it), `extra` (under the card's text, chosen or not), `follow` (shown only once chosen).
 - Put the cards in an element with `role="radiogroup"` and an `aria-label` (the question). For a short row of choices without descriptions use `segmented_switch` or plain radios.
 
+### `review_option`
+
+One answer to a curator's question, as a `radio_card`: what it is, what choosing it does, whether it is the recommended answer and on whose word, who chose it, and the input it needs once chosen. The review's questions (`ReviewLive.ItemRow`) and "Based on which Source?" (`Admin.TaxonomyLive.BasisPicker`) set their options with it.
+
+```heex
+<div role="radiogroup" aria-label="Based on" class="grid gap-1.5">
+  <.review_option id="basis-source" name="basis[choice]" value="source"
+    checked={@choice == "source"} recommended label="A Source in Gallformers"
+    summary="The paper the change follows." on_pick="pick" target={@myself}>
+    <:follow>…the Source typeahead…</:follow>
+  </.review_option>
+</div>
+```
+
+- Attributes: `id` (the radio's), `name` (the group's), `value`, `checked`, `recommended`, `by` (who recommends it, or why, shown at the right while recommended and nobody has chosen), `tally` (who chose it, recommended or not; in place of `by`), `label`, `summary`, `tags` (`%{text, kind: :best | :conflict}` chips after the label: `:conflict` danger, `:best` info), `on_pick` (the event the radio sends, with `phx-value-choice` set to `value`), `target`.
+- Slots: `extra` (under it, chosen or not: a comparison), `follow` (shown once chosen, in a `data-role="follow"` grid).
+- Put the options in a `role="radiogroup"` element labelled with the question, as `radio_card`'s. For a Trait's values use `review_value_list`.
+
 ### `save_bar`
 
 Shows unsaved changes and offers Save and Discard. Its role depends on the admin save model, which is still open (matter `bc0d`).
@@ -458,7 +490,7 @@ An article in the Articles list. A band tinted by its topic (`tone`: `:sky` iden
 
 ### `change_entry`
 
-One curator change in the change log (a `Gallformers.Audit.ChangeLog` group, via `Catalog.changes/1`): when (`time_ago`), who did what and from which Source (linked to its review); the Galls and taxa it touched and the taxon names it added (each taxon with its rank); what happened to its Facts as chips (added, made current, superseded, withdrawn, unsupported); and "Show the N Facts", each Fact in words with its Gall or taxon. Every Gall, taxon and Fact links **View** (the public page, at `#fact-<id>`, in a new tab) and **Edit** (the same page with `?edit`, the inline editor, matter ec2c). A taxon with no page of its own (an inducer species) is found by search and edited in the taxonomy admin. The dashboard and the Changes page render the same entry. Attribute: `group`.
+One curator change in the change log (a `Gallformers.Audit.ChangeLog` group, via `Catalog.changes/1`): when (`time_ago`), who did what and from which Source (linked to its review); the Galls and taxa it touched and the taxon names it added (each taxon with its rank); what happened to its Facts as chips (added, made current, superseded, withdrawn, unsupported); and "Show the N Facts", each Fact in words with its Gall or taxon. Every Gall, taxon and Fact links **View** (the public page, at `#fact-<id>`, in a new tab) and **Edit** (the same page with `?edit`, the inline editor, matter ec2c). An inducer species has its species page (`/species/:id`, Edit at `?edit`); a taxon with no page of its own (an order) is found by search and edited in the taxonomy admin. The dashboard and the Changes page render the same entry. Attribute: `group`.
 
 ### Inline editing (`CurationComponents`)
 

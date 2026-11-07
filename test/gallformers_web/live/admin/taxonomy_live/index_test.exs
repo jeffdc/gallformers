@@ -71,6 +71,30 @@ defmodule GallformersWeb.Admin.TaxonomyLive.IndexTest do
   end
 
   describe "moving selected children" do
+    test "each child has the table's own selection checkbox; ticking one selects its row",
+         %{conn: conn} do
+      from = taxon_fixture(rank: :family, name: "Pickidae#{uniq()}", kingdom: "Animalia")
+      a = taxon_fixture(rank: :genus, name: "Picka#{uniq()}", parent: from)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy?#{%{parent: from.id}}")
+      box = "#taxon-#{a.id} input.gf-checkbox[phx-click=toggle_select][phx-value-id='#{a.id}']"
+
+      assert has_element?(view, box)
+      assert has_element?(view, "#{box}[aria-label='Select #{Taxa.accepted_name(a)}']")
+
+      view |> element(box) |> render_click()
+
+      assert has_element?(view, "#taxon-#{a.id}[data-selected]")
+      assert has_element?(view, "button", "Move 1 selected")
+    end
+
+    test "search results have no selection", %{conn: conn} do
+      taxon_fixture(rank: :genus, name: "Nopicka#{uniq()}", kingdom: "Animalia")
+      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy?#{%{q: "Nopicka"}}")
+
+      refute has_element?(view, "#taxa-table input[type=checkbox]")
+    end
+
     test "moves the selected genera under the picked family", %{conn: conn} do
       from = taxon_fixture(rank: :family, name: "Fromidae#{uniq()}", kingdom: "Animalia")
       to = taxon_fixture(rank: :family, name: "Toidae#{uniq()}", kingdom: "Animalia")

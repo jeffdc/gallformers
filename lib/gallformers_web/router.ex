@@ -23,7 +23,8 @@ defmodule GallformersWeb.Router do
     plug OpenApiSpex.Plug.PutApiSpec, module: GallformersWeb.ApiSpec
   end
 
-  # Old /gall/:id and /host/:id URLs of records that became no page (301).
+  # Old /gall/:id, /host/:id and /species/:id URLs of records that became no
+  # page (301).
   pipeline :legacy_entity_redirects do
     plug GallformersWeb.Plugs.LegacyEntityRedirect
   end
@@ -223,6 +224,7 @@ defmodule GallformersWeb.Router do
       # Entity pages
       live "/gall/:id", GallLive
       live "/host/:id", HostLive
+      live "/species/:id", SpeciesLive
       live "/family/:name", IntermediateLive, :family
       live "/genus/:name", GenusLive
       live "/source/:id", SourceLive

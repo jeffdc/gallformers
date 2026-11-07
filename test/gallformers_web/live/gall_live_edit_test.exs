@@ -56,6 +56,14 @@ defmodule GallformersWeb.GallLiveEditTest do
       assert has_element?(view, "#gall-editor")
       assert has_element?(view, "[data-scope=elsewhere]")
     end
+
+    test "the Inducer's lineage and synonyms are edited on its species page", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      assert has_element?(view, "#editing a[href='/species/#{ctx.wasp.id}?edit']")
+      assert has_element?(view, "#gall-editor a[href='/species/#{ctx.wasp.id}?edit']")
+      refute has_element?(view, "a[href='/admin/taxonomy/#{ctx.wasp.id}']")
+    end
   end
 
   describe "Hosts" do

@@ -181,4 +181,45 @@ defmodule Gallformers.Catalog.DisplayRangeTest do
 
     assert_same_places(gall)
   end
+
+  describe "display_range_for_galls/1 (an Inducer's Galls on one map)" do
+    test "the union of the Galls' ranges, an exact place winning over country level", ctx do
+      other = gall_fixture()
+      us_country = plant_fixture()
+      host_range_fixture(us_country, [{"US", "country"}])
+      host!(ctx.california_oak, ctx.gall, ctx.source)
+      host!(ctx.canadian_oak, other, ctx.source)
+      host!(us_country, other, ctx.source)
+
+      assert sorted(Catalog.display_range_for_galls([ctx.gall.id, other.id])) ==
+               %{in_range: ["US-CA"], inherited_range: ["CA-AB"], introduced_range: []}
+    end
+
+    test "a place native for one Gall's Hosts is not introduced", ctx do
+      other = gall_fixture()
+      introduced = plant_fixture()
+
+      host_range_fixture(introduced, [
+        {"US-CA", "exact", "introduced"},
+        {"RO-B", "exact", "introduced"}
+      ])
+
+      host!(ctx.california_oak, ctx.gall, ctx.source)
+      host!(introduced, other, ctx.source)
+
+      assert sorted(Catalog.display_range_for_galls([ctx.gall.id, other.id])) ==
+               %{in_range: ["RO-B", "US-CA"], inherited_range: [], introduced_range: ["RO-B"]}
+    end
+
+    test "Galls with no range data are left out; everywhere when none has any", ctx do
+      host!(ctx.california_oak, ctx.gall, ctx.source)
+      unknown = gall_fixture()
+
+      assert sorted(Catalog.display_range_for_galls([ctx.gall.id, unknown.id])) ==
+               %{in_range: ["US-CA"], inherited_range: [], introduced_range: []}
+
+      assert Catalog.display_range_for_galls([unknown.id]) == :everywhere
+      assert Catalog.display_range_for_galls([]) == :everywhere
+    end
+  end
 end

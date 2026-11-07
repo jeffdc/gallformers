@@ -2235,6 +2235,15 @@ defmodule Gallformers.Import do
   def taxonomic_position(taxon_id) when is_integer(taxon_id), do: FactsView.position(taxon_id)
 
   @doc """
+  The splits in effect that taxon `taxon_id` is part of, newest first: the
+  taxon divided, its daughters and the Source deciding each
+  (`Gallformers.Import.FactsView.splits/1`). With
+  `Gallformers.Taxa.merged_into/1` (lumps), a taxon's split and lump history.
+  """
+  @spec taxon_splits(integer()) :: [map()]
+  def taxon_splits(taxon_id) when is_integer(taxon_id), do: FactsView.splits(taxon_id)
+
+  @doc """
   The gall Facts about Gall `gall_id` (`Gallformers.Catalog.facts_about_galls/1`),
   grouped by category as `facts_for_source/1` groups a Source's, all under
   the one Gall: each entry with the Fact's `standing` and its `sources`

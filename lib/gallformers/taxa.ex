@@ -49,6 +49,7 @@ defmodule Gallformers.Taxa do
       NameNormalizer,
       Rank,
       ReadModels.HostPage,
+      ReadModels.SpeciesPage,
       Taxon,
       TaxonName,
       TaxonNote,
@@ -81,6 +82,7 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.ReadModels.Browse
   alias Gallformers.Taxa.ReadModels.HostPage
   alias Gallformers.Taxa.ReadModels.Search
+  alias Gallformers.Taxa.ReadModels.SpeciesPage
   alias Gallformers.Taxa.Records
   alias Gallformers.Taxa.Taxon
   alias Gallformers.Taxa.TaxonName
@@ -573,6 +575,16 @@ defmodule Gallformers.Taxa do
   @spec taxon_redirect(integer()) :: integer() | nil
   defdelegate taxon_redirect(id), to: Records, as: :redirect
 
+  @doc """
+  The taxa merged into `taxon_id` (lumps), by when: `%{taxon_id, name, at}`,
+  the name the merged taxon had, nil when the audit trail holds none
+  (`Gallformers.Taxa.Records.merged_into/1`).
+  """
+  @spec merged_into(integer()) :: [
+          %{taxon_id: integer(), name: String.t() | nil, at: DateTime.t()}
+        ]
+  defdelegate merged_into(taxon_id), to: Records
+
   # -- legacy crosswalk --------------------------------------------------------
 
   @doc """
@@ -862,6 +874,20 @@ defmodule Gallformers.Taxa do
   @spec host_page(integer()) :: {:ok, HostPage.t()} | :not_found
   def host_page(id) when is_integer(id), do: HostPage.for_taxon(id)
 
+  @doc """
+  What the species page shows of taxon `id`, an organism's taxon at species
+  rank or below that is not a plant
+  (`Gallformers.Taxa.ReadModels.SpeciesPage`): `{:ok, page}`, `{:plant, id}`
+  for a plant (its Host page), `{:higher, %{rank, name}}` for a taxon above
+  species rank, or `:not_found`.
+  """
+  @spec species_page(integer()) ::
+          {:ok, SpeciesPage.t()}
+          | {:plant, integer()}
+          | {:higher, %{rank: Rank.t(), name: String.t()}}
+          | :not_found
+  def species_page(id) when is_integer(id), do: SpeciesPage.for_taxon(id)
+
   # Rank pages and the Hosts browse tree (`Gallformers.Taxa.ReadModels.Browse`).
 
   @doc """
@@ -926,6 +952,10 @@ defmodule Gallformers.Taxa do
   @doc "Every plant's ID, ascending."
   @spec list_plant_ids() :: [integer()]
   defdelegate list_plant_ids(), to: Gallformers.Taxa.ReadModels.Site
+
+  @doc "Every species page's taxon ID: the non-plant taxa at species rank or below."
+  @spec list_species_ids() :: [integer()]
+  defdelegate list_species_ids(), to: Gallformers.Taxa.ReadModels.Site
 
   @doc "The taxa at ranks with a page, as `%{rank, name}`, each name and rank once."
   @spec list_rank_pages() :: [Gallformers.Taxa.ReadModels.Site.rank_page()]

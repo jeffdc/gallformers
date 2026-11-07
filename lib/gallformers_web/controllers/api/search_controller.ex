@@ -31,11 +31,14 @@ defmodule GallformersWeb.API.SearchController do
   Performs a global search across all entity types.
   """
   def search(conn, %{"q" => query}) when is_binary(query) and query != "" do
-    results = Search.global_search(query)
-    json(conn, results)
+    json(conn, query |> Search.global_search() |> api_categories())
   end
 
   def search(conn, _params) do
-    json(conn, Search.empty_results())
+    json(conn, api_categories(Search.empty_results()))
   end
+
+  # The API keeps its documented categories: the species pages' results
+  # (`species`) are the site's, not v2's.
+  defp api_categories(results), do: Map.delete(results, :species)
 end

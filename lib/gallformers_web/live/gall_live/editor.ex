@@ -662,7 +662,7 @@ defmodule GallformersWeb.GallLive.Editor do
         <.edit_scope
           :if={@gall.inducers != []}
           kind={:elsewhere}
-          href={"/admin/taxonomy/#{hd(@gall.inducers).taxon_id}"}
+          href={GallformersWeb.TaxonomyURL.inducer_path(hd(@gall.inducers), edit: true)}
         >
           Correcting the Inducer is taxonomy: on <i>{hd(@gall.inducers).name}</i>'s page.
         </.edit_scope>

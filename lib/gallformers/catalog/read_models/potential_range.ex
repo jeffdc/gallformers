@@ -228,6 +228,42 @@ defmodule Gallformers.Catalog.ReadModels.PotentialRange do
     end
   end
 
+  @doc """
+  The display ranges of the Galls among `gall_ids` on one map (an Inducer's
+  Galls, on its species page), as `for_display/1` gives each: the union of
+  their places, a place exact for one Gall exact (not country level), and
+  a place introduced only where no Gall's Hosts are native there. Galls
+  whose range is everywhere (no Host range data) are left out;
+  `:everywhere` when every Gall's is, or there are none.
+  """
+  @spec for_display_together([integer()]) :: :everywhere | DisplayRange.t()
+  def for_display_together(gall_ids) when is_list(gall_ids) do
+    case gall_ids
+         |> Enum.uniq()
+         |> Enum.map(&for_display/1)
+         |> Enum.reject(&(&1 == :everywhere)) do
+      [] ->
+        :everywhere
+
+      ranges ->
+        union = fn field -> ranges |> Enum.flat_map(&Map.fetch!(&1, field)) |> MapSet.new() end
+        exact = union.(:in_range)
+
+        native =
+          ranges
+          |> Enum.flat_map(&((&1.in_range ++ &1.inherited_range) -- &1.introduced_range))
+          |> MapSet.new()
+
+        %DisplayRange{
+          in_range: Enum.sort(exact),
+          inherited_range:
+            :inherited_range |> union.() |> MapSet.difference(exact) |> Enum.sort(),
+          introduced_range:
+            :introduced_range |> union.() |> MapSet.difference(native) |> Enum.sort()
+        }
+    end
+  end
+
   # The taxa whose `host_range` rows make each Gall's range, by Gall ID: its
   # current Hosts, a Host above species rank (a genus or section, today's
   # "Genus spp" placeholders) with every taxon in its subtree (`803b`

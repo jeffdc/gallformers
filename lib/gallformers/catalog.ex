@@ -107,6 +107,7 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.ReadModels.GallSummary
   alias Gallformers.Catalog.ReadModels.PotentialRange
   alias Gallformers.Catalog.ReadModels.Site
+  alias Gallformers.Catalog.ReadModels.SpeciesSources
   alias Gallformers.Catalog.Records
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
@@ -576,7 +577,7 @@ defmodule Gallformers.Catalog do
         changeset
 
       source_id ->
-        if source_id in gall_source_ids(changeset.data.id),
+        if source_id in SpeciesSources.gall_source_ids(changeset.data.id),
           do: changeset,
           else:
             Changeset.add_error(
@@ -595,7 +596,7 @@ defmodule Gallformers.Catalog do
   @spec datacomplete_lock(Gall.t()) :: :unlocked | {:locked, datacomplete_lock_reason()}
   def datacomplete_lock(%Gall{id: id}) do
     cond do
-      gall_source_ids(id) == [] -> {:locked, :no_sources}
+      SpeciesSources.gall_source_ids(id) == [] -> {:locked, :no_sources}
       match?([%{undescribed: true}], add_undescribed([%{id: id}])) -> {:locked, :undescribed}
       true -> :unlocked
     end
@@ -611,18 +612,21 @@ defmodule Gallformers.Catalog do
   @spec gall_sources(integer()) :: [Source.t()]
   def gall_sources(gall_id) when is_integer(gall_id) do
     gall_id
-    |> gall_source_ids()
+    |> SpeciesSources.gall_source_ids()
     |> Sources.list_sources_by_id()
     |> Enum.sort_by(&{&1.title, &1.id})
   end
 
-  defp gall_source_ids(gall_id) do
-    cited = Repo.all(from(c in LegacyCitation, where: c.gall_id == ^gall_id, select: c.source_id))
-    noted = gall_id |> Sources.list_gall_notes() |> Enum.map(& &1.source_id)
-    attributing = gall_id |> Current.source_ids_attributing() |> Repo.all()
-
-    Enum.uniq(cited ++ noted ++ attributing)
-  end
+  @doc """
+  The Sources of the species page of taxon `taxon_id`, whose Galls are
+  `gall_ids` (`Gallformers.Catalog.ReadModels.SpeciesSources`): every
+  Source citing one of the Galls or stating anything of the taxon's
+  taxonomy, Gallformers' own left out, each once with the Galls it covers
+  (`gall_ids`) and whether it speaks of the taxonomy (`taxonomy`), by year.
+  """
+  @spec species_sources(integer(), [integer()]) :: [SpeciesSources.entry()]
+  def species_sources(taxon_id, gall_ids) when is_integer(taxon_id) and is_list(gall_ids),
+    do: SpeciesSources.for_taxon(taxon_id, gall_ids)
 
   @typedoc """
   A current range adjustment of a Gall (`list_range_adjustments/1`), with
@@ -1081,6 +1085,16 @@ defmodule Gallformers.Catalog do
   """
   @spec display_range(integer()) :: :everywhere | DisplayRange.t()
   def display_range(gall_id) when is_integer(gall_id), do: PotentialRange.for_display(gall_id)
+
+  @doc """
+  The display ranges of `gall_ids` together on one map (an Inducer's Galls,
+  `Gallformers.Catalog.ReadModels.PotentialRange.for_display_together/1`):
+  their places' union, Galls with no range data left out, `:everywhere`
+  when none has any.
+  """
+  @spec display_range_for_galls([integer()]) :: :everywhere | DisplayRange.t()
+  def display_range_for_galls(gall_ids) when is_list(gall_ids),
+    do: PotentialRange.for_display_together(gall_ids)
 
   @doc """
   A Gall's current Inducer, Hosts and Traits

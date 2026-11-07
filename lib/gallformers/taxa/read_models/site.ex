@@ -1,7 +1,8 @@
 defmodule Gallformers.Taxa.ReadModels.Site do
   @moduledoc """
   Site-wide taxon reads (`803b` Task 12): the plant counts of the home and
-  about pages, and the plant IDs and rank pages the sitemap lists.
+  about pages, and the plant IDs, species pages and rank pages the sitemap
+  lists.
 
   "Plants" are Plantae taxa at species rank or below, as in
   `Gallformers.Taxa.ReadModels.Browse`.
@@ -56,6 +57,22 @@ defmodule Gallformers.Taxa.ReadModels.Site do
   @doc "Every plant's ID, ascending."
   @spec list_plant_ids() :: [integer()]
   def list_plant_ids, do: Repo.all(from(t in plants(), order_by: t.id, select: t.id))
+
+  @doc """
+  Every species page's taxon ID, ascending: the taxa at species rank or below
+  that are not plants (a taxon with no kingdom recorded is none).
+  """
+  @spec list_species_ids() :: [integer()]
+  def list_species_ids do
+    from(t in Taxon,
+      where:
+        t.rank in ^Rank.species_and_below() and
+          (is_nil(t.kingdom) or t.kingdom != "Plantae"),
+      order_by: t.id,
+      select: t.id
+    )
+    |> Repo.all()
+  end
 
   @doc """
   The taxa at ranks with a page (family, subfamily, tribe, subtribe, genus,

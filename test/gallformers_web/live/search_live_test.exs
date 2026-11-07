@@ -179,6 +179,20 @@ defmodule GallformersWeb.SearchLiveTest do
       assert render(view) =~ "Oak Apple Gall Wasp"
     end
 
+    test "a Gallformer species links to its species page, with its Galls", %{conn: conn} do
+      {:ok, inducer} = Gallformers.Taxa.resolve_name("Andricus seedii", rank: :species)
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=Andricus+seedii")
+
+      assert has_element?(
+               view,
+               "#results-table a[href='/species/#{inducer.id}']",
+               "Andricus seedii"
+             )
+
+      assert has_element?(view, "#results-table [data-part=type]", "Gallformer")
+      assert has_element?(view, "nav a", "Gallformer")
+    end
+
     test "a higher taxon links to its rank page, with its parent", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/globalsearch?q=Cynipini")
 

@@ -34,11 +34,23 @@ defmodule GallformersWeb.TaxonomyURLTest do
                "/tribe/Cynipini"
     end
 
-    test "an inducer species has no page of its own" do
+    test "an organism at species rank or below: its species page" do
+      for rank <- ~w(species subspecies variety form), kingdom <- ["Animalia", nil] do
+        assert TaxonomyURL.taxon_path(%{
+                 id: 3,
+                 name: "Andricus quercuscalifornicus",
+                 rank: rank,
+                 kingdom: kingdom
+               }) ==
+                 "/species/3"
+      end
+    end
+
+    test "a rank with no page (an order) has none" do
       assert TaxonomyURL.taxon_path(%{
-               id: 3,
-               name: "Andricus quercuscalifornicus",
-               rank: "species",
+               id: 4,
+               name: "Hymenoptera",
+               rank: "order",
                kingdom: "Animalia"
              }) ==
                nil
