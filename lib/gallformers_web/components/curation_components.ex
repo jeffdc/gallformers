@@ -215,15 +215,19 @@ defmodule GallformersWeb.CurationComponents do
   Review and apply, the body of its dialog: each change with its flags (the
   back end's words), its confirmation box when it needs one, Apply for it
   alone (not while it needs a reason, is blocked, waits for confirmation or
-  is already submitted) and Take out; then the evidence for the Fact
-  changes (a reason, observations, a Source); then Apply all.
-  `confirmed` lists the item ids the curator has confirmed.
+  is already submitted) and Take out, and under it a Fact change's own
+  evidence (its text, its observations as links, its Source); then the
+  evidence for the Fact changes without their own (a reason,
+  observations, a Source), not shown when every one has its own; then
+  Apply all. `confirmed` lists the item ids the curator has confirmed.
   """
   attr :id, :string, required: true
 
   attr :items, :list,
     required: true,
-    doc: "maps with `id`, `kind`, `text`, `flags`, optional `state`"
+    doc:
+      "maps with `id`, `kind`, `text`, `flags`, optional `state` and `evidence` " <>
+        "(the item's own: `%{text, observations, source}`, `source` `%{id, title}` or nil)"
 
   attr :evidence, :map, required: true, doc: "`%{text, observations, source_id}`"
   attr :confirmed, :list, default: []
@@ -281,18 +285,42 @@ defmodule GallformersWeb.CurationComponents do
               /> I'm sure
             </label>
           </div>
+          <div
+            :if={item[:evidence]}
+            data-part="evidence"
+            class="flex flex-col gap-0.5 text-meta text-ink-2"
+          >
+            <span class="text-muted">Its own evidence</span>
+            <span :if={item.evidence.text}>{item.evidence.text}</span>
+            <span :if={item.evidence.observations != []} class="flex flex-wrap gap-x-3">
+              <a
+                :for={observation <- item.evidence.observations}
+                href={observation_url(observation)}
+                target="_blank"
+                rel="noopener"
+              >
+                {observation_url(observation)}
+              </a>
+            </span>
+            <span :if={item.evidence.source}>
+              Source:
+              <a href={"/source/#{item.evidence.source.id}"} target="_blank" rel="noopener">
+                {item.evidence.source.title}
+              </a>
+            </span>
+          </div>
         </li>
       </ul>
 
       <form
-        :if={Enum.any?(@items, &(&1.kind == :fact))}
+        :if={shared_evidence?(@items)}
         id={"#{@id}-evidence"}
         phx-change="set_evidence"
         class="flex flex-col gap-2"
       >
         <h3 class="text-subsection">Evidence for the Fact changes</h3>
         <p class="text-meta text-muted">
-          Asked once for the set. A change that supersedes a Source needs a reason, an observation or a Source.
+          Asked once, for the Fact changes without evidence of their own. A change that supersedes a Source needs a reason, an observation or a Source.
         </p>
         <label class="gf-label" for={"#{@id}-evidence-text"}>Why</label>
         <textarea
@@ -314,7 +342,7 @@ defmodule GallformersWeb.CurationComponents do
       </form>
 
       <.typeahead
-        :if={Enum.any?(@items, &(&1.kind == :fact))}
+        :if={shared_evidence?(@items)}
         id={"#{@id}-evidence-source"}
         label="A Source"
         placeholder="A Source's title"
@@ -341,6 +369,10 @@ defmodule GallformersWeb.CurationComponents do
     do: "https://bugguide.net/node/view/#{id}"
 
   defp observation_url(%{id: id}), do: "https://www.inaturalist.org/observations/#{id}"
+
+  # The set's evidence is asked while a Fact item has none of its own.
+  defp shared_evidence?(items),
+    do: Enum.any?(items, &(&1.kind == :fact and is_nil(&1[:evidence])))
 
   defp needs?(item, kind), do: Enum.any?(item.flags, &(&1.kind == kind))
 

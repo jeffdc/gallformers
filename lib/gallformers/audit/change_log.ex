@@ -22,7 +22,8 @@ defmodule Gallformers.Audit.ChangeLog do
     * the questions it decided.
 
   Plain SQL over the audit trail and the tables it names, so it depends on
-  nothing but the Repo.
+  nothing but the Repo (and PubSub, to tell a page new changes are there:
+  `subscribe/0`, `changed/0`).
   """
   alias Gallformers.Repo
 
@@ -117,6 +118,28 @@ defmodule Gallformers.Audit.ChangeLog do
           taxa: [taxon()],
           decided: non_neg_integer()
         }
+
+  @pubsub Gallformers.PubSub
+  @topic "audit:changes"
+
+  @doc """
+  Subscribes the calling process to "changes recorded" (`"audit:changes"`):
+  `{:change_log, :changed}` arrives after curators' changes commit, so a
+  page listing them (the admin dashboard) reads them again.
+  """
+  @spec subscribe() :: :ok | {:error, term()}
+  def subscribe, do: Phoenix.PubSub.subscribe(@pubsub, @topic)
+
+  @doc """
+  Tells the subscribers (`subscribe/0`) that changes were recorded. Called
+  after they commit: by `Gallformers.Curation` when the tray applies, and
+  after the import job takes a package a step on.
+  """
+  @spec changed() :: :ok
+  def changed do
+    _ = Phoenix.PubSub.broadcast(@pubsub, @topic, {:change_log, :changed})
+    :ok
+  end
 
   @doc """
   The curators' latest changes, grouped, newest first. Options: `:limit`,

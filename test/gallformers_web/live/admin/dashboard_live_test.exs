@@ -20,6 +20,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
 
   alias Gallformers.Audit.Actor
   alias Gallformers.Curation
+  alias Gallformers.Curation.PackageListener
 
   setup %{conn: conn} do
     {conn, user} = log_in_admin(conn, "Rita Reviewer")
@@ -97,6 +98,42 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
       assert has_element?(view, "a[href='/admin/changes']", "All changes")
     end
 
+    test "keep up: a curator's apply from the tray shows without a refresh", ctx do
+      gall = gall_fixture(%{name: "Andricus livei"})
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin")
+      refute has_element?(view, "#recent-changes", "Adam Kranz")
+
+      # A curator's apply, and another's change in the audit trail.
+      {:ok, _} =
+        Curation.add_item(ctx.actor, %{
+          kind: :editorial,
+          subject: {:gall, gall.id},
+          field: :abundance,
+          value: 3
+        })
+
+      curator_change("Adam Kranz", "catalog.update_gall_editorial", 0, [
+        {"galls", "update", %{id: gall.id}}
+      ])
+
+      {:ok, %{applied: [_]}} = Curation.apply(ctx.actor)
+
+      assert has_element?(view, "#recent-changes li [data-part=summary]", "Adam Kranz")
+    end
+
+    test "keep up: an import the import job applied shows without a refresh", ctx do
+      source = source_fixture("Weld", "1959")
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin")
+
+      curator_change("Adam Kranz", "import.apply_batch", 0, [
+        {"import_batches", "update", %{id: 1, package_id: package_for(source).id}}
+      ])
+
+      :ok = PackageListener.package_advanced(package_for(source))
+
+      assert has_element?(view, "#recent-changes li [data-part=summary]", "Adam Kranz")
+    end
+
     test "with no changes yet, it says so", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
       assert has_element?(view, "#recent-changes-section", "No changes yet.")
@@ -127,6 +164,25 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
              )
 
       assert has_element?(view, "#your-changes", "In your tray")
+    end
+
+    test "keeps up: a change applied leaves it without a refresh", %{conn: conn} = ctx do
+      gall = gall_fixture(name: "Andricus traylivei gall")
+
+      {:ok, _} =
+        Curation.add_item(ctx.actor, %{
+          kind: :editorial,
+          subject: {:gall, gall.id},
+          field: :abundance,
+          value: 3
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#your-changes", "Abundance")
+
+      {:ok, %{applied: [_]}} = Curation.apply(ctx.actor)
+
+      assert has_element?(view, "#your-changes-section", "Your tray is empty")
     end
 
     test "with an empty tray, it says how to make one", %{conn: conn} do

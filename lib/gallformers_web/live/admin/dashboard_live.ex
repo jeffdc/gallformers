@@ -5,13 +5,15 @@ defmodule GallformersWeb.Admin.DashboardLive do
   proposals and the questions merges left), then Your changes (the
   curator's tray, `Gallformers.Curation`, kept up to date), then the
   curators' recent changes (`Gallformers.Catalog.changes/1`, the same
-  `change_entry` as the Changes page). The rail: Create, and Site for a
+  `change_entry` as the Changes page, kept up to date through
+  `Gallformers.Audit.ChangeLog.subscribe/0`). The rail: Create, and Site for a
   superadmin. (Find is gone: the command palette finds anything, and Galls
   and plants are edited on their pages.)
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.{Accounts, Catalog, Curation}
+  alias Gallformers.Audit.ChangeLog
   alias GallformersWeb.Admin.ReviewLive.Loader
   alias GallformersWeb.Live.UserAuth
 
@@ -20,7 +22,11 @@ defmodule GallformersWeb.Admin.DashboardLive do
   @impl true
   def mount(_params, session, socket) do
     curator = UserAuth.curator(session["current_user"])
-    if curator && connected?(socket), do: Curation.subscribe(curator)
+
+    if connected?(socket) do
+      if curator, do: Curation.subscribe(curator)
+      ChangeLog.subscribe()
+    end
 
     {:ok,
      socket
@@ -31,14 +37,20 @@ defmodule GallformersWeb.Admin.DashboardLive do
        waiting:
          List.wrap(Loader.renames_row()) ++
            List.wrap(Loader.merge_conflicts_row()) ++
-           Enum.sort_by(Loader.sources(), & &1.to_decide, :desc),
-       changes: Catalog.changes(limit: 60) |> Enum.take(@recent)
+           Enum.sort_by(Loader.sources(), & &1.to_decide, :desc)
      )
+     |> load_changes()
      |> load_tray()}
   end
 
+  # The curator's tray changed: Your changes. Changes were recorded (the
+  # tray applied, the import job took a package on): Recent changes.
   @impl true
   def handle_info({:change_set, _change}, socket), do: {:noreply, load_tray(socket)}
+  def handle_info({:change_log, :changed}, socket), do: {:noreply, load_changes(socket)}
+
+  defp load_changes(socket),
+    do: assign(socket, changes: Catalog.changes(limit: 60) |> Enum.take(@recent))
 
   defp load_tray(socket) do
     items =

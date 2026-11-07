@@ -18,6 +18,7 @@ import PhotoViewer from "./hooks/photo_viewer"
 import ImageUpload from "./hooks/image_upload"
 import IndeterminateCheckbox from "./hooks/indeterminate_checkbox"
 import InputEvent from "./hooks/input_event"
+import LeaveEdit from "./hooks/leave_edit"
 import RangeMap from "./hooks/range_map"
 import RegionPrompt from "./hooks/region_prompt"
 import RegionScope from "./hooks/region_scope"
@@ -30,7 +31,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
-  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, ImageUpload, IndeterminateCheckbox, InputEvent, Palette, PhotoViewer, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, SourceReader, Typeahead},
+  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, ImageUpload, IndeterminateCheckbox, InputEvent, LeaveEdit, Palette, PhotoViewer, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, SourceReader, Typeahead},
 })
 
 // Show progress bar on live navigation and form submits

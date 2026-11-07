@@ -39,6 +39,10 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
       the citation's `description` (the note's text), `useasdefault` (it is
       the Gall's default Source), `externallink` and `note?`;
     * `images` (by `image.gall_id`) and `display_range`;
+    * `inserted_at`, and `updated_at`: the latest change to the Gall, its
+      editorial fields or anything about it — a Fact about it made, or
+      attributed, or its standing changed, or a note on one
+      (`last_updated/1`);
     * `attributions` — every current Fact's attributions, keyed by what the
       Fact says: `{:inducer, taxon_id}`, `{:host, taxon_id}`,
       `{:trait, trait, value}`, `{:alias, name}`,
@@ -47,6 +51,7 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
   """
   import Ecto.Query, only: [from: 2]
 
+  alias Gallformers.Catalog.FactNote
   alias Gallformers.Catalog.Gall
   alias Gallformers.Catalog.LegacyCitation
   alias Gallformers.Catalog.PendingTerms
@@ -58,6 +63,7 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
   alias Gallformers.Catalog.Vocab.TraitValue
   alias Gallformers.Facts
   alias Gallformers.Facts.Attribution
+  alias Gallformers.Facts.Fact
   alias Gallformers.Images
   alias Gallformers.Images.Image
   alias Gallformers.Ranges.DisplayRange
@@ -196,8 +202,31 @@ defmodule Gallformers.Catalog.ReadModels.GallPage do
       display_range: PotentialRange.for_display(gall.id),
       attributions: attributions,
       inserted_at: gall.inserted_at,
-      updated_at: gall.updated_at
+      updated_at: last_updated(gall)
     }
+  end
+
+  # The latest of the Gall's own timestamp and those of the Facts about it,
+  # their attributions and their notes: an applied tray item touches one.
+  defp last_updated(%Gall{id: id, updated_at: updated_at}) do
+    fact_ids = Current.fact_ids_about(id)
+
+    latest =
+      Enum.map(
+        [
+          from(f in Fact, where: f.id in subquery(fact_ids), select: max(f.updated_at)),
+          from(a in Attribution,
+            where: a.fact_id in subquery(fact_ids),
+            select: max(a.updated_at)
+          ),
+          from(n in FactNote, where: n.fact_id in subquery(fact_ids), select: max(n.inserted_at))
+        ],
+        &Repo.one/1
+      )
+
+    [updated_at | latest]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.max(DateTime, fn -> nil end)
   end
 
   defp abundance(nil), do: nil
