@@ -173,6 +173,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
     :hedge_range,
     :hedge_gall,
     :hedge_other,
+    :taxonomy_acceptance,
     :source
   ]
 
@@ -236,6 +237,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
           | {:synonym_of, integer()}
           | {:generation, String.t()}
           | {:statements, %{String.t() => :keep | :leave | {:reading, integer()}}}
+          | {:reason, String.t()}
 
   # -- sections ------------------------------------------------------------------
 
@@ -450,6 +452,16 @@ defmodule GallformersWeb.Admin.Review.Questions do
        "Gallformers can't tell whether it already holds this Source. Pick it, or add it as a " <>
          "new Source.", true, "Holds approval", @blocks}
 
+  defp copy(:taxonomy_acceptance, _who),
+    do:
+      {"Taxonomic statements to accept or decline",
+       "A newer paper places, names, synonymizes or splits these taxa differently from the " <>
+         "tree. Its statement counts only once you accept it: the tree then follows it, and " <>
+         "older papers' questions about the same taxon close as history. Declining keeps the " <>
+         "tree on the paper it follows, with your reason shown beside the declined one.", false,
+       "Doesn't hold approval: the tree waits until you decide",
+       "If you leave it: the tree keeps following the paper it follows now."}
+
   defp copy(:gall_rename, _who),
     do:
       {"Gall names a change in the tree would change",
@@ -556,6 +568,9 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   # The Source is right about a synonym: the name is a species of its own
   # again, or another species' synonym (`Gallformers.Import.SynonymDecisions`).
+  def picked_decision(%Choice{picker: :reason}, {:reason, reason}) when is_binary(reason),
+    do: %{"decline" => true, "reason" => String.trim(reason)}
+
   def picked_decision(%Choice{picker: :tree}, :split), do: %{"split" => true}
 
   def picked_decision(%Choice{picker: :tree}, {:synonym_of, id}) when is_integer(id),
@@ -646,6 +661,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
   # -- which section -------------------------------------------------------------
 
   defp section_id(%QueueItem{kind: :gall_rename}, _ctx), do: :gall_rename
+  defp section_id(%QueueItem{kind: :taxonomy_acceptance}, _ctx), do: :taxonomy_acceptance
 
   defp section_id(%QueueItem{statement_ref: ref}, _ctx) when ref in ["source", "retracts"],
     do: :source
@@ -1282,6 +1298,50 @@ defmodule GallformersWeb.Admin.Review.Questions do
               decision: %{"new" => true}
             }
           ]
+    }
+  end
+
+  # A Source's taxonomic statement newer than what the tree follows
+  # (`Gallformers.Import.TaxonomyQueue`): accept it (the tree follows), or
+  # decline it with a reason, asked only once Decline is chosen. What the
+  # tree holds now is the page's fresh reading (`subject["now"]`), else
+  # what it held when the question was raised.
+  defp build(:taxonomy_acceptance, item, ctx) do
+    s = item.subject
+    claim = statement_claim(s, ctx)
+    now = s["now"] || item.reason
+    now_text = if now, do: " " <> cap(String.trim_trailing(now, ".")) <> "."
+    follow = "Accept: follow #{ctx.who}"
+
+    %{
+      written: statement_written(s, ctx),
+      context: s["stated"] && "Stated #{s["stated"]}",
+      question: "#{cap(ctx.who)} #{claim}.#{now_text} Follow #{ctx.who}?",
+      scope:
+        "The tree follows the newest statement a curator has accepted; this one is newer. " <>
+          "Facts about Galls attach to the taxa, so they are right either way.",
+      proposal:
+        proposal(
+          follow,
+          "The literature decides: a newer paper is followed unless you have " <>
+            "reason not to.",
+          %{"accept" => true}
+        ),
+      choices: [
+        %Choice{
+          label: follow,
+          hint: accept_effect(s, ctx),
+          decision: %{"accept" => true}
+        },
+        %Choice{
+          label: "Decline",
+          hint:
+            "The tree keeps following the paper it follows now. #{cap(poss(ctx.who))} " <>
+              "statement stays on record as declined, with your reason.",
+          picker: :reason,
+          note: "Why you don't follow it; readers see it beside the declined statement."
+        }
+      ]
     }
   end
 
@@ -3071,6 +3131,126 @@ defmodule GallformersWeb.Admin.Review.Questions do
   end
 
   defp act_claim(_act, _deny?, _ctx), do: "states a taxonomic act"
+
+  # -- taxonomic statements to accept (`Gallformers.Import.TaxonomyQueue`) --------
+
+  # A statement's taxa in the Source's words (`subject["written"]`, by
+  # role), else by the tree's name.
+  defp stated_name(s, role, id_key, ctx) do
+    case get_in(s, ["written", role]) do
+      name when is_binary(name) -> name
+      _ -> s[id_key] && name(ctx, :taxa, s[id_key])
+    end
+  end
+
+  defp stated_into(s, ctx) do
+    case get_in(s, ["written", "into"]) do
+      [_ | _] = names -> names
+      _ -> Enum.map(List.wrap(s["into_taxon_ids"]), &name(ctx, :taxa, &1))
+    end
+  end
+
+  # What the statement says, after the Source's name.
+  defp statement_claim(%{"kind" => kind, "stance" => stance} = s, ctx),
+    do: claim(kind, stance == "deny", s, ctx)
+
+  defp statement_claim(_s, _ctx), do: "states a taxonomic act"
+
+  defp claim("placement", deny?, s, ctx) do
+    {t, p} = {stated_taxon(s, ctx), stated_parent(s, ctx)}
+    if deny?, do: "denies that #{t} belongs under #{p}", else: "places #{t} under #{p}"
+  end
+
+  defp claim("name", true, s, _ctx), do: "denies the name #{stated_full_name(s)}"
+
+  defp claim("name", false, s, _ctx),
+    do: "names it #{stated_full_name(s)}#{s["rank"] && " at rank #{s["rank"]}"}"
+
+  defp claim("synonymy", deny?, s, ctx) do
+    {n, a} = {stated_synonym(s, ctx), stated_accepted(s, ctx)}
+
+    if deny?,
+      do: "denies that #{n} is a synonym of #{a}",
+      else: "treats #{n} as a synonym of #{a}"
+  end
+
+  defp claim("split", _deny?, s, ctx),
+    do: "splits #{stated_taxon(s, ctx)} into #{and_list(stated_into(s, ctx)) || "other taxa"}"
+
+  defp claim("common_name", true, s, ctx),
+    do: "denies that #{stated_taxon(s, ctx)} is called “#{s["common_name"]}”"
+
+  defp claim("common_name", false, s, ctx),
+    do: "calls #{stated_taxon(s, ctx)} “#{s["common_name"]}”"
+
+  defp claim(_kind, _deny?, _s, _ctx), do: "states a taxonomic act"
+
+  # The statement in a few words, for its row.
+  defp statement_written(%{"kind" => kind, "stance" => stance} = s, ctx) do
+    written = written_act(kind, s, ctx)
+    if stance == "deny", do: "Not: #{written}", else: written
+  end
+
+  defp statement_written(_s, _ctx), do: "A taxonomic act"
+
+  defp written_act("placement", s, ctx),
+    do: "#{stated_taxon(s, ctx)} under #{stated_parent(s, ctx)}"
+
+  defp written_act("name", s, _ctx), do: stated_full_name(s)
+
+  defp written_act("synonymy", s, ctx),
+    do: "#{stated_synonym(s, ctx)}, a synonym of #{stated_accepted(s, ctx)}"
+
+  defp written_act("split", s, ctx),
+    do: "#{stated_taxon(s, ctx)}, split into #{and_list(stated_into(s, ctx)) || "other taxa"}"
+
+  defp written_act("common_name", s, ctx), do: "#{stated_taxon(s, ctx)}: “#{s["common_name"]}”"
+  defp written_act(_kind, _s, _ctx), do: "A taxonomic act"
+
+  defp stated_taxon(s, ctx), do: stated_name(s, "taxon", "taxon_id", ctx) || "a taxon"
+  defp stated_parent(s, ctx), do: stated_name(s, "parent", "parent_id", ctx) || "the root"
+
+  defp stated_accepted(s, ctx),
+    do: stated_name(s, "accepted", "accepted_taxon_id", ctx) || "another taxon"
+
+  defp stated_synonym(s, ctx), do: s["name"] || stated_name(s, "name", nil, ctx) || "a name"
+
+  defp stated_full_name(s),
+    do: Enum.join(Enum.reject([s["name"], s["authorship"]], &is_nil/1), " ")
+
+  # What accepting does to the tree.
+  defp accept_effect(%{"stance" => "deny"}, _ctx),
+    do:
+      "The statement counts: the tree drops what it denies once no newer accepted " <>
+        "statement holds it."
+
+  defp accept_effect(%{"kind" => "placement"} = s, ctx),
+    do:
+      "The tree moves #{stated_taxon(s, ctx)} under #{stated_parent(s, ctx)}; the Galls " <>
+        "named after it get rename proposals."
+
+  defp accept_effect(%{"kind" => "name"} = s, _ctx),
+    do:
+      "The tree names it #{s["name"]}#{s["authorship"] && " " <> s["authorship"]}; an old " <>
+        "name stays as a synonym, and the Galls named after it get rename proposals."
+
+  defp accept_effect(%{"kind" => "synonymy"} = s, ctx),
+    do:
+      "#{stated_synonym(s, ctx)} becomes a synonym of #{stated_accepted(s, ctx)}. " <>
+        "If it is a species of its own today, it is merged in: its Galls follow, with rename " <>
+        "proposals."
+
+  defp accept_effect(%{"kind" => "split"} = s, ctx),
+    do:
+      "The tree splits #{stated_taxon(s, ctx)}: each Gall on it then asks " <>
+        "which taxon induces it."
+
+  defp accept_effect(%{"kind" => "common_name"} = s, ctx),
+    do:
+      "The tree gives #{stated_taxon(s, ctx)} the common name " <>
+        "“#{s["common_name"]}”."
+
+  defp accept_effect(_s, _ctx), do: "The tree follows the statement."
 
   # A batch ref in the Source's words; never the ref itself.
   defp written_ref(ctx, ref, fallback) when is_binary(ref) do

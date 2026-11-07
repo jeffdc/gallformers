@@ -187,6 +187,36 @@ defmodule Gallformers.Facts.AcceptanceTest do
     end
   end
 
+  describe "slot_statements/1" do
+    test "every statement in the slot, with whether each counts", ctx do
+      statements = Facts.slot_statements(ctx.statement.id)
+
+      assert Enum.sort(Enum.map(statements, & &1.id)) ==
+               Enum.sort([ctx.legacy.id, ctx.statement.id])
+
+      by_id = Map.new(statements, &{&1.id, &1})
+      assert %{counts: true, retracted: false, fact_id: older_id} = by_id[ctx.legacy.id]
+      assert older_id == ctx.older.id
+
+      assert %{counts: false, stated_on: ~D[1990-01-01], stated_precision: :year} =
+               by_id[ctx.statement.id]
+    end
+
+    test "an unslotted Fact's statements are its own" do
+      fact = fact!("taxon_synonymy", nil)
+      other = fact!("taxon_synonymy", nil)
+      a = attribute!(fact, legacy_source(), %{stated: nil})
+      _b = attribute!(other, legacy_source(), %{stated: nil})
+
+      assert [%{id: id}] = Facts.slot_statements(a.id)
+      assert id == a.id
+    end
+
+    test "none for an unknown statement" do
+      assert Facts.slot_statements(-1) == []
+    end
+  end
+
   test "the kinds that need acceptance are the taxonomic ones" do
     assert Enum.sort(Facts.acceptance_kinds()) ==
              ~w(taxon_common_name taxon_name taxon_placement taxon_split taxon_synonymy)

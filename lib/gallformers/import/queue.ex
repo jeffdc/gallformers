@@ -18,7 +18,8 @@ defmodule Gallformers.Import.Queue do
   | the package's Source (`"source"`) | `%{"source_id" => id}` or `%{"new" => true}` |
   | the Source a notice retracts (`"retracts"`) | `%{"source_id" => id}` or `%{"skip" => true}` |
   | a phase 6 dispute (`f3`, `a2`, ...; `Gallformers.Import.Disputes`) | `%{"keep" => true}` (the statement stands) or `%{"skip" => true}` (it is dropped); a Host dispute also `%{"keep" => true, "host_reading" => %{"name", "taxon_id"}}` (it stands, the Host read as another plant throughout the Source; a species-level Host only) or `%{"keep" => true, "host_taxon_id" => id}` (it stands on the plant chosen, for its statements only) |
-  | a same-date conflict, a generation outside its group, a disagreeing act | `%{}` (acknowledged) |
+  | a same-date conflict, a generation outside its group, a plant's disagreeing act | `%{}` (acknowledged) |
+  | a taxonomic statement to accept (`Gallformers.Import.TaxonomyQueue`) | `%{"accept" => true}` or `%{"decline" => true, "reason" => text}` (a reason required) |
   | a rename proposal (`Gallformers.Import.GallRenames`) | `%{"accept" => true}` or `%{"reject" => true}` |
   | a statement set aside (`u:<slot>:<term>`, `Gallformers.Import.SetAside`) | `%{"keep" => true}` or `%{"state" => spec}` |
   | a Trait term (`u:<trait>:<term>`, `Gallformers.Import.TraitTerms`) | `%{"place" => c}` or `%{"place" => [c1, c2]}` (for every Source: the values a term names), `%{"category" => c}` (these Galls), `%{"no_fit" => true}` or `%{"keep" => true}` |
@@ -71,8 +72,9 @@ defmodule Gallformers.Import.Queue do
   Hosts, undescribed-Gall candidates, disputes (but those about Trait
   terms, `Gallformers.Import.Disputes.trait?/1`), the Source, and a gall
   batch's held-valid synonyms. Same-date conflicts, generations outside
-  their groups and a taxonomy batch's disagreeing acts are for a curator
-  after the fact: the Facts are recorded either way. Statements set aside
+  their groups, a taxonomy batch's disagreeing acts and the taxonomic
+  statements to accept or decline (`Gallformers.Import.TaxonomyQueue`) are
+  for a curator after the fact: the Facts are recorded either way. Statements set aside
   and questions about Trait terms never hold approval: left alone, a
   statement stays out and a term stays as text on its Gall.
   """
@@ -86,6 +88,7 @@ defmodule Gallformers.Import.Queue do
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.SetAside
   alias Gallformers.Import.SynonymDecisions
+  alias Gallformers.Import.TaxonomyQueue
   alias Gallformers.Import.TraitTerms
   alias Gallformers.Repo
   alias Gallformers.Sources
@@ -104,6 +107,7 @@ defmodule Gallformers.Import.Queue do
   def blocking?(%{kind: :dispute} = item, _batch_type), do: not Disputes.trait?(item)
   def blocking?(%{kind: kind}, _batch_type) when kind in @blocking, do: true
   def blocking?(%{kind: :taxonomy_disagreement}, :gall), do: true
+  def blocking?(%{kind: :taxonomy_acceptance}, _batch_type), do: false
   def blocking?(_item, _batch_type), do: false
 
   # -- validating decisions ----------------------------------------------------
@@ -144,6 +148,9 @@ defmodule Gallformers.Import.Queue do
 
       SynonymDecisions.synonym?(item) ->
         or_choice(SynonymDecisions.check(item, choice), item, choice)
+
+      item.kind == :taxonomy_acceptance ->
+        TaxonomyQueue.check(choice)
 
       item.kind == :dispute and Disputes.host_extras?(choice) ->
         {extras, choice} = Disputes.split(choice)

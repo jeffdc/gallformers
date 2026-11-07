@@ -484,6 +484,79 @@ defmodule Gallformers.Facts do
   def needs_acceptance?(kind, source_id) when is_binary(kind) and is_integer(source_id),
     do: kind in @acceptance_kinds and source_id not in Sources.own_source_ids()
 
+  @typedoc "A statement in a slot as `slot_statements/1` gives it."
+  @type slot_statement :: %{
+          id: integer(),
+          fact_id: integer(),
+          source_id: integer(),
+          stance: :confirm | :deny,
+          stated_on: Date.t() | nil,
+          stated_precision: Gallformers.Sources.PartialDate.precision() | nil,
+          counts: boolean(),
+          retracted: boolean()
+        }
+
+  @doc """
+  Every statement competing with attribution `attribution_id`'s: the
+  attributions of every Fact in its Fact's slot, or of its Fact alone when
+  that is in none, itself included. Each says whether it `counts`
+  (`counts?/3`) and whether its Source is `retracted`, so a caller can tell
+  whether a statement is newer than what the standings follow
+  (`Gallformers.Facts.Standing.newer?/2`). [] for an unknown attribution.
+  """
+  @spec slot_statements(integer()) :: [slot_statement()]
+  def slot_statements(attribution_id) when is_integer(attribution_id) do
+    case Repo.one(
+           from(a in Attribution,
+             join: f in Fact,
+             on: f.id == a.fact_id,
+             where: a.id == ^attribution_id,
+             select: {f.id, f.slot}
+           )
+         ) do
+      nil -> []
+      {fact_id, slot} -> statements_competing(fact_id, slot)
+    end
+  end
+
+  defp statements_competing(fact_id, slot) do
+    facts =
+      if slot,
+        do: from(f in Fact, where: f.slot == ^slot),
+        else: from(f in Fact, where: f.id == ^fact_id)
+
+    rows =
+      from([f] in facts,
+        join: a in Attribution,
+        on: a.fact_id == f.id,
+        order_by: a.id,
+        select: %{
+          id: a.id,
+          fact_id: a.fact_id,
+          kind: f.kind,
+          source_id: a.source_id,
+          stance: a.stance,
+          stated_on: a.stated_on,
+          stated_precision: a.stated_precision,
+          accepted_at: a.accepted_at,
+          declined_at: a.declined_at
+        }
+      )
+      |> Repo.all()
+
+    own =
+      if Enum.any?(rows, &(&1.kind in @acceptance_kinds)), do: Sources.own_source_ids(), else: []
+
+    retracted = rows |> Enum.map(& &1.source_id) |> Enum.uniq() |> Sources.retracted_source_ids()
+
+    Enum.map(rows, fn row ->
+      row
+      |> Map.put(:counts, counts?(row.kind, row, own))
+      |> Map.put(:retracted, row.source_id in retracted)
+      |> Map.drop([:kind, :accepted_at, :declined_at])
+    end)
+  end
+
   # Sets the decision fields `fields_of.(attribution)` gives (`:unchanged`
   # for none) and recomputes the standings.
   defp decide(actor, operation, attribution_id, fields_of) do

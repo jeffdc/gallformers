@@ -1753,6 +1753,69 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert_plain(q)
   end
 
+  describe "a taxonomic statement to accept or decline (f923 Task 6)" do
+    defp acceptance(subject) do
+      %QueueItem{
+        kind: :taxonomy_acceptance,
+        statement_ref: "a5",
+        subject:
+          Map.merge(
+            %{"stance" => "confirm", "fact_id" => 9, "attribution_id" => 8, "source_id" => 3},
+            subject
+          ),
+        reason: "the tree places Andricus foo under Andricus"
+      }
+    end
+
+    test "asks whether to follow the Source, recommending it, holding nothing" do
+      item =
+        acceptance(%{
+          "kind" => "placement",
+          "taxon_id" => 1,
+          "parent_id" => 2,
+          "written" => %{"taxon" => "Andricus foo", "parent" => "Callirhytis"}
+        })
+
+      q = present(item)
+
+      assert q.section.id == :taxonomy_acceptance
+      refute q.holds_approval
+      assert q.written == "Andricus foo under Callirhytis"
+
+      assert q.question ==
+               "Ashmead places Andricus foo under Callirhytis. The tree places Andricus foo " <>
+                 "under Andricus. Follow Ashmead?"
+
+      assert labels(q) == ["Accept: follow Ashmead", "Decline"]
+      assert choice(q, "Accept: follow Ashmead").proposed == true
+      assert choice(q, "Accept: follow Ashmead").decision == %{"accept" => true}
+      assert choice(q, "Accept: follow Ashmead").hint =~ "moves Andricus foo under Callirhytis"
+      assert %{decision: nil, picker: :reason} = choice(q, "Decline")
+      assert_plain(q)
+    end
+
+    test "what the tree holds now, when the page reads it, replaces the reason" do
+      item =
+        acceptance(%{
+          "kind" => "synonymy",
+          "name" => "Andricus foo",
+          "accepted_taxon_id" => 2,
+          "now" => "the tree holds Andricus foo as a species of its own"
+        })
+
+      q = present(item)
+      assert q.written == "Andricus foo, a synonym of Heteroecus chrysolepidis"
+      assert q.question =~ "The tree holds Andricus foo as a species of its own."
+    end
+
+    test "a decline needs its reason" do
+      q = present(acceptance(%{"kind" => "common_name", "taxon_id" => 1, "common_name" => "x"}))
+
+      assert Questions.picked_decision(choice(q, "Decline"), {:reason, "  Not followed. "}) ==
+               %{"decline" => true, "reason" => "Not followed."}
+    end
+  end
+
   # -- the Source, and renames ---------------------------------------------------
 
   test "a Source match picks a Source Gallformers holds or adds a new one" do
@@ -1859,6 +1922,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
              :hedge_range,
              :hedge_gall,
              :hedge_other,
+             :taxonomy_acceptance,
              :source
            ]
   end

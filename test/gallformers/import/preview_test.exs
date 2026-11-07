@@ -210,6 +210,34 @@ defmodule Gallformers.Import.PreviewTest do
       assert Repo.aggregate(Taxon, :count) == taxa_before
       _ = ctx
     end
+
+    test "an act that would be a taxonomy question is in conflict with the tree" do
+      taxon_fixture(name: "Callirhytis previewa", kingdom: "Animalia")
+      taxon_fixture(name: "Andricus previewa", kingdom: "Animalia")
+
+      taxonomy =
+        taxonomy_batch()
+        |> unique_batch_id()
+        |> Map.put("taxa", [
+          %{"ref" => "t1", "name_as_written" => "Callirhytis previewa", "rank" => "species"},
+          %{"ref" => "t2", "name_as_written" => "Andricus previewa", "rank" => "species"}
+        ])
+        |> Map.put("acts", [
+          %{
+            "id" => "a1",
+            "stance" => "confirm",
+            "kind" => "synonymy",
+            "name" => "t1",
+            "accepted" => "t2",
+            "evidence" => [%{"item" => "#/texts/1", "quote" => "Andricus quercuscalifornicus"}]
+          }
+        ])
+
+      package = package(gall: nil, taxonomy: taxonomy) |> with_review() |> deliver!()
+
+      assert [%{ref: "a1", status: :conflict, why: why}] = preview!(package).taxonomy.acts
+      assert why =~ "does not hold Callirhytis previewa as a synonym"
+    end
   end
 
   describe "a package held by questions" do

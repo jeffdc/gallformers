@@ -14,15 +14,23 @@ defmodule Gallformers.Import.ApplyTaxonomy do
        (`attribution_names`). A name the tree holds as a synonym while this
        Source treats it as valid is recorded against the tree's taxon.
        Attributions are diffed like a gall batch's (`Gallformers.Import.Diff`).
-    3. **Disagreements are flagged, never applied.** An act that disagrees
-       with the tree — a synonymy the tree does not hold, a placement under
-       another parent, a name or rank other than the tree's, a common name
-       it lacks, any split (assigning records to the daughters is curator
-       work), or a denial of what the tree holds — becomes a
-       `:taxonomy_disagreement` queue item for a curator to apply
-       editorially or leave. The tree is otherwise unchanged. A first
-       common name, for a taxon that holds none, is new information rather
-       than a disagreement: recorded, with no item.
+    3. **A statement that differs from the tree is a question, never
+       applied** (`f923` Task 6). An act that differs from the tree — a
+       synonymy the tree does not hold, a placement under another parent, a
+       name or rank other than the tree's (an authorship only one side
+       gives is no difference), a common name it lacks, any split, or a
+       denial of what the tree holds (`Gallformers.Import.TaxonomyQueue.difference/4`)
+       — is recorded awaiting a curator's acceptance, and raises a
+       `:taxonomy_acceptance` question in the taxonomy queue when it is
+       newer than every statement that counts in its slot
+       (`Gallformers.Import.TaxonomyQueue.question/3`; an older one is
+       history). The tree follows it once a curator accepts it. A plant's
+       act stays a `:taxonomy_disagreement` for a curator to apply
+       editorially or leave (plant data is editorial), a first common name
+       for a plant that holds none being new information, with no item.
+       The name and placement a taxon created here is created with (its
+       statements agreeing with the tree) are accepted with it: the
+       curator's approval created the taxon from the paper.
     4. **Original combinations are history.** The name and placement acts
        of a taxon the resolver flags `"original_combination"` (the
        Source's original description of a combination the tree now holds
@@ -48,8 +56,8 @@ defmodule Gallformers.Import.ApplyTaxonomy do
   alias Gallformers.Import.ApplyGall
   alias Gallformers.Import.Attributions
   alias Gallformers.Import.Diff
+  alias Gallformers.Import.TaxonomyQueue
   alias Gallformers.Taxa
-  alias Gallformers.Taxa.NameNormalizer
 
   @doc "Applies the taxonomy batch in `ctx`."
   @spec run(map()) :: {:ok, map()} | {:error, term()}
@@ -69,14 +77,14 @@ defmodule Gallformers.Import.ApplyTaxonomy do
 
       refs = %{taxa: taxa, declared: declared, created: created}
 
-      with {:ok, outcomes, disagreements} <- write_all(ctx, diff, acts, refs),
+      with {:ok, outcomes, questions} <- write_all(ctx, diff, acts, refs),
            stated = for({_ref, %{fact_id: id}} <- outcomes, is_integer(id), do: id),
            {:ok, removal_conflicts} <- Diff.remove_unstated(diff, ctx.batch.mode, stated) do
         {:ok,
          %{
            statements: Enum.map(outcomes, &statement_row/1),
            updates: updates,
-           queue: disagreements ++ ApplyGall.conflict_items(outcomes, removal_conflicts)
+           queue: questions ++ ApplyGall.conflict_items(outcomes, removal_conflicts)
          }}
       end
     end
@@ -230,27 +238,57 @@ defmodule Gallformers.Import.ApplyTaxonomy do
   # -- acts --------------------------------------------------------------------
 
   defp write_all(ctx, diff, acts, refs) do
-    Enum.reduce_while(acts, {:ok, [], []}, fn act, {:ok, outcomes, disagreements} ->
-      case write_act(ctx, diff, act, refs) do
-        {:ok, outcome, key} ->
-          disagreements = disagreements ++ disagreement_items(act, outcome, key, refs)
-          {:cont, {:ok, outcomes ++ [{act["id"], outcome}], disagreements}}
-
-        {:error, reason} ->
-          {:halt, {:error, {act["id"], reason}}}
+    Enum.reduce_while(acts, {:ok, [], []}, fn act, {:ok, outcomes, questions} ->
+      with {:ok, outcome, key} <- write_act(ctx, diff, act, refs),
+           {:ok, items} <- question_items(ctx, act, outcome, key, refs) do
+        {:cont, {:ok, outcomes ++ [{act["id"], outcome}], questions ++ items}}
+      else
+        {:error, reason} -> {:halt, {:error, {act["id"], reason}}}
       end
     end)
   end
 
-  # A recorded act that disagrees with the tree is one queue item.
-  defp disagreement_items(_act, %{fact_id: nil}, _key, _refs), do: []
+  # A recorded act that differs from the tree: a plant's is one
+  # `:taxonomy_disagreement`, another's a question in the taxonomy queue
+  # when the volume rule calls for one. One that agrees, about a taxon
+  # created here, is accepted.
+  defp question_items(_ctx, _act, %{fact_id: nil}, _key, _refs), do: {:ok, []}
 
-  defp disagreement_items(act, _outcome, key, refs) do
-    case disagreement(act, key, refs) do
-      reason when is_binary(reason) -> [disagreement_item(act, reason)]
-      nil -> []
+  defp question_items(ctx, act, outcome, key, refs) do
+    kind = act["kind"]
+
+    if TaxonomyQueue.plant?(key) do
+      case TaxonomyQueue.difference(kind, act["stance"], key, first_common_name: :agrees) do
+        nil -> {:ok, []}
+        reason -> {:ok, [disagreement_item(act, reason)]}
+      end
+    else
+      case {Facts.get_attribution(outcome.fact_id, ctx.source.id),
+            TaxonomyQueue.difference(kind, act["stance"], key)} do
+        {nil, _difference} ->
+          {:ok, []}
+
+        {attribution, nil} ->
+          accept_created(ctx, act, attribution, key, refs)
+
+        {attribution, reason} ->
+          {:ok, List.wrap(TaxonomyQueue.question(attribution.id, reason, act["id"]))}
+      end
     end
   end
+
+  # A created taxon's name or placement as it was created with: accepted.
+  defp accept_created(ctx, %{"kind" => kind, "stance" => "confirm"}, attribution, key, refs)
+       when kind in ["name", "placement"] do
+    if key.taxon_id in refs.created and attribution.accepted_at == nil and
+         Facts.needs_acceptance?("taxon_" <> kind, attribution.source_id) do
+      with {:ok, _} <- Facts.accept(ctx.actor, attribution.id), do: {:ok, []}
+    else
+      {:ok, []}
+    end
+  end
+
+  defp accept_created(_ctx, _act, _attribution, _key, _refs), do: {:ok, []}
 
   defp write_act(ctx, diff, act, refs) do
     cond do
@@ -406,107 +444,7 @@ defmodule Gallformers.Import.ApplyTaxonomy do
   defp declared_name(nil), do: nil
   defp declared_name(declared), do: declared["name_reading"] || declared["name_as_written"]
 
-  # -- disagreements -----------------------------------------------------------
-
-  # Why the act disagrees with the editorial tree, or nil.
-  defp disagreement(%{"kind" => "placement", "stance" => stance}, key, refs) do
-    taxon = Taxa.get_taxon!(key.taxon_id)
-    there? = taxon.parent_id == key.parent_id
-
-    cond do
-      stance == "confirm" and there? ->
-        nil
-
-      stance == "confirm" and key.taxon_id in refs.created ->
-        nil
-
-      stance == "confirm" ->
-        "the tree places #{name(taxon)} #{where(taxon.parent_id)}"
-
-      there? ->
-        "the tree places #{name(taxon)} under #{name(key.parent_id)}, which the Source denies"
-
-      true ->
-        nil
-    end
-  end
-
-  defp disagreement(%{"kind" => "name", "stance" => stance}, key, _refs) do
-    taxon = Taxa.get_taxon!(key.taxon_id)
-    same? = same_name?(Taxa.accepted_name(taxon), key.name) and to_string(taxon.rank) == key.rank
-
-    cond do
-      stance == "confirm" and same? -> nil
-      stance == "confirm" -> "the tree names it #{name(taxon)} at rank #{taxon.rank}"
-      same? -> "the tree holds #{name(taxon)}, which the Source denies"
-      true -> nil
-    end
-  end
-
-  defp disagreement(%{"kind" => "synonymy", "stance" => stance}, key, _refs) do
-    accepted = Taxa.get_taxon!(key.accepted_taxon_id)
-
-    held? =
-      Enum.any?(accepted.names, &(&1.status == :synonym and same_name?(&1.name, key.name)))
-
-    cond do
-      stance == "confirm" and held? ->
-        nil
-
-      stance == "confirm" ->
-        "the tree does not hold #{key.name} as a synonym of #{name(accepted)}" <>
-          held_elsewhere(key.name, accepted.id)
-
-      held? ->
-        "the tree holds #{key.name} as a synonym of #{name(accepted)}, which the Source denies"
-
-      true ->
-        nil
-    end
-  end
-
-  defp disagreement(%{"kind" => "split", "stance" => "confirm"}, key, _refs) do
-    "a split of #{name(key.taxon_id)}: assigning existing records to the daughters is curator work"
-  end
-
-  # A first common name, for a taxon that holds none, is new information,
-  # not a disagreement: it is recorded with no item.
-  defp disagreement(%{"kind" => "common_name", "stance" => stance}, key, _refs) do
-    names = Taxa.list_common_names(key.taxon_id)
-    held? = Enum.any?(names, &(String.downcase(&1.name) == String.downcase(key.common_name)))
-
-    cond do
-      stance == "confirm" and names == [] ->
-        nil
-
-      stance == "confirm" and not held? ->
-        "the tree does not hold the common name #{key.common_name} for #{name(key.taxon_id)}"
-
-      stance == "deny" and held? ->
-        "the tree holds the common name #{key.common_name}, which the Source denies"
-
-      true ->
-        nil
-    end
-  end
-
-  defp disagreement(_act, _key, _refs), do: nil
-
-  defp held_elsewhere(name, accepted_id) do
-    case Taxa.resolve_name(name) do
-      {:ok, %{id: id} = other} when id != accepted_id ->
-        status =
-          if other.matched_name.status == :accepted, do: "the accepted name", else: "a synonym"
-
-        "; it is #{status} of another taxon, #{name(other)}"
-
-      {:ambiguous, _taxa} ->
-        "; several taxa have this name"
-
-      _ ->
-        ""
-    end
-  end
+  # -- a plant's disagreements ---------------------------------------------------
 
   defp disagreement_item(act, reason) do
     %{
@@ -530,14 +468,6 @@ defmodule Gallformers.Import.ApplyTaxonomy do
       reason: reason
     }
   end
-
-  defp same_name?(a, b), do: NameNormalizer.normalize(a) == NameNormalizer.normalize(b)
-
-  defp name(%Taxa.Taxon{} = taxon), do: Taxa.accepted_name(taxon)
-  defp name(id) when is_integer(id), do: Taxa.accepted_name(id)
-
-  defp where(nil), do: "at the root"
-  defp where(parent_id), do: "under #{name(parent_id)}"
 
   defp statement_row({ref, outcome}) do
     %{
