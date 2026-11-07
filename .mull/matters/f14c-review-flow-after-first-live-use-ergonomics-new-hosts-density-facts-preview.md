@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-11-04
-updated: 2026-11-05
+updated: 2026-11-07
 epic: taxogall
 relates: [bc0d]
 ---
@@ -76,4 +76,11 @@ Proposal (to settle with Jeff):
 - Housekeeping: drop the unused `vocab_requests` table (after Jeff's design-system work lands, to avoid clashing with it). Recorded, not now: the API and site search don't use Source terms; the PDF page view.
 
 - Undo rule (Jeff, 2026-11-05: acceptable): Undo of a decided question is allowed only while nothing depends on it: the Source isn't approved yet, and nothing the decision changed (a synonym added, a plant created, a name split) has been edited since, per the audit log. Otherwise Undo says why ("… was edited by … since") and points to the taxonomy admin. Not yet built.
+
+
+## Built 2026-11-07
+
+- **Undo of a decided question** (`Import.Undo`, `undo_decision/2`; merge `c028806e`, refined in `90a55ef0`): allowed while the Source isn't approved and nothing the decision changed has been changed since (Carbonite); otherwise says who changed what and when, linking to the taxonomy admin or the Gall. Reverses what the decision did (synonym or plant added, name split or moved, sense synonym, kept trait words, rename, split answer — exactly what it moved — taxonomy acceptance or decline via reopen) and reopens the item with its notes; replay kind `:queue_decision_undone`. Refused: accepted splits, lumps, questions closed as history, trait-term decisions that changed the vocabulary, decisions made before decisions recorded their tree edits. Any admin may undo anyone's decision.
+- **Admin corrections page** (`/admin/sources/:id`, `Import.SourceCorrections`; merge `f70efdce`): the Source's applied Facts with Correct ▾ (withdraw; change Host, Trait value, parent, accepted taxon) and a required note; never edits a Fact; a corrected taxonomic statement awaits a curator unless "Accept it now"; corrections listed, move Updated, replay. Sources over 300 gall Facts (the legacy data, ~44,000) are corrected one Gall at a time via a search. Shares `fact_editor` with the review Facts page.
+- **WCVP authorship for plants** (`Ranges.WcvpAuthorship`; merge `f035ecc0`): fills blank plant name authorship from WCVP (linked record, else unique name+rank, narrowed by synonymy; ambiguous left blank and listed); in the catalog migration, `mix gallformers.wcvp.authorship`, `Release.backfill_wcvp_authorship/0`; follows WCVP relinks; shown on plant pages; editable in plant Edit mode.
 
