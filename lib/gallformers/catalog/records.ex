@@ -25,6 +25,10 @@ defmodule Gallformers.Catalog.Records do
   attributions are removed. Its notes go with a Fact. The emptied Facts
   are left for the caller to delete (`delete_facts/2`) once nothing else
   names them.
+
+  A split's answer moves one Gall's Inducer Facts the same way
+  (`move_gall_inducer/4`); its undo moves back exactly what moved
+  (`inducer_facts/2` read before, `return_gall_inducer/5`).
   """
   import Ecto.Query
 
@@ -489,20 +493,191 @@ defmodule Gallformers.Catalog.Records do
   @spec move_gall_inducer(Actor.t(), integer(), integer(), integer()) :: {:ok, moves()}
   def move_gall_inducer(%Actor{} = actor, gall_id, from_id, to_id) do
     Audit.transaction(actor, "catalog.move_gall_inducer", fn ->
-      inducers =
-        Repo.all(
-          from(r in RelationshipFact,
-            where:
-              r.type == "inducer_of" and r.object_gall_id == ^gall_id and
-                r.subject_taxon_id == ^from_id
-          )
-        )
-
+      inducers = inducers_of(gall_id, from_id)
       rows = rows(inducers ++ qualifiers_of(inducers), {:taxon, [from_id]})
       moved = move_all(actor, rows, &swap(&1, from_id, to_id))
       {:ok, _} = delete_facts(actor, Enum.map(moved.moves, & &1.from))
       moved
     end)
+  end
+
+  defp inducers_of(gall_id, taxon_id) do
+    Repo.all(
+      from(r in RelationshipFact,
+        where:
+          r.type == "inducer_of" and r.object_gall_id == ^gall_id and
+            r.subject_taxon_id == ^taxon_id,
+        order_by: r.fact_id
+      )
+    )
+  end
+
+  @typedoc """
+  One of a Gall's `inducer_of` Facts, or a qualifier of one (`qualifier`
+  `{qualifier, value}`; nil for the Fact itself), with the Gall it is
+  stated in the context of and its notes; as `return_gall_inducer/5`
+  takes it back, with the Sources whose statements go back (`source_ids`).
+  """
+  @type inducer_fact :: %{
+          optional(:fact_id) => integer(),
+          optional(:source_ids) => [integer()],
+          qualifier: {String.t(), String.t()} | nil,
+          gall_context_id: integer() | nil,
+          notes: [%{text: String.t(), author_name: String.t() | nil}]
+        }
+
+  @doc """
+  Gall `gall_id`'s `inducer_of` Facts naming taxon `taxon_id`, then their
+  qualifiers, each with its `fact_id` and notes: what `move_gall_inducer/4`
+  moves, read before it does.
+  """
+  @spec inducer_facts(integer(), integer()) :: [inducer_fact()]
+  def inducer_facts(gall_id, taxon_id) when is_integer(gall_id) and is_integer(taxon_id) do
+    inducers = inducers_of(gall_id, taxon_id)
+    qualifiers = Enum.sort_by(qualifiers_of(inducers), & &1.fact_id)
+    context = Map.new(inducers, &{&1.fact_id, &1.gall_context_id})
+    ids = Enum.map(inducers ++ qualifiers, & &1.fact_id)
+
+    notes =
+      from(n in FactNote, where: n.fact_id in ^ids, order_by: n.id)
+      |> Repo.all()
+      |> Enum.group_by(& &1.fact_id, &%{text: &1.text, author_name: &1.author_name})
+
+    Enum.map(inducers, fn r ->
+      %{fact_id: r.fact_id, qualifier: nil, gall_context_id: r.gall_context_id}
+    end)
+    |> Enum.concat(
+      Enum.map(qualifiers, fn q ->
+        %{
+          fact_id: q.fact_id,
+          qualifier: {q.qualifier, q.value},
+          gall_context_id: Map.fetch!(context, q.of_fact_id)
+        }
+      end)
+    )
+    |> Enum.map(&Map.put(&1, :notes, Map.get(notes, &1.fact_id, [])))
+  end
+
+  @doc """
+  Moves back what `move_gall_inducer/4` moved from taxon `to_id` to
+  `from_id` on Gall `gall_id` (the undo of a split's answer): for each of
+  `facts` (`inducer_fact/0`, the Facts themselves before their
+  qualifiers), the attributions of its `source_ids` and its notes move
+  from the `from_id` Fact back onto the `to_id` one (made again if it was
+  deleted), and nothing else: the `from_id` Fact keeps the statements it
+  held before. A `from_id` Fact left with no attribution (nor qualifier
+  with one) is deleted. What is no longer there (a replay that did it
+  already) is skipped.
+  """
+  @spec return_gall_inducer(Actor.t(), integer(), integer(), integer(), [inducer_fact()]) ::
+          {:ok, :ok}
+  def return_gall_inducer(%Actor{} = actor, gall_id, from_id, to_id, facts) do
+    Audit.transaction(actor, "catalog.return_gall_inducer", fn ->
+      {relationships, qualifiers} = Enum.split_with(facts, &is_nil(&1.qualifier))
+
+      left =
+        for fact <- relationships ++ qualifiers,
+            id = return_one(actor, gall_id, {from_id, to_id}, fact),
+            uniq: true,
+            do: id
+
+      {:ok, _} = delete_facts(actor, Enum.filter(left, &unattributed?/1))
+      :ok
+    end)
+  end
+
+  # Moves one Fact's statements back; returns the Fact they left, or nil.
+  defp return_one(actor, gall_id, {from_id, to_id}, %{qualifier: nil} = fact) do
+    with %RelationshipFact{fact_id: from} <-
+           find_detail(RelationshipFact, inducer_key(gall_id, from_id, fact.gall_context_id)) do
+      to =
+        find_or_create_detail(
+          actor,
+          RelationshipFact,
+          inducer_key(gall_id, to_id, fact.gall_context_id)
+        )
+
+      move_back(actor, from, to, fact)
+    end
+  end
+
+  defp return_one(actor, gall_id, {from_id, to_id}, %{qualifier: {qualifier, value}} = fact) do
+    with %RelationshipFact{fact_id: of_from} <-
+           find_detail(RelationshipFact, inducer_key(gall_id, from_id, fact.gall_context_id)),
+         %QualifierFact{fact_id: from} <-
+           find_detail(QualifierFact, %{of_fact_id: of_from, qualifier: qualifier, value: value}) do
+      of_to =
+        find_or_create_detail(
+          actor,
+          RelationshipFact,
+          inducer_key(gall_id, to_id, fact.gall_context_id)
+        )
+
+      to =
+        find_or_create_detail(actor, QualifierFact, %{
+          of_fact_id: of_to,
+          qualifier: qualifier,
+          value: value
+        })
+
+      move_back(actor, from, to, fact)
+    end
+  end
+
+  defp move_back(actor, from, to, fact) do
+    for source_id <- Map.get(fact, :source_ids, []),
+        %{id: id} <- [Facts.get_attribution(from, source_id)] do
+      {:ok, _} = Facts.move_attribution(actor, id, to)
+    end
+
+    for note <- fact.notes do
+      from(n in FactNote,
+        where: n.fact_id == ^from and n.text == ^note.text,
+        order_by: n.id,
+        limit: 1,
+        select: n.id
+      )
+      |> with_author(note.author_name)
+      |> Repo.one()
+      |> case do
+        nil -> :ok
+        id -> Repo.update_all(from(n in FactNote, where: n.id == ^id), set: [fact_id: to])
+      end
+    end
+
+    from
+  end
+
+  defp with_author(query, nil), do: where(query, [n], is_nil(n.author_name))
+  defp with_author(query, name), do: where(query, [n], n.author_name == ^name)
+
+  defp inducer_key(gall_id, taxon_id, context_id) do
+    %{
+      type: "inducer_of",
+      subject_taxon_id: taxon_id,
+      subject_gall_id: nil,
+      object_taxon_id: nil,
+      object_gall_id: gall_id,
+      gall_context_id: context_id
+    }
+  end
+
+  defp find_detail(module, key) do
+    {:ok, detail} = Assert.find(module, key)
+    detail
+  end
+
+  defp find_or_create_detail(actor, module, key) do
+    {:ok, detail} = Assert.find_or_create(module, actor, key)
+    detail.fact_id
+  end
+
+  # No attribution on the Fact, nor on any of its qualifiers.
+  defp unattributed?(fact_id) do
+    qualifiers =
+      Repo.all(from(q in QualifierFact, where: q.of_fact_id == ^fact_id, select: q.fact_id))
+
+    Facts.source_ids_by_fact([fact_id | qualifiers]) == %{}
   end
 
   defp swap(id, id, to_id), do: to_id

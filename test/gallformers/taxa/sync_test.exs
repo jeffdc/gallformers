@@ -413,6 +413,68 @@ defmodule Gallformers.Taxa.SyncTest do
     end
   end
 
+  describe "recomputing the contests, on the seeded catalog" do
+    # The seeds' Andricus seedii holds "Callirhytis seedii" as a synonym, by
+    # the legacy statement; a 1990 paper revalidates Callirhytis seedii, and
+    # its name and placement statements are accepted. Data written before
+    # Facts had contests (migration `20261107140000_add_fact_contests`
+    # filled them in without recomputing) still counts the synonymy, and
+    # the tree still holds it.
+    setup ctx do
+      [seedii] = Taxa.get_by_name("Andricus seedii", :species)
+
+      [synonymy] =
+        Repo.all(from(f in Facts.Fact, where: f.contest == "taxon_name:callirhytis seedii"))
+
+      paper = source_fixture("Revalidation", "1990")
+      genus = taxon_fixture(rank: :genus, name: "Callirhytis", parent: ctx.tribe)
+      legacy!(genus, ctx.legacy)
+      revalidated = taxon_fixture(name: "Callirhytis seedii", parent: genus)
+
+      Taxa.assert_name(
+        test_actor(),
+        %{taxon_id: revalidated.id, name: "Callirhytis seedii", rank: :species},
+        confirm(paper)
+      )
+      |> accept!()
+
+      Taxa.assert_placement(
+        test_actor(),
+        %{taxon_id: revalidated.id, parent_id: genus.id},
+        confirm(paper)
+      )
+      |> accept!()
+
+      Repo.update_all(from(f in Facts.Fact, where: f.id == ^synonymy.id),
+        set: [standing: :current]
+      )
+
+      %Taxa.TaxonName{}
+      |> Taxa.TaxonName.changeset(%{
+        taxon_id: seedii.id,
+        status: :synonym,
+        name: "Callirhytis seedii"
+      })
+      |> Repo.insert!()
+
+      %{seedii: seedii, synonymy: synonymy, revalidated: revalidated}
+    end
+
+    test "supersedes the synonymy the revalidated name outranks, and the tree follows, once",
+         ctx do
+      assert synonyms_of(ctx.seedii) == ["Callirhytis seedii"]
+
+      assert {:ok, %{changed: 1}} = Facts.recompute_contests(test_actor())
+
+      assert Facts.get_fact!(ctx.synonymy.id).standing == :superseded
+      assert synonyms_of(ctx.seedii) == []
+      assert Taxa.accepted_name(ctx.revalidated.id) == "Callirhytis seedii"
+      assert Sync.check() |> for_taxa([ctx.seedii, ctx.revalidated]) == []
+
+      assert {:ok, %{changed: 0}} = Facts.recompute_contests(test_actor())
+    end
+  end
+
   describe "a lump and the absorbed taxon's synonym at once" do
     test "both come into effect in one change", ctx do
       nigra = taxon_fixture(name: "Synca nigra", parent: ctx.genus)

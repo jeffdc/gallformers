@@ -7,6 +7,7 @@ defmodule Gallformers.Release do
     deps: [
       Gallformers.Audit,
       Gallformers.CatalogMigration,
+      Gallformers.Facts,
       Gallformers.Import,
       Gallformers.Ranges,
       Gallformers.Repo,
@@ -17,6 +18,7 @@ defmodule Gallformers.Release do
   alias Gallformers.Audit.Actor
   alias Gallformers.CatalogMigration
   alias Gallformers.CatalogMigration.Report
+  alias Gallformers.Facts
   alias Gallformers.Import
   alias Gallformers.Ranges.WcvpAuthorship
   alias Gallformers.Repo.WCVP
@@ -101,6 +103,42 @@ defmodule Gallformers.Release do
 
       {:error, :wcvp_unavailable} ->
         raise "WCVP authorship not filled: the WCVP database cannot be read"
+    end
+  end
+
+  @doc """
+  Recomputes the standings of the Facts that contest a name
+  (`Gallformers.Facts.recompute_contests/1`, matter `f923`: a revalidated
+  name outranks an older synonymy of it), as the system actor
+  `"recompute_contests"`, and prints how many contests it recomputed and
+  how many Facts' standings changed. Migration
+  `20261107140000_add_fact_contests` gave the existing name and synonymy
+  Facts their contests without recomputing; run this once on a database
+  migrated past it (the tree follows what changes):
+
+      bin/gallformers eval "Gallformers.Release.recompute_contests()"
+
+  Idempotent: running it again changes nothing. Starts only the repo.
+  Returns the summary, or raises when a listener refuses a change.
+  """
+  @spec recompute_contests() :: Facts.contests_recomputed()
+  def recompute_contests do
+    load_app()
+
+    {:ok, result, _apps} =
+      Ecto.Migrator.with_repo(
+        Gallformers.Repo,
+        fn _repo -> Facts.recompute_contests(Actor.system("recompute_contests")) end,
+        pool_size: 2
+      )
+
+    case result do
+      {:ok, summary} ->
+        IO.puts(Facts.format_contests_recomputed(summary))
+        summary
+
+      {:error, reason} ->
+        raise "Contests not all recomputed: #{inspect(reason)}"
     end
   end
 

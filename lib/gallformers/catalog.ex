@@ -802,6 +802,17 @@ defmodule Gallformers.Catalog do
   @spec repoint_inducer(Actor.t(), integer(), integer(), integer()) :: {:ok, Records.moves()}
   defdelegate repoint_inducer(actor, gall_id, from_id, to_id), to: Records, as: :move_gall_inducer
 
+  @doc "A Gall's Inducer Facts naming a taxon, with their qualifiers and notes (`Gallformers.Catalog.Records.inducer_facts/2`)."
+  @spec inducer_facts(integer(), integer()) :: [Records.inducer_fact()]
+  defdelegate inducer_facts(gall_id, taxon_id), to: Records
+
+  @doc "Moves back exactly what re-pointing a Gall's Inducer moved (`Gallformers.Catalog.Records.return_gall_inducer/5`)."
+  @spec return_inducer(Actor.t(), integer(), integer(), integer(), [Records.inducer_fact()]) ::
+          {:ok, :ok}
+  defdelegate return_inducer(actor, gall_id, from_id, to_id, facts),
+    to: Records,
+    as: :return_gall_inducer
+
   # -- splits (`f923`, `Gallformers.Catalog.SplitInducers`) ----------------------------
 
   @doc "The Galls whose current Inducer is a taxon (`Gallformers.Catalog.SplitInducers.galls_on/1`)."

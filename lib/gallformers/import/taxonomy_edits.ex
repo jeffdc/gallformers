@@ -17,7 +17,8 @@ defmodule Gallformers.Import.TaxonomyEdits do
       the accepted name's `"authorship"` (nil for none): a plant's,
       editorially (`Gallformers.Taxa.set_authorship/3`)
     * `{:remove_synonym, name}` — `"remove_synonym"`, keyed by the taxon and
-      the synonym's name, payload its `"sensu"`
+      the synonym's name, payload its `"sensu"` and `"authorship"` (so
+      Undo adds it back as it was)
     * `{:remove_common_name, name}` — `"remove_common_name"`, keyed by the
       taxon and the name
     * `{:delete_taxon, taxon}` — `"delete_taxon"`; besides what
@@ -108,7 +109,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
     %TaxonName{} = found = Repo.get(TaxonName, row_id(name)) || Repo.rollback(:not_found)
 
     {Map.put(key("remove_synonym", found.taxon_id), "name", found.name),
-     %{"sensu" => found.sensu}}
+     %{"sensu" => found.sensu, "authorship" => found.authorship}}
   end
 
   def entry({:remove_common_name, name}) do

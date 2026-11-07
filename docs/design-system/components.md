@@ -49,6 +49,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `file_drop` | FormComponents | Forms | Built | `file_dropzone`, the image managers' hand-built drop boxes |
 | `radio_card` | FormComponents | Forms | Built | the review's hand-built option cards (`review_option`, `review_value_list`) |
 | `review_option` | ReviewComponents | Forms | Built | — |
+| `fact_editor` | FactsComponents | Forms | Built | the review Facts page's and the admin Source page's two copies of the form under a Fact |
 | `save_bar` | FormComponents | Forms | Approved (pending the save model) | per-section Save buttons |
 | `filter_select` | FormComponents | Forms | Built | the ID page's filter dropdowns |
 | `category_tile` | DomainComponents | Domain | Built | home page group and Host genus rows |
@@ -398,6 +399,22 @@ One answer to a curator's question, as a `radio_card`: what it is, what choosing
 - Attributes: `id` (the radio's), `name` (the group's), `value`, `checked`, `recommended`, `by` (who recommends it, or why, shown at the right while recommended and nobody has chosen), `tally` (who chose it, recommended or not; in place of `by`), `label`, `summary`, `tags` (`%{text, kind: :best | :conflict}` chips after the label: `:conflict` danger, `:best` info), `on_pick` (the event the radio sends, with `phx-value-choice` set to `value`), `target`.
 - Slots: `extra` (under it, chosen or not: a comparison), `follow` (shown once chosen, in a `data-role="follow"` grid).
 - Put the options in a `role="radiogroup"` element labelled with the question, as `radio_card`'s. For a Trait's values use `review_value_list`.
+
+### `fact_editor`
+
+The form of an edit open on one Fact, in the `editor` slot of `facts_view` and `facts_taxonomy`, under the Fact it changes: the review Facts page's edits before approval (Drop, Change Host, Change value, Note) and the admin Source page's corrections after it (Withdraw, Change Host, value, parent or accepted taxon). Top to bottom: what the edit does, in words; a taxon search when the edit picks a taxon (a `typeahead`, results grouped and each with its rank and aliases muted); the Trait's values to tick when it picks values (`review_value_list`, checkboxes); the page's own fields (the inner block: "Accept it now"); the note; the refusal; Save and Cancel.
+
+```heex
+<.fact_editor id="correction-editor" title="Change the Host: the plant the Source names."
+  on_submit="correct" target={@myself} pick={@pick}
+  search_label="The plant: species and below, genera, sections"
+  note_label="Note: why (required)" error={@edit_error} save_text="Save the correction" />
+```
+
+- Attributes: `id` (required; the parts are `<id>-note`, `<id>-values`, `<id>-error`, `<id>-save`, `<id>-cancel`), `title` (required), `on_submit` (required), `target`, `pick` (required: `%{query, results, selected, values, note}`, the open edit's choices), `search_label` (shows the search; nil for none), `search_id` (default `<id>-taxon`), `search_event`, `select_event`, `clear_event` (default `search_taxon`, `select_taxon`, `clear_taxon`), `values` (the Trait's `{value, definition}` pairs; nil for none), `on_toggle` (default `toggle_value`), `note_label` (required: say whether the note is required), `error`, `save_text` (required), `save_variant` (`danger` for an edit that takes a statement away).
+- Slots: `inner_block` (the edit's own fields, before the note).
+- Cancel sends `edit_cancel`. The page holds the edit's state and its events; the Host search's results come from `GallformersWeb.Admin.ReviewLive.Loader.host_choices/2`.
+- Used by the review Facts page (`Admin.ReviewLive.Facts`) and the admin Source page's Facts (`Admin.SourceLive.Facts`).
 
 ### `save_bar`
 

@@ -1449,9 +1449,12 @@ defmodule Gallformers.Import do
       |> Queue.validate_decision(item, decision)
 
     if changeset.valid? do
-      # What carrying it out logged, kept with the decision for Undo.
-      {decision, carried_out} =
-        ReplayLog.collect(fn -> actor |> carry_out(item, decision) |> unwrap_or_rollback() end)
+      # What carrying it out logged, and what it says it moved besides
+      # (a split's answer), kept with the decision for Undo.
+      {{decision, moved}, logged} =
+        ReplayLog.collect(fn -> actor |> carry_out(item, decision) |> carried_or_rollback() end)
+
+      carried_out = Enum.map(logged, &entry_json/1) ++ moved
 
       item =
         changeset
@@ -1482,6 +1485,12 @@ defmodule Gallformers.Import do
       true -> {:ok, decision}
     end
   end
+
+  # The decision carried out, with the `"carried_out"` entries it gives
+  # beyond what it logged (none, but for a split's answer).
+  defp carried_or_rollback({:ok, decision}), do: {decision, []}
+  defp carried_or_rollback({:ok, decision, moved}), do: {decision, moved}
+  defp carried_or_rollback({:error, reason}), do: Repo.rollback(reason)
 
   # The package's files when a decision on `items` will resolve it again (a
   # batch's item, the package resolvable) or write a set-aside item's Facts
@@ -1800,7 +1809,8 @@ defmodule Gallformers.Import do
 
   # The decision, keyed by stable references (`decision_key/1`); a decision
   # that may have changed the tree keeps the entries carrying it out
-  # logged before it (`"carried_out"`), for Undo (`Gallformers.Import.Undo`).
+  # logged before it (`"carried_out"`), and a split's answer what it
+  # moved, for Undo (`Gallformers.Import.Undo`).
   defp log_decision(%QueueItem{} = item, carried_out) do
     payload = %{"decision" => StableRef.encode_decision(item.decision)}
 
@@ -1812,7 +1822,7 @@ defmodule Gallformers.Import do
 
     payload =
       if Undo.tree_item?(item),
-        do: Map.put(payload, "carried_out", Enum.map(carried_out, &entry_json/1)),
+        do: Map.put(payload, "carried_out", carried_out),
         else: payload
 
     ReplayLog.append!(:queue_decision, decision_key(item), payload)
