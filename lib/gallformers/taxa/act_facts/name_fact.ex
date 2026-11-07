@@ -84,6 +84,10 @@ defmodule Gallformers.Taxa.ActFacts.NameFact do
   def slot(%__MODULE__{taxon_id: taxon_id}), do: "taxon:#{taxon_id}:name"
 
   @impl true
+  def contest(%__MODULE__{normalized_name: name, taxon_id: taxon_id}),
+    do: {"taxon_name:#{name}", "taxon:#{taxon_id}"}
+
+  @impl true
   def natural_key(%__MODULE__{} = n),
     do: {n.taxon_id, n.normalized_name, n.rank, sensu_key(n.sensu), n.normalized_authorship}
 

@@ -26,7 +26,11 @@ defmodule Gallformers.Taxa.Sync do
       and the names of its outranked (superseded) name Facts; a synonym a
       synonymy states but no current Fact backs is removed. A current
       synonymy of a name that is another taxon's accepted name is a lump:
-      that taxon is merged into this one (`merge/3`);
+      that taxon is merged into this one (`merge/3`). A synonymy older
+      than a dated statement of its name as another taxon's name (a
+      revalidated name) is not current (`Gallformers.Facts`, "A
+      revalidated name outranks an older synonymy of it"): the name leaves
+      this taxon's synonyms and is no lump;
     * **common names** — as synonyms, from common-name Facts;
     * **splits** — a split coming into effect is a `:split` event
       (`split/3`); its Galls' questions are `f923` Task 7.

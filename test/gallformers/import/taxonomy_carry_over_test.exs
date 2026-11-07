@@ -23,6 +23,8 @@ defmodule Gallformers.Import.TaxonomyCarryOverTest do
   alias Gallformers.Import.TaxonomyCarryOver
   alias Gallformers.Sources
   alias Gallformers.Taxa
+  alias Gallformers.Taxa.ActFacts.SynonymyFact
+  alias Gallformers.Taxa.NameNormalizer
   alias Gallformers.Taxa.Sync
 
   setup :audit_test_metadata
@@ -140,6 +142,16 @@ defmodule Gallformers.Import.TaxonomyCarryOverTest do
     source_id |> Facts.list_source_attributions("taxon_") |> Map.values()
   end
 
+  defp legacy_synonymies(taxon, name) do
+    key = NameNormalizer.normalize(name)
+
+    Repo.all(
+      from s in SynonymyFact,
+        where: s.accepted_taxon_id == ^taxon.id and s.normalized_name == ^key,
+        preload: :fact
+    )
+  end
+
   defp tree(taxa) do
     for t <- taxa do
       t = Taxa.get_taxon!(t.id)
@@ -179,24 +191,45 @@ defmodule Gallformers.Import.TaxonomyCarryOverTest do
       assert again.unmatched == []
     end
 
-    test "what the Source's statements don't carry is reported for a curator", _ctx do
-      # No statement that the name is not C. clarkei's synonym.
+    test "a revalidation stating only the name and placement is carried", ctx do
+      # No statement that the name is not C. clarkei's synonym: the dated
+      # name statement outranks the older (legacy) synonymy of it.
       package = deliver(revalidation([name_act(), placement_act()]))
       taxon_id = decided_and_approved(package, %{"split" => true})
+      split = Taxa.get_taxon!(taxon_id)
+      before = tree([split, ctx.held])
 
       assert {:ok, report} = TaxonomyCarryOver.run(test_actor(), Import.list_replay_entries())
 
       assert report.accepted == 2
+      assert report.unmatched == []
+      assert tree([split, ctx.held]) == before
+      assert differences([split, ctx.held]) == []
+
+      assert [%{fact: %{standing: :superseded}}] =
+               legacy_synonymies(ctx.held, "Carryandricus wisliceni")
+    end
+
+    test "what the Source's statements don't carry is reported for a curator", ctx do
+      # Only a placement: nothing names the split taxon, so the legacy
+      # synonymy of its name into C. clarkei still counts.
+      package = deliver(revalidation([placement_act()]))
+      taxon_id = decided_and_approved(package, %{"split" => true})
+
+      assert {:ok, report} = TaxonomyCarryOver.run(test_actor(), Import.list_replay_entries())
+
+      assert report.accepted == 1
       assert [unmatched] = report.unmatched
       assert unmatched.name == "Carryandricus wisliceni"
       assert unmatched.decision =~ "split"
       assert unmatched.source =~ "T"
-      assert [line] = unmatched.differences
-      assert line =~ "Carryrhytis clarkei — synonym"
-      assert line =~ "Carryandricus wisliceni"
+      assert [_] = Enum.filter(unmatched.differences, &(&1 =~ "Carryrhytis clarkei — synonym"))
+      assert [_] = Enum.filter(unmatched.differences, &(&1 =~ "Carryandricus wisliceni — name"))
+      assert differences([Taxa.get_taxon!(taxon_id)]) != []
 
-      # The split itself is carried: only C. clarkei's synonym differs.
-      assert differences([Taxa.get_taxon!(taxon_id)]) == []
+      assert [%{fact: %{standing: :current}}] =
+               legacy_synonymies(ctx.held, "Carryandricus wisliceni")
+
       assert TaxonomyCarryOver.format(report) =~ "Carryandricus wisliceni"
     end
 

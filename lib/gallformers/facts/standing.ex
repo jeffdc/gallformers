@@ -43,6 +43,23 @@ defmodule Gallformers.Facts.Standing do
   keeps its previous standing (`:unsupported` if it has none), and the slot's
   other current Facts are `:superseded`, since something newer outranks them
   either way.
+
+  ## Contests
+
+  6. Facts in different slots (or in none) may contest one thing for
+     different holders (`contest`, `holder`): a name as one taxon's
+     accepted name (a `:claimant`) or as a synonym of another taxon (a
+     `:rival`). A claimant its own statements confirm (rules 1–4: it is
+     `:current`, or `:superseded` in its slot by a newer value, as a
+     taxon's former name) outranks each `:current` rival held by another
+     holder whose newest counting confirmation is older than the
+     claimant's newest counting confirmation (older by rule 3: the
+     claimant's period comes entirely after): the rival becomes
+     `:superseded`. So a claimant confirmed only by undated statements
+     outranks nothing, and an undated rival loses to any dated claimant.
+     Claimants keep their standing. Matter `f923`, "A revalidated name
+     outranks an older synonymy of it": a paper revalidating a name states
+     its name, not "N is not a synonym of X".
   """
 
   alias Gallformers.Facts.Standing.Conflict
@@ -64,11 +81,18 @@ defmodule Gallformers.Facts.Standing do
           optional(any()) => any()
         }
 
-  @typedoc "A Fact: its ID, its previous standing (nil if it never had one), its attributions."
+  @typedoc """
+  A Fact: its ID, its previous standing (nil if it never had one), its
+  attributions; for rule 6, the thing it contests (`contest`), for whom
+  (`holder`) and its `role` there.
+  """
   @type fact :: %{
           required(:id) => term(),
           required(:previous) => standing() | nil,
           required(:attributions) => [statement()],
+          optional(:contest) => term() | nil,
+          optional(:holder) => term() | nil,
+          optional(:role) => :claimant | :rival | nil,
           optional(any()) => any()
         }
 
@@ -108,6 +132,61 @@ defmodule Gallformers.Facts.Standing do
 
     {standings, slot_conflicts} = settle_slot(current, standings)
     {standings, own_conflicts ++ slot_conflicts}
+  end
+
+  @doc """
+  Settles contests (rule 6) over `standings`, the standings rules 1–5 gave
+  `facts`: each `:current` rival a claimant in its contest outranks
+  becomes `:superseded`. Pass every Fact of each contest concerned, with
+  its slot siblings settled in `standings`; Facts with no contest are left
+  as they are.
+
+  Returns the updated standings.
+  """
+  @spec settle_contests([fact()], %{term() => standing()}) :: %{term() => standing()}
+  def settle_contests(facts, standings) when is_list(facts) and is_map(standings) do
+    facts
+    |> Enum.filter(&Map.get(&1, :contest))
+    |> Enum.group_by(& &1.contest)
+    |> Enum.reduce(standings, fn {_contest, contesters}, acc ->
+      settle_contest(contesters, standings, acc)
+    end)
+  end
+
+  defp settle_contest(contesters, standings, acc) do
+    # Confirmed by its own statements: current, or outranked in its slot.
+    claims =
+      for %{role: :claimant} = fact <- contesters,
+          Map.get(standings, fact.id) in [:current, :superseded],
+          do: {fact.holder, latest_confirmation_start(fact)}
+
+    outranked =
+      for %{role: :rival} = fact <- contesters,
+          Map.get(standings, fact.id) == :current,
+          outranked?(fact, claims),
+          do: {fact.id, :superseded}
+
+    Map.merge(acc, Map.new(outranked))
+  end
+
+  defp outranked?(rival, claims) do
+    rival_end = latest_confirmation_end(rival)
+    Enum.any?(claims, fn {holder, start} -> holder != rival.holder and start > rival_end end)
+  end
+
+  # Where the latest-starting (or latest-ending) counting confirmation of
+  # `fact` starts (ends), as a Gregorian day; undated ones at
+  # `undated_period/0`, so a claimant with only those outranks nothing.
+  defp latest_confirmation_start(fact), do: confirmation_bound(fact, &elem(&1, 0))
+  defp latest_confirmation_end(fact), do: confirmation_bound(fact, &elem(&1, 1))
+
+  defp confirmation_bound(%{attributions: attributions}, bound) do
+    for(
+      a <- attributions,
+      not a.retracted and counts?(a) and a.stance == :confirm,
+      do: bound.(period(a))
+    )
+    |> Enum.max(fn -> @before_every_date end)
   end
 
   @doc """

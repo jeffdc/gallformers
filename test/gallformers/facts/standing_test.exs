@@ -199,4 +199,112 @@ defmodule Gallformers.Facts.StandingTest do
       assert Standing.resolve_slot([legacy, dated]) == {%{1 => :superseded, 2 => :current}, []}
     end
   end
+
+  describe "settle_contests/2: a claimant outranks an older rival (rule 6)" do
+    # A Fact contesting "the name N" for `holder`: a claimant (N as the
+    # holder's accepted name) or a rival (N as a synonym of the holder).
+    defp contester(id, role, holder, attributions),
+      do:
+        id
+        |> fact(attributions)
+        |> Map.merge(%{role: role, contest: "taxon_name:n", holder: holder})
+
+    defp settle(facts, standings), do: Standing.settle_contests(facts, standings)
+
+    test "a current claimant by a dated statement supersedes an undated rival" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+      synonymy = contester(2, :rival, "taxon:2", [stmt(:legacy, :confirm, nil)])
+
+      assert settle([name, synonymy], %{1 => :current, 2 => :current}) ==
+               %{1 => :current, 2 => :superseded}
+    end
+
+    test "and a rival whose newest counting confirmation is older" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+
+      synonymy =
+        contester(2, :rival, "taxon:2", [
+          stmt(:old, :confirm, "1900"),
+          stmt(:awaiting, :confirm, "2001", counts: false),
+          stmt(:gone, :confirm, "2002", retracted: true)
+        ])
+
+      assert settle([name, synonymy], %{1 => :current, 2 => :current}) ==
+               %{1 => :current, 2 => :superseded}
+    end
+
+    test "a rival newer than the claimant, or as new, keeps its standing" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+      newer = contester(2, :rival, "taxon:2", [stmt(:later, :confirm, "1960")])
+      tied = contester(3, :rival, "taxon:3", [stmt(:same, :confirm, "1959-05")])
+
+      assert settle([name, newer, tied], %{1 => :current, 2 => :current, 3 => :current}) ==
+               %{1 => :current, 2 => :current, 3 => :current}
+    end
+
+    test "an undated claimant outranks nothing" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:legacy, :confirm, nil)])
+      synonymy = contester(2, :rival, "taxon:2", [stmt(:legacy2, :confirm, nil)])
+
+      assert settle([name, synonymy], %{1 => :current, 2 => :current}) ==
+               %{1 => :current, 2 => :current}
+    end
+
+    test "a claimant its own statements don't confirm outranks nothing" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+      synonymy = contester(2, :rival, "taxon:2", [stmt(:legacy, :confirm, nil)])
+
+      for standing <- [:unsupported, :withdrawn, :retracted] do
+        assert settle([name, synonymy], %{1 => standing, 2 => :current}) ==
+                 %{1 => standing, 2 => :current}
+      end
+    end
+
+    test "a claimant a newer name outranks in its slot still outranks the older rival" do
+      # The taxon renamed since: the name is its synonym now, not the other's.
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+      synonymy = contester(2, :rival, "taxon:2", [stmt(:legacy, :confirm, nil)])
+
+      assert settle([name, synonymy], %{1 => :superseded, 2 => :current}) ==
+               %{1 => :superseded, 2 => :superseded}
+    end
+
+    test "a claimant current by an undated statement outranks nothing, whatever awaits" do
+      name =
+        contester(1, :claimant, "taxon:1", [
+          stmt(:legacy, :confirm, nil),
+          stmt(:awaiting, :confirm, "1959", counts: false)
+        ])
+
+      synonymy = contester(2, :rival, "taxon:2", [stmt(:legacy2, :confirm, nil)])
+
+      assert settle([name, synonymy], %{1 => :current, 2 => :current}) ==
+               %{1 => :current, 2 => :current}
+    end
+
+    test "a rival held by the claimant's own holder is not outranked" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+      own = contester(2, :rival, "taxon:1", [stmt(:legacy, :confirm, nil)])
+
+      assert settle([name, own], %{1 => :current, 2 => :current}) ==
+               %{1 => :current, 2 => :current}
+    end
+
+    test "only Facts in the same contest compete; a rival not current is left as it is" do
+      name = contester(1, :claimant, "taxon:1", [stmt(:paper, :confirm, "1959")])
+
+      elsewhere =
+        2
+        |> contester(:rival, "taxon:2", [stmt(:legacy, :confirm, nil)])
+        |> Map.put(:contest, "taxon_name:m")
+
+      withdrawn = contester(3, :rival, "taxon:3", [stmt(:legacy, :deny, nil)])
+      plain = fact(4, [stmt(:x, :confirm, nil)])
+
+      assert settle(
+               [name, elsewhere, withdrawn, plain],
+               %{1 => :current, 2 => :current, 3 => :withdrawn, 4 => :current}
+             ) == %{1 => :current, 2 => :current, 3 => :withdrawn, 4 => :current}
+    end
+  end
 end

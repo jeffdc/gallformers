@@ -66,6 +66,10 @@ defmodule Gallformers.Taxa.ActFacts.SynonymyFact do
   def slot(_synonymy), do: nil
 
   @impl true
+  def contest(%__MODULE__{normalized_name: name, accepted_taxon_id: taxon_id}),
+    do: {"taxon_name:#{name}", "taxon:#{taxon_id}"}
+
+  @impl true
   def natural_key(%__MODULE__{} = s), do: {s.normalized_name, s.accepted_taxon_id}
 
   @impl true

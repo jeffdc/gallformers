@@ -34,11 +34,14 @@ defmodule Gallformers.Import.TaxonomyCarryOver do
   A synonym decision is carried when, after the acceptances, the tree rows
   it changed follow the Facts (`Gallformers.Taxa.Sync.check/0`): the taxon
   it resolved the name to (for a split, every row; for a move, the name as
-  its synonym) and the name as a synonym of any other taxon. Otherwise it
-  is reported with those differences: usually the Source states the name
-  valid but never that it is not the old taxon's synonym, so the legacy
-  statement holding it there still counts. A decision whose package, Source
-  or taxon can't be found is reported with the reason.
+  its synonym) and the name as a synonym of any other taxon. A split whose
+  Source states only the name and placement is carried: its dated name
+  statement, accepted, outranks the older (legacy) statement making the
+  name the old taxon's synonym (`Gallformers.Facts`, "A revalidated name
+  outranks an older synonymy of it"). Otherwise it is reported with those
+  differences: say, a Source that never names the split taxon, so nothing
+  outranks that synonymy. A decision whose package, Source or taxon can't
+  be found is reported with the reason.
 
   ## Idempotent
 

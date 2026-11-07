@@ -13,6 +13,12 @@ defmodule Gallformers.Taxa.ActFacts do
   | split | `SplitFact` | taxon + set of daughters | none |
   | common name | `CommonNameFact` | taxon + common name (any case) | none |
 
+  A name Fact and a synonymy Fact of the same normalized name contest it
+  (`taxon_name:<normalized name>`, held by `taxon:<id>`): a taxon's current
+  name by a dated statement outranks an older synonymy of that name into
+  another taxon (`Gallformers.Facts`, "A revalidated name outranks an older
+  synonymy of it").
+
   Asserting an act finds the Fact by its natural key or creates it (with its
   details), then records the Source's stance with `Gallformers.Facts.attribute/2`,
   all in one transaction as one actor. The act's per-statement words go on
@@ -56,6 +62,12 @@ defmodule Gallformers.Taxa.ActFacts do
   @doc "The slot the Fact competes in, or nil."
   @callback slot(detail()) :: String.t() | nil
 
+  @doc """
+  What the Fact contests with Facts in other slots, and for whom
+  (`Gallformers.Facts.Fact`'s `contest` and `contest_holder`), or nil.
+  """
+  @callback contest(detail()) :: {String.t(), String.t()} | nil
+
   @doc "The natural key, as a term (for locking)."
   @callback natural_key(detail()) :: term()
 
@@ -65,7 +77,7 @@ defmodule Gallformers.Taxa.ActFacts do
   @doc "Writes rows that belong with newly inserted details."
   @callback after_insert(detail()) :: :ok
 
-  @optional_callbacks after_insert: 1
+  @optional_callbacks after_insert: 1, contest: 1
 
   @doc """
   Asserts an act of kind `module` (a details schema implementing this
@@ -169,9 +181,19 @@ defmodule Gallformers.Taxa.ActFacts do
   end
 
   defp create(module, actor, changeset, key) do
+    {contest, holder} =
+      if function_exported?(module, :contest, 1),
+        do: module.contest(key) || {nil, nil},
+        else: {nil, nil}
+
     fact =
       actor
-      |> Facts.create_fact(%{kind: module.kind(), slot: module.slot(key)})
+      |> Facts.create_fact(%{
+        kind: module.kind(),
+        slot: module.slot(key),
+        contest: contest,
+        contest_holder: holder
+      })
       |> ok_or_rollback()
 
     detail =
