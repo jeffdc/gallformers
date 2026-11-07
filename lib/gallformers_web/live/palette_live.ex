@@ -130,7 +130,7 @@ defmodule GallformersWeb.PaletteLive do
             <div :for={group <- @groups} class="flex flex-col">
               <span
                 :if={group.title}
-                class="px-4 pb-1 pt-2 text-caption font-semibold uppercase tracking-wide text-muted"
+                class="px-4 pb-1 pt-2 text-meta font-semibold text-muted"
               >
                 {group.title}
               </span>

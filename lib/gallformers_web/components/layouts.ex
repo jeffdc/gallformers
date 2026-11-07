@@ -137,11 +137,11 @@ defmodule GallformersWeb.Layouts do
       <div id="mobile-menu" class="hidden border-t border-line bg-surface px-4 pb-4 md:hidden">
         <div class="mt-2 flex flex-col font-brand text-body">
           <a href="/id" class="py-2 font-semibold text-brand">Identify a gall</a>
-          <span class="pt-3 text-caption font-semibold uppercase tracking-wide text-muted">
+          <span class="pt-3 text-meta font-semibold text-muted">
             Browse
           </span>
           <a :for={link <- @browse_links} href={link.href} class="py-2 text-ink">{link.label}</a>
-          <span class="pt-3 text-caption font-semibold uppercase tracking-wide text-muted">
+          <span class="pt-3 text-meta font-semibold text-muted">
             Resources
           </span>
           <a :for={link <- @resource_links} href={link.href} class="py-2 text-ink">{link.label}</a>

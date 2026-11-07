@@ -6,6 +6,7 @@
   "lib/gallformers_web/design_system/conformance.ex": {
     "dark_variant": 3,
     "inline_style": 1,
+    "letter_case": 2,
     "radius": 1,
     "shadow": 3
   },

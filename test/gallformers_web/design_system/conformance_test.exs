@@ -45,6 +45,13 @@ defmodule GallformersWeb.DesignSystem.ConformanceTest do
                [:arbitrary_value, :dark_variant, :inline_style]
     end
 
+    test "flags all-caps and tracked-out text but not tight tracking" do
+      assert rules(~S(<dt class="uppercase tracking-wide md:tracking-wider tracking-tight">)) ==
+               [:letter_case, :letter_case, :letter_case]
+
+      assert rules(".gf-x { text-transform: uppercase; }") == [:letter_case]
+    end
+
     test "flags hex colors but not issue numbers or anchors" do
       assert rules(~S(<p data-c="#661419" data-d="#fff">see #123 and #top</p>)) ==
                [:hex_color, :hex_color]

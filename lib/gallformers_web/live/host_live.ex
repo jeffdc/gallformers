@@ -8,7 +8,7 @@ defmodule GallformersWeb.HostLive do
   photos or a table with facets; for admins each links to its Gall's range
   exclusions), a pointer to the Galls on its genus as a whole, its photos,
   its range (framed on the native range; Enlarge opens a large map), its
-  synonyms and More info. Citations on plants were not migrated, so the page
+  synonyms and See also. Citations on plants were not migrated, so the page
   has no Sources (`803b`, decision 1). An unknown or malformed ID, a Gall or
   a plant above species rank is a 404.
 
@@ -425,7 +425,7 @@ defmodule GallformersWeb.HostLive do
 
             <dl :if={@host.synonyms != []} class="flex flex-col gap-3 text-ui">
               <div>
-                <dt class="text-meta font-semibold uppercase tracking-wide text-muted">
+                <dt class="text-meta text-muted">
                   Also known as
                 </dt>
                 <dd id="host-names" class="text-ink-2">

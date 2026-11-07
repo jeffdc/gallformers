@@ -234,7 +234,7 @@ defmodule GallformersWeb.FormComponents do
 
     ~H"""
     <fieldset id={@id} class={["flex flex-col", @class]} {@rest}>
-      <legend class="mb-1 text-caption font-semibold uppercase tracking-wide text-muted">
+      <legend class="gf-label">
         {@title}
       </legend>
       <input :if={@multiple} type="hidden" name={@input_name} value="" />
@@ -1067,7 +1067,7 @@ defmodule GallformersWeb.FormComponents do
             <%= for {item, index} <- Enum.with_index(@results) do %>
               <%= if @group_key && show_group_header?(item, index, @results, @group_key) do %>
                 <div
-                  class="px-3 py-1.5 text-caption font-semibold uppercase tracking-wide text-muted"
+                  class="px-3 py-1.5 text-meta font-semibold text-muted"
                   role="presentation"
                 >
                   {Map.get(item, @group_key)}

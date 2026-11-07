@@ -924,7 +924,7 @@ defmodule GallformersWeb.GallLive do
 
             <dl class="flex flex-col gap-3 text-ui">
               <div :if={@name_rows != [] or @common_names != []}>
-                <dt class="text-meta font-semibold uppercase tracking-wide text-muted">
+                <dt class="text-meta text-muted">
                   Also known as
                 </dt>
                 <dd id="gall-names" class="text-ink-2">

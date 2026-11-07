@@ -25,7 +25,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `data_table` | DataComponents | Data | Built | `<.table>`, `species_table`, 21 raw `gf-table` tables |
 | `fact_list` | DataComponents | Data | Built | the trait grid, ad hoc label/value lists, `record_metadata` |
 | `name_list` | DataComponents | Data | Built | slash-separated Host lines, one-column name tables |
-| `see_also` | UIComponents | Data | Built (restyled) | the See Also logos: now "More info", text links searching iNaturalist, BugGuide (Galls), Google Scholar, BHL |
+| `see_also` | UIComponents | Data | Built (restyled) | the See Also logos: now "See also", text links searching iNaturalist, BugGuide (Galls), Google Scholar, BHL |
 | `chip` | DataComponents | Data | Built | `badge`, `chip`, `data_complete_badge`, `.gf-badge`, `.gf-pill`, `destination_badge` |
 | `stat` | DataComponents | Data | Built | the home and dashboard number tiles |
 | `empty_state` | DataComponents | Data | Built | ad hoc "Nothing here" text |
@@ -174,7 +174,7 @@ The one table. Rows are `--gf-row-h` tall and single-line: long text truncates, 
 - Per row: `row_attrs` (function row -> a map of attributes put on the `tr`, for the page's hooks and tests: `%{"data-image-id" => id}`) and `row_state` (function row -> `nil`, `:selected`, `:ok`, `:warn`, `:danger` or `:info`: the row's tint, each with its chip meaning, and `data-state`; a selected row is `:selected` by itself).
 - Selection, for a page or a LiveComponent: `select_event` (default `select`), `target` (a LiveComponent's `@myself`, for the checkboxes and the header's), `selectable_row` (function item -> boolean; a row it rejects has no checkbox and is left out of select-all), `select_disabled` (while a bulk action runs). `select_all` adds a checkbox in the header (labelled "Select all"), ticked when every selectable row is selected; it sends `select_all`'s event, or `select_none`'s when every row is already selected (default: the same event, a toggle).
 - Slots: `col`, `empty`, `footer` (pagination, totals).
-- Grey heads (`bg-surface-2`), caption-size uppercase labels, hairline rows, `bg-sky-soft` on hover.
+- Grey heads (`bg-surface-2`), sentence-case group-heading labels, hairline rows, `bg-sky-soft` on hover.
 - A column that is empty for every row is not shown (columns with a `field`, list rows).
 - The table has a minimum width (36rem): in a narrow container it scrolls sideways rather than crushing its `grow` column. Don't use a table for a list of names alone (use `name_list`) or for label/value pairs (use `fact_list`).
 
@@ -503,7 +503,7 @@ Running text: rendered Markdown (`markdown` attribute, through `Gallformers.Mark
 
 ### `article_card`
 
-An article in the Articles list. A band tinted by its topic (`tone`: `:sky` identification and guides, `:autumn` FAQ, taxonomy, undescribed, `:brand` the site and its people, `:plain` anything else) names the topic and carries a large icon, tilted and cropped by the band's edge; then the title in the brand face, a three-line preview and a meta line (author · date). The card is one link; `edit_href` adds an admin pencil in its corner. `featured` lays it out wide (band beside the text on wide screens, a larger title and preview, every topic named) with a `label` ("Newest"). Which tone and icon a topic gets is the page's choice (`ArticlesHTML`), not the component's. Attributes: `href`, `title`, `topic`, `icon`, `tone`, `meta`, `featured`, `label`, `edit_href`, `class`; the inner block is the preview.
+An article in the Articles list. A band tinted by its topic (`tone`: `:sky` identification and guides, `:autumn` FAQ, taxonomy, undescribed, `:brand` the site and its people, `:plain` anything else) carries a large icon, tilted and cropped by the band's edge, and no text; then the title in the brand face, a three-line preview and a meta line (topic · author · date). The card is one link; `edit_href` adds an admin pencil in its corner. `featured` lays it out wide (band beside the text on wide screens, a larger title and preview, every topic named). Which tone and icon a topic gets is the page's choice (`ArticlesHTML`), not the component's. Attributes: `href`, `title`, `topic`, `icon`, `tone`, `meta`, `featured`, `edit_href`, `class`; the inner block is the preview.
 
 ### `change_entry`
 

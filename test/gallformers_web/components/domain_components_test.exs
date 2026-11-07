@@ -129,7 +129,7 @@ defmodule GallformersWeb.DomainComponentsTest do
   end
 
   describe "article_card" do
-    test "a card: the band with its topic and icon, the title, preview and meta, one link" do
+    test "a card: the band with its icon, the title, preview and meta naming the topic, one link" do
       assigns = %{}
 
       html =
@@ -148,15 +148,15 @@ defmodule GallformersWeb.DomainComponentsTest do
 
       assert attr(html, "a[data-layout=card]", "href") == ["/articles/idguide"]
       assert attr(html, "[data-part=band]", "data-tone") == ["sky"]
-      assert text(html, "[data-part=band]") == "identification"
+      assert text(html, "[data-part=band]") == ""
       assert count(html, "[data-part=band] .ph-compass") == 1
       assert text(html, "h2") == "Gall Identification Guide"
       assert text(html, "[data-part=preview]") == "A gall is a novel organ grown by a plant."
-      assert text(html, "[data-part=meta]") == "Adam Kranz · January 26, 2026"
+      assert text(html, "[data-part=meta]") == "identification · Adam Kranz · January 26, 2026"
       assert count(html, "a[title='Edit in admin']") == 0
     end
 
-    test "featured: the wide layout, with its label; an edit link when given" do
+    test "featured: the wide layout, its topic in the meta line; an edit link when given" do
       assigns = %{}
 
       html =
@@ -165,7 +165,6 @@ defmodule GallformersWeb.DomainComponentsTest do
           href="/articles/lookalikes"
           title="Gall Lookalikes"
           topic="identification"
-          label="Newest"
           featured
           edit_href="/admin/articles/9"
         >
@@ -174,7 +173,8 @@ defmodule GallformersWeb.DomainComponentsTest do
         """)
 
       assert count(html, "a[data-layout=featured]") == 1
-      assert text(html, "[data-part=label]") == "Newest"
+      assert text(html, "[data-part=meta]") == "identification"
+      assert text(html, "[data-part=band]") == ""
       assert attr(html, "[data-part=band]", "data-tone") == ["plain"]
       assert attr(html, "a[title='Edit in admin']", "href") == ["/admin/articles/9"]
     end

@@ -79,10 +79,17 @@ defmodule GallformersWeb.DesignSystem.Conformance do
     hex_color: [
       pattern: ~r/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z_-])/,
       hint: "Colors come from tokens in assets/css/system/tokens.css."
+    ],
+    # Matches the class and the CSS value alike (`text-transform: uppercase`).
+    letter_case: [
+      pattern: ~r/#{@start}#{@variants}(?:uppercase|tracking-(?:wide|wider|widest))(?![\w-])/,
+      hint:
+        "Text is in sentence case, labels too: a label is text-meta text-muted, like " <>
+          "fact_list's. A small label over a heading is an eyebrow; delete it."
     ]
   ]
 
-  @css_rules [:hex_color]
+  @css_rules [:hex_color, :letter_case]
 
   @typedoc "One piece of off-system styling."
   @type finding :: %{rule: atom(), line: pos_integer(), match: String.t()}

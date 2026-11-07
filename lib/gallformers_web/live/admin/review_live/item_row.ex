@@ -965,7 +965,7 @@ defmodule GallformersWeb.Admin.ReviewLive.ItemRow do
         <:written>
           <span
             :if={@q.trait}
-            class="mr-1 text-caption font-normal uppercase tracking-wider text-muted"
+            class="mr-1 text-meta text-muted"
           >
             {humanize(@q.trait)}
           </span>

@@ -95,7 +95,7 @@ defmodule GallformersWeb.PageComponents do
 
       <dl :if={@meta != []} data-part="meta" class="flex flex-wrap gap-x-5 gap-y-1 text-body">
         <div :for={meta <- @meta} class="flex items-baseline gap-1.5">
-          <dt :if={meta[:label]} class="text-caption font-semibold uppercase tracking-wide text-muted">
+          <dt :if={meta[:label]} class="text-meta text-muted">
             {meta[:label]}
           </dt>
           <dd class="text-ink-2">{render_slot(meta)}</dd>

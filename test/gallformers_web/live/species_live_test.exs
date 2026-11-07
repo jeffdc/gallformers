@@ -73,7 +73,7 @@ defmodule GallformersWeb.SpeciesLiveTest do
       assert has_element?(view, "#species-sources a[href='/source/59']")
     end
 
-    test "has More info and no Edit for a reader", %{view: view} do
+    test "has See also and no Edit for a reader", %{view: view} do
       assert has_element?(view, "a", "iNaturalist")
       refute has_element?(view, "a[aria-pressed]", "Edit")
     end

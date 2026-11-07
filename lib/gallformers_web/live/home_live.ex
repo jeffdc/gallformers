@@ -210,9 +210,6 @@ defmodule GallformersWeb.HomeLive do
             </.link>
             <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
               <div class="flex min-w-0 flex-col gap-0.5">
-                <span class="text-caption font-semibold uppercase tracking-wide text-muted">
-                  A gall to meet
-                </span>
                 <.link
                   navigate={"/gall/#{@random_gall.id}"}
                   class="text-section font-semibold text-ink"

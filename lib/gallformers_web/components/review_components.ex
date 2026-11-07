@@ -125,7 +125,7 @@ defmodule GallformersWeb.ReviewComponents do
             data-role="columns"
             class={[
               "hidden md:flex gap-x-3 px-4 py-1 bg-surface-2 border-b border-line",
-              "text-caption font-semibold uppercase tracking-wide text-muted"
+              "text-meta font-semibold text-muted"
             ]}
           >
             <span class={@r.written}>The Source wrote</span>
@@ -138,7 +138,7 @@ defmodule GallformersWeb.ReviewComponents do
             data-role="columns"
             class={[
               "hidden md:flex gap-x-3 px-4 py-1 bg-surface-2 border-b border-line",
-              "text-caption font-semibold uppercase tracking-wide text-muted"
+              "text-meta font-semibold text-muted"
             ]}
           >
             <span class={@q.chevron} aria-hidden="true"></span>
@@ -330,13 +330,13 @@ defmodule GallformersWeb.ReviewComponents do
     <div :if={@checker != [] or @producer != []} id={@id} class="grid md:grid-cols-2 gap-3">
       <.panel>
         <div class="text-ui text-ink-2">
-          <h4 class="text-caption uppercase tracking-wider text-muted mb-1">{@producer_title}</h4>
+          <h4 class="mb-1 text-meta font-semibold text-muted">{@producer_title}</h4>
           <p :for={text <- @producer}>{text}</p>
         </div>
       </.panel>
       <.panel>
         <div class="text-ui text-ink-2">
-          <h4 class="text-caption uppercase tracking-wider text-muted mb-1">{@checker_title}</h4>
+          <h4 class="mb-1 text-meta font-semibold text-muted">{@checker_title}</h4>
           <p :for={text <- @checker}>{text}</p>
         </div>
       </.panel>
@@ -352,7 +352,7 @@ defmodule GallformersWeb.ReviewComponents do
     <div :if={@definitions != []} class="grid sm:grid-cols-2 gap-3" data-role="definitions">
       <.panel :for={d <- @definitions}>
         <div class="text-ui text-ink-2">
-          <span :if={d.who} class="text-caption uppercase tracking-wider text-muted">{d.who}</span>
+          <span :if={d.who} class="text-meta text-muted">{d.who}</span>
           <b class="block text-ink">{d.value}</b>
           {d.definition}
         </div>
@@ -398,7 +398,7 @@ defmodule GallformersWeb.ReviewComponents do
   # The comparison tables' cells, in the look of `data_table/1` (which can't
   # hold their tinted first row, marked rows or a cell across two columns).
   @table_th "whitespace-nowrap border-b border-line-strong bg-surface-2 px-3 py-1.5 text-left " <>
-              "text-caption font-semibold uppercase tracking-wide text-muted"
+              "text-meta font-semibold text-muted"
   @table_tr "border-b border-line last:border-b-0"
   @table_td "px-3 py-1.5 align-top"
 
@@ -1113,12 +1113,12 @@ defmodule GallformersWeb.ReviewComponents do
   def review_step_head(assigns) do
     ~H"""
     <div id="step-head" class="mt-4 grid gap-0.5">
-      <span class="text-caption uppercase tracking-wider text-muted">
+      <h2 class="text-section text-ink">{@step.title}</h2>
+      <span class="text-meta text-muted">
         Step {@step.n} of {@of} · {if @step.holds_approval,
           do: "holds approval",
           else: "doesn't hold approval"}
       </span>
-      <h2 class="text-section text-ink">{@step.title}</h2>
       <p class="text-body text-ink-2">{@step.question}</p>
       <p :if={@intro} data-role="intro" class="text-ui text-ink-2 max-w-text">{@intro}</p>
     </div>
@@ -1533,7 +1533,7 @@ defmodule GallformersWeb.ReviewComponents do
   def review_notes(assigns) do
     ~H"""
     <div class="grid gap-2 border-t border-line pt-3">
-      <h3 class="text-caption font-semibold uppercase tracking-wider text-muted">Notes</h3>
+      <h3 class="text-subsection">Notes</h3>
       <.review_note_list :if={@notes != []} id={"#{@id}-notes"} notes={@notes} />
       <.form
         for={%{}}

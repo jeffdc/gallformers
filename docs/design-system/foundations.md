@@ -108,9 +108,16 @@ Sizes are semantic and depend on the density context. Use the utility named for 
 | `text-body` | Running text | 16px | 14px |
 | `text-ui` | Table cells, list rows, controls | 15px | 14px |
 | `text-meta` | Secondary lines, counts, metadata | 14px | 13px |
-| `text-caption` | Labels (uppercase, tracked), captions, credits | 12px | 12px |
+| `text-caption` | Captions, credits | 12px | 12px |
 
-Weights: 400 for text, 600 for labels and emphasis, 650 for headings. Uppercase only for small labels (`text-caption`), with 0.05–0.07em letter-spacing. Headings use `text-wrap: balance`. Running text stays within `max-w-text` (44rem, about 70 characters).
+Weights: 400 for text, 600 for labels and emphasis, 650 for headings. Headings use `text-wrap: balance`. Running text stays within `max-w-text` (44rem, about 70 characters).
+
+**Everything is in sentence case.** No all-caps and no tracked-out letter-spacing, on labels, table heads and chips alike; the conformance check flags `uppercase` and `tracking-wide`. Two label styles cover what small caps used to:
+
+- **A label** beside or above its value (a label/value pair, a meta line): `text-meta text-muted`, as in `fact_list`.
+- **A group heading** over a run of items (a table's column heads, a menu's or a result list's groups, a Facts category): `text-meta font-semibold text-muted`.
+
+No small label above a heading (an "eyebrow"): the heading carries its own weight. What an eyebrow would say goes in the meta line under the heading, or nowhere.
 
 The base stylesheet sizes `h1`–`h3` from this scale, so a bare `<h2>` is already a section heading. A class on a heading overrides it.
 

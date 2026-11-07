@@ -34,7 +34,6 @@
       icon={topic_look(@featured).icon}
       tone={topic_look(@featured).tone}
       meta={card_meta(@featured)}
-      label="Newest"
       featured
       edit_href={@is_admin && ~p"/admin/articles/#{@featured.id}"}
     >

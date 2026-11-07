@@ -112,7 +112,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
      "Woody knots on the limbs, emitting pale yellow, conical, brittle projections."},
     {"text-ui", "Tables, lists, controls", "Quercus imbricaria Michx. · 14 Galls"},
     {"text-meta", "Secondary lines, counts", "Created Oct 28, 2026 · 6 of 11 traits recorded"},
-    {"text-caption", "Labels, captions, credits", "POSSIBLE RANGE"}
+    {"text-caption", "Captions, credits", "Photo by shroomydan · CC-BY"}
   ]
 
   @impl true
@@ -182,7 +182,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
                 density
               ]}
             >
-              <span class="text-caption font-semibold uppercase tracking-wide text-muted">
+              <span class="text-meta font-semibold text-muted">
                 {label}
               </span>
               <div :for={{class, role, sample} <- @type_scale} class="flex flex-col">
@@ -191,7 +191,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
                   class,
                   "text-ink truncate",
                   class in ~w(text-page text-section text-subsection) && "font-brand font-semibold",
-                  class == "text-caption" && "font-semibold uppercase tracking-wide text-muted"
+                  class == "text-caption" && "text-muted"
                 ]}>
                   {sample}
                 </span>
@@ -211,7 +211,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
               :for={{label, density} <- [{"Reading", nil}, {"Working", "gf-density-working"}]}
               class={["flex flex-col gap-3", density]}
             >
-              <span class="text-caption font-semibold uppercase tracking-wide text-muted">
+              <span class="text-meta font-semibold text-muted">
                 {label}
               </span>
               <div class="flex flex-wrap items-center gap-2">
@@ -1219,7 +1219,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
               icon="ph-question" tone={:autumn} meta="Adam Kranz · January 26, 2026">
               Preface At the time of writing…
             </.article_card>
-            <.article_card … featured label="Newest" />
+            <.article_card … featured />
             '''
           }
         >
@@ -1231,7 +1231,6 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
               icon="ph-magnifying-glass-plus"
               tone={:sky}
               meta="Gallformers Contributors · October 27, 2026"
-              label="Newest"
               featured
             >
               Organisms that look like galls but are not.
@@ -1810,7 +1809,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
         data-theme={theme}
         class="flex flex-col gap-2 rounded-panel border border-line bg-paper p-panel text-ink"
       >
-        <span class="text-caption font-semibold uppercase tracking-wide text-muted">{theme}</span>
+        <span class="text-meta font-semibold text-muted">{theme}</span>
         {render_slot(@inner_block, theme)}
       </div>
     </div>

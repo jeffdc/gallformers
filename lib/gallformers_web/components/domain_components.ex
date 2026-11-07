@@ -853,11 +853,10 @@ defmodule GallformersWeb.DomainComponents do
 
   @doc """
   An article in the Articles list: a band tinted by its topic (`tone`)
-  with the topic named and a large tilted icon, then the title, a
-  three-line preview and a meta line. The card is one link; `edit_href`
+  with a large tilted icon, then the title, a three-line preview and a
+  meta line that starts with the topic. The card is one link; `edit_href`
   adds an admin edit link in its corner. `featured` lays it out wide (the
-  band beside the text, a larger title and preview) and names it with
-  `label` ("Newest").
+  band beside the text, a larger title and preview).
 
       <.article_card href={~p"/articles/\#{a.slug}"} title={a.title} topic="faq"
         icon="ph-question" tone={:autumn} meta="Adam Kranz · January 26, 2026">
@@ -866,12 +865,11 @@ defmodule GallformersWeb.DomainComponents do
   """
   attr :href, :string, required: true
   attr :title, :string, required: true
-  attr :topic, :string, default: nil, doc: "named on the band"
+  attr :topic, :string, default: nil, doc: "the first item in the meta line"
   attr :icon, :string, default: "ph-article"
   attr :tone, :atom, default: :plain, values: [:sky, :autumn, :brand, :plain]
   attr :meta, :string, default: nil, doc: "author · date"
   attr :featured, :boolean, default: false
-  attr :label, :string, default: nil, doc: "a featured card's label"
   attr :edit_href, :string, default: nil
   attr :class, :any, default: nil, doc: "layout only"
 
@@ -897,19 +895,6 @@ defmodule GallformersWeb.DomainComponents do
             tone_class(@tone)
           ]}
         >
-          <span
-            :if={@label}
-            data-part="label"
-            class="absolute left-4 top-4 font-brand text-caption font-semibold uppercase tracking-wide text-ink-2"
-          >
-            {@label}
-          </span>
-          <span
-            :if={@topic && !@featured}
-            class="absolute left-4 top-3 text-caption font-semibold uppercase tracking-wide text-ink-2"
-          >
-            {@topic}
-          </span>
           <.icon
             name={@icon}
             class={[
@@ -922,12 +907,6 @@ defmodule GallformersWeb.DomainComponents do
           "flex flex-col",
           if(@featured, do: "gap-2 p-6 md:col-span-3", else: "flex-1 gap-1.5 p-4")
         ]}>
-          <p
-            :if={@topic && @featured}
-            class="text-caption font-semibold uppercase tracking-wide text-muted"
-          >
-            {@topic}
-          </p>
           <h2 class={[
             "font-brand text-ink group-hover:underline",
             if(@featured, do: "text-section", else: "text-subsection")
@@ -941,7 +920,9 @@ defmodule GallformersWeb.DomainComponents do
           >
             {render_slot(@inner_block)}
           </p>
-          <p :if={@meta} data-part="meta" class="mt-auto pt-2 text-meta text-muted">{@meta}</p>
+          <p :if={@topic || @meta} data-part="meta" class="mt-auto pt-2 text-meta text-muted">
+            {Enum.join(Enum.reject([@topic, @meta], &is_nil/1), " · ")}
+          </p>
         </div>
       </.link>
       <.link

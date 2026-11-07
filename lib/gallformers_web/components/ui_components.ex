@@ -284,7 +284,7 @@ defmodule GallformersWeb.UIComponents do
   end
 
   @doc """
-  "More info": links searching external resources for the name (design
+  "See also": links searching external resources for the name (design
   system, matter bc0d; the logos were retired).
 
   For galls: iNaturalist, BugGuide, Google Scholar, BHL
@@ -327,7 +327,7 @@ defmodule GallformersWeb.UIComponents do
 
     ~H"""
     <div :if={!@undescribed} class={["flex flex-col gap-0.5", @class]}>
-      <span class="text-meta font-semibold uppercase tracking-wide text-muted">More info</span>
+      <span data-part="label" class="text-meta text-muted">See also</span>
       <div class="flex flex-wrap gap-x-4 text-ui">
         <a
           href={"https://www.inaturalist.org/search?q=#{@search_name}"}

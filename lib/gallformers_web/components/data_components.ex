@@ -266,7 +266,7 @@ defmodule GallformersWeb.DataComponents do
                 aria-sort={col[:sortable] && aria_sort(@sort, col[:field])}
                 class={[
                   "whitespace-nowrap border-b border-line-strong bg-surface-2 px-3",
-                  "text-caption font-semibold uppercase tracking-wide text-muted",
+                  "text-meta font-semibold text-muted",
                   if(col[:numeric], do: "text-right", else: "text-left"),
                   hide_below(col[:hide_below])
                 ]}
@@ -276,7 +276,7 @@ defmodule GallformersWeb.DataComponents do
                   type="button"
                   phx-click="sort"
                   phx-value-field={col[:field]}
-                  class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-ink"
+                  class="inline-flex items-center gap-1 hover:text-ink"
                 >
                   {col[:label]}
                   <.icon

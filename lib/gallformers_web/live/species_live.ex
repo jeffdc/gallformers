@@ -16,7 +16,7 @@ defmodule GallformersWeb.SpeciesLive do
     * **Sources:** every Source citing it or one of its Galls
       (`Gallformers.Catalog.species_sources/2`).
     * **Rail:** its Galls' ranges together on one map
-      (`Gallformers.Catalog.display_range_for_galls/1`), More info, the
+      (`Gallformers.Catalog.display_range_for_galls/1`), See also, the
       dates.
 
   A plant's ID goes to its Host page and a higher taxon's to its rank page;
