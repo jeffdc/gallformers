@@ -303,6 +303,7 @@ defmodule Gallformers.Import.QueueTest do
       }
 
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      assert_replays_again([entry], test_actor())
       assert %QueueItem{status: :decided} = Repo.reload!(item)
     end
   end
@@ -406,6 +407,7 @@ defmodule Gallformers.Import.QueueTest do
       assert parent == StableRef.taxon(genus.id)
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert created_taxon(package).parent_id == genus.id
     end
   end

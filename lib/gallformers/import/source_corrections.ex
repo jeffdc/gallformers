@@ -667,7 +667,7 @@ defmodule Gallformers.Import.SourceCorrections do
   defp decode_correction(%{"op" => "parent", "to" => nil}), do: {:ok, {:parent, nil}}
 
   defp decode_correction(%{"op" => op, "to" => ref}) when op in ["host", "parent", "accepted"] do
-    with {:ok, id} <- StableRef.resolve_taxon(ref),
+    with {:ok, id} <- StableRef.resolve_current_taxon(ref),
          do: {:ok, {String.to_existing_atom(op), id}}
   end
 

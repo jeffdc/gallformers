@@ -351,6 +351,7 @@ defmodule Gallformers.Import.ProposalsTest do
 
       assert after_accept != snapshot(package, ctx)
       assert {:ok, _count} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert snapshot(package, ctx) == after_accept
     end
   end

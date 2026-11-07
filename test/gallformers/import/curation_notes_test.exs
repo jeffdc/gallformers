@@ -102,9 +102,11 @@ defmodule Gallformers.Import.CurationNotesTest do
       wipe!(FactNote)
 
       assert {:ok, 1} = Replay.run(logged, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(logged, test_actor())
       assert [%FactNote{text: "Young trees.", author_name: "test"}] = Repo.all(FactNote)
 
       assert {:ok, 1} = Replay.run(logged, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(logged, test_actor())
       assert [_one] = Repo.all(FactNote)
     end
   end
@@ -125,7 +127,9 @@ defmodule Gallformers.Import.CurationNotesTest do
 
       wipe!(TaxonNote)
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again([entry], test_actor())
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again([entry], test_actor())
       assert [%TaxonNote{author_name: "test"}] = Taxa.list_taxon_notes(ctx.oak.id)
     end
   end

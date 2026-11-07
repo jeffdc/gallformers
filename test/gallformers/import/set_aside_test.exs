@@ -470,6 +470,7 @@ defmodule Gallformers.Import.SetAsideTest do
                Catalog.find_fact(:trait, %{gall_id: ctx.gall.id, trait: "color", value: "brown"})
 
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
 
       assert {:ok, fact_id} =
                Catalog.find_fact(:trait, %{gall_id: ctx.gall.id, trait: "color", value: "brown"})
@@ -503,6 +504,7 @@ defmodule Gallformers.Import.SetAsideTest do
       }
 
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      assert_replays_again([entry], test_actor())
       assert %QueueItem{status: :decided, decision: ^decision} = Repo.reload!(item)
 
       assert %{key: key, payload: %{"decision" => ^encoded}} =

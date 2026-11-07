@@ -91,7 +91,7 @@ defmodule Gallformers.Import.CurationNotes do
   end
 
   def replay(actor, :taxon_note, %{"taxon" => taxon, "about" => about}, payload) do
-    with {:ok, taxon_id} <- StableRef.resolve_taxon(taxon) do
+    with {:ok, taxon_id} <- StableRef.resolve_current_taxon(taxon) do
       if Repo.exists?(
            from(n in TaxonNote,
              where:
@@ -138,7 +138,7 @@ defmodule Gallformers.Import.CurationNotes do
   @doc "The Gall page key a stable key (`fact_key/1`) names, its taxon and place found again."
   @spec decode_fact_key(map()) :: {:ok, Catalog.gall_fact_key()} | {:error, term()}
   def decode_fact_key(%{"kind" => role, "taxon" => taxon}) when role in ["inducer", "host"] do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon),
+    with {:ok, id} <- StableRef.resolve_current_taxon(taxon),
          do: {:ok, {String.to_existing_atom(role), id}}
   end
 

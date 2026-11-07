@@ -339,7 +339,8 @@ defmodule Gallformers.Import.TaxonomyStatements do
   @doc """
   Replays a logged statement: the Source found by its title, the act's
   taxa by their stable references, recorded again (`state/5`). A statement
-  the Source already makes is left as it is.
+  the Source already makes with that stance is left as it is, and not
+  logged again (a replay run again).
   """
   @spec replay(Actor.t(), map(), map()) :: :ok | {:error, term()}
   def replay(%Actor{} = actor, %{"source" => source, "kind" => kind, "fact" => fact}, payload) do
@@ -352,10 +353,23 @@ defmodule Gallformers.Import.TaxonomyStatements do
         |> put_present(:statement_text, payload["statement_text"])
         |> put_present(:authorship_as_written, payload["authorship_as_written"])
 
-      case state(actor, source_id, kind, key, attrs) do
-        {:ok, _result} -> :ok
-        {:error, reason} -> {:error, reason}
+      if stated?(source_id, kind, key, attrs.stance) do
+        :ok
+      else
+        case state(actor, source_id, kind, key, attrs) do
+          {:ok, _result} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
       end
+    end
+  end
+
+  defp stated?(source_id, kind, key, stance) do
+    with {:ok, fact_id} when is_integer(fact_id) <- Taxa.find_act_fact(kind, key),
+         %Attribution{stance: ^stance} <- Facts.get_attribution(fact_id, source_id) do
+      true
+    else
+      _ -> false
     end
   end
 

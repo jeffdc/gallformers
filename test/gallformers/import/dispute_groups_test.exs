@@ -153,6 +153,7 @@ defmodule Gallformers.Import.DisputeGroupsTest do
         end)
 
       assert {:ok, 10} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert Enum.map(disputes(package), &{&1.statement_ref, &1.decision}) == after_decisions
     end
   end
@@ -274,6 +275,7 @@ defmodule Gallformers.Import.DisputeGroupsTest do
 
       assert statements(ctx.package)[{:taxon, "t2"}].taxon_id != ctx.douglasii.id
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
 
       assert {statements(ctx.package)[{:taxon, "t2"}].taxon_id,
               for(n <- Taxa.list_synonyms(ctx.douglasii.id), do: {n.name, n.sensu})} ==
@@ -430,6 +432,7 @@ defmodule Gallformers.Import.DisputeGroupsTest do
                for(%{kind: :queue_decision} = e <- entries, do: e.payload["decision"])
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert Import.get_queue_item!(ctx.host.id).decision == after_decision
     end
 

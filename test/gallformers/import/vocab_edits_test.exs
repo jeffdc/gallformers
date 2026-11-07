@@ -186,10 +186,12 @@ defmodule Gallformers.Import.VocabEditsTest do
     Repo.delete!(value)
 
     assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
     assert Catalog.get_trait_value("shape", "lenticular").definition == @value.definition
 
     logged = length(Import.list_replay_entries())
     assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
     assert length(Import.list_replay_entries()) == logged
   end
 
@@ -222,10 +224,12 @@ defmodule Gallformers.Import.VocabEditsTest do
       assert term_state(@trait, @term) == before
 
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
       assert term_state(@trait, @term) == after_edit
 
       logged = length(Import.list_replay_entries())
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
       assert term_state(@trait, @term) == after_edit
       assert length(Import.list_replay_entries()) == logged
     end
@@ -293,6 +297,7 @@ defmodule Gallformers.Import.VocabEditsTest do
       assert texture_sources(gall.id, "bumpy") == []
 
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
       assert texture_sources(gall.id, "bumpy") == [{rough.id, "Rough"}]
     end
   end
@@ -307,6 +312,7 @@ defmodule Gallformers.Import.VocabEditsTest do
     Repo.delete!(Catalog.get_term("shape", "orb"))
 
     assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
 
     assert %TraitTermMapping{placed_at: @at, placed_by: :agreement} =
              Catalog.get_term("shape", "orb")
@@ -328,6 +334,7 @@ defmodule Gallformers.Import.VocabEditsTest do
     ]
 
     assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
 
     assert Catalog.get_trait_value("season", "Spring").definition ==
              "The Gall forms and grows in spring."
@@ -351,6 +358,7 @@ defmodule Gallformers.Import.VocabEditsTest do
     ]
 
     assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
 
     assert %TraitTermMapping{status: :placed, categories: ["sphere"], placed_by: :curator} =
              Catalog.get_term("shape", "orb")

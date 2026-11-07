@@ -211,6 +211,7 @@ defmodule Gallformers.Import.ReviewTest do
 
       # Already denied: skipped.
       assert {:ok, 1} = Replay.run(replay_entries(:package_denied), actor: test_actor())
+      assert_replays_again(replay_entries(:package_denied), test_actor())
       assert [_] = replay_entries(:package_denied)
     end
   end
@@ -303,6 +304,7 @@ defmodule Gallformers.Import.ReviewTest do
       }
 
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      assert_replays_again([entry], test_actor())
       assert %Batch{status: :denied, denied_reason: "Replayed."} = Import.get_batch!(ctx.gall.id)
     end
   end

@@ -39,7 +39,12 @@ defmodule Gallformers.Import.Replay do
     * `:synonym_added`, `:plant_added`, `:taxonomy_edit` — the Host-name
       step's and the taxonomy admin's edits, made again on the taxa found
       by name (the newer ops, and WCVP actions logged as the state they
-      left: `Gallformers.Import.TaxonomyEdits`).
+      left: `Gallformers.Import.TaxonomyEdits`), unless the tree holds
+      them: the taxon has the synonym in that sense, a taxon of that name
+      (or the name a later rename gives it) and rank exists, the taxon
+      is under that parent, has that accepted name or common name, or
+      holds the flags, authorship, range or WCVP link; a synonym or common
+      name to remove is gone, a taxon to delete no longer named.
     * `:package_denied` (`%{"package"}`) — the package, registered from its
       files if it is not yet, is denied with the logged reason.
     * `:batch_denied` (`%{"package", "batch_id"}`) — the package is made
@@ -93,9 +98,25 @@ defmodule Gallformers.Import.Replay do
 
   Each step goes through the same functions as on preview, so the log is
   written again as it is replayed. The first entry that cannot be replayed
-  stops the replay: `{:error, %{index, entry, reason}}`. Entries already
-  done (a batch applied, an item decided) are skipped, so a stopped replay
-  can be fixed and run again.
+  stops the replay: `{:error, %{index, entry, reason}}`.
+
+  ## Running it again
+
+  A stopped replay can be fixed and run again from the start: each entry
+  whose effect the database holds already is skipped (`:ok`, nothing
+  written or logged), told from the data, not from a mark of what was
+  replayed, so a replay over a database that holds an edit already skips
+  it too. A batch applied, an item decided, a package or batch denied, a
+  note, statement, decision, correction, Trait term or Source edit in
+  place, a Gall or taxon gone, and the tree edits above. A curator's edit
+  on a package's Fact is done once its batch is applied. A taxon renamed
+  later in the log is found, by an entry before the rename, through the
+  synonym the rename kept or the name the log's renames give it
+  (`StableRef.resolve_current_taxon/1`).
+
+  A change the log takes back later (a retraction lifted, a decision
+  undone, a common name added and removed) can't be told done from the
+  data: run again, both are made again, ending as they ended.
   """
   alias Gallformers.Audit.Actor
   alias Gallformers.Catalog
@@ -120,6 +141,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.TaxonomyEdits
   alias Gallformers.Import.TaxonomyStatements
   alias Gallformers.Import.VocabEdits
+  alias Gallformers.Taxa
 
   @typedoc "A log entry: a `ReplayEntry` or a map with its `kind`, `key` and `payload`."
   @type entry :: ReplayEntry.t() | map()
@@ -136,11 +158,16 @@ defmodule Gallformers.Import.Replay do
 
     entries
     |> Enum.map(&normalize/1)
+    |> with_later_renames()
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, 0}, fn {entry, index}, {:ok, count} ->
       case replay(actor, entry) do
-        :ok -> {:cont, {:ok, count + 1}}
-        {:error, reason} -> {:halt, {:error, %{index: index, entry: entry, reason: reason}}}
+        :ok ->
+          {:cont, {:ok, count + 1}}
+
+        {:error, reason} ->
+          entry = Map.delete(entry, :later_renames)
+          {:halt, {:error, %{index: index, entry: entry, reason: reason}}}
       end
     end)
   end
@@ -264,29 +291,44 @@ defmodule Gallformers.Import.Replay do
     end
   end
 
+  # Done when the taxon holds the name in that sense already.
   defp replay(actor, %{kind: :synonym_added, key: %{"taxon" => taxon, "name" => name}} = entry) do
-    with {:ok, taxon_id} <- StableRef.resolve_taxon(taxon) do
-      opts = [sensu: entry.payload["sensu"], authorship: entry.payload["authorship"]]
-      ok(Import.record_synonym_added(actor, taxon_id, name, opts))
+    with {:ok, taxon_id} <- current_taxon(entry, taxon) do
+      sensu = entry.payload["sensu"]
+
+      if holds_name?(taxon_id, name, sensu) do
+        :ok
+      else
+        opts = [sensu: sensu, authorship: entry.payload["authorship"]]
+        ok(Import.record_synonym_added(actor, taxon_id, name, opts))
+      end
     end
   end
 
+  # Done when a plant of that name (or one the log renames it to) and rank
+  # is in the tree.
   defp replay(actor, %{kind: :plant_added, key: %{"name" => name, "rank" => rank}} = entry) do
-    with {:ok, parent_id} <- optional_taxon(entry.payload["parent"]) do
-      ok(
-        Import.record_plant_added(actor, %{
-          name: name,
-          rank: rank,
-          parent_id: parent_id,
-          authorship: entry.payload["authorship"]
-        })
-      )
+    with {:ok, parent_id} <- optional_taxon(entry, entry.payload["parent"]) do
+      if created?(entry, name, rank, "Plantae") do
+        :ok
+      else
+        ok(
+          Import.record_plant_added(actor, %{
+            name: name,
+            rank: rank,
+            parent_id: parent_id,
+            authorship: entry.payload["authorship"]
+          })
+        )
+      end
     end
   end
 
-  defp replay(actor, %{kind: :taxonomy_edit, key: key, payload: payload}) do
-    with {:ok, edit} <- edit(key, payload) do
-      ok(Import.record_taxonomy_edit(actor, edit))
+  defp replay(actor, %{kind: :taxonomy_edit, key: key, payload: payload} = entry) do
+    case edit(entry, key, payload) do
+      {:ok, edit} -> ok(Import.record_taxonomy_edit(actor, edit))
+      :done -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -380,47 +422,154 @@ defmodule Gallformers.Import.Replay do
   defp replay(actor, %{kind: :source_correction, key: key, payload: payload}),
     do: SourceCorrections.replay(actor, key, payload)
 
-  defp replay(_actor, entry), do: {:error, {:unknown_entry, entry}}
+  defp replay(_actor, entry),
+    do: {:error, {:unknown_entry, Map.delete(entry, :later_renames)}}
 
-  defp edit(%{"op" => "place", "taxon" => taxon}, payload) do
-    with {:ok, taxon_id} <- StableRef.resolve_taxon(taxon),
-         {:ok, parent_id} <- optional_taxon(payload["parent"]) do
-      {:ok, {:place, taxon_id, parent_id}}
+  # The edit an entry stands for, or `:done` when the tree holds it already.
+  defp edit(entry, %{"op" => "place", "taxon" => taxon}, payload) do
+    with {:ok, taxon_id} <- current_taxon(entry, taxon),
+         {:ok, parent_id} <- optional_taxon(entry, payload["parent"]) do
+      if Taxa.get_taxon!(taxon_id).parent_id == parent_id,
+        do: :done,
+        else: {:ok, {:place, taxon_id, parent_id}}
     end
   end
 
-  defp edit(%{"op" => "rename", "taxon" => taxon}, %{"name" => name}) do
-    with {:ok, taxon_id} <- StableRef.resolve_taxon(taxon), do: {:ok, {:rename, taxon_id, name}}
-  end
+  # Renamed already when no taxon has the old name but one has the new
+  # name (or a name the log renames it to later).
+  defp edit(entry, %{"op" => "rename", "taxon" => taxon}, %{"name" => name}) do
+    case StableRef.resolve_taxon(taxon) do
+      {:ok, taxon_id} ->
+        if Taxa.accepted_name(taxon_id) == String.trim(name),
+          do: :done,
+          else: {:ok, {:rename, taxon_id, name}}
 
-  defp edit(%{"op" => "add_common_name", "taxon" => taxon}, %{"name" => name}) do
-    with {:ok, taxon_id} <- StableRef.resolve_taxon(taxon),
-         do: {:ok, {:add_common_name, taxon_id, name}}
-  end
+      {:error, {:taxon_not_found, _}} = error ->
+        if match?({:ok, _}, current_taxon(entry, %{taxon | "name" => name})),
+          do: :done,
+          else: error
 
-  defp edit(%{"op" => "create_taxon", "name" => name, "rank" => rank}, payload) do
-    with {:ok, parent_id} <- optional_taxon(payload["parent"]) do
-      {:ok,
-       {:create_taxon,
-        %{
-          name: name,
-          rank: rank,
-          parent_id: parent_id,
-          kingdom: payload["kingdom"],
-          origin: String.to_existing_atom(payload["origin"] || "curated")
-        }}}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  defp edit(key, payload) do
-    case TaxonomyEdits.decode(key, payload) do
+  defp edit(entry, %{"op" => "add_common_name", "taxon" => taxon}, %{"name" => name}) do
+    with {:ok, taxon_id} <- current_taxon(entry, taxon) do
+      held = for common <- Taxa.list_common_names(taxon_id), do: String.downcase(common.name)
+
+      if String.downcase(String.trim(name)) in held,
+        do: :done,
+        else: {:ok, {:add_common_name, taxon_id, name}}
+    end
+  end
+
+  defp edit(entry, %{"op" => "create_taxon", "name" => name, "rank" => rank}, payload) do
+    with {:ok, parent_id} <- optional_taxon(entry, payload["parent"]) do
+      kingdom = payload["kingdom"] || (parent_id && Taxa.get_taxon!(parent_id).kingdom)
+
+      if created?(entry, name, rank, kingdom) do
+        :done
+      else
+        {:ok,
+         {:create_taxon,
+          %{
+            name: name,
+            rank: rank,
+            parent_id: parent_id,
+            kingdom: payload["kingdom"],
+            origin: String.to_existing_atom(payload["origin"] || "curated")
+          }}}
+      end
+    end
+  end
+
+  defp edit(entry, key, payload) do
+    case TaxonomyEdits.decode(key, payload, &current_taxon(entry, &1)) do
       :unknown -> {:error, {:unknown_edit, key}}
       decoded -> decoded
     end
   end
 
-  defp optional_taxon(nil), do: {:ok, nil}
-  defp optional_taxon(ref), do: StableRef.resolve_taxon(ref)
+  # A taxon created already: one of that rank (and kingdom) has the name,
+  # or the name the log renames it to later, as its accepted name.
+  defp created?(entry, name, rank, kingdom) do
+    names = [name | List.wrap(later_name(entry, name, rank))]
+    ref = %{"rank" => rank, "kingdom" => kingdom}
+
+    Enum.any?(names, fn name ->
+      case StableRef.resolve_taxon(Map.put(ref, "name", name)) do
+        {:ok, _id} -> true
+        {:error, {:taxon_ambiguous, _ref}} -> true
+        {:error, _reason} -> false
+      end
+    end)
+  end
+
+  # The taxon a stable reference names now. On a log replayed again, a
+  # taxon renamed later in the log is found by its old name: through the
+  # synonym the rename kept (`StableRef.resolve_current_taxon/1`), or by the
+  # name the log's later renames give it.
+  defp current_taxon(entry, ref) do
+    with {:error, {:taxon_not_found, _}} = error <- StableRef.resolve_current_taxon(ref) do
+      case later_name(entry, ref["name"], ref["rank"]) do
+        nil -> error
+        name -> StableRef.resolve_taxon(%{ref | "name" => name})
+      end
+    end
+  end
+
+  # The name the log's renames after `entry` (`with_later_renames/1`) give
+  # a taxon of `rank` named `name`, or nil if none renames it.
+  defp later_name(entry, name, rank) do
+    renamed =
+      entry
+      |> Map.get(:later_renames, [])
+      |> Enum.reduce(name, fn {old, old_rank, new}, current ->
+        if old == current and old_rank == rank, do: new, else: current
+      end)
+
+    if renamed != name, do: renamed
+  end
+
+  # Each entry with the taxonomy admin's renames logged after it, in order
+  # (`{old name, rank, new name}`); a rename's own counts as after it.
+  defp with_later_renames(entries) do
+    {entries, _renames} =
+      List.foldr(entries, {[], []}, fn entry, {done, renames} ->
+        renames =
+          case entry do
+            %{
+              kind: :taxonomy_edit,
+              key: %{"op" => "rename", "taxon" => %{"name" => old, "rank" => rank}},
+              payload: %{"name" => new}
+            } ->
+              [{old, rank, String.trim(new)} | renames]
+
+            _entry ->
+              renames
+          end
+
+        {[Map.put(entry, :later_renames, renames) | done], renames}
+      end)
+
+    entries
+  end
+
+  # Whether the taxon holds `name` (accepted or synonym) in the sense
+  # `sensu` (nil: its own), as the names' unique index counts them.
+  defp holds_name?(taxon_id, name, sensu) do
+    sensu = if is_binary(sensu) and String.trim(sensu) != "", do: sensu
+
+    case Taxa.resolve_name(name, sensu: sensu) do
+      {:ok, taxon} -> taxon.id == taxon_id
+      {:ambiguous, taxa} -> Enum.any?(taxa, &(&1.id == taxon_id))
+      :none -> false
+    end
+  end
+
+  defp optional_taxon(_entry, nil), do: {:ok, nil}
+  defp optional_taxon(entry, ref), do: current_taxon(entry, ref)
 
   defp optional_gall(nil), do: {:ok, nil}
   defp optional_gall(ref), do: StableRef.resolve_gall(ref)

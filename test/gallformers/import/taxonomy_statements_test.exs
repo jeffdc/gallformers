@@ -459,6 +459,7 @@ defmodule Gallformers.Import.TaxonomyStatementsTest do
       assert parent_id(ctx.genus) == ctx.family.id
 
       assert {:ok, 3} = Replay.run(entries, actor: ctx.actor)
+      assert_replays_again(entries, ctx.actor)
 
       source = Sources.get_source_by_title(title)
       assert %{accepted_at: %DateTime{}} = placement_attribution(ctx.genus, ctx.other, source)
@@ -475,6 +476,7 @@ defmodule Gallformers.Import.TaxonomyStatementsTest do
 
       [entry] = Import.list_replay_entries()
       assert {:ok, 1} = Replay.run([entry], actor: ctx.actor)
+      assert_replays_again([entry], ctx.actor)
       assert parent_id(ctx.genus) == ctx.other.id
     end
   end

@@ -171,6 +171,16 @@ defmodule Gallformers.Import.TaxonomyEditsTest do
 
     assert {:ok, 11} = Replay.run(entries, actor: test_actor())
     assert snapshot() == before
+
+    # Replayed again, each edit in place is skipped. Replayus alpha's link,
+    # confirmed and then marked no match, is set both ways again: the data
+    # can't tell the first was done.
+    Gallformers.ImportFixtures.assert_replays_again(entries, test_actor(), relogs: true)
+    assert snapshot().taxa == before.taxa
+
+    alpha_link? = &(&1.key["op"] == "set_wcvp" and &1.key["taxon"]["name"] == "Replayus alpha")
+    assert [_, _] = Enum.filter(entries, alpha_link?)
+    Gallformers.ImportFixtures.assert_replays_again(Enum.reject(entries, alpha_link?))
   end
 
   test "a sync without preloaded region data logs the range it wrote too" do

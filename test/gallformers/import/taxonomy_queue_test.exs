@@ -360,6 +360,7 @@ defmodule Gallformers.Import.TaxonomyQueueTest do
       )
 
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
 
       assert %QueueItem{status: :decided, decision: %{"accept" => true}} =
                Repo.get!(QueueItem, item.id)

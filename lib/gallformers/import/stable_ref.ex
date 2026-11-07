@@ -63,6 +63,24 @@ defmodule Gallformers.Import.StableRef do
     end
   end
 
+  @doc """
+  As `resolve_taxon/1`, and on a log replayed again, a taxon renamed since
+  (later in the log, already replayed) is found by the reference's name,
+  which a rename keeps as a synonym (`Gallformers.Taxa.rename/3`): the one
+  taxon of its rank and kingdom holding it as a synonym of no sensu. For
+  an edit, not for a deletion or merge, which are done when the name
+  names no taxon.
+  """
+  @spec resolve_current_taxon(map()) :: {:ok, integer()} | {:error, term()}
+  def resolve_current_taxon(%{"name" => name, "rank" => rank} = ref) do
+    with {:error, {:taxon_not_found, _}} = error <- resolve_taxon(ref) do
+      case Taxa.resolve_name(name, rank: String.to_existing_atom(rank), kingdom: ref["kingdom"]) do
+        {:ok, %{id: id, matched_name: %{status: :synonym}}} -> {:ok, id}
+        _ -> error
+      end
+    end
+  end
+
   @doc "A Gall's stable reference."
   @spec gall(integer()) :: map()
   def gall(id) when is_integer(id) do

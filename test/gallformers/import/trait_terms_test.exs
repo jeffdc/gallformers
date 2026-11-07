@@ -924,6 +924,7 @@ defmodule Gallformers.Import.TraitTermsTest do
       assert traits(ctx.gall.id, "texture") == []
       assert [%{kind: :trait_term_edit}] = entries
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert traits(ctx.gall.id, "texture") == ["bumpy"]
     end
   end
@@ -964,6 +965,7 @@ defmodule Gallformers.Import.TraitTermsTest do
         assert Catalog.get_term("color", term) == nil
         assert [%{kind: :queue_decision}] = entries
         assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+        assert_replays_again(entries, test_actor())
 
         assert %QueueItem{status: :decided, decision: ^decision} = question(package)
         written = statements(package)[{:fact, "f7"}]
@@ -1003,6 +1005,7 @@ defmodule Gallformers.Import.TraitTermsTest do
       }
 
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      assert_replays_again([entry], test_actor())
 
       # A placement the vocabulary doesn't hold is still a question missing.
       other = put_in(entry, [:payload, "decision"], %{"place" => "white"})
@@ -1019,6 +1022,7 @@ defmodule Gallformers.Import.TraitTermsTest do
                |> Enum.filter(&(&1 in [:trait_term_edit, :batch_applied]))
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert %{status: :placed, placed_by: :agreement} = Catalog.get_term("color", "pale tan")
     end
   end

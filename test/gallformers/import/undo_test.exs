@@ -185,6 +185,7 @@ defmodule Gallformers.Import.UndoTest do
       assert after_undo == before
       assert Enum.map(entries, & &1.kind) == [:queue_decision, :queue_decision_undone]
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert snapshot(package) == before
     end
   end
@@ -257,6 +258,7 @@ defmodule Gallformers.Import.UndoTest do
         end)
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert synonyms(ctx.lobata) == []
       assert snapshot(package) == before
     end
@@ -306,6 +308,7 @@ defmodule Gallformers.Import.UndoTest do
         end)
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert Wcvp.linked_taxon_ids("500") == []
       assert snapshot(package) == before
     end
@@ -362,6 +365,7 @@ defmodule Gallformers.Import.UndoTest do
         end)
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert [%{authorship: "Beutenmüller, 1910"}] = Taxa.list_synonyms(ctx.held)
     end
 
@@ -394,6 +398,7 @@ defmodule Gallformers.Import.UndoTest do
         end)
 
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert synonyms(ctx.held) == ["Fixtandricus wisliceni"]
 
       assert {:ok, %{matched_name: %{status: :synonym}}} =

@@ -156,53 +156,80 @@ defmodule Gallformers.Import.TaxonomyEdits do
   def run(actor, {:set_wcvp, taxon, attrs}), do: Wcvp.put_link(actor, taxon, attrs)
 
   @doc """
-  The edit a logged entry stands for, its taxa and places found by their
-  stable references; `:unknown` for an op not handled here.
+  The edit a logged entry stands for, its taxa found by their stable
+  references with `resolve` (default
+  `Gallformers.Import.StableRef.resolve_current_taxon/1`: a taxon renamed
+  later in the log is found by its old name too) and its places by code;
+  `:done` for an edit already in place — a name or common name to remove
+  that is gone, a taxon to delete that no name names, flags, an authorship,
+  a range or a WCVP link the taxon holds — so a replay run again skips it;
+  `:unknown` for an op not handled here.
   """
-  @spec decode(map(), map()) :: {:ok, edit()} | {:error, term()} | :unknown
-  def decode(%{"op" => "update_editorial", "taxon" => taxon}, payload) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon) do
+  @spec decode(map(), map(), (map() -> {:ok, integer()} | {:error, term()})) ::
+          {:ok, edit()} | :done | {:error, term()} | :unknown
+  def decode(key, payload, resolve \\ &StableRef.resolve_current_taxon/1) do
+    case decode_edit(key, payload, resolve) do
+      {:ok, edit} -> if done?(edit), do: :done, else: {:ok, edit}
+      other -> other
+    end
+  end
+
+  defp decode_edit(%{"op" => "update_editorial", "taxon" => taxon}, payload, resolve) do
+    with {:ok, id} <- resolve.(taxon) do
       attrs = for {field, value} <- payload, into: %{}, do: {editorial_field(field), value}
       {:ok, {:update_editorial, id, attrs}}
     end
   end
 
-  def decode(%{"op" => "set_authorship", "taxon" => taxon}, payload) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon),
+  defp decode_edit(%{"op" => "set_authorship", "taxon" => taxon}, payload, resolve) do
+    with {:ok, id} <- resolve.(taxon),
          do: {:ok, {:set_authorship, id, payload["authorship"]}}
   end
 
-  def decode(%{"op" => "remove_synonym", "taxon" => taxon, "name" => name}, payload) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon) do
+  defp decode_edit(
+         %{"op" => "remove_synonym", "taxon" => taxon, "name" => name},
+         payload,
+         resolve
+       ) do
+    with {:ok, id} <- resolve.(taxon) do
       case Enum.find(Taxa.list_synonyms(id), &(&1.name == name and &1.sensu == payload["sensu"])) do
-        nil -> {:error, {:synonym_not_found, name}}
+        nil -> :done
         synonym -> {:ok, {:remove_synonym, synonym}}
       end
     end
   end
 
-  def decode(%{"op" => "remove_common_name", "taxon" => taxon, "name" => name}, _payload) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon) do
+  defp decode_edit(
+         %{"op" => "remove_common_name", "taxon" => taxon, "name" => name},
+         _payload,
+         resolve
+       ) do
+    with {:ok, id} <- resolve.(taxon) do
       case Enum.find(Taxa.list_common_names(id), &(&1.name == name)) do
-        nil -> {:error, {:common_name_not_found, name}}
+        nil -> :done
         common -> {:ok, {:remove_common_name, common}}
       end
     end
   end
 
-  def decode(%{"op" => "delete_taxon", "taxon" => taxon}, _payload) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon), do: {:ok, {:delete_taxon, id}}
+  # Deleted already when no taxon has the name it was deleted under.
+  defp decode_edit(%{"op" => "delete_taxon", "taxon" => taxon}, _payload, _resolve) do
+    case StableRef.resolve_taxon(taxon) do
+      {:ok, id} -> {:ok, {:delete_taxon, id}}
+      {:error, {:taxon_not_found, _}} -> :done
+      {:error, reason} -> {:error, reason}
+    end
   end
 
-  def decode(%{"op" => "set_host_range", "taxon" => taxon}, %{"places" => places}) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon),
+  defp decode_edit(%{"op" => "set_host_range", "taxon" => taxon}, %{"places" => places}, resolve) do
+    with {:ok, id} <- resolve.(taxon),
          {:ok, entries} <- place_entries(places) do
       {:ok, {:set_host_range, id, entries}}
     end
   end
 
-  def decode(%{"op" => "set_wcvp", "taxon" => taxon}, payload) do
-    with {:ok, id} <- StableRef.resolve_taxon(taxon),
+  defp decode_edit(%{"op" => "set_wcvp", "taxon" => taxon}, payload, resolve) do
+    with {:ok, id} <- resolve.(taxon),
          {:ok, synced_at} <- synced_at(payload["wcvp_synced_at"]) do
       attrs =
         for field <- @link_fields, Map.has_key?(payload, Atom.to_string(field)), into: %{} do
@@ -216,7 +243,37 @@ defmodule Gallformers.Import.TaxonomyEdits do
     end
   end
 
-  def decode(_key, _payload), do: :unknown
+  defp decode_edit(_key, _payload, _resolve), do: :unknown
+
+  # Whether the taxon holds the state the edit sets already.
+  defp done?({:update_editorial, id, attrs}),
+    do: id |> Taxa.get_taxon!() |> Taxa.Taxon.editorial_changeset(attrs) |> unchanged?()
+
+  defp done?({:set_authorship, id, authorship}) do
+    value =
+      if is_binary(authorship) and String.trim(authorship) != "", do: String.trim(authorship)
+
+    Enum.any?(Taxa.get_taxon!(id).names, &(&1.status == :accepted and &1.authorship == value))
+  end
+
+  defp done?({:set_host_range, id, entries}) do
+    held =
+      for p <- Ranges.get_places_for_taxon_with_precision(id),
+          do: {p.place_id, p.precision, p.distribution_type}
+
+    MapSet.new(held) == MapSet.new(Ranges.normalize_taxon_places(entries))
+  end
+
+  defp done?({:set_wcvp, id, attrs}) do
+    case Wcvp.get_link(id) do
+      nil -> false
+      link -> link |> TaxonWcvp.changeset(attrs) |> unchanged?()
+    end
+  end
+
+  defp done?(_edit), do: false
+
+  defp unchanged?(%Ecto.Changeset{changes: changes}), do: changes == %{}
 
   # What still being decided names a taxon only in JSON (`Gallformers.Import.RecordRefs`),
   # as `Gallformers.Taxa.references/1` gives foreign keys.

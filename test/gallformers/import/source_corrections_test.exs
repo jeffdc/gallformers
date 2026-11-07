@@ -403,6 +403,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       _ = host!(ctx.gall, ctx.rubus, words)
 
       assert {:ok, 1} = Replay.run(logged, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(logged, test_actor())
       assert Facts.get_attribution(fact.id, ctx.paper.id) == nil
 
       assert %Attribution{} =
@@ -414,6 +415,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
 
       count = length(Import.list_source_corrections(ctx.paper.id))
       assert {:ok, 1} = Replay.run(logged, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(logged, test_actor())
       assert length(Import.list_source_corrections(ctx.paper.id)) == count
     end
   end

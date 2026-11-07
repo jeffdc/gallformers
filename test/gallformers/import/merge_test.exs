@@ -195,6 +195,7 @@ defmodule Gallformers.Import.MergeTest do
 
       # Decided already: replaying the decision is skipped.
       assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again([entry], test_actor())
     end
 
     test "Galls pointing at the absorbed one are re-pointed", ctx do
@@ -272,6 +273,7 @@ defmodule Gallformers.Import.MergeTest do
 
       # Done already: skipped.
       assert {:ok, 1} = Replay.run(Import.list_replay_entries(), actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(Import.list_replay_entries(), test_actor())
     end
   end
 
