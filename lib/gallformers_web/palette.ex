@@ -3,13 +3,25 @@ defmodule GallformersWeb.Palette do
   What the command palette offers (design system, matters bc0d and ec2c):
   groups of rows, each row a place to go.
 
-  With nothing typed: the fixed Go to list, and for a curator their
-  commands (Edit this page, Add from observation…, Sources to review,
-  Changes). For a query: Go to shortcuts into the ID tool ("Galls on
-  *Quercus alba*", "… in Virginia", "Galls in Virginia"), for a curator
-  "Review: <Source>" for each Source found that has an import under review,
-  then the matches by kind (`Gallformers.Search.global_search/2`, and
-  published articles by title), and last, every result on the search page.
+  With nothing typed: for a curator whose tray holds changes, Your changes
+  first (Review and apply, then the changes, `Gallformers.Curation.summary/1`'s
+  lines); then the fixed Go to list, and for a curator their commands (Edit
+  this page, Add from observation…, Sources to review, Changes).
+
+  For a query: the commands whose words the typed words start (Go to's,
+  a curator's, and Review and apply while their tray holds changes), then
+  Go to shortcuts into the ID tool ("Galls on *Quercus alba*", "… in
+  Virginia", "Galls in Virginia"), for a curator "Review: <Source>" for
+  each Source found that has an import under review, then the matches by
+  kind (`Gallformers.Search.global_search/2`, and published articles by
+  title), and last, every result on the search page. Commands come first
+  when the typed words start words of a command's name; when they match
+  only its other words (its description and synonyms), or the query is a
+  single character, the commands come after the results, just before every
+  result.
+
+  A row is a place to go (`href`), or with `action: :review` opens the
+  tray's Review and apply (`GallformersWeb.TrayLive`).
 
   Rows are numbered (`index`) across the groups, for the keyboard.
   """
@@ -24,71 +36,160 @@ defmodule GallformersWeb.Palette do
           name: boolean(),
           prefix: String.t() | nil,
           suffix: String.t() | nil,
+          action: :review | nil,
           index: non_neg_integer()
         }
 
   @type group :: %{title: String.t() | nil, rows: [row()]}
 
+  @typedoc "A curator's tray (`Gallformers.Curation.summary/1`)."
+  @type changes :: %{count: non_neg_integer(), lines: [String.t()]} | nil
+
+  # How many of the tray's changes the palette lists.
+  @changes_shown 5
+  # How many commands a query shows.
+  @commands_shown 5
+
   @doc """
   The palette's groups for `query`. Options: `admin?` (a curator's
-  commands).
+  commands) and `changes` (a curator's tray, `Gallformers.Curation.summary/1`).
   """
   @spec groups(String.t(), keyword()) :: [group()]
   def groups(query, opts \\ []) do
     admin? = Keyword.get(opts, :admin?, false)
+    changes = if admin?, do: Keyword.get(opts, :changes)
 
     case String.trim(query) do
-      "" -> start(admin?)
-      q -> results(q, admin?)
+      "" -> start(admin?, changes)
+      q -> results(q, admin?, changes)
     end
     |> Enum.reject(&(&1.rows == []))
     |> number()
   end
 
-  defp start(admin?) do
+  defp start(admin?, changes) do
     [
-      %{
-        title: "Go to",
-        rows: [
-          row(
-            "ph-magnifying-glass-plus",
-            "Identify a gall",
-            "/id",
-            "Start from the plant it's on"
-          ),
-          row("gf-gall", "Browse galls", "/galls", "By what causes them"),
-          row("gf-host", "Browse host plants", "/hosts"),
-          row("gf-place", "Browse places", "/places"),
-          row("ph-article", "Articles", "/articles"),
-          row("ph-tree-structure", "Identification keys", "/keys"),
-          row("ph-book-open", "Glossary", "/glossary")
-        ]
-      },
-      %{
-        title: "Curators",
-        rows:
-          if(admin?,
-            do: [
-              row("ph-pencil-simple", "Edit this page", "?edit", "Turn on Edit here"),
-              row(
-                "ph-eye",
-                "Add from observation…",
-                "/admin/observation",
-                "An iNaturalist observation into your tray"
-              ),
-              row("ph-check-circle", "Sources to review", "/admin/review"),
-              row("ph-list", "Changes", "/admin/changes", "What curators changed")
-            ],
-            else: []
-          )
-      }
+      %{title: "Your changes", rows: your_changes(changes)},
+      %{title: "Go to", rows: Enum.map(go_to(), &elem(&1, 0))},
+      %{title: "Curators", rows: Enum.map(curators(admin?, nil), &elem(&1, 0))}
     ]
   end
+
+  # Each command with the other words it is found by (besides its name and
+  # description).
+  defp go_to do
+    [
+      {row(
+         "ph-magnifying-glass-plus",
+         "Identify a gall",
+         "/id",
+         "Start from the plant it's on"
+       ), ~w(id tool)},
+      {row("gf-gall", "Browse galls", "/galls", "By what causes them"), []},
+      {row("gf-host", "Browse host plants", "/hosts"), ~w(hosts)},
+      {row("gf-place", "Browse places", "/places"), []},
+      {row("ph-article", "Articles", "/articles"), []},
+      {row("ph-tree-structure", "Identification keys", "/keys"), []},
+      {row("ph-book-open", "Glossary", "/glossary"), ~w(terms)}
+    ]
+  end
+
+  defp curators(false, _changes), do: []
+
+  defp curators(true, changes) do
+    review_and_apply(changes) ++
+      [
+        {row("ph-pencil-simple", "Edit this page", "?edit", "Turn on Edit here"), []},
+        {row(
+           "ph-eye",
+           "Add from observation…",
+           "/admin/observation",
+           "An iNaturalist observation into your tray"
+         ), ~w(inat intake)},
+        {row("ph-check-circle", "Sources to review", "/admin/review"), ~w(imports)},
+        {row("ph-list", "Changes", "/admin/changes", "What curators changed"), ~w(history recent)}
+      ]
+  end
+
+  # Review and apply, while the tray holds changes (a command when typed).
+  defp review_and_apply(%{count: count} = changes) when count > 0,
+    do: [{review_row(changes), ~w(tray changes)}]
+
+  defp review_and_apply(_changes), do: []
+
+  defp your_changes(%{count: count, lines: lines} = changes) when count > 0 do
+    [
+      review_row(changes)
+      | for(line <- Enum.take(lines, @changes_shown), do: review(row("ph-pencil", line, "#")))
+    ]
+  end
+
+  defp your_changes(_changes), do: []
+
+  defp review_row(%{count: count}),
+    do:
+      review(
+        row(
+          "ph-check",
+          "Review and apply",
+          "#",
+          "#{count} #{if count == 1, do: "change", else: "changes"} in your tray"
+        )
+      )
+
+  defp review(row), do: %{row | action: :review}
+
+  # The commands the typed words find: {by name, by other words}. Each word
+  # typed must start a word of the command (its name; else its name,
+  # description and synonyms).
+  defp commands(q, admin?, changes), do: commands_for(words(q), admin?, changes)
+
+  # Punctuation alone has no words to match.
+  defp commands_for([], _admin?, _changes), do: {[], []}
+
+  defp commands_for(typed, admin?, changes) do
+    {by_name, by_other} =
+      (go_to() ++ curators(admin?, changes))
+      |> Enum.map(fn {row, also} -> {row, match(typed, row, also)} end)
+      |> Enum.reject(&(elem(&1, 1) == nil))
+      |> Enum.split_with(&(elem(&1, 1) == :name))
+
+    {Enum.map(by_name, &elem(&1, 0)), Enum.map(by_other, &elem(&1, 0))}
+  end
+
+  defp match(typed, row, also) do
+    name = words(row.label)
+
+    cond do
+      starts_all?(typed, name) -> :name
+      starts_all?(typed, name ++ words(row.detail || "") ++ also) -> :other
+      true -> nil
+    end
+  end
+
+  defp starts_all?(typed, words),
+    do: Enum.all?(typed, fn t -> Enum.any?(words, &String.starts_with?(&1, t)) end)
+
+  defp words(text), do: text |> String.downcase() |> String.split(~r/[^\p{L}\p{N}]+/u, trim: true)
 
   # A package still being reviewed (`GallformersWeb.Admin.ReviewLive.Loader`'s).
   @reviewable [:validated, :resolving, :awaiting_review]
 
-  defp results(q, admin?) do
+  defp results(q, admin?, changes) do
+    {by_name, by_other} = commands(q, admin?, changes)
+
+    {first, last} =
+      if String.length(q) > 1 and by_name != [],
+        do: {by_name ++ by_other, []},
+        else: {[], by_name ++ by_other}
+
+    q
+    |> search_groups(admin?)
+    |> List.insert_at(0, %{title: "Commands", rows: Enum.take(first, @commands_shown)})
+    |> List.insert_at(-2, %{title: "Commands", rows: Enum.take(last, @commands_shown)})
+  end
+
+  defp search_groups(q, admin?) do
     found = Search.global_search(q)
 
     groups =
@@ -193,7 +294,8 @@ defmodule GallformersWeb.Palette do
       detail: detail,
       name: false,
       prefix: nil,
-      suffix: nil
+      suffix: nil,
+      action: nil
     }
 
   # A row whose label is a scientific name.

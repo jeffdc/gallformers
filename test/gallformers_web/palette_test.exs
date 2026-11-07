@@ -41,6 +41,93 @@ defmodule GallformersWeb.PaletteTest do
     end
   end
 
+  describe "a curator's changes" do
+    @changes %{
+      count: 2,
+      lines: ["Andricus foo gall: Completeness: complete", "Quercus bar: Name"],
+      oldest_at: nil
+    }
+
+    test "with nothing typed, first: Review and apply, then each change, each opening Review" do
+      [first | _] = Palette.groups("", admin?: true, changes: @changes)
+
+      assert first.title == "Your changes"
+
+      assert labels(first) == [
+               "Review and apply",
+               "Andricus foo gall: Completeness: complete",
+               "Quercus bar: Name"
+             ]
+
+      assert hd(first.rows).detail == "2 changes in your tray"
+      assert first.rows |> Enum.map(& &1.action) |> Enum.uniq() == [:review]
+    end
+
+    test "none with an empty tray, or for anyone but a curator" do
+      empty = %{count: 0, lines: [], oldest_at: nil}
+
+      assert group(Palette.groups("", admin?: true, changes: empty), "Your changes") == nil
+      assert group(Palette.groups("", admin?: true), "Your changes") == nil
+      assert group(Palette.groups("", admin?: false, changes: @changes), "Your changes") == nil
+    end
+
+    test "typed: Review and apply is a command, while the tray holds changes" do
+      [row] = group(Palette.groups("apply", admin?: true, changes: @changes), "Commands").rows
+
+      assert {row.label, row.action, row.detail} ==
+               {"Review and apply", :review, "2 changes in your tray"}
+
+      assert group(Palette.groups("apply", admin?: true), "Commands") == nil
+    end
+  end
+
+  describe "commands, typed" do
+    test "match the typed text, in their own group, for a curator" do
+      groups = Palette.groups("observation", admin?: true)
+
+      assert labels(group(groups, "Commands")) == ["Add from observation…"]
+      assert hrefs(group(groups, "Commands")) == ["/admin/observation"]
+    end
+
+    test "each word typed starts a word of the command, in any case" do
+      assert labels(group(Palette.groups("ADD OBS", admin?: true), "Commands")) ==
+               ["Add from observation…"]
+
+      assert labels(group(Palette.groups("edit", admin?: true), "Commands")) == ["Edit this page"]
+
+      assert "Sources to review" in labels(
+               group(Palette.groups("review", admin?: true), "Commands")
+             )
+
+      assert "Changes" in labels(group(Palette.groups("changes", admin?: true), "Commands"))
+    end
+
+    test "the curator's commands are a curator's only; the Go to list is everyone's" do
+      assert group(Palette.groups("observation", admin?: false), "Commands") == nil
+
+      assert labels(group(Palette.groups("glossary", admin?: false), "Commands")) == ["Glossary"]
+
+      assert labels(group(Palette.groups("identify", admin?: false), "Commands")) == [
+               "Identify a gall"
+             ]
+    end
+
+    test "a match on a command's name comes first; one on its other words, after the results" do
+      by_name = Palette.groups("observation", admin?: true)
+      assert hd(by_name).title == "Commands"
+
+      # "iNaturalist" is only in the description of Add from observation…
+      by_other_words = Palette.groups("inaturalist", admin?: true)
+      assert Enum.at(by_other_words, -2).title == "Commands"
+      assert labels(Enum.at(by_other_words, -2)) == ["Add from observation…"]
+    end
+
+    test "no command matches a search for a name, or punctuation alone" do
+      assert group(Palette.groups("quercus", admin?: true), "Commands") == nil
+      assert group(Palette.groups("…", admin?: true), "Commands") == nil
+    end
+  end
+
   describe "for a query" do
     test "a plant: Galls on it in the ID tool, and its page" do
       plant = plant_fixture(name: "Quercus paletteana")
