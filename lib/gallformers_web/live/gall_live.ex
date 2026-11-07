@@ -5,8 +5,10 @@ defmodule GallformersWeb.GallLive do
   `Gallformers.Catalog.gall_page/1`: its Inducer's lineage, name and
   generation, the other generation, Hosts, Traits, the Gallformers ID Notes
   (pinned, in full), its Sources by year (each opens in the reader; a
-  `?source=` link opens it there directly), its photos, the range map
-  (framed on the native range; Enlarge opens a large map) and its names.
+  `?source=` link opens it there directly), its Facts with their Sources
+  (`Gallformers.Import.facts_for_gall/1`, the history collapsed), its
+  photos, the range map (framed on the native range; Enlarge opens a large
+  map) and its names.
   An unknown or malformed ID is a 404.
   """
   use GallformersWeb, :live_view
@@ -21,6 +23,8 @@ defmodule GallformersWeb.GallLive do
     Markdown,
     Places
   }
+
+  import GallformersWeb.FactsComponents, only: [facts_view: 1, entries: 1]
 
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
@@ -260,10 +264,19 @@ defmodule GallformersWeb.GallLive do
            modal_font_size: :base,
            sources_expanded: false,
            sources_order: :asc,
-           map_open: false
+           map_open: false,
+           facts: load_facts(socket, gall_id)
          )}
     end
   end
+
+  # The Gall's Facts with their Sources, read on the connected mount (and
+  # again after an apply): the first render, what search engines read, has
+  # the page without waiting for them.
+  defp load_facts(socket, gall_id),
+    do: if(connected?(socket), do: Import.facts_for_gall(gall_id))
+
+  defp current_count(entries), do: Enum.count(entries, &(&1.standing in [nil, :current]))
 
   # The breadcrumb: the (first) Inducer's lineage, the ranks that have a
   # page (family … genus), each linked by its encoded name.
@@ -555,7 +568,8 @@ defmodule GallformersWeb.GallLive do
     assigns =
       assign(assigns,
         note: Enum.find(assigns.sources, & &1.note?),
-        listed: listed_sources(assigns.sources, assigns.sources_order)
+        listed: listed_sources(assigns.sources, assigns.sources_order),
+        fact_entries: entries(assigns.facts || [])
       )
 
     ~H"""
@@ -603,6 +617,18 @@ defmodule GallformersWeb.GallLive do
           >
             {trait_value(@traits, label)}
           </:meta>
+          <:action :if={@editing}>
+            <%!-- The dialog is the Editor's (GallLive.Editor). --%>
+            <.button
+              id="add-from-observation"
+              variant="secondary"
+              icon="ph-eye"
+              phx-click="open_observation"
+              phx-target="#gall-editor"
+            >
+              Add from observation…
+            </.button>
+          </:action>
           <:action :if={@curator}>
             <.edit_toggle editing={@editing} path={"/gall/#{@gall.id}"} />
           </:action>
@@ -822,6 +848,22 @@ defmodule GallformersWeb.GallLive do
               >
                 Show all {length(@listed)} sources
               </.button>
+            </.section>
+
+            <.section
+              :if={@fact_entries != []}
+              id="gall-facts"
+              title="Facts"
+              count={current_count(@fact_entries)}
+            >
+              <:aside>What Gallformers holds about this gall, with the Sources that say it</:aside>
+              <.facts_view
+                id="gall-facts-view"
+                galls={@facts}
+                mode={:public}
+                gall_header={false}
+                history
+              />
             </.section>
           </div>
 

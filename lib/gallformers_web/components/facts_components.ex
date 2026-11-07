@@ -12,7 +12,11 @@ defmodule GallformersWeb.FactsComponents do
     * `:applied` — the same page once the Source is approved: its applied
       Facts, read-only, each Fact's standing marked when not current;
     * `:public` — the public Source page (`GallformersWeb.SourceLive`):
-      as `:applied`, linking only to public pages.
+      as `:applied`, linking only to public pages; and the public Gall
+      page (`GallformersWeb.GallLive`, `Gallformers.Import.facts_for_gall/1`),
+      one Gall without its header (`gall_header={false}`), each Fact with
+      the Sources stating it (an entry's `sources`) and the Facts no longer
+      current collapsed as its history (`history`).
 
   Each Fact is one tight row: its value in Gallformers' terms, the
   Source's words muted beside it, its mark, and its quotes behind a toggle
@@ -43,6 +47,9 @@ defmodule GallformersWeb.FactsComponents do
   ]
 
   @statuses [:new, :held, :conflict, :waiting, :dropped]
+
+  # The standings of a Fact no longer current, as its history counts them.
+  @past_order [:withdrawn, :superseded, :retracted, :unsupported]
 
   @status_text %{
     new: "new",
@@ -231,6 +238,12 @@ defmodule GallformersWeb.FactsComponents do
   attr :passages, :map, default: %{}
   attr :on_passage, :any, default: nil
   attr :empty, :string, default: "No Facts."
+  attr :gall_header, :boolean, default: true, doc: "each Gall's name over its Facts"
+
+  attr :history, :boolean,
+    default: false,
+    doc: "the Facts not current (withdrawn, superseded, retracted) collapsed under the rest"
+
   slot :editor, doc: "the open edit's form, given the entry"
 
   def facts_view(assigns) do
@@ -256,6 +269,8 @@ defmodule GallformersWeb.FactsComponents do
         passages={@passages}
         on_passage={@on_passage}
         editor={@editor}
+        header={@gall_header}
+        history={@history}
       />
     </div>
     """
@@ -295,19 +310,32 @@ defmodule GallformersWeb.FactsComponents do
   attr :passages, :map, required: true
   attr :on_passage, :any, default: nil
   attr :editor, :list, default: []
+  attr :header, :boolean, default: true
+  attr :history, :boolean, default: false
 
   defp facts_gall(assigns) do
-    categories =
-      for {category, title} <- @category_titles,
-          list = Map.get(assigns.gall.facts, category),
-          list not in [nil, [], %{}],
-          do: {category, title, list}
+    {facts, past} =
+      if assigns.history,
+        do: split_history(assigns.gall.facts),
+        else: {assigns.gall.facts, %{}}
 
-    assigns = assign(assigns, categories: categories)
+    past_entries = past |> Map.values() |> Enum.flat_map(&flatten/1)
+
+    assigns =
+      assign(assigns,
+        categories: categories(facts),
+        past: categories(past),
+        past_counts:
+          past_entries
+          |> Enum.frequencies_by(& &1.standing)
+          |> Enum.sort_by(fn {standing, _n} ->
+            Enum.find_index(@past_order, &(&1 == standing))
+          end)
+      )
 
     ~H"""
     <section id={@id} class="gf-card overflow-hidden" data-role="facts-gall">
-      <header class="px-3 py-2 bg-surface-2 border-b border-line">
+      <header :if={@header} class="px-3 py-2 bg-surface-2 border-b border-line">
         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <h3 class="gf-facts-title text-ink">
             <%= cond do %>
@@ -352,57 +380,134 @@ defmodule GallformersWeb.FactsComponents do
           Left out{if @gall.why, do: ": #{@gall.why}"}; its Facts are not written.
         </p>
       </header>
-      <div class="px-3 py-2 lg:columns-2 lg:gap-6">
-        <div
+      <div class="px-3 py-2 lg:columns-2 lg:gap-6" data-role="current">
+        <.facts_category
           :for={{category, title, list} <- @categories}
-          class="break-inside-avoid mb-2"
-          data-category={category}
-        >
-          <h4 class="gf-facts-category">
-            {title} <span class="font-normal tabular-nums">{count(list)}</span>
-          </h4>
-          <%= if category == :traits do %>
-            <div
-              :for={{trait, rows} <- Enum.sort_by(list, fn {t, _} -> to_string(t) end)}
-              class="flex flex-col gap-x-2 border-t border-line first-of-type:border-t-0 sm:flex-row"
-              data-trait={trait}
-            >
-              <span class="pt-1 text-caption text-ink-2 sm:w-32 sm:shrink-0 sm:py-1">
-                {humanize(trait)}
-              </span>
-              <ul class="min-w-0 flex-1 divide-y divide-line">
-                <.fact_row
-                  :for={e <- rows}
-                  entry={e}
-                  mode={@mode}
-                  editable={@editable}
-                  questions={@questions}
-                  editing={@editing}
-                  passages={@passages}
-                  on_passage={@on_passage}
-                  editor={@editor}
-                />
-              </ul>
-            </div>
-          <% else %>
-            <ul class="divide-y divide-line">
-              <.fact_row
-                :for={e <- list}
-                entry={e}
-                mode={@mode}
-                editable={@editable}
-                questions={@questions}
-                editing={@editing}
-                passages={@passages}
-                on_passage={@on_passage}
-                editor={@editor}
-              />
-            </ul>
-          <% end %>
-        </div>
-        <p :if={@categories == []} class="text-caption italic text-muted">No Facts.</p>
+          category={category}
+          title={title}
+          list={list}
+          mode={@mode}
+          editable={@editable}
+          questions={@questions}
+          editing={@editing}
+          passages={@passages}
+          on_passage={@on_passage}
+          editor={@editor}
+        />
+        <p :if={@categories == []} class="text-caption italic text-muted">
+          {if @past == [], do: "No Facts.", else: "No current Facts."}
+        </p>
       </div>
+      <details :if={@past != []} data-role="history" class="border-t border-line px-3 py-2">
+        <summary class="cursor-pointer text-meta text-link">
+          History: {Enum.map_join(@past_counts, ", ", fn {standing, n} -> "#{n} #{standing}" end)}
+        </summary>
+        <div class="mt-1 lg:columns-2 lg:gap-6">
+          <.facts_category
+            :for={{category, title, list} <- @past}
+            category={category}
+            title={title}
+            list={list}
+            mode={@mode}
+            editable={false}
+            questions={@questions}
+            passages={@passages}
+            on_passage={@on_passage}
+          />
+        </div>
+      </details>
     </section>
+    """
+  end
+
+  # The categories that have Facts, in the page's order.
+  defp categories(facts) do
+    for {category, title} <- @category_titles,
+        list = Map.get(facts, category),
+        list not in [nil, [], %{}],
+        do: {category, title, list}
+  end
+
+  # The Facts current (or not yet written) and those no longer current.
+  defp split_history(facts) do
+    current = fn e -> e.standing in [nil, :current] end
+
+    split =
+      for {category, list} <- facts, into: %{} do
+        {category, split_list(list, current)}
+      end
+
+    {Map.new(split, fn {c, {now, _past}} -> {c, now} end),
+     Map.new(split, fn {c, {_now, past}} -> {c, past} end)}
+  end
+
+  defp split_list(list, current) when is_list(list), do: Enum.split_with(list, current)
+
+  defp split_list(by_trait, current) when is_map(by_trait) do
+    split = for {trait, list} <- by_trait, do: {trait, Enum.split_with(list, current)}
+
+    {for({trait, {now, _past}} <- split, now != [], into: %{}, do: {trait, now}),
+     for({trait, {_now, past}} <- split, past != [], into: %{}, do: {trait, past})}
+  end
+
+  # One category of a Gall's Facts: its title and count, then its rows
+  # (Traits by Trait).
+  attr :category, :atom, required: true
+  attr :title, :string, required: true
+  attr :list, :any, required: true
+  attr :mode, :atom, required: true
+  attr :editable, :boolean, required: true
+  attr :questions, :map, required: true
+  attr :editing, :string, default: nil
+  attr :passages, :map, required: true
+  attr :on_passage, :any, default: nil
+  attr :editor, :list, default: []
+
+  defp facts_category(assigns) do
+    ~H"""
+    <div class="break-inside-avoid mb-2" data-category={@category}>
+      <h4 class="gf-facts-category">
+        {@title} <span class="font-normal tabular-nums">{count(@list)}</span>
+      </h4>
+      <%= if @category == :traits do %>
+        <div
+          :for={{trait, rows} <- Enum.sort_by(@list, fn {t, _} -> to_string(t) end)}
+          class="flex flex-col gap-x-2 border-t border-line first-of-type:border-t-0 sm:flex-row"
+          data-trait={trait}
+        >
+          <span class="pt-1 text-caption text-ink-2 sm:w-32 sm:shrink-0 sm:py-1">
+            {humanize(trait)}
+          </span>
+          <ul class="min-w-0 flex-1 divide-y divide-line">
+            <.fact_row
+              :for={e <- rows}
+              entry={e}
+              mode={@mode}
+              editable={@editable}
+              questions={@questions}
+              editing={@editing}
+              passages={@passages}
+              on_passage={@on_passage}
+              editor={@editor}
+            />
+          </ul>
+        </div>
+      <% else %>
+        <ul class="divide-y divide-line">
+          <.fact_row
+            :for={e <- @list}
+            entry={e}
+            mode={@mode}
+            editable={@editable}
+            questions={@questions}
+            editing={@editing}
+            passages={@passages}
+            on_passage={@on_passage}
+            editor={@editor}
+          />
+        </ul>
+      <% end %>
+    </div>
     """
   end
 
@@ -528,6 +633,7 @@ defmodule GallformersWeb.FactsComponents do
         shown: shown_names(entry),
         written: written(entry),
         quotes: Enum.with_index(entry.words.evidence),
+        sources: Map.get(entry, :sources, []),
         editable: assigns.editable and is_binary(entry.ref) and assigns.mode == :preview,
         dropped_by_edit: Enum.any?(entry.edits, &(&1.kind == :drop))
       )
@@ -545,6 +651,14 @@ defmodule GallformersWeb.FactsComponents do
         </span>
         <span :if={@written != []} class="text-caption text-muted" title="The Source's words">
           {Enum.map_join(@written, " · ", &"“#{&1}”")}
+        </span>
+        <span :if={@sources != []} class="text-caption text-muted" data-part="sources">
+          <span :for={{source, i} <- Enum.with_index(@sources)}>
+            {if i > 0, do: " · "}{if source.stance == :deny, do: "denied by "}<.link
+              navigate={"/source/#{source.source_id}"}
+              class="hover:underline"
+            >{source.name}</.link>
+          </span>
         </span>
         <span class="ml-auto flex items-center gap-2">
           <button

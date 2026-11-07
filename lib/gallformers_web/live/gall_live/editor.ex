@@ -12,7 +12,8 @@ defmodule GallformersWeb.GallLive.Editor do
     * a Trait value: ✕ withdraws it; a Trait's Add adds one;
     * Add a host, found by name;
     * Add from observation… (`GallformersWeb.ObservationIntake`, this Gall
-      given).
+      given), opened from the page header's button beside the Edit toggle
+      (`open_observation`, targeted at this component).
 
   What is already in the tray is marked on the page (`pending_for/2`). The
   page refreshes this component when the tray changes elsewhere
@@ -613,15 +614,6 @@ defmodule GallformersWeb.GallLive.Editor do
           </.button>
           <.button size="sm" variant="secondary" icon="ph-map-trifold" phx-click="open_range">
             Range exclusions…
-          </.button>
-          <.button
-            size="sm"
-            variant="secondary"
-            icon="ph-eye"
-            phx-click="open_observation"
-            phx-target={@myself}
-          >
-            Add from observation…
           </.button>
         </div>
       </.panel>

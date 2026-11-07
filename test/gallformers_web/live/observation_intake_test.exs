@@ -93,6 +93,25 @@ defmodule GallformersWeb.ObservationIntakeTest do
       assert has_element?(view, "#observation-intake-read input[name=url]")
     end
 
+    test "Add from observation… sits beside the Edit toggle, not in the Editorial panel", ctx do
+      {:ok, view, _html} = live(ctx.conn, ~p"/gall/#{ctx.gall.id}?edit")
+
+      assert has_element?(view, "header [data-part=actions] button", "Add from observation…")
+      refute has_element?(view, "#editorial button", "Add from observation…")
+
+      view
+      |> element("header [data-part=actions] button", "Add from observation…")
+      |> render_click()
+
+      assert has_element?(view, "#observation-dialog #observation-intake-read")
+    end
+
+    test "with Edit off, there is no Add from observation…", ctx do
+      {:ok, view, _html} = live(ctx.conn, ~p"/gall/#{ctx.gall.id}")
+
+      refute has_element?(view, "button", "Add from observation…")
+    end
+
     test "its proposals go into the tray, each with the observation as evidence", ctx do
       stub_inat!(observation(ctx))
       {:ok, view, _html} = live(ctx.conn, ~p"/gall/#{ctx.gall.id}?edit")
@@ -203,6 +222,101 @@ defmodule GallformersWeb.ObservationIntakeTest do
       view |> element("#observation-intake-add") |> render_click()
 
       assert items(ctx.actor) |> Enum.map(& &1.spec.gall_id) |> Enum.uniq() == [ctx.gall.id]
+    end
+
+    test "when the Host must be given, it is picked by name and goes into the tray", ctx do
+      oak = plant_fixture(name: "Quercus pickedwebobs")
+      stub_inat!(observation(ctx, %{"description" => nil}))
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin/observation")
+      read(view)
+
+      need = "No Host found in the observation"
+      assert has_element?(view, "#observation-intake [role=status]", need)
+
+      view
+      |> with_target("#observation-intake")
+      |> render_hook("search_host", %{"value" => "pickedweb"})
+
+      view |> element("#observation-intake-host [phx-value-id='#{oak.id}']") |> render_click()
+
+      # After the occurrence (0), ticked.
+      assert has_element?(
+               view,
+               "#observation-intake [data-part=item]:has(input[phx-value-index='1'][checked])",
+               "Quercus pickedwebobs"
+             )
+
+      refute has_element?(view, "#observation-intake [role=status]", need)
+
+      view |> element("#observation-intake-add") |> render_click()
+
+      assert [host] = Enum.filter(items(ctx.actor), &match?({:host, _}, &1.spec.key))
+      assert host.spec.key == {:host, oak.id}
+      assert host.spec.gall_id == ctx.gall.id
+      assert [%{provider: "inaturalist", id: "5151"}] = host.evidence.observations
+    end
+
+    test "a plant already proposed is ticked, not offered twice", ctx do
+      host_field = %{
+        "name" => "Host Plant ID",
+        "datatype" => "taxon",
+        "value" => "54780",
+        "taxon" => %{"id" => 54_780, "name" => "Quercus webcurata"}
+      }
+
+      stub_inat!(observation(ctx, %{"ofvs" => [host_field], "description" => nil}))
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin/observation")
+      read(view)
+
+      # Items: the occurrence (0), then the Host (1). Untick the Host.
+      host_box = "#observation-intake [data-part=item] input[phx-value-index='1']"
+      view |> element(host_box) |> render_click()
+      refute has_element?(view, "#{host_box}[checked]")
+
+      view
+      |> with_target("#observation-intake")
+      |> render_hook("search_host", %{"value" => "webcurata"})
+
+      view |> element("#observation-intake-host [phx-value-id='#{ctx.oak.id}']") |> render_click()
+
+      assert has_element?(view, "#{host_box}[checked]")
+      refute has_element?(view, "#observation-intake [data-part=item] input[phx-value-index='2']")
+    end
+
+    test "the chosen Gall links to its page in Edit mode", ctx do
+      stub_inat!(observation(ctx))
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin/observation")
+      read(view)
+
+      assert has_element?(
+               view,
+               "#observation-intake a[href='/gall/#{ctx.gall.id}?edit']",
+               "Open this Gall in Edit mode"
+             )
+    end
+  end
+
+  describe "the Host picker in the Gall page's dialog" do
+    test "adds the Host picked to the tray, for this Gall", ctx do
+      oak = plant_fixture(name: "Quercus dialogwebobs")
+      stub_inat!(observation(ctx, %{"description" => nil}))
+      {:ok, view, _html} = live(ctx.conn, ~p"/gall/#{ctx.gall.id}?edit")
+      view |> element("button", "Add from observation…") |> render_click()
+      read(view)
+
+      view
+      |> with_target("#observation-intake")
+      |> render_hook("search_host", %{"value" => "dialogweb"})
+
+      view |> element("#observation-intake-host [phx-value-id='#{oak.id}']") |> render_click()
+      view |> element("#observation-intake-add") |> render_click()
+
+      assert [host] = Enum.filter(items(ctx.actor), &match?({:host, _}, &1.spec.key))
+      assert host.spec.key == {:host, oak.id}
+      assert host.spec.gall_id == ctx.gall.id
+
+      # On the Gall's own page there's no link to it.
+      refute has_element?(view, "#observation-intake a[href='/gall/#{ctx.gall.id}?edit']")
     end
   end
 end

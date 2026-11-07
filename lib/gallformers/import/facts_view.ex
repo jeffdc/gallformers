@@ -65,6 +65,7 @@ defmodule Gallformers.Import.FactsView do
   alias Gallformers.Facts.Fact
   alias Gallformers.Places.Place
   alias Gallformers.Repo
+  alias Gallformers.Sources
   alias Gallformers.Sources.DocumentItem
   alias Gallformers.Taxa.Taxon
   alias Gallformers.Taxa.TaxonName
@@ -129,14 +130,55 @@ defmodule Gallformers.Import.FactsView do
   @spec entries(integer(), [integer()]) :: [entry()]
   def entries(_source_id, []), do: []
 
-  def entries(source_id, fact_ids) when is_integer(source_id) and is_list(fact_ids) do
+  def entries(source_id, fact_ids) when is_integer(source_id) and is_list(fact_ids),
+    do: build(source_id, fact_ids, Facts.list_attributions_for_facts(fact_ids))
+
+  @doc """
+  The entries of the gall Facts among `fact_ids` with no one Source's
+  words (as `entries/2`), each with its `sources`: every attribution's
+  Source, `%{source_id, name, stance}` (`name` as
+  `Gallformers.Sources.short_name/1`, else the title), oldest statement
+  first. For a page showing a Gall's Facts from all its Sources.
+  """
+  @spec gall_entries([integer()]) :: [entry()]
+  def gall_entries([]), do: []
+
+  def gall_entries(fact_ids) when is_list(fact_ids) do
+    all = Facts.list_attributions_for_facts(fact_ids)
+    names = all |> Map.values() |> List.flatten() |> source_names()
+
+    for e <- build(nil, fact_ids, all) do
+      sources =
+        all
+        |> Map.get(e.fact_id, [])
+        |> Enum.sort_by(&{&1.stated_on != nil, stated_days(&1.stated_on), &1.id})
+        |> Enum.map(&%{source_id: &1.source_id, name: names[&1.source_id], stance: &1.stance})
+
+      Map.put(e, :sources, sources)
+    end
+  end
+
+  # A statement's date as a number to sort by (undated ones sort first on
+  # `stated_on != nil`, Standing's rule 4).
+  defp stated_days(nil), do: nil
+  defp stated_days(%Date{} = date), do: Date.to_gregorian_days(date)
+
+  defp source_names(attributions) do
+    attributions
+    |> Enum.map(& &1.source_id)
+    |> Enum.uniq()
+    |> Sources.list_sources_by_id()
+    |> Map.new(&{&1.id, Sources.short_name(&1) || &1.title})
+  end
+
+  defp build(source_id, fact_ids, all) do
     facts = Repo.all(from(f in Fact, where: f.id in ^fact_ids)) |> Map.new(&{&1.id, &1})
     details = details(fact_ids)
 
     attributions =
-      fact_ids
-      |> Facts.list_attributions_for_facts()
-      |> Map.new(fn {id, list} -> {id, Enum.find(list, &(&1.source_id == source_id))} end)
+      Map.new(all, fn {id, list} ->
+        {id, source_id && Enum.find(list, &(&1.source_id == source_id))}
+      end)
 
     names = names(details)
     items = items(Map.values(attributions))
