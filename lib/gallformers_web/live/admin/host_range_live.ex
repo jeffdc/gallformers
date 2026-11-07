@@ -592,60 +592,47 @@ defmodule GallformersWeb.Admin.HostRangeLive do
           <%!-- Sync progress --%>
           <.notice :if={@processing} kind={:info} icon="ph-arrows-clockwise">
             {processing_label(@processing)}: {@processing.done} / {@processing.total}
-            <progress
-              class="mt-2 block h-2 w-full accent-brand"
+            <.progress_bar
+              id="host-range-progress"
               value={@processing.done}
-              max={max(@processing.total, 1)}
-            >
-              {@processing.done} / {@processing.total}
-            </progress>
+              max={@processing.total}
+              label={processing_label(@processing)}
+              class="mt-2"
+            />
           </.notice>
 
-          <%!-- Selection and bulk actions --%>
-          <div class="flex flex-wrap items-center gap-2">
-            <label class="mr-2 inline-flex cursor-pointer items-center gap-2 text-ui text-ink-2">
-              <input
-                type="checkbox"
-                id="host-range-select-all"
-                checked={MapSet.size(@selected_ids) == length(@hosts) and length(@hosts) > 0}
-                phx-click={
-                  if MapSet.size(@selected_ids) == length(@hosts),
-                    do: "deselect_all",
-                    else: "select_all"
-                }
-                class="gf-checkbox"
-                disabled={@processing != nil}
-              /> Select all on this page
-            </label>
-            <%= if MapSet.size(@selected_ids) > 0 and is_nil(@processing) do %>
-              <.button variant="primary" icon="ph-check" phx-click="confirm_selected">
-                Confirm Selected ({MapSet.size(@selected_ids)})
-              </.button>
-              <.button icon="ph-link" phx-click="match_selected">
-                Match Selected to WCVP
-              </.button>
-              <.button icon="ph-arrows-clockwise" phx-click="sync_selected">
-                Sync Selected from WCVP
-              </.button>
-              <.button variant="ghost" phx-click="ignore_selected">Ignore Selected</.button>
-              <.button variant="ghost" phx-click="unignore_selected">Clear Match Status</.button>
-              <.button variant="ghost" phx-click="deselect_all">Clear selection</.button>
-            <% end %>
+          <%!-- Bulk actions on the selection --%>
+          <div
+            :if={MapSet.size(@selected_ids) > 0 and is_nil(@processing)}
+            class="flex flex-wrap items-center gap-2"
+          >
+            <.button variant="primary" icon="ph-check" phx-click="confirm_selected">
+              Confirm Selected ({MapSet.size(@selected_ids)})
+            </.button>
+            <.button icon="ph-link" phx-click="match_selected">
+              Match Selected to WCVP
+            </.button>
+            <.button icon="ph-arrows-clockwise" phx-click="sync_selected">
+              Sync Selected from WCVP
+            </.button>
+            <.button variant="ghost" phx-click="ignore_selected">Ignore Selected</.button>
+            <.button variant="ghost" phx-click="unignore_selected">Clear Match Status</.button>
+            <.button variant="ghost" phx-click="deselect_all">Clear selection</.button>
           </div>
 
           <%!-- Table --%>
-          <.data_table id="host-range-hosts" rows={@hosts} row_id={&"host-#{&1.id}"}>
-            <:col :let={host}>
-              <input
-                type="checkbox"
-                checked={MapSet.member?(@selected_ids, host.id)}
-                phx-click="toggle_select"
-                phx-value-id={host.id}
-                aria-label={"Select #{host.name}"}
-                class="gf-checkbox align-middle"
-                disabled={@processing != nil}
-              />
-            </:col>
+          <.data_table
+            id="host-range-hosts"
+            rows={@hosts}
+            row_id={&"host-#{&1.id}"}
+            selectable
+            selected={@selected_ids}
+            select_event="toggle_select"
+            select_label={&"Select #{&1.name}"}
+            select_all="select_all"
+            select_none="deselect_all"
+            select_disabled={@processing != nil}
+          >
             <:col :let={host} label="Host" grow>
               <.link navigate={~p"/admin/taxonomy/#{host.id}"}>
                 <.taxon_name name={host.name} />

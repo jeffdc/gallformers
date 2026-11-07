@@ -95,7 +95,7 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
     test "select all and clear selection", %{conn: conn} = ctx do
       {:ok, view, _html} = live(conn, review(ctx.tag))
 
-      view |> element("#host-range-select-all") |> render_click()
+      view |> element("#host-range-hosts-select-all") |> render_click()
       assert render(view) =~ "Confirm Selected (2)"
 
       view |> element("button", "Clear selection") |> render_click()

@@ -18,15 +18,28 @@ defmodule GallformersWeb.UIComponents do
   @doc """
   Renders a loading spinner.
 
+  `tone` `:brand` (the default) suits a page or panel; `:current` takes the
+  text colour around it, for a spinner inside a button (on a primary
+  button's fill it is `text-on-fill`).
+
   ## Examples
 
       <.loading_spinner />
       <.loading_spinner size="lg" />
       <.loading_spinner size="sm" label="Loading data..." />
+      <.button variant="primary" disabled>
+        <.loading_spinner size="sm" tone={:current} label="Loading" /> Loading…
+      </.button>
   """
   attr :size, :string, default: "md", values: ~w(sm md lg), doc: "spinner size"
   attr :label, :string, default: "Loading", doc: "accessible label for screen readers"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
+
+  attr :tone, :atom,
+    default: :brand,
+    values: [:brand, :current],
+    doc: ":brand, or :current (the text colour around it: inside a button)"
+
+  attr :class, :any, default: nil, doc: "layout only"
 
   def loading_spinner(assigns) do
     size_classes = %{
@@ -39,7 +52,7 @@ defmodule GallformersWeb.UIComponents do
 
     ~H"""
     <svg
-      class={["animate-spin text-brand", @size_class, @class]}
+      class={["animate-spin", @tone == :brand && "text-brand", @size_class, @class]}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"

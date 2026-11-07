@@ -112,39 +112,17 @@ defmodule GallformersWeb.Admin.ImagesComponent do
             <span :if={@images != [] && @view_mode == :grid}>
               Drag to reorder. First image is the default.
             </span>
-            <span
-              class="inline-flex overflow-hidden rounded-ctl border border-line-strong"
-              role="group"
-              aria-label="View"
+            <.segmented_switch
+              label="View"
+              value={@view_mode}
+              event="toggle_view"
+              param="view"
+              target={@myself}
+              disabled={@copy_mode != nil}
             >
-              <button
-                :for={
-                  {view, icon, label} <- [
-                    {:grid, "ph-squares-four", "Grid view"},
-                    {:table, "ph-list", "Table view"}
-                  ]
-                }
-                type="button"
-                phx-click="toggle_view"
-                phx-value-view={view}
-                phx-target={@myself}
-                disabled={@copy_mode != nil}
-                aria-pressed={to_string(@view_mode == view)}
-                aria-label={label}
-                title={label}
-                class={[
-                  "flex h-7 items-center px-2.5 disabled:cursor-not-allowed",
-                  view == :table && "border-l border-line-strong",
-                  cond do
-                    @view_mode == view -> "bg-brand-fill text-on-fill"
-                    @copy_mode -> "bg-surface-2 text-muted"
-                    true -> "bg-surface text-ink-2 hover:bg-surface-2"
-                  end
-                ]}
-              >
-                <.icon name={icon} class="size-4" />
-              </button>
-            </span>
+              <:option value={:grid} icon="ph-squares-four" label="Grid view" />
+              <:option value={:table} icon="ph-list" label="Table view" />
+            </.segmented_switch>
           </div>
         </:aside>
 
@@ -251,15 +229,6 @@ defmodule GallformersWeb.Admin.ImagesComponent do
               <.notice :if={@copy_mode} title="Copy metadata">
                 Tick the images to copy this image's metadata to. Escape cancels.
                 <:action>
-                  <label class="inline-flex items-center gap-2 text-meta text-ink">
-                    <input
-                      type="checkbox"
-                      phx-click="select_all_targets"
-                      phx-target={@myself}
-                      checked={all_targets_selected?(@copy_mode, @images)}
-                      class="gf-checkbox"
-                    /> Select all
-                  </label>
                   <.button
                     variant="primary"
                     size="sm"
@@ -275,23 +244,21 @@ defmodule GallformersWeb.Admin.ImagesComponent do
                 </:action>
               </.notice>
 
-              <.data_table id={"#{@id}-table"} rows={@images}>
-                <%!-- Checkbox column (copy mode only) --%>
-                <:col :let={image} :if={@copy_mode} label="Copy to">
-                  <%= if image.id == @copy_mode.source_id do %>
-                    <.chip variant={:info} size="sm">From</.chip>
-                  <% else %>
-                    <input
-                      type="checkbox"
-                      phx-click="toggle_copy_target"
-                      phx-value-id={image.id}
-                      phx-target={@myself}
-                      checked={MapSet.member?(@copy_mode.selected_ids, image.id)}
-                      aria-label="Copy to this image"
-                      class="gf-checkbox align-middle"
-                    />
-                  <% end %>
-                </:col>
+              <%!-- In copy mode a checkbox per image to copy to (the source
+                   row has none), with select-all in the header. --%>
+              <.data_table
+                id={"#{@id}-table"}
+                rows={@images}
+                row_attrs={&%{"data-image-id" => &1.id}}
+                row_state={&image_row_state(&1, @copy_mode)}
+                selectable={@copy_mode != nil}
+                selected={(@copy_mode && @copy_mode.selected_ids) || []}
+                selectable_row={&(&1.id != (@copy_mode && @copy_mode.source_id))}
+                select_event="toggle_copy_target"
+                select_label={fn _image -> "Copy to this image" end}
+                select_all="select_all_targets"
+                target={@myself}
+              >
                 <:col :let={image} label="Image">
                   <div class="flex w-16 flex-col items-start gap-1 py-1">
                     <div class="relative">
@@ -317,6 +284,14 @@ defmodule GallformersWeb.Admin.ImagesComponent do
                       data-default-image
                     >
                       Default
+                    </.chip>
+                    <.chip
+                      :if={@copy_mode && image.id == @copy_mode.source_id}
+                      variant={:info}
+                      size="sm"
+                      data-copy-source
+                    >
+                      From
                     </.chip>
                   </div>
                 </:col>
@@ -390,16 +365,12 @@ defmodule GallformersWeb.Admin.ImagesComponent do
           data-accepted-types="image/jpeg,image/png,image/jpg"
           class="flex flex-col items-start gap-block"
         >
-          <%!-- Dropzone --%>
-          <div
-            data-dropzone
-            class="flex w-full cursor-pointer flex-col items-center gap-1 rounded-panel border-2 border-dashed border-line-strong p-6 text-center transition-colors hover:border-brand"
-          >
-            <.icon name="ph-cloud-arrow-up" class="size-10 text-muted" />
-            <p class="text-ui text-ink-2">Drag and drop images here, or click to select</p>
-            <p class="text-meta text-muted">Max 20 files. JPG or PNG only.</p>
-            <input data-file-input type="file" accept="image/jpeg,image/png" multiple class="hidden" />
-          </div>
+          <.file_drop
+            accept="image/jpeg,image/png"
+            multiple
+            label="Drag and drop images here, or click to select"
+            hint="Max 20 files. JPG or PNG only."
+          />
 
           <%!-- Preview Container --%>
           <div data-preview-container class="flex flex-wrap gap-4"></div>
@@ -1155,6 +1126,12 @@ defmodule GallformersWeb.Admin.ImagesComponent do
 
   defp unattributed?(image), do: not Attribution.image_attributed?(image)
 
+  # A table row's tint: the copy's source, then an image needing attribution.
+  defp image_row_state(%{id: id}, %{source_id: id}), do: :info
+
+  defp image_row_state(image, _copy_mode),
+    do: if(unattributed?(image), do: :warn)
+
   # The first image is the default.
   defp default_image?(image, [first | _rest]), do: image.id == first.id
   defp default_image?(_image, []), do: false
@@ -1249,12 +1226,5 @@ defmodule GallformersWeb.Admin.ImagesComponent do
     images
     |> Enum.reject(&(&1.id == copy_mode.source_id))
     |> MapSet.new(& &1.id)
-  end
-
-  defp all_targets_selected?(nil, _images), do: false
-
-  defp all_targets_selected?(copy_mode, images) do
-    targets = target_ids(copy_mode, images)
-    MapSet.equal?(copy_mode.selected_ids, targets) && MapSet.size(targets) > 0
   end
 end

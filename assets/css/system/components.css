@@ -101,6 +101,14 @@
     font-variant-numeric: tabular-nums;
     padding: 0 0.25rem;
   }
+  .gf-chip-recommended {
+    background: color-mix(in srgb, var(--gf-maroon) 10%, transparent);
+    color: var(--gf-maroon);
+    border-color: transparent;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
   .gf-chip-sm { font-size: 0.6875rem; padding: 0 0.375rem; }
   .gf-chip-remove {
     display: inline-flex;
@@ -286,6 +294,26 @@
     cursor: pointer;
   }
   .gf-file:hover::file-selector-button { border-color: var(--gf-maroon); }
+
+  /* progress_bar (FeedbackComponents): a track filled from the left by SVG
+     rects, so neither the server nor the upload hooks need inline styles. */
+  .gf-progress {
+    display: block;
+    width: 100%;
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background-color: var(--gf-line);
+  }
+  .gf-progress-sm { height: 0.375rem; }
+  .gf-progress > svg { display: block; width: 100%; height: 100%; }
+  .gf-progress rect { fill: var(--gf-maroon-fill); transition: width 0.2s ease-out; }
+  .gf-progress rect[data-tone="ok"] { fill: var(--gf-ok); }
+  .gf-progress rect[data-tone="info"] { fill: var(--gf-info); }
+  .gf-progress rect[data-tone="warn"] { fill: var(--gf-warn); }
+  @media (prefers-reduced-motion: reduce) {
+    .gf-progress rect { transition: none; }
+  }
 
   .gf-hint { margin-top: 0.25rem; color: var(--gf-muted); font-size: var(--gf-fs-meta); }
   .gf-error {

@@ -30,8 +30,8 @@ defmodule GallformersWeb.ReviewComponents do
   import GallformersWeb.ActionComponents, only: [button: 1]
   import GallformersWeb.DataComponents, only: [chip: 1]
   import GallformersWeb.DomainComponents, only: [source_quote: 1]
-  import GallformersWeb.FeedbackComponents, only: [notice: 1]
-  import GallformersWeb.FormComponents, only: [search_field: 1]
+  import GallformersWeb.FeedbackComponents, only: [notice: 1, progress_bar: 1]
+  import GallformersWeb.FormComponents, only: [radio_card: 1, search_field: 1]
   import GallformersWeb.PageComponents, only: [panel: 1]
 
   # The rows' columns, as flex items so the column heads line up with the
@@ -273,21 +273,13 @@ defmodule GallformersWeb.ReviewComponents do
   attr :class, :any, default: nil
 
   def review_progress(assigns) do
-    total = max(assigns.total, 1)
-
-    assigns =
-      assign(assigns,
-        done_pct: Float.round(100 * assigns.done / total, 1),
-        proposed_pct: Float.round(100 * assigns.proposed / total, 1)
-      )
-
     ~H"""
-    <div class={["h-1.5 rounded-full bg-line overflow-hidden", @class]} aria-hidden="true">
-      <svg width="100%" height="100%" class="block" preserveAspectRatio="none">
-        <rect width={"#{@done_pct}%"} height="100%" class="fill-ok" />
-        <rect x={"#{@done_pct}%"} width={"#{@proposed_pct}%"} height="100%" class="fill-info" />
-      </svg>
-    </div>
+    <.progress_bar
+      max={@total}
+      segments={[{@done, :ok}, {@proposed, :info}]}
+      size="sm"
+      class={@class}
+    />
     """
   end
 
@@ -817,12 +809,7 @@ defmodule GallformersWeb.ReviewComponents do
           phx-target={@target}
         />
         {label}
-        <span
-          :if={@recommended == value}
-          class="text-caption font-bold uppercase tracking-wider text-brand"
-        >
-          rec.
-        </span>
+        <.chip :if={@recommended == value} variant={:recommended} size="sm">rec.</.chip>
       </label>
     </div>
     """
@@ -1378,74 +1365,36 @@ defmodule GallformersWeb.ReviewComponents do
 
   def review_option(assigns) do
     ~H"""
-    <div
-      class={[
-        "rounded-ctl border px-3 py-2",
-        cond do
-          @checked -> "border-brand bg-brand/5"
-          @recommended -> "border-brand bg-surface"
-          true -> "border-line bg-surface hover:border-line-strong"
-        end
-      ]}
-      data-recommended={@recommended}
-      data-chosen={@checked}
+    <.radio_card
+      id={@id}
+      name={@name}
+      value={@value}
+      checked={@checked}
+      recommended={@recommended}
+      summary={@summary}
+      phx-click={@on_pick}
+      phx-value-choice={@value}
+      phx-target={@target}
     >
-      <label for={@id} class="flex flex-wrap gap-x-2.5 gap-y-0.5 items-start cursor-pointer">
-        <input
-          type="radio"
-          id={@id}
-          name={@name}
-          value={@value}
-          checked={@checked}
-          class="mt-1 size-4 shrink-0 accent-brand-fill"
-          phx-click={@on_pick}
-          phx-value-choice={@value}
-          phx-target={@target}
-        />
-        <span class="min-w-0 flex-1 font-semibold text-ink">
-          {@label}
-          <span
-            :if={@recommended}
-            data-role="recommended"
-            class="ml-1 align-middle rounded-ctl bg-brand/10 px-1.5 text-caption font-bold uppercase tracking-wider text-brand"
-          >
-            Recommended
-          </span>
-          <.chip
-            :for={tag <- @tags}
-            data-role={"tag-#{tag.kind}"}
-            variant={if tag.kind == :conflict, do: :danger, else: :info}
-            size="sm"
-            class="ml-1 align-middle"
-          >
-            {tag.text}
-          </.chip>
-        </span>
-        <span
-          :if={@tally}
-          data-role="tally"
-          class={[
-            "basis-full pl-6.5 md:pl-0 md:basis-auto text-meta md:text-right max-w-72",
-            if(@recommended, do: "font-semibold text-brand", else: "text-muted")
-          ]}
+      <:label>
+        {@label}
+        <.chip
+          :for={tag <- @tags}
+          data-role={"tag-#{tag.kind}"}
+          variant={if tag.kind == :conflict, do: :danger, else: :info}
+          size="sm"
+          class="ml-1"
         >
-          {@tally}
-        </span>
-        <span
-          :if={!@tally and @recommended and @by}
-          class="basis-full pl-6.5 md:pl-0 md:basis-auto text-meta font-semibold text-brand md:text-right max-w-72"
-        >
-          {@by}
-        </span>
-        <span :if={@summary} class="basis-full pl-6.5 text-meta text-muted">
-          {@summary}
-        </span>
-      </label>
-      <div :if={@extra != []} class="mt-1 ml-7 grid gap-1">{render_slot(@extra)}</div>
-      <div :if={@checked and @follow != []} class="mt-2 md:ml-7 grid gap-2" data-role="follow">
-        {render_slot(@follow)}
-      </div>
-    </div>
+          {tag.text}
+        </.chip>
+      </:label>
+      <:aside :if={@tally}><span data-role="tally">{@tally}</span></:aside>
+      <:aside :if={!@tally and @recommended and @by}>{@by}</:aside>
+      <:extra :if={@extra != []}>{render_slot(@extra)}</:extra>
+      <:follow :if={@follow != []}>
+        <div data-role="follow" class="grid gap-2">{render_slot(@follow)}</div>
+      </:follow>
+    </.radio_card>
     """
   end
 
@@ -1469,39 +1418,26 @@ defmodule GallformersWeb.ReviewComponents do
     ~H"""
     <div id={@id} class="grid gap-1 max-h-80 overflow-y-auto" data-role="values">
       <p :if={@values == []} class="text-ui italic text-muted">No value matches.</p>
-      <label
+      <.radio_card
         :for={{value, definition} <- @values}
-        for={"#{@id}-#{value}"}
-        class={[
-          "flex flex-wrap gap-x-2 rounded-ctl border px-2.5 py-1.5 text-ui cursor-pointer",
-          if(value in @selected,
-            do: "border-brand bg-brand/5",
-            else: "border-line bg-surface hover:border-line-strong"
-          )
-        ]}
+        id={"#{@id}-#{value}"}
+        name={if @type == "radio", do: @id, else: "#{@id}[]"}
+        value={value}
+        type={@type}
+        checked={value in @selected}
+        size={:sm}
+        summary={definition}
+        phx-click={@on_pick}
+        phx-value-value={value}
+        phx-target={@target}
       >
-        <input
-          type={@type}
-          id={"#{@id}-#{value}"}
-          name={if @type == "radio", do: @id, else: "#{@id}[]"}
-          value={value}
-          checked={value in @selected}
-          class={[
-            "mt-0.5 shrink-0",
-            if(@type == "radio", do: "size-4 accent-brand-fill", else: "gf-checkbox")
-          ]}
-          phx-click={@on_pick}
-          phx-value-value={value}
-          phx-target={@target}
-        />
-        <span class="min-w-0 flex-1 font-medium text-ink">
+        <:label>
           {value}
           <span :if={@note && value in @noted} class="ml-1 text-caption font-normal text-muted">
             {@note}
           </span>
-        </span>
-        <span :if={definition} class="basis-full pl-6 text-muted">{definition}</span>
-      </label>
+        </:label>
+      </.radio_card>
     </div>
     """
   end

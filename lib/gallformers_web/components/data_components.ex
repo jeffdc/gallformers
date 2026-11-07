@@ -21,6 +21,7 @@ defmodule GallformersWeb.DataComponents do
     * `:rank` a taxonomic rank
     * `:neutral` a category (the default)
     * `:count` a number that needs you
+    * `:recommended` the recommended answer to a question
 
   A chip with `on_remove` is a removable choice (a picked filter or name).
 
@@ -34,7 +35,7 @@ defmodule GallformersWeb.DataComponents do
   """
   attr :variant, :atom,
     default: :neutral,
-    values: [:ok, :warn, :danger, :info, :rank, :neutral, :count]
+    values: [:ok, :warn, :danger, :info, :rank, :neutral, :count, :recommended]
 
   attr :icon, :string, default: nil
   attr :on_remove, JS, default: nil, doc: "makes the chip removable"
@@ -90,7 +91,16 @@ defmodule GallformersWeb.DataComponents do
 
   Sorting and selection are the LiveView's: a sortable header is a button
   that sends `sort` with `phx-value-field`; a selection checkbox sends
-  `select` with `phx-value-id`.
+  `select` with `phx-value-id` (or `select_event`, to `target` when the
+  table is in a LiveComponent). `selectable_row` leaves rows without a
+  checkbox. `select_all` adds a header checkbox, ticked when every
+  selectable row is selected, sending `select_all`, or `select_none` when
+  all are already selected (by default the same event: a toggle).
+
+  Per row, `row_attrs` (row -> a map of attributes, for hooks and tests)
+  goes on the `tr`, and `row_state` (row -> nil, `:selected`, `:ok`,
+  `:warn`, `:danger` or `:info`) tints it and sets `data-state`. A selected
+  row is `:selected`.
 
   ## Examples
 
@@ -105,6 +115,20 @@ defmodule GallformersWeb.DataComponents do
 
       <.data_table id="galls" rows={@streams.galls} row_item={fn {_id, g} -> g end} selectable selected={@selected}>
         <:col :let={g} label="Name" grow><em>{g.name}</em></:col>
+      </.data_table>
+
+      <.data_table
+        id="images-table"
+        rows={@images}
+        row_attrs={&%{"data-image-id" => &1.id}}
+        row_state={&if(unattributed?(&1), do: :warn)}
+        selectable
+        selected={@copy_mode.selected_ids}
+        select_event="toggle_copy_target"
+        select_all="select_all_targets"
+        target={@myself}
+      >
+        <:col :let={i} label="Caption" grow>{i.caption}</:col>
       </.data_table>
   """
   attr :id, :string, required: true, doc: "the table body's id (a stream's container)"
@@ -135,6 +159,34 @@ defmodule GallformersWeb.DataComponents do
   attr :select_label, :any,
     default: nil,
     doc: ~s|function item -> the checkbox's accessible label (default: "Select row")|
+
+  attr :select_event, :string, default: "select", doc: "the event a row's checkbox sends"
+
+  attr :selectable_row, :any,
+    default: nil,
+    doc: "function item -> boolean; a row it rejects has no checkbox (default: every row)"
+
+  attr :select_disabled, :boolean,
+    default: false,
+    doc: "disables the checkboxes (a bulk action runs)"
+
+  attr :select_all, :string,
+    default: nil,
+    doc: "adds a header checkbox that sends this event while not every row is selected"
+
+  attr :select_none, :string,
+    default: nil,
+    doc: "the header checkbox's event when every row is selected (default: `select_all`)"
+
+  attr :target, :any, default: nil, doc: "a LiveComponent's @myself, for the selection events"
+
+  attr :row_attrs, :any,
+    default: nil,
+    doc: ~s|function row -> a map of attributes for its `tr` (%{"data-image-id" => 4})|
+
+  attr :row_state, :any,
+    default: nil,
+    doc: "function row -> nil | :selected | :ok | :warn | :danger | :info: the row's tint"
 
   attr :active, :any,
     default: nil,
@@ -169,6 +221,10 @@ defmodule GallformersWeb.DataComponents do
       |> assign(:row_h, if(assigns.compact, do: "h-7", else: "h-row"))
       |> assign(:select_key, select_key(assigns.row_item, assigns.select_id))
       |> assign(:select_label, select_label(assigns.row_item, assigns.select_label))
+      |> assign(:can_select, can_select(assigns.row_item, assigns.selectable_row))
+      |> assign(:row_state, row_state_fn(assigns))
+      |> assign(:row_attrs, assigns.row_attrs || fn _row -> %{} end)
+      |> assign_select_all()
 
     ~H"""
     <div class={["overflow-hidden rounded-panel border border-line bg-surface", @class]} {@rest}>
@@ -191,7 +247,18 @@ defmodule GallformersWeb.DataComponents do
                 scope="col"
                 class="w-0 border-b border-line-strong bg-surface-2 px-3"
               >
-                <span class="sr-only">Select</span>
+                <input
+                  :if={@select_all}
+                  type="checkbox"
+                  id={"#{@id}-select-all"}
+                  class="gf-checkbox align-middle"
+                  phx-click={if @all_selected, do: @select_none || @select_all, else: @select_all}
+                  phx-target={@target}
+                  checked={@all_selected}
+                  disabled={@select_disabled}
+                  aria-label="Select all"
+                />
+                <span :if={!@select_all} class="sr-only">Select</span>
               </th>
               <th
                 :for={col <- @cols}
@@ -234,30 +301,38 @@ defmodule GallformersWeb.DataComponents do
               phx-click={row_action(row, @row_click, @row_navigate)}
               data-selected={@selectable && @select_key.(row) in @selected}
               data-active={@active && @active.(row)}
+              data-state={@row_state.(row)}
               aria-current={@active && @active.(row) && "true"}
               class={[
                 @row_h,
                 "border-b border-line last:border-b-0",
                 cond do
-                  @selectable && @select_key.(row) in @selected ->
-                    "bg-sky"
+                  @row_state.(row) == :selected ->
+                    state_class(:selected)
 
                   @active && @active.(row) ->
                     "bg-sky outline outline-2 -outline-offset-2 outline-brand"
+
+                  state = @row_state.(row) ->
+                    state_class(state)
 
                   true ->
                     "hover:bg-sky-soft"
                 end,
                 (@row_click || @row_navigate) && "cursor-pointer"
               ]}
+              {@row_attrs.(row)}
             >
               <td :if={@selectable} class="w-0 px-3">
                 <input
+                  :if={@can_select.(row)}
                   type="checkbox"
-                  class="size-4 align-middle"
-                  phx-click="select"
+                  class="gf-checkbox align-middle"
+                  phx-click={@select_event}
+                  phx-target={@target}
                   phx-value-id={@select_key.(row)}
                   checked={@select_key.(row) in @selected}
+                  disabled={@select_disabled}
                   aria-label={@select_label.(row)}
                 />
               </td>
@@ -349,6 +424,38 @@ defmodule GallformersWeb.DataComponents do
 
   defp select_label(_row_item, nil), do: fn _row -> "Select row" end
   defp select_label(row_item, label), do: &label.(row_item.(&1))
+
+  defp can_select(_row_item, nil), do: fn _row -> true end
+  defp can_select(row_item, selectable_row), do: &selectable_row.(row_item.(&1))
+
+  # A selected row is :selected; otherwise the page's state, if any.
+  defp row_state_fn(%{selectable: selectable, selected: selected, row_state: row_state} = assigns) do
+    select_key = select_key(assigns.row_item, assigns.select_id)
+
+    fn row ->
+      if selectable && select_key.(row) in selected,
+        do: :selected,
+        else: row_state && row_state.(row)
+    end
+  end
+
+  defp state_class(:selected), do: "bg-sky"
+  defp state_class(:ok), do: "bg-ok-bg"
+  defp state_class(:warn), do: "bg-warn-bg"
+  defp state_class(:danger), do: "bg-danger-bg"
+  defp state_class(:info), do: "bg-info-bg"
+
+  # Whether every selectable row is selected (a stream can't be inspected).
+  defp assign_select_all(%{select_all: nil} = assigns), do: assign(assigns, :all_selected, false)
+
+  defp assign_select_all(%{stream?: true} = assigns), do: assign(assigns, :all_selected, false)
+
+  defp assign_select_all(assigns) do
+    keys =
+      for row <- assigns.rows, assigns.can_select.(row), do: assigns.select_key.(row)
+
+    assign(assigns, :all_selected, keys != [] and Enum.all?(keys, &(&1 in assigns.selected)))
+  end
 
   @doc """
   Label/value pairs: a Gall's traits, a record's facts in a rail.

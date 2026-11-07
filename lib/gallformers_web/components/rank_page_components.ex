@@ -9,7 +9,7 @@ defmodule GallformersWeb.RankPageComponents do
   """
   use Phoenix.Component
 
-  import GallformersWeb.ActionComponents, only: [button: 1]
+  import GallformersWeb.ActionComponents, only: [button: 1, segmented_switch: 1]
   import GallformersWeb.CoreComponents, only: [icon: 1]
   import GallformersWeb.DataComponents, only: [chip: 1, data_table: 1]
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
@@ -93,7 +93,16 @@ defmodule GallformersWeb.RankPageComponents do
       <div class={["min-w-0", if(@list.facets != [], do: "lg:col-span-3", else: "lg:col-span-4")]}>
         <.section id={"#{@id}-section"} title={@title} count={count_label(@list, @narrowed)}>
           <:aside>
-            <.view_switch :if={length(@list.views) > 1} view={@list.view} />
+            <.segmented_switch
+              :if={length(@list.views) > 1}
+              label="View"
+              value={@list.view}
+              event="galls_view"
+              param="view"
+            >
+              <:option value={:photos}>Photos</:option>
+              <:option value={:table}>Table</:option>
+            </.segmented_switch>
           </:aside>
           <p :if={@list.shown == []} class="text-ui text-muted">
             No galls match these filters.
@@ -169,32 +178,6 @@ defmodule GallformersWeb.RankPageComponents do
     if narrowed or list.selected != %{},
       do: "#{shown} of #{format_number(length(list.all))}",
       else: shown
-  end
-
-  attr :view, :atom, required: true
-
-  defp view_switch(assigns) do
-    ~H"""
-    <span
-      class="inline-flex overflow-hidden rounded-ctl border border-line-strong"
-      role="group"
-      aria-label="View"
-    >
-      <button
-        :for={{view, label} <- [photos: "Photos", table: "Table"]}
-        type="button"
-        phx-click="galls_view"
-        phx-value-view={view}
-        aria-pressed={to_string(@view == view)}
-        class={[
-          "px-3 py-1 text-meta font-semibold",
-          if(@view == view, do: "bg-brand-fill text-on-fill", else: "bg-surface text-ink-2")
-        ]}
-      >
-        {label}
-      </button>
-    </span>
-    """
   end
 
   @doc """

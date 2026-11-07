@@ -1,6 +1,7 @@
 defmodule GallformersWeb.FeedbackComponents do
   @moduledoc """
-  The design system's feedback and overlays: `notice`, `dialog`.
+  The design system's feedback and overlays: `notice`, `progress_bar`,
+  `dialog`.
 
   A `notice` is a message inline in the page; a `dialog` is the one modal,
   opened with `show_dialog/2` and closed with `hide_dialog/2`. See
@@ -311,4 +312,82 @@ defmodule GallformersWeb.FeedbackComponents do
     |> JS.remove_class("overflow-hidden", to: "body")
     |> JS.pop_focus()
   end
+
+  @doc """
+  How far something has got: a sync, an upload, a review. A thin track
+  filled from the left, drawn as SVG so the width needs no inline style.
+
+  With a `label` the bar is a `progressbar` (`aria-valuenow`, `aria-valuemax`);
+  without one it is decorative (`aria-hidden`): the words beside it say the
+  numbers. `segments` (`{value, tone}` pairs, in place of `value`) are drawn
+  one after another, e.g. decided then proposed. Values are clamped to `max`;
+  a zero `max` draws an empty bar.
+
+  The upload hooks draw the same markup from JavaScript (`.gf-progress`, a
+  `rect[data-bar]` whose width they set).
+
+  ## Examples
+
+      <.progress_bar value={@done} max={@total} label="Hosts synced" />
+      <.progress_bar max={@total} segments={[{@done, :ok}, {@proposed, :info}]} size="sm" />
+  """
+  attr :id, :string, default: nil
+  attr :value, :integer, default: 0
+  attr :max, :integer, required: true
+  attr :label, :string, default: nil, doc: "the accessible name; nil makes the bar decorative"
+  attr :tone, :atom, default: :brand, values: [:brand, :ok, :info, :warn]
+
+  attr :segments, :list,
+    default: nil,
+    doc: "`{value, tone}` pairs drawn one after another, in place of `value` and `tone`"
+
+  attr :size, :string, default: "md", values: ~w(sm md)
+  attr :class, :any, default: nil, doc: "layout only (width, margins)"
+
+  def progress_bar(assigns) do
+    assigns = assign(assigns, :rects, progress_rects(assigns))
+
+    ~H"""
+    <div
+      id={@id}
+      class={["gf-progress", @size == "sm" && "gf-progress-sm", @class]}
+      role={@label && "progressbar"}
+      aria-label={@label}
+      aria-valuemin={@label && 0}
+      aria-valuemax={@label && @max}
+      aria-valuenow={@label && @value}
+      aria-hidden={!@label && "true"}
+    >
+      <svg width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">
+        <rect
+          :for={{x, width, tone} <- @rects}
+          data-bar
+          data-tone={tone}
+          x={x}
+          width={width}
+          height="100%"
+        />
+      </svg>
+    </div>
+    """
+  end
+
+  defp progress_rects(%{segments: segments, max: max}) when is_list(segments),
+    do: rects(segments, max)
+
+  defp progress_rects(%{value: value, tone: tone, max: max}), do: rects([{value, tone}], max)
+
+  # Each segment's start and width as percentages, never past the end.
+  defp rects(segments, max) do
+    {rects, _end} =
+      Enum.map_reduce(segments, 0.0, fn {value, tone}, start ->
+        width = if max > 0, do: min(100 * value / max, 100 - start), else: 0.0
+        width = Float.round(max(width, 0.0), 1)
+        {{pct(start), pct(width), tone}, start + width}
+      end)
+
+    rects
+  end
+
+  defp pct(n), do: "#{Float.round(n * 1.0, 1)}%"
 end
