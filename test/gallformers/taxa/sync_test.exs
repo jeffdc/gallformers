@@ -303,6 +303,116 @@ defmodule Gallformers.Taxa.SyncTest do
     end
   end
 
+  describe "a revalidated name (it outranks an older synonymy of it)" do
+    # The tree holds "Synca nigra" as a synonym of Synca alba, by a legacy
+    # statement; a 1959 paper treats it as a species of its own, stating
+    # only its name and placement.
+    setup ctx do
+      {:ok, _} = Taxa.add_synonym(test_actor(), ctx.species, "Synca nigra")
+
+      {:ok, %{fact: synonymy}} =
+        Taxa.assert_synonymy(
+          test_actor(),
+          %{name: "Synca nigra", accepted_taxon_id: ctx.species.id},
+          %{source_id: ctx.legacy.id, stance: :confirm, stated: nil}
+        )
+
+      nigra = taxon_fixture(name: "Synca nigra", parent: ctx.genus)
+
+      {:ok, %{attribution: name}} =
+        Taxa.assert_name(
+          test_actor(),
+          %{taxon_id: nigra.id, name: "Synca nigra", rank: :species},
+          confirm(ctx.weld)
+        )
+
+      {:ok, %{attribution: placement}} =
+        Taxa.assert_placement(
+          test_actor(),
+          %{taxon_id: nigra.id, parent_id: ctx.genus.id},
+          confirm(ctx.weld)
+        )
+
+      %{nigra: nigra, synonymy: synonymy, name: name, placement: placement}
+    end
+
+    defp synonyms_of(taxon), do: Enum.map(Taxa.list_synonyms(taxon), & &1.name)
+
+    test "accepting its name supersedes the synonymy; the old taxon loses the synonym", ctx do
+      {:ok, _} = Facts.accept(test_actor(), ctx.name.id)
+      {:ok, _} = Facts.accept(test_actor(), ctx.placement.id)
+
+      assert Facts.get_fact!(ctx.synonymy.id).standing == :superseded
+      assert %Taxon{} = Taxa.get_taxon(ctx.nigra.id)
+      assert Taxa.accepted_name(ctx.nigra.id) == "Synca nigra"
+      assert synonyms_of(ctx.species) == []
+      assert Sync.check() |> for_taxa([ctx.species, ctx.nigra]) == []
+
+      # The pages read the standing: Synca alba's position doesn't count it.
+      assert [] = Import.taxonomic_position(ctx.species.id).disagreeing
+    end
+
+    test "a later change to the old taxon's synonyms doesn't lump the name into it", ctx do
+      {:ok, _} = Facts.accept(test_actor(), ctx.name.id)
+      {:ok, _} = Facts.accept(test_actor(), ctx.placement.id)
+
+      Taxa.assert_synonymy(
+        test_actor(),
+        %{name: "Cynips alba", accepted_taxon_id: ctx.species.id},
+        confirm(ctx.weld)
+      )
+      |> accept!()
+
+      assert %Taxon{} = Taxa.get_taxon(ctx.nigra.id)
+      assert synonyms_of(ctx.species) == ["Cynips alba"]
+      assert Sync.check() |> for_taxa([ctx.species, ctx.nigra]) == []
+    end
+
+    test "renamed later, the name stays the revalidated taxon's synonym only", ctx do
+      {:ok, _} = Facts.accept(test_actor(), ctx.name.id)
+      {:ok, _} = Facts.accept(test_actor(), ctx.placement.id)
+
+      Taxa.assert_name(
+        test_actor(),
+        %{taxon_id: ctx.nigra.id, name: "Zynca nigra", rank: :species},
+        confirm(source_fixture("Recombination", "2001"))
+      )
+      |> accept!()
+
+      assert Facts.get_fact!(ctx.synonymy.id).standing == :superseded
+      assert Taxa.accepted_name(ctx.nigra.id) == "Zynca nigra"
+      assert synonyms_of(ctx.nigra) == ["Synca nigra"]
+      assert synonyms_of(ctx.species) == []
+      assert Sync.check() |> for_taxa([ctx.species, ctx.nigra]) == []
+    end
+
+    test "retracting the paper lets the synonymy count again; the tree follows back", ctx do
+      {:ok, _} = Facts.accept(test_actor(), ctx.name.id)
+      {:ok, _} = Facts.accept(test_actor(), ctx.placement.id)
+
+      notice = source_fixture("Retraction", "2001")
+      {:ok, _} = Sources.retract_source(test_actor(), ctx.weld, notice, ~D[2001-01-01])
+      {:ok, _} = Facts.recompute_for_source(test_actor(), ctx.weld.id)
+
+      assert Facts.get_fact!(ctx.synonymy.id).standing == :current
+      # The name is the old taxon's synonym again: the revalidated taxon is lumped back.
+      assert Taxa.get_taxon(ctx.nigra.id) == nil
+      assert Taxa.taxon_redirect(ctx.nigra.id) == ctx.species.id
+      assert synonyms_of(ctx.species) == ["Synca nigra"]
+      assert Sync.check() |> for_taxa([ctx.species]) == []
+    end
+
+    test "declining its name lets the synonymy count again", ctx do
+      {:ok, _} = Facts.accept(test_actor(), ctx.name.id)
+      assert synonyms_of(ctx.species) == []
+
+      {:ok, _} = Facts.decline(test_actor(), ctx.name.id, "Still a synonym.")
+
+      assert Facts.get_fact!(ctx.synonymy.id).standing == :current
+      assert synonyms_of(ctx.species) == ["Synca nigra"]
+    end
+  end
+
   describe "a lump and the absorbed taxon's synonym at once" do
     test "both come into effect in one change", ctx do
       nigra = taxon_fixture(name: "Synca nigra", parent: ctx.genus)

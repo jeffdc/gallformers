@@ -8,8 +8,8 @@ defmodule Gallformers.Facts do
   per Fact and Source. A Fact's `standing` is precomputed from its
   attributions by the pure rules in `Gallformers.Facts.Standing`, and every
   function here that changes attributions recomputes, in the same
-  transaction, the standings of the Facts it touched and of their slot
-  siblings. Rules the standings cannot settle come back as
+  transaction, the standings of the Facts it touched and of their slot (and
+  contest) siblings. Rules the standings cannot settle come back as
   `Gallformers.Facts.Standing.Conflict`s for the caller to queue.
 
   The typed details of each kind of Fact live in tables owned by `Catalog`
@@ -40,12 +40,26 @@ defmodule Gallformers.Facts do
   literature is the authority, gated by a curator. Which kinds are gated
   is data here, not a call to the context that owns them.
 
+  ## A revalidated name outranks an older synonymy of it
+
+  A taxon's name Fact and a synonymy Fact of the same name into another
+  taxon contest the name (`Gallformers.Facts.Fact`'s `contest` and
+  `contest_holder`, given by `Taxa` when it makes the Fact): once the name
+  is a taxon's accepted name by a dated, counting statement (and still
+  after a newer name of the taxon outranks it), a synonymy of it into
+  another taxon whose newest counting confirmation is older (legacy
+  undated included) is `:superseded`
+  (`Gallformers.Facts.Standing.settle_contests/2`). Should the name
+  statement stop counting (declined, retracted), the synonymy counts
+  again. Which kinds claim and which yield is data here too. Matter
+  `f923`: a paper revalidating a name seldom says "not a synonym of X".
+
   ## Concurrency
 
-  Attribution writes lock the Facts they recompute (the Fact and its slot
-  siblings, in ID order), so concurrent writes to one Fact or slot run one
-  after the other and each sees the other's result. A Fact's slot never
-  changes.
+  Attribution writes lock the Facts they recompute (the Fact, its slot
+  siblings and its contest siblings, in ID order), so concurrent writes to
+  one Fact, slot or contest run one after the other and each sees the
+  other's result. A Fact's slot and contest never change.
   """
   use Boundary,
     deps: [Gallformers.Audit, Gallformers.Repo, Gallformers.Sources],
@@ -88,6 +102,13 @@ defmodule Gallformers.Facts do
   # Kinds whose statements count only once a curator accepts them (`f923`).
   @acceptance_kinds ~w(taxon_placement taxon_name taxon_synonymy taxon_split taxon_common_name)
 
+  # The kinds that contest a name across slots, and their roles there
+  # (`Gallformers.Facts.Standing.settle_contests/2`; `f923`, "A revalidated
+  # name outranks an older synonymy of it"): a taxon's current name Fact
+  # claims the name; a synonymy of it into another taxon, stated before,
+  # yields.
+  @contest_roles %{"taxon_name" => :claimant, "taxon_synonymy" => :rival}
+
   @typedoc "Why a curator's decision on a statement was refused."
   @type decision_error :: :not_found | :not_taxonomic | :own_source | :reason_required
 
@@ -102,7 +123,11 @@ defmodule Gallformers.Facts do
 
   @doc """
   Creates a Fact of `kind`, in `slot` if it competes for a single value
-  (e.g. `%{kind: "trait", slot: "gall:123:detachable"}`).
+  (e.g. `%{kind: "trait", slot: "gall:123:detachable"}`), and with
+  `contest` and `contest_holder` if it contests one thing with Facts in
+  other slots (a taxon's name: `%{kind: "taxon_name", slot:
+  "taxon:7:name", contest: "taxon_name:andricus", contest_holder:
+  "taxon:7"}`).
 
   A new Fact is `:unsupported` until something attributes it.
   """
@@ -607,9 +632,9 @@ defmodule Gallformers.Facts do
   @doc """
   Deletes Facts `fact_ids` with their attributions (and the attributions'
   evidence, names and Observations), as when the Gall or taxon they are
-  about is deleted; then recomputes the standings of the slot siblings
-  that remain. The typed details of each Fact (owned by `Catalog` and
-  `Taxa`) must be deleted first; audit keeps what was removed.
+  about is deleted; then recomputes the standings of the slot and contest
+  siblings that remain. The typed details of each Fact (owned by `Catalog`
+  and `Taxa`) must be deleted first; audit keeps what was removed.
 
   Returns the conflicts found among the siblings.
   """
@@ -789,28 +814,49 @@ defmodule Gallformers.Facts do
 
   # -- standings -----------------------------------------------------------
 
-  # Locks the Facts and their slot siblings, in ID order, and returns them.
+  # Locks the Facts, their slot siblings and their contest siblings (with
+  # those siblings' own slot siblings, so a claimant's slot is settled), in
+  # ID order, and returns them. Slots and contests never change, so finding
+  # them before locking is safe.
   defp lock_facts([]), do: []
 
   defp lock_facts(fact_ids) do
-    slots =
-      from(f in Fact,
-        where: f.id in ^fact_ids and not is_nil(f.slot),
-        distinct: true,
-        select: f.slot
-      )
-      |> Repo.all()
+    ids = related_ids(fact_ids)
+
+    from(f in Fact, where: f.id in ^ids, order_by: f.id, lock: "FOR UPDATE")
+    |> Repo.all()
+  end
+
+  defp related_ids(fact_ids) do
+    found = with_slot_siblings(fact_ids)
+
+    case for({_id, contest} <- found, contest != nil, uniq: true, do: contest) do
+      [] ->
+        Enum.map(found, &elem(&1, 0))
+
+      contests ->
+        from(f in Fact, where: f.contest in ^contests, select: f.id)
+        |> Repo.all()
+        |> Enum.concat(Enum.map(found, &elem(&1, 0)))
+        |> Enum.uniq()
+        |> with_slot_siblings()
+        |> Enum.map(&elem(&1, 0))
+    end
+  end
+
+  # `{id, contest}` of the Facts and their slot siblings.
+  defp with_slot_siblings(fact_ids) do
+    slots = from(f in Fact, where: f.id in ^fact_ids and not is_nil(f.slot), select: f.slot)
 
     from(f in Fact,
-      where: f.id in ^fact_ids or f.slot in ^slots,
-      order_by: f.id,
-      lock: "FOR UPDATE"
+      where: f.id in ^fact_ids or f.slot in subquery(slots),
+      select: {f.id, f.contest}
     )
     |> Repo.all()
   end
 
-  # Recomputes and stores the standings of `fact_ids` and their slot
-  # siblings; returns the conflicts found.
+  # Recomputes and stores the standings of `fact_ids`, their slot siblings
+  # and their contest siblings (`lock_facts/1`); returns the conflicts found.
   defp recompute(fact_ids) do
     facts = lock_facts(fact_ids)
     ids = Enum.map(facts, & &1.id)
@@ -854,16 +900,21 @@ defmodule Gallformers.Facts do
         |> Map.drop([:accepted_at, :declined_at])
       end)
 
-    {standings, conflicts} =
-      facts
-      |> Enum.map(fn fact ->
+    contesters =
+      Enum.map(facts, fn fact ->
         %{
           id: fact.id,
           slot: fact.slot,
           previous: fact.standing,
-          attributions: Map.get(by_fact, fact.id, [])
+          attributions: Map.get(by_fact, fact.id, []),
+          contest: fact.contest,
+          holder: fact.contest_holder,
+          role: Map.get(@contest_roles, fact.kind)
         }
       end)
+
+    {standings, conflicts} =
+      contesters
       |> Enum.group_by(& &1.slot)
       |> Enum.flat_map(fn
         {nil, unslotted} -> Enum.map(unslotted, &Standing.resolve/1)
@@ -872,6 +923,8 @@ defmodule Gallformers.Facts do
       |> Enum.reduce({%{}, []}, fn {standings, conflicts}, {all_standings, all_conflicts} ->
         {Map.merge(all_standings, standings), all_conflicts ++ conflicts}
       end)
+
+    standings = Standing.settle_contests(contesters, standings)
 
     case store_standings(facts, standings) do
       [] -> :ok
