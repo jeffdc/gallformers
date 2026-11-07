@@ -141,7 +141,7 @@ defmodule Gallformers.Catalog.ReadModels.GallIndex do
       Process.get(@deferred, false) ->
         :ok
 
-      Oban.whereis(oban) == nil ->
+      not Gallformers.Jobs.running?(oban) ->
         refresh(gall_ids)
 
       true ->

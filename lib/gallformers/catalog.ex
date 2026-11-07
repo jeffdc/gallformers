@@ -39,6 +39,7 @@ defmodule Gallformers.Catalog do
       Gallformers.Audit,
       Gallformers.Facts,
       Gallformers.Images,
+      Gallformers.Jobs,
       Gallformers.Places,
       Gallformers.Ranges,
       Gallformers.Repo,

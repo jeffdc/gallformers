@@ -108,6 +108,7 @@ defmodule Gallformers.Import do
       Gallformers.Facts,
       # Deletes and merges delete and move images (`Gallformers.Import.Deletion`).
       Gallformers.Images,
+      Gallformers.Jobs,
       Gallformers.Licenses,
       Gallformers.Places,
       Gallformers.Ranges,
@@ -2681,7 +2682,7 @@ defmodule Gallformers.Import do
   def enqueue_package(%Actor{} = actor, %Package{id: id}, oban \\ Oban) do
     args = %{"package_id" => id, "actor" => Actor.to_meta(actor)}
 
-    if Oban.whereis(oban) == nil do
+    if not Gallformers.Jobs.running?(oban) do
       case Worker.perform(%Oban.Job{args: args}) do
         :ok -> {:ok, nil}
         {:error, reason} -> {:error, reason}
