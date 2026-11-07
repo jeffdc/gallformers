@@ -8,14 +8,14 @@ defmodule Gallformers.JobsTest do
   alias Gallformers.Jobs
 
   test "the app's Oban instance is running in tests" do
-    assert Jobs.running?(Oban)
+    assert Jobs.running?(Oban) == true
   end
 
   test "an instance that isn't running is not" do
-    refute Jobs.running?(:no_such_oban)
+    assert Jobs.running?(:no_such_oban) == false
   end
 
   test "with Oban not started at all, nothing is running (no raise)" do
-    refute Jobs.running?(Oban, :no_such_registry)
+    assert Jobs.running?(Oban, :no_such_registry) == false
   end
 end

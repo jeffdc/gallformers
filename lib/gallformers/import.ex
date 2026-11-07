@@ -2682,15 +2682,15 @@ defmodule Gallformers.Import do
   def enqueue_package(%Actor{} = actor, %Package{id: id}, oban \\ Oban) do
     args = %{"package_id" => id, "actor" => Actor.to_meta(actor)}
 
-    if not Gallformers.Jobs.running?(oban) do
+    if Gallformers.Jobs.running?(oban) do
+      args
+      |> Worker.new(replace: [available: [:args], scheduled: [:args], retryable: [:args]])
+      |> then(&Oban.insert(oban, &1))
+    else
       case Worker.perform(%Oban.Job{args: args}) do
         :ok -> {:ok, nil}
         {:error, reason} -> {:error, reason}
       end
-    else
-      args
-      |> Worker.new(replace: [available: [:args], scheduled: [:args], retryable: [:args]])
-      |> then(&Oban.insert(oban, &1))
     end
   end
 
