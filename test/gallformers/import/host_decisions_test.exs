@@ -19,6 +19,7 @@ defmodule Gallformers.Import.HostDecisionsTest do
   alias Gallformers.Import.Queue
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.Replay
+  alias Gallformers.Import.StableRef
   alias Gallformers.Ranges
   alias Gallformers.Ranges.Wcvp
   alias Gallformers.Taxa
@@ -45,9 +46,12 @@ defmodule Gallformers.Import.HostDecisionsTest do
     %{quercus: quercus, lobata: lobata, wasp: wasp, gall: gall}
   end
 
-  defp deliver(host_name) do
+  defp deliver(host_name, rank \\ "species") do
     gall =
-      batch() |> unique_batch_id() |> put_in(["taxa", Access.at(1), "name_as_written"], host_name)
+      batch()
+      |> unique_batch_id()
+      |> put_in(["taxa", Access.at(1), "name_as_written"], host_name)
+      |> put_in(["taxa", Access.at(1), "rank"], rank)
 
     package(gall: gall) |> with_review() |> deliver!()
   end
@@ -204,6 +208,45 @@ defmodule Gallformers.Import.HostDecisionsTest do
       assert valid?(item, %{"wcvp_id" => "900"})
     end
 
+    # Stephanomeria: the genus record was added as a species of its own
+    # name under a genus of that name.
+    test "a genus record adds the genus, under its family" do
+      package = deliver("Wcvpgenerus", "genus")
+      item = host_item(package)
+
+      assert [%{"wcvp_id" => "920", "action" => "add_from_wcvp"}] = item.proposal["suggestions"]
+
+      {:ok, item} = Import.decide_queue_item(test_actor(), item, %{"wcvp_id" => "920"})
+
+      genus = Taxa.get_taxon!(item.decision["taxon_id"])
+      assert genus.rank == :genus
+      assert Taxa.accepted_name(genus) == "Wcvpgenerus"
+      assert [%{status: :accepted, authorship: "Nutt."}] = genus.names
+
+      assert [%{name: "Generaceae", rank: :family}, %{name: "Wcvpgenerus", rank: :genus}] =
+               genus |> Taxa.lineage() |> Enum.take(-2)
+
+      assert {:ok, %{id: id}} = Taxa.resolve_name("Wcvpgenerus", kingdom: "Plantae")
+      assert id == genus.id
+      assert Wcvp.linked_taxon_ids("920") == [genus.id]
+      assert [%{code: "US-CA"}] = Ranges.get_places_for_taxon_with_precision(genus.id)
+      assert synonyms(genus) == []
+      assert %{resolution: :resolved, taxon_id: ^id} = host_statement(package)
+    end
+
+    test "a genus record uses the genus the tree holds, not a species of its name" do
+      family = plant_fixture(name: "Generaceae", rank: :family)
+      genus = plant_fixture(name: "Wcvpgenerus", rank: :genus, parent: family)
+      plant_fixture(name: "Wcvpgenerus", rank: :species, parent: genus)
+      package = deliver("Wcvpgeneros", "genus")
+
+      {:ok, item} =
+        Import.decide_queue_item(test_actor(), host_item(package), %{"wcvp_id" => "920"})
+
+      assert item.decision["taxon_id"] == genus.id
+      assert synonyms(genus) == ["Wcvpgeneros"]
+    end
+
     test "a record with no accepted name, or a synonym of one, cannot be added" do
       item = host_item(deliver("Wcvpunplacedus vagus var. alter"))
 
@@ -355,6 +398,98 @@ defmodule Gallformers.Import.HostDecisionsTest do
       assert %{resolution: :resolved, taxon_id: id} = host_statement(package)
       assert id == ctx.lobata.id
     end
+
+    test "a genus record's decision replays to the genus, again and again" do
+      package = deliver("Wcvpgenerus", "genus")
+
+      {entries, _} =
+        logged_and_undone(fn ->
+          Import.decide_queue_item(test_actor(), host_item(package), %{"wcvp_id" => "920"})
+        end)
+
+      assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
+      assert_genus_host(package)
+    end
+
+    # The log the old bug left (Stephanomeria, a cutover rehearsal): the
+    # genus record added as a species of the genus's name, under a genus
+    # made for it, its range and link on the species, and the decision
+    # naming the species.
+    test "a log of the genus record added as a species replays to the genus, no species made" do
+      package = deliver("Wcvpgenerus", "genus")
+      {tree, [decision]} = Enum.split(old_genus_log(package), -1)
+
+      assert {:ok, 5} = Replay.run(tree, actor: test_actor())
+      assert_replays_again(tree, test_actor())
+      {:ok, package} = Import.resolve_package(test_actor(), package)
+      assert host_item(package) == nil
+
+      assert {:ok, 1} = Replay.run([decision], actor: test_actor())
+      assert_replays_again(tree ++ [decision], test_actor())
+      assert_genus_host(package)
+    end
+
+    test "a log of the genus record added as a species decides the open Host on the genus" do
+      package = deliver("Wcvpgenerus", "genus")
+      entries = old_genus_log(package)
+
+      assert {:ok, 6} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
+      assert_genus_host(package)
+    end
+  end
+
+  defp old_genus_log(package) do
+    statement = host_statement(package)
+    batch = gall_row(package)
+    species = %{"name" => "Wcvpgenerus", "rank" => "species", "kingdom" => "Plantae"}
+    genus = %{"name" => "Wcvpgenerus", "rank" => "genus", "kingdom" => "Plantae"}
+    family = %{"name" => "Generaceae", "rank" => "family", "kingdom" => "Plantae"}
+    place = %{"code" => "US-CA", "precision" => "exact", "distribution_type" => "native"}
+
+    [
+      {:taxonomy_edit, %{"op" => "create_taxon", "name" => "Generaceae", "rank" => "family"},
+       %{"parent" => nil, "kingdom" => "Plantae", "origin" => "powo"}},
+      {:taxonomy_edit, %{"op" => "create_taxon", "name" => "Wcvpgenerus", "rank" => "genus"},
+       %{"parent" => family, "kingdom" => "Plantae", "origin" => "powo"}},
+      {:plant_added, %{"name" => "Wcvpgenerus", "rank" => "species"},
+       %{"parent" => genus, "authorship" => "Nutt."}},
+      {:taxonomy_edit, %{"op" => "set_host_range", "taxon" => species}, %{"places" => [place]}},
+      {:taxonomy_edit, %{"op" => "set_wcvp", "taxon" => species},
+       %{
+         "wcvp_id" => "920",
+         "powo_id" => "urn:lsid:ipni.org:names:test920",
+         "wcvp_synced_at" => "2026-11-05T00:59:09Z"
+       }},
+      {:queue_decision,
+       %{
+         "kind" => "unresolved_host",
+         "package" => package.key,
+         "batch_id" => batch.producer_batch_id,
+         "statement_ref" => statement.ref
+       }, %{"decision" => %{"taxon" => species, "wcvp_id" => "920"}}}
+    ]
+    |> Enum.map(fn {kind, key, payload} -> %{kind: kind, key: key, payload: payload} end)
+  end
+
+  # The Host on the genus Wcvpgenerus, under its family, with the record's
+  # range and link; no species of its name.
+  defp assert_genus_host(package) do
+    assert {:ok, genus_id} =
+             StableRef.resolve_taxon(%{
+               "name" => "Wcvpgenerus",
+               "rank" => "genus",
+               "kingdom" => "Plantae"
+             })
+
+    assert %{resolution: :resolved, taxon_id: ^genus_id} = host_statement(package)
+    assert Taxa.resolve_name("Wcvpgenerus", rank: :species) == :none
+    assert Wcvp.linked_taxon_ids("920") == [genus_id]
+    assert [%{code: "US-CA"}] = Ranges.get_places_for_taxon_with_precision(genus_id)
+
+    assert [%{name: "Generaceae", rank: :family}, %{name: "Wcvpgenerus", rank: :genus}] =
+             genus_id |> Taxa.lineage() |> Enum.take(-2)
   end
 
   defp logged_and_undone(fun) do

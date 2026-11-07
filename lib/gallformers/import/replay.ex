@@ -21,9 +21,11 @@ defmodule Gallformers.Import.Replay do
       decision, its taxa, Galls and Sources found by their stable
       references. A Host decision that added a synonym or a plant is done
       when no item asks for the Host any more because it resolves to that
-      plant: the synonym or plant, logged and replayed before it, resolved
-      it; so is a synonym decision that split a name off or moved it,
-      whose tree edits, replayed before it, resolve the name. A rename
+      plant (for a WCVP decision, also a plant linked to the record, or
+      holding its name at its rank): the synonym or plant, logged and
+      replayed before it, resolved it; so is a synonym decision that split
+      a name off or moved it, whose tree edits, replayed before it,
+      resolve the name. A rename
       proposal's decision (`"kind" => "gall_rename"`,
       no package) is found by its Gall and the name it was decided for
       (`Gallformers.Import.GallRenames.find/2`): replaying the taxonomy
@@ -44,7 +46,11 @@ defmodule Gallformers.Import.Replay do
       (or the name a later rename gives it) and rank exists, the taxon
       is under that parent, has that accepted name or common name, or
       holds the flags, authorship, range or WCVP link; a synonym or common
-      name to remove is gone, a taxon to delete no longer named.
+      name to remove is gone, a taxon to delete no longer named. A log of
+      the old WCVP bug, which added a genus record as a one-word species
+      under a genus of the same name (Stephanomeria), replays to the genus:
+      that species is not made, and the edits and decisions naming it go
+      to the genus.
     * `:package_denied` (`%{"package"}`) — the package, registered from its
       files if it is not yet, is denied with the logged reason.
     * `:batch_denied` (`%{"package", "batch_id"}`) — the package is made
@@ -262,6 +268,8 @@ defmodule Gallformers.Import.Replay do
   end
 
   defp replay(actor, %{kind: :queue_decision, key: key, payload: %{"decision" => decision}}) do
+    decision = bug_genus(decision)
+
     with {:ok, package} <- ensure_package(actor, key["package"]) do
       case find_item(actor, package, key) do
         {:ok, %QueueItem{status: :decided}} ->
@@ -306,10 +314,13 @@ defmodule Gallformers.Import.Replay do
   end
 
   # Done when a plant of that name (or one the log renames it to) and rank
-  # is in the tree.
+  # is in the tree; or, for the old WCVP bug's species named as its parent
+  # genus (`as_genus/1`), once the genus is: it is not made.
   defp replay(actor, %{kind: :plant_added, key: %{"name" => name, "rank" => rank}} = entry) do
-    with {:ok, parent_id} <- optional_taxon(entry, entry.payload["parent"]) do
-      if created?(entry, name, rank, "Plantae") do
+    parent = entry.payload["parent"]
+
+    with {:ok, parent_id} <- optional_taxon(entry, parent) do
+      if created?(entry, name, rank, "Plantae") or own_genus?(name, rank, parent) do
         :ok
       else
         ok(
@@ -509,8 +520,18 @@ defmodule Gallformers.Import.Replay do
   # The taxon a stable reference names now. On a log replayed again, a
   # taxon renamed later in the log is found by its old name: through the
   # synonym the rename kept (`StableRef.resolve_current_taxon/1`), or by the
-  # name the log's later renames give it.
+  # name the log's later renames give it. The old WCVP bug's species, not
+  # made, is its genus (`as_genus/1`).
   defp current_taxon(entry, ref) do
+    with {:error, {:taxon_not_found, _}} = error <- named_taxon(entry, ref) do
+      case as_genus(ref) do
+        nil -> error
+        genus -> with({:error, _} <- named_taxon(entry, genus), do: error)
+      end
+    end
+  end
+
+  defp named_taxon(entry, ref) do
     with {:error, {:taxon_not_found, _}} = error <- StableRef.resolve_current_taxon(ref) do
       case later_name(entry, ref["name"], ref["rank"]) do
         nil -> error
@@ -518,6 +539,24 @@ defmodule Gallformers.Import.Replay do
       end
     end
   end
+
+  # The old WCVP bug (Stephanomeria): a WCVP genus record was
+  # added from the Host step or the taxonomy admin as a species of the
+  # genus's own name, under a genus of that name made for it, and its range
+  # and link went on the species. A species is named by two words at
+  # least, so a one-word species is that bug's: its genus, where the log
+  # names it (the species is not made, `own_genus?/3`).
+  defp as_genus(%{"rank" => "species", "name" => name} = ref) when is_binary(name) do
+    if match?([_], String.split(name)), do: %{ref | "rank" => "genus"}
+  end
+
+  defp as_genus(_ref), do: nil
+
+  # A plant added as a species of its parent genus's own name: the bug's.
+  defp own_genus?(name, "species", %{"name" => name, "rank" => "genus"}),
+    do: as_genus(%{"rank" => "species", "name" => name}) != nil
+
+  defp own_genus?(_name, _rank, _parent), do: false
 
   # The name the log's renames after `entry` (`with_later_renames/1`) give
   # a taxon of `rank` named `name`, or nil if none renames it.
@@ -653,21 +692,49 @@ defmodule Gallformers.Import.Replay do
   # package was resolved, so no item asks for it. So is a synonym decision
   # that split a name off or moved it (`Gallformers.Import.SynonymDecisions`):
   # its tree edits, replayed before it, resolve the name to its taxon.
+  #
+  # A WCVP decision's plant is also any the tree links to the record, or
+  # holds by its name at its rank (`HostDecisions.plant_ids/1`): the plant a
+  # log of the old WCVP bug names is its genus.
   defp host_done?(package, key, decision) do
     with true <- HostDecisions.adds?(decision) or SynonymDecisions.changes_tree?(decision),
-         {:ok, %{"taxon_id" => taxon_id}} <- StableRef.decode_decision(decision) do
+         [_ | _] = taxon_ids <- decided_taxa(decision) do
       Enum.any?(Import.list_batches(package), fn batch ->
         batch.producer_batch_id == key["batch_id"] and
           Enum.any?(
             Import.list_statements(batch),
             &(&1.kind == :taxon and &1.ref == key["statement_ref"] and &1.resolution == :resolved and
-                &1.taxon_id == taxon_id)
+                &1.taxon_id in taxon_ids)
           )
       end)
     else
       _ -> false
     end
   end
+
+  defp decided_taxa(decision) do
+    decoded =
+      case StableRef.decode_decision(decision) do
+        {:ok, %{"taxon_id" => taxon_id}} -> [taxon_id]
+        _ -> []
+      end
+
+    wcvp = if is_binary(decision["wcvp_id"]), do: HostDecisions.plant_ids(decision["wcvp_id"])
+    decoded ++ List.wrap(wcvp)
+  end
+
+  # A decision on the old WCVP bug's species (`as_genus/1`), not made: on
+  # its genus.
+  defp bug_genus(%{"taxon" => %{} = ref} = decision) do
+    with {:error, {:taxon_not_found, _}} <- StableRef.resolve_taxon(ref),
+         %{} = genus <- as_genus(ref) do
+      %{decision | "taxon" => genus}
+    else
+      _ -> decision
+    end
+  end
+
+  defp bug_genus(decision), do: decision
 
   # A trait term's placement the vocabulary already holds (its mapping
   # replayed before the decision): the replayed import asks no question,

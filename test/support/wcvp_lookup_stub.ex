@@ -16,6 +16,11 @@ defmodule Gallformers.Wcvp.LookupStub do
       authors: accepted "Smith" and "911", illegitimate "Jones"; and
       "Wcvphomonymus dubius var. minor" twice, both synonyms: "912" of 910
       ("Brown"), "913" of 700 ("Green") — for authorship by name
+    - "920" / "Wcvpgenerus" — a genus record (as WCVP holds Stephanomeria),
+      native in California
+
+  Only "920" gives its `taxon_rank`; a record without one is read by its
+  name's infraspecific marker.
 
   Like `Gallformers.Wcvp.Lookup`, `search/2` leaves out records that are not
   Accepted unless asked for synonyms, and `get_accepted_name/1` returns the
@@ -168,6 +173,19 @@ defmodule Gallformers.Wcvp.LookupStub do
       taxon_status: "Synonym",
       accepted_plant_name_id: "700",
       native_distribution: [],
+      introduced_distribution: []
+    },
+    "920" => %WcvpName{
+      plant_name_id: "920",
+      taxon_name: "Wcvpgenerus",
+      taxon_rank: "Genus",
+      family: "Generaceae",
+      genus: "Wcvpgenerus",
+      taxon_authors: "Nutt.",
+      powo_id: "urn:lsid:ipni.org:names:test920",
+      taxon_status: "Accepted",
+      accepted_plant_name_id: "920",
+      native_distribution: ["CAL"],
       introduced_distribution: []
     }
   }

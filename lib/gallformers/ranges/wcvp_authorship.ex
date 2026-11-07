@@ -37,6 +37,7 @@ defmodule Gallformers.Ranges.WcvpAuthorship do
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
   alias Gallformers.Ranges.TaxonWcvp
+  alias Gallformers.Ranges.Wcvp
   alias Gallformers.Repo
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Rank
@@ -60,13 +61,6 @@ defmodule Gallformers.Ranges.WcvpAuthorship do
           ambiguous: [%{taxon_id: integer(), name: String.t()}],
           not_in_wcvp: non_neg_integer()
         }
-
-  @wcvp_ranks %{
-    "species" => :species,
-    "subspecies" => :subspecies,
-    "variety" => :variety,
-    "form" => :form
-  }
 
   defp lookup, do: Application.get_env(:gallformers, :wcvp_lookup, Gallformers.Wcvp.Lookup)
 
@@ -278,24 +272,11 @@ defmodule Gallformers.Ranges.WcvpAuthorship do
 
   defp key(name), do: name |> String.downcase() |> String.split() |> Enum.join(" ")
 
-  defp record_rank(%{taxon_rank: rank, taxon_name: name}) do
-    case rank do
-      rank when rank in [nil, ""] -> name_rank(name)
-      rank -> Map.get(@wcvp_ranks, String.downcase(rank), :other)
-    end
-  end
+  # A WCVP rank Gallformers has none for matches no plant's.
+  defp record_rank(record), do: Wcvp.rank(record) || :other
 
   # A name's rank read from its infraspecific marker.
-  defp name_rank(name) do
-    words = String.split(name)
-
-    cond do
-      "var." in words -> :variety
-      "subsp." in words -> :subspecies
-      "f." in words -> :form
-      true -> :species
-    end
-  end
+  defp name_rank(name), do: Wcvp.rank(%{taxon_name: name})
 
   # -- the summary ---------------------------------------------------------------
 

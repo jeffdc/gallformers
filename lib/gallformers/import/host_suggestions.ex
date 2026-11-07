@@ -551,7 +551,8 @@ defmodule Gallformers.Import.HostSuggestions do
   defp accepted?(%{plant_name_id: id, accepted_plant_name_id: id}), do: true
   defp accepted?(_record), do: false
 
-  # The tree's plant for a WCVP record: linked to it, else by its name.
+  # The tree's plant for a WCVP record: linked to it, else by its name at
+  # its rank (a genus record is the genus, not a species of its name).
   defp tree_taxon(nil), do: nil
 
   defp tree_taxon(record) do
@@ -560,7 +561,10 @@ defmodule Gallformers.Import.HostSuggestions do
         id
 
       [] ->
-        case Taxa.resolve_name(record.taxon_name, kingdom: @plantae) do
+        case Taxa.resolve_name(record.taxon_name,
+               rank: WcvpLinks.rank(record),
+               kingdom: @plantae
+             ) do
           {:ok, taxon} -> taxon.id
           _ -> nil
         end

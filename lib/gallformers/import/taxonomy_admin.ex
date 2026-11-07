@@ -9,6 +9,7 @@ defmodule Gallformers.Import.TaxonomyAdmin do
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
   alias Gallformers.Import
+  alias Gallformers.Ranges.Wcvp, as: WcvpLinks
   alias Gallformers.Repo
   alias Gallformers.Taxa
   alias Gallformers.Taxa.Rank
@@ -73,26 +74,33 @@ defmodule Gallformers.Import.TaxonomyAdmin do
   end
 
   @doc """
-  Adds a plant from its WCVP record (`wcvp`: `taxon_name`, `taxon_authors`,
-  `family`, `genus`, `plant_name_id`, `powo_id`) at `rank` under its WCVP
-  genus and family — WCVP is authoritative for a plant's family — making the
-  family or genus when there is none, with its Host range `entries` and its
-  WCVP link.
+  Adds a plant from its WCVP record (`wcvp`: `taxon_name`, `taxon_rank`,
+  `taxon_authors`, `family`, `genus`, `plant_name_id`, `powo_id`) at the
+  record's own rank (`wcvp_rank/1`): a genus under its WCVP family, a
+  species or below under its WCVP genus and family — WCVP is authoritative
+  for a plant's family — making the family or genus when there is none,
+  with its Host range `entries` and its WCVP link. `{:error, message}` for
+  a record at a rank Gallformers has none for.
   """
-  @spec add_plant_from_wcvp(Actor.t(), map(), Rank.t(), [range_entry()]) ::
+  @spec add_plant_from_wcvp(Actor.t(), map(), [range_entry()]) ::
           {:ok, Taxon.t()} | {:error, term()}
-  def add_plant_from_wcvp(%Actor{} = actor, wcvp, rank, entries) do
+  def add_plant_from_wcvp(%Actor{} = actor, wcvp, entries) do
+    case wcvp_rank(wcvp) do
+      nil -> {:error, "WCVP's rank #{wcvp.taxon_rank} has no rank in Gallformers"}
+      rank -> add_wcvp_plant(actor, wcvp, rank, entries)
+    end
+  end
+
+  defp add_wcvp_plant(actor, wcvp, rank, entries) do
     Audit.transaction(actor, "import.taxonomy_admin.add_plant_from_wcvp", fn ->
       family_id = find_or_create_plant_taxon(actor, wcvp.family, :family, nil)
-      genus_name = wcvp.genus || wcvp.taxon_name |> String.split() |> hd()
-      genus_id = find_or_create_plant_taxon(actor, genus_name, :genus, family_id)
 
       plant =
         ok!(
           Import.record_plant_added(actor, %{
             name: wcvp.taxon_name,
             rank: rank,
-            parent_id: genus_id,
+            parent_id: wcvp_parent(actor, wcvp, rank, family_id),
             authorship: blank_to_nil(wcvp.taxon_authors)
           })
         )
@@ -111,18 +119,21 @@ defmodule Gallformers.Import.TaxonomyAdmin do
     end)
   end
 
-  @doc "The rank a WCVP record's name is at, read from its infraspecific marker."
-  @spec wcvp_rank(map()) :: Rank.t()
-  def wcvp_rank(%{taxon_name: name}) do
-    words = String.split(name)
+  # A genus record goes under its family, not a genus of its own name.
+  defp wcvp_parent(_actor, _wcvp, :genus, family_id), do: family_id
 
-    cond do
-      "var." in words -> :variety
-      "subsp." in words -> :subspecies
-      "f." in words -> :form
-      true -> :species
-    end
+  defp wcvp_parent(actor, wcvp, _rank, family_id) do
+    genus_name = wcvp.genus || wcvp.taxon_name |> String.split() |> hd()
+    find_or_create_plant_taxon(actor, genus_name, :genus, family_id)
   end
+
+  @doc """
+  The rank a WCVP record is at (`Gallformers.Ranges.Wcvp.rank/1`): its
+  `taxon_rank`, nil for one Gallformers has no rank for; a record without
+  one, or a name alone, read from its infraspecific marker.
+  """
+  @spec wcvp_rank(map()) :: Rank.t() | nil
+  defdelegate wcvp_rank(record), to: WcvpLinks, as: :rank
 
   defp find_or_create_plant_taxon(actor, name, rank, parent_id) do
     case Taxa.resolve_name(name, rank: rank, kingdom: "Plantae") do

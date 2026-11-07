@@ -106,6 +106,19 @@ defmodule GallformersWeb.Admin.TaxonomyLive.NewTest do
       assert {:taxonomy_edit, "set_wcvp"} in ops()
     end
 
+    test "adds a genus record as a genus under its family", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/new")
+      render_click(view, "select_wcvp", %{"id" => "920"})
+      render_async(view)
+      view |> element("#add-from-wcvp") |> render_click()
+
+      assert {:ok, genus} = Taxa.resolve_name("Wcvpgenerus", kingdom: "Plantae")
+      assert_redirect(view, "/admin/taxonomy/#{genus.id}")
+      assert genus.rank == :genus
+      assert [%{name: "Generaceae", rank: :family}, %{name: "Wcvpgenerus"}] = Taxa.lineage(genus)
+      assert Wcvp.get_link(genus.id).wcvp_id == "920"
+    end
+
     test "includes the introduced range when asked", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/new")
       render_click(view, "select_wcvp", %{"id" => "800"})

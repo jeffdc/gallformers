@@ -169,12 +169,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
         entries = wcvp_entries(prefilled)
         record = prefilled.record
 
-        case Import.record_plant_added_from_wcvp(
-               socket.assigns.actor,
-               record,
-               wcvp_rank(record),
-               entries
-             ) do
+        case Import.record_plant_added_from_wcvp(socket.assigns.actor, record, entries) do
           {:ok, plant} ->
             {:noreply,
              socket
@@ -562,18 +557,6 @@ defmodule GallformersWeb.Admin.TaxonomyLive.New do
 
   defp wcvp_entries(%{entries: entries}),
     do: Enum.filter(entries, &(elem(&1, 2) == "native"))
-
-  # The rank a WCVP name is at, read from its infraspecific marker.
-  defp wcvp_rank(%{taxon_name: name}) do
-    words = String.split(name)
-
-    cond do
-      "var." in words -> :variety
-      "subsp." in words -> :subspecies
-      "f." in words -> :form
-      true -> :species
-    end
-  end
 
   defp parent_ranks(nil), do: Rank.all()
   defp parent_ranks(rank), do: Enum.filter(Rank.all(), &Rank.below?(rank, &1))
