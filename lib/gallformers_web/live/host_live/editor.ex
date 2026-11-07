@@ -3,15 +3,21 @@ defmodule GallformersWeb.HostLive.Editor do
   Edit mode's Editorial panel on a plant's page (matter `ec2c`: plant pages
   are editorial): the plant's name, its synonyms and its range, each edit
   an editorial item in the curator's tray (`Gallformers.Curation`), with
-  what it is "based on" when it departs from WCVP.
+  what it is "based on" when it departs from WCVP. Each is a row of one
+  list, its label beside its value and actions (as the Gall page's Edit
+  mode sets its rows).
 
     * **Name:** Rename… gives the new accepted name (the old one stays a
       synonym when it applies, as in the taxonomy admin).
-    * **Synonyms:** each taken out with ✕, one added by name (and "sensu"
-      for a misapplied name). The tray holds the whole list the plant
-      should have, so the next edit starts from the list in the tray.
-    * **Range:** Range… opens the Host range editor on the page
-      (`GallformersWeb.HostLive` runs it); the tray holds the whole range.
+    * **Synonyms:** each a row with Take out; Add a synonym opens its
+      fields: the name, and behind a disclosure the optional "sensu" (for
+      a misapplied name) and "based on". The tray holds the whole list the
+      plant should have, so the next edit starts from the list in the tray
+      (and keeps what it is based on unless a new one is given).
+    * **Range:** a summary (its places, how many introduced: the tray's
+      range, else the plant's) and Range…, which opens the Host range
+      editor on the page (`GallformersWeb.HostLive` runs it); the tray
+      holds the whole range.
 
   What is already in the tray is marked ("in your tray"). The page
   refreshes this component when the tray changes (`send_update/3` with
@@ -19,10 +25,10 @@ defmodule GallformersWeb.HostLive.Editor do
   """
   use GallformersWeb, :live_component
 
-  alias Gallformers.Curation
+  alias Gallformers.{Curation, Ranges}
 
   @impl true
-  def mount(socket), do: {:ok, assign(socket, name_dialog: false)}
+  def mount(socket), do: {:ok, assign(socket, name_dialog: false, synonym_form: false)}
 
   @impl true
   def update(%{refresh: true}, socket), do: {:ok, load_pending(socket)}
@@ -36,8 +42,34 @@ defmodule GallformersWeb.HostLive.Editor do
 
   defp load_pending(socket) do
     %{curator: curator, host: host} = socket.assigns
-    assign(socket, pending: Curation.pending_for(curator, {:plant, host.id}))
+    socket = assign(socket, pending: Curation.pending_for(curator, {:plant, host.id}))
+    assign(socket, range_summary: range_summary(socket.assigns))
   end
+
+  # The range in a line: its places and how many are introduced, the
+  # tray's range when it holds one, else the plant's (as stored: a country
+  # is one place).
+  defp range_summary(%{pending: pending, host: host}) do
+    types =
+      case in_tray(pending, :range) do
+        nil ->
+          host.id
+          |> Ranges.get_places_for_taxon_with_precision()
+          |> Enum.map(& &1.distribution_type)
+
+        item ->
+          Enum.map(item.spec.value, fn {_place_id, _precision, type} -> type end)
+      end
+
+    case {length(types), Enum.count(types, &(&1 == "introduced"))} do
+      {0, _} -> "No range recorded"
+      {places, 0} -> places_word(places)
+      {places, introduced} -> "#{places_word(places)}, #{introduced} introduced"
+    end
+  end
+
+  defp places_word(1), do: "1 place"
+  defp places_word(count), do: "#{count} places"
 
   # The field's item in the tray, if any.
   defp in_tray(pending, field), do: pending |> Map.get({:editorial, field}, []) |> List.first()
@@ -70,6 +102,12 @@ defmodule GallformersWeb.HostLive.Editor do
     end
   end
 
+  def handle_event("open_synonym", _params, socket),
+    do: {:noreply, assign(socket, synonym_form: true)}
+
+  def handle_event("close_synonym", _params, socket),
+    do: {:noreply, assign(socket, synonym_form: false)}
+
   def handle_event("add_synonym", %{"name" => name} = params, socket) do
     case String.trim(name) do
       "" ->
@@ -78,7 +116,11 @@ defmodule GallformersWeb.HostLive.Editor do
       name ->
         synonym = %{name: name, sensu: blank_nil(params["sensu"])}
         synonyms = Enum.uniq(working_synonyms(socket.assigns) ++ [synonym])
-        {:noreply, tray(socket, :synonyms, synonyms, params["based_on"] || based_on(socket))}
+
+        socket =
+          tray(socket, :synonyms, synonyms, blank_nil(params["based_on"]) || based_on(socket))
+
+        {:noreply, assign(socket, synonym_form: false)}
     end
   end
 
@@ -134,68 +176,145 @@ defmodule GallformersWeb.HostLive.Editor do
 
     ~H"""
     <div id={@id}>
+      <%!-- One row per editorial field, label beside its value and actions,
+           as the Gall page's Edit mode sets its rows. --%>
       <.panel id="host-editorial" title="Editorial">
-        <div class="flex flex-col gap-block text-ui">
-          <div id="host-editor-name" class="flex flex-col gap-1">
-            <span class="gf-label">Name</span>
-            <div class="flex flex-wrap items-center gap-2">
-              <.taxon_name name={(@name_item && @name_item.spec.value) || @host.name} />
-              <.button size="sm" variant="secondary" phx-click="open_name" phx-target={@myself}>
+        <dl class="flex flex-col divide-y divide-line text-ui">
+          <div id="host-editor-name" class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
+            <dt class="w-24 shrink-0 text-meta text-muted">Name</dt>
+            <dd class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span class="min-w-0 flex-1">
+                <.taxon_name name={(@name_item && @name_item.spec.value) || @host.name} />
+              </span>
+              <.tray_mark item={@name_item} />
+              <.button variant="ghost" size="sm" phx-click="open_name" phx-target={@myself}>
                 Rename…
               </.button>
-              <.tray_mark item={@name_item} />
-            </div>
+            </dd>
           </div>
 
-          <div id="host-editor-synonyms" class="flex flex-col gap-1">
-            <span class="gf-label">Synonyms</span>
-            <ul :if={@synonyms != []} class="flex flex-wrap gap-1.5">
-              <li :for={s <- @synonyms}>
-                <.chip
-                  variant={:neutral}
-                  on_remove={
-                    JS.push("remove_synonym",
-                      value: %{name: s.name, sensu: s.sensu || ""},
-                      target: @myself
-                    )
-                  }
-                  remove_label={"Take out #{s.name}"}
+          <div
+            id="host-editor-synonyms"
+            class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5"
+          >
+            <dt class="w-24 shrink-0 text-meta text-muted">Synonyms</dt>
+            <dd class="flex min-w-0 flex-1 flex-col gap-1">
+              <ul :if={@synonyms != []} class="flex flex-col">
+                <li
+                  :for={s <- @synonyms}
                   data-synonym={s.name}
+                  class="flex flex-wrap items-baseline gap-x-3"
                 >
-                  <i>{s.name}</i><span :if={s.sensu}> sensu {s.sensu}</span>
-                </.chip>
-              </li>
-            </ul>
-            <p :if={@synonyms == []} class="text-muted">No synonyms. Add one below.</p>
-            <.tray_mark item={in_tray(@pending, :synonyms)} />
-            <form
-              phx-submit="add_synonym"
-              phx-target={@myself}
-              class="mt-1 flex flex-wrap items-end gap-2"
-            >
-              <.field label="Add a synonym" for="host-synonym-name">
-                <input id="host-synonym-name" name="name" type="text" class="gf-input" />
-              </.field>
-              <.field label="Sensu" for="host-synonym-sensu" help="For a misapplied name">
-                <input id="host-synonym-sensu" name="sensu" type="text" class="gf-input" />
-              </.field>
-              <.field label="Based on" for="host-synonym-based-on" help="When it departs from WCVP">
-                <input id="host-synonym-based-on" name="based_on" type="text" class="gf-input" />
-              </.field>
-              <.button type="submit" size="sm" variant="secondary">Add</.button>
-            </form>
+                  <span class="min-w-0 flex-1">
+                    <.taxon_name name={s.name} />
+                    <span :if={s.sensu} class="text-meta text-muted">
+                      sensu {s.sensu}
+                    </span>
+                  </span>
+                  <.button
+                    variant="ghost"
+                    size="sm"
+                    phx-click="remove_synonym"
+                    phx-value-name={s.name}
+                    phx-value-sensu={s.sensu || ""}
+                    phx-target={@myself}
+                    aria-label={"Take out #{s.name}"}
+                  >
+                    Take out
+                  </.button>
+                </li>
+              </ul>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="min-w-0 flex-1 text-muted">
+                  {if @synonyms == [], do: "No synonyms."}
+                </span>
+                <.tray_mark item={in_tray(@pending, :synonyms)} />
+                <.button
+                  :if={!@synonym_form}
+                  variant="ghost"
+                  size="sm"
+                  icon="ph-plus"
+                  phx-click="open_synonym"
+                  phx-target={@myself}
+                >
+                  Add a synonym
+                </.button>
+              </div>
+              <form
+                :if={@synonym_form}
+                id="host-synonym-form"
+                phx-submit="add_synonym"
+                phx-target={@myself}
+                class="flex max-w-md flex-col gap-2 py-1"
+              >
+                <.field label="Synonym" for="host-synonym-name">
+                  <input
+                    id="host-synonym-name"
+                    name="name"
+                    type="text"
+                    autocomplete="off"
+                    class="gf-input"
+                    phx-mounted={JS.focus()}
+                  />
+                </.field>
+                <details>
+                  <summary class="cursor-pointer text-meta text-link">
+                    Sensu and based on (optional)
+                  </summary>
+                  <div class="mt-2 flex flex-col gap-2">
+                    <.field label="Sensu" for="host-synonym-sensu" help="For a misapplied name">
+                      <input
+                        id="host-synonym-sensu"
+                        name="sensu"
+                        type="text"
+                        autocomplete="off"
+                        aria-describedby="host-synonym-sensu-help"
+                        class="gf-input"
+                      />
+                    </.field>
+                    <.field
+                      label="Based on"
+                      for="host-synonym-based-on"
+                      help="When it departs from WCVP"
+                    >
+                      <input
+                        id="host-synonym-based-on"
+                        name="based_on"
+                        type="text"
+                        autocomplete="off"
+                        aria-describedby="host-synonym-based-on-help"
+                        class="gf-input"
+                      />
+                    </.field>
+                  </div>
+                </details>
+                <div class="flex gap-2">
+                  <.button type="submit" size="sm" variant="primary">Put in tray</.button>
+                  <.button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    phx-click="close_synonym"
+                    phx-target={@myself}
+                  >
+                    Cancel
+                  </.button>
+                </div>
+              </form>
+            </dd>
           </div>
 
-          <div id="host-editor-range" class="flex flex-col gap-1">
-            <span class="gf-label">Range</span>
-            <div class="flex flex-wrap items-center gap-2">
-              <.button size="sm" variant="secondary" icon="ph-map-trifold" phx-click="open_range">
+          <div id="host-editor-range" class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
+            <dt class="w-24 shrink-0 text-meta text-muted">Range</dt>
+            <dd class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span data-part="summary" class="min-w-0 flex-1">{@range_summary}</span>
+              <.tray_mark item={in_tray(@pending, :range)} />
+              <.button variant="ghost" size="sm" icon="ph-map-trifold" phx-click="open_range">
                 Range…
               </.button>
-              <.tray_mark item={in_tray(@pending, :range)} />
-            </div>
+            </dd>
           </div>
-        </div>
+        </dl>
       </.panel>
 
       <.dialog

@@ -125,6 +125,53 @@ defmodule GallformersWeb.Admin.ImagesComponentTest do
       assert has_element?(view, "#images table td", "Jane Doe")
       assert has_element?(view, "#images table td", "A bud gall")
     end
+
+    # Live-use finding 13 (matter ec2c): the table scrolled sideways on a wide
+    # screen, hiding the row actions. It has three columns now (the image,
+    # its caption and credit, its actions), the details wrapping in one cell.
+    test "the table view fits its panel: the details in one cell, the actions in each row",
+         %{conn: conn} do
+      gall = gall_fixture()
+      source = source_fixture("A Source of photos", "2001")
+
+      image =
+        image!({:gall, gall.id}, %{
+          license: "CC-BY",
+          licenselink: "https://creativecommons.org/licenses/by/4.0/",
+          creator: "Jane Doe",
+          caption: "A bud gall",
+          attribution: "Photo by Jane Doe",
+          sourcelink: "https://www.inaturalist.org/photos/1",
+          source_id: source.id
+        })
+
+      {:ok, view, _html} = mount_for(conn, {:gall, gall.id})
+      view |> element("#images button[phx-value-view=table]") |> render_click()
+
+      assert has_element?(view, "#images table thead th:nth-child(3)", "Actions")
+      refute has_element?(view, "#images table thead th:nth-child(4)")
+
+      details = "#images table tbody td:nth-child(2) [data-part=details]"
+
+      for text <- [
+            "A bud gall",
+            "Jane Doe",
+            "CC-BY",
+            "A Source of photos",
+            "www.inaturalist.org",
+            "Photo by Jane Doe"
+          ],
+          do: assert(has_element?(view, details, text))
+
+      assert has_element?(view, "#images table tbody td [data-default-image]")
+
+      for click <- ["start_copy", "edit_image", "confirm_delete"] do
+        assert has_element?(
+                 view,
+                 "#images table tbody td:last-child button[phx-click=#{click}][phx-value-id='#{image.id}']"
+               )
+      end
+    end
   end
 
   describe "the unattributed warning" do

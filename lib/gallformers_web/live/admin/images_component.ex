@@ -5,7 +5,8 @@ defmodule GallformersWeb.Admin.ImagesComponent do
   and the taxon page; ported from the old species image screen.
 
     * a grid (drag to reorder, `SortableImages`; the first image is the
-      default) or a table of the metadata;
+      default) or a table of the metadata (the image, its caption and
+      credit folded into one wrapping cell, its actions: it fits its panel);
     * presigned multi-upload straight to S3 (`ImageUpload`), appended to the
       owner's images;
     * metadata editing with the attribution rules
@@ -292,62 +293,46 @@ defmodule GallformersWeb.Admin.ImagesComponent do
                   <% end %>
                 </:col>
                 <:col :let={image} label="Image">
-                  <div class="relative w-16">
-                    <img
-                      src={Image.sized_url(image.path, :small)}
-                      onerror={"this.onerror=null; this.src='#{Image.sized_url(image.path, :original)}'"}
-                      alt={image.caption || "Image"}
-                      class="size-16 rounded-ctl object-cover"
-                    />
-                    <div
-                      :if={unattributed?(image)}
-                      data-unattributed
-                      class="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-autumn text-on-fill"
-                      title="Not attributed"
-                    >
-                      <.icon name="ph-warning" class="size-3" />
+                  <div class="flex w-16 flex-col items-start gap-1 py-1">
+                    <div class="relative">
+                      <img
+                        src={Image.sized_url(image.path, :small)}
+                        onerror={"this.onerror=null; this.src='#{Image.sized_url(image.path, :original)}'"}
+                        alt={image.caption || "Image"}
+                        class="size-16 rounded-ctl object-cover"
+                      />
+                      <div
+                        :if={unattributed?(image)}
+                        data-unattributed
+                        class="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-autumn text-on-fill"
+                        title="Not attributed"
+                      >
+                        <.icon name="ph-warning" class="size-3" />
+                      </div>
                     </div>
+                    <.chip
+                      :if={default_image?(image, @images)}
+                      variant={:info}
+                      size="sm"
+                      data-default-image
+                    >
+                      Default
+                    </.chip>
                   </div>
                 </:col>
-                <:col :let={image} label="Default">
-                  <span :if={default_image?(image, @images)} data-default-image class="text-brand">
-                    <.icon name="ph-check-circle-fill" class="size-5" />
-                    <span class="sr-only">Default</span>
-                  </span>
+                <%!-- The caption and credit in one wrapping cell, so the table
+                     fits its panel and the actions stay in view. --%>
+                <:col :let={image} label="Caption and credit" grow full>
+                  <div data-part="details" class="flex flex-col gap-0.5 py-1">
+                    <span :if={present?(image.caption)} class="text-ink">{image.caption}</span>
+                    <span :if={!present?(image.caption)} class="text-muted">No caption</span>
+                    <.detail_line parts={credit_parts(image)} class="text-meta text-ink-2" />
+                    <span :if={present?(image.attribution)} class="text-meta text-muted">
+                      {image.attribution}
+                    </span>
+                    <.detail_line parts={source_parts(image)} class="text-meta text-muted" />
+                  </div>
                 </:col>
-                <:col :let={image} label="Creator" field={:creator}>{image.creator}</:col>
-                <:col :let={image} label="License" field={:license}>{image.license}</:col>
-                <:col :let={image} label="Source" field={:source}>
-                  <.link :if={image.source} navigate={~p"/source/#{image.source.id}"}>
-                    {truncate(image.source.title, 30)}
-                  </.link>
-                </:col>
-                <:col :let={image} label="Source link" field={:sourcelink}>
-                  <a
-                    :if={present?(image.sourcelink)}
-                    href={image.sourcelink}
-                    target="_blank"
-                    rel="noopener"
-                    title={image.sourcelink}
-                  >
-                    {URI.parse(image.sourcelink).host || String.slice(image.sourcelink, 0, 20)}
-                  </a>
-                </:col>
-                <:col :let={image} label="License link" field={:licenselink}>
-                  <a
-                    :if={valid_url?(image.licenselink)}
-                    href={image.licenselink}
-                    target="_blank"
-                    rel="noopener"
-                    title={image.licenselink}
-                  >
-                    {URI.parse(image.licenselink).host || String.slice(image.licenselink, 0, 20)}
-                  </a>
-                </:col>
-                <:col :let={image} label="Attribution" field={:attribution}>
-                  {image.attribution}
-                </:col>
-                <:col :let={image} label="Caption" field={:caption}>{image.caption}</:col>
                 <:col :let={image} label="Actions" numeric>
                   <%!-- Row actions (hidden during copy mode) --%>
                   <div :if={!@copy_mode} class="flex justify-end gap-1">
@@ -1184,6 +1169,65 @@ defmodule GallformersWeb.Admin.ImagesComponent do
   end
 
   defp present?(value), do: value not in [nil, ""]
+
+  # The table's credit line: the creator, then the license (linked to it).
+  defp credit_parts(image) do
+    [
+      present?(image.creator) && %{text: image.creator},
+      present?(image.license) &&
+        %{text: image.license, href: valid_url?(image.licenselink) && image.licenselink}
+    ]
+    |> Enum.filter(& &1)
+  end
+
+  # The table's source line: the Source (its page), then the link the image
+  # came from (its host).
+  defp source_parts(image) do
+    [
+      image.source &&
+        %{
+          text: truncate(image.source.title, 60),
+          title: image.source.title,
+          navigate: ~p"/source/#{image.source.id}"
+        },
+      present?(image.sourcelink) &&
+        %{
+          text: URI.parse(image.sourcelink).host || String.slice(image.sourcelink, 0, 20),
+          title: image.sourcelink,
+          href: image.sourcelink
+        }
+    ]
+    |> Enum.filter(& &1)
+  end
+
+  attr :parts, :list, required: true
+  attr :class, :any, default: nil
+
+  # One line of a table cell's details: its parts (text, or a link) joined
+  # with " · ". Nothing when there are none.
+  defp detail_line(assigns) do
+    ~H"""
+    <span :if={@parts != []} class={@class}>
+      <%= for {part, index} <- Enum.with_index(@parts) do %>
+        {if index > 0, do: " · "}<.link
+          :if={part[:navigate]}
+          navigate={part.navigate}
+          title={part[:title]}
+        >{part.text}</.link>
+        <a
+          :if={part[:href]}
+          href={part.href}
+          target="_blank"
+          rel="noopener"
+          title={part[:title]}
+        >
+          {part.text}
+        </a>
+        <span :if={!part[:navigate] && !part[:href]}>{part.text}</span>
+      <% end %>
+    </span>
+    """
+  end
 
   defp truncate(nil, _length), do: ""
 

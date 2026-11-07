@@ -51,6 +51,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.EditTest do
       assert has_element?(view, "a[href='/host/#{plant.id}']")
     end
 
+    test "the intro mentions the Host range's Save button only where the Host range shows",
+         %{conn: conn} do
+      genus = genus()
+      plant = plant_fixture(name: "#{Taxa.accepted_name(genus)} intro", parent: genus)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/taxonomy/#{genus.id}")
+      assert html =~ "Each change is saved as you make it."
+      refute html =~ "Host range, which is saved"
+
+      {:ok, view, html} = live(conn, ~p"/admin/taxonomy/#{plant.id}")
+      assert has_element?(view, "h2", "Host range")
+      assert html =~ "except the Host range, which is saved with its Save button"
+    end
+
     test "an unknown taxon goes back to the list", %{conn: conn} do
       assert {:error, {:live_redirect, %{to: "/admin/taxonomy"}}} =
                live(conn, ~p"/admin/taxonomy/999999999")
