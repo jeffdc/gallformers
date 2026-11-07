@@ -6,14 +6,15 @@ defmodule GallformersWeb.SourceLive do
   ISBN and license, the original, its citation, the Galls it speaks of
   (`Gallformers.Catalog.list_galls_for_source/1`, each opening that Gall's
   entry for it), what it says of them (its Facts, grouped by Gall then
-  category, `Gallformers.Import.facts_for_source/1`, read-only; matter
-  `f14c`, read on the connected mount only), when it came to Gallformers
+  category, then its taxonomic statements with whether Gallformers
+  follows each, `Gallformers.Import.facts_for_source/1`, read-only; matters
+  `f14c`, `f923`, read on the connected mount only), when it came to Gallformers
   (`Gallformers.Import.source_dates/1`) and its images, when it has any. An
   unknown or malformed ID is a 404.
   """
   use GallformersWeb, :live_view
 
-  import GallformersWeb.FactsComponents, only: [facts_view: 1]
+  import GallformersWeb.FactsComponents, only: [facts_view: 1, facts_taxonomy: 1]
 
   alias Gallformers.{Accounts, Catalog, Images, Import, Sources}
   alias Gallformers.Images.Image
@@ -241,13 +242,28 @@ defmodule GallformersWeb.SourceLive do
               <p :if={@facts == nil} class="flex items-center gap-2 text-ui text-muted">
                 <.loading_spinner size="sm" /> Loading…
               </p>
-              <p :if={@facts == []} class="text-ui text-muted">No facts from this Source yet.</p>
-              <.facts_view
-                :if={@facts not in [nil, []]}
-                id="source-facts-galls"
-                galls={@facts}
-                mode={:public}
-              />
+              <p
+                :if={@facts && @facts.galls == [] && @facts.taxonomy.acts == []}
+                class="text-ui text-muted"
+              >
+                No facts from this Source yet.
+              </p>
+              <div
+                :if={@facts && (@facts.galls != [] || @facts.taxonomy.acts != [])}
+                class="grid gap-3"
+              >
+                <.facts_view
+                  :if={@facts.galls != []}
+                  id="source-facts-galls"
+                  galls={@facts.galls}
+                  mode={:public}
+                />
+                <.facts_taxonomy
+                  id="source-facts-taxonomy"
+                  taxonomy={@facts.taxonomy}
+                  mode={:public}
+                />
+              </div>
             </.section>
 
             <.source_dates id="source-dates" dates={@dates} class="text-meta text-muted" />

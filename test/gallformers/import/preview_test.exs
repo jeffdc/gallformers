@@ -145,7 +145,7 @@ defmodule Gallformers.Import.PreviewTest do
 
       # Approval writes the same Facts: the Source's Facts, as the same view shows them.
       package = approve!(package)
-      applied = package.source_id |> Import.facts_for_source() |> Enum.flat_map(&all_facts/1)
+      applied = Import.facts_for_source(package.source_id).galls |> Enum.flat_map(&all_facts/1)
 
       assert Enum.sort(Enum.map(applied, &comparable/1)) ==
                Enum.sort(Enum.map(entries(preview), &comparable/1))
@@ -208,6 +208,18 @@ defmodule Gallformers.Import.PreviewTest do
                g.facts.inducer
 
       assert Repo.aggregate(Taxon, :count) == taxa_before
+
+      # Approved, the Source's acts are its taxonomic statements, each
+      # awaiting a curator (`f923`).
+      package = approve!(package)
+
+      assert [
+               %{ref: "a1", kind: :name, decision: %{state: :awaiting}},
+               %{ref: "a2", kind: :placement, decision: %{state: :awaiting}} = applied
+             ] = Import.facts_for_source(package.source_id).taxonomy.acts
+
+      assert applied.value.taxon.name == "Andricus novus"
+      assert applied.value.parent.name == "Andricus"
       _ = ctx
     end
   end

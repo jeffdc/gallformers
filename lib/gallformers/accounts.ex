@@ -216,6 +216,25 @@ defmodule Gallformers.Accounts do
   def get_user(id), do: Repo.get(User, id)
 
   @doc """
+  The names to show for users `ids`, by ID: each one's display name, else
+  its nickname. A user with neither, or none with that ID, is left out.
+  """
+  @spec display_names([integer()]) :: %{integer() => String.t()}
+  def display_names([]), do: %{}
+
+  def display_names(ids) when is_list(ids) do
+    from(u in User, where: u.id in ^Enum.uniq(ids), select: {u.id, u.display_name, u.nickname})
+    |> Repo.all()
+    |> Enum.flat_map(fn {id, display, nickname} ->
+      case Enum.find([display, nickname], &(&1 not in [nil, ""])) do
+        nil -> []
+        name -> [{id, name}]
+      end
+    end)
+    |> Map.new()
+  end
+
+  @doc """
   Gets a user profile by Auth0 ID.
 
   Returns `nil` if no user with that Auth0 ID exists.

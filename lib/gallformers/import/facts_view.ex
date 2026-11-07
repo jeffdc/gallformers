@@ -49,8 +49,9 @@ defmodule Gallformers.Import.FactsView do
   (`:traits` a map of Trait to entries), every category present.
   """
 
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query, only: [from: 2, union_all: 2]
 
+  alias Gallformers.Accounts
   alias Gallformers.Catalog.Facts.AliasFact
   alias Gallformers.Catalog.Facts.DescriptionFact
   alias Gallformers.Catalog.Facts.OccurrenceFact
@@ -62,11 +63,17 @@ defmodule Gallformers.Import.FactsView do
   alias Gallformers.Catalog.RelationshipTypes
   alias Gallformers.Catalog.Vocab.TraitValue
   alias Gallformers.Facts
+  alias Gallformers.Facts.Attribution
   alias Gallformers.Facts.Fact
   alias Gallformers.Places.Place
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Sources.DocumentItem
+  alias Gallformers.Taxa.ActFacts.CommonNameFact
+  alias Gallformers.Taxa.ActFacts.NameFact
+  alias Gallformers.Taxa.ActFacts.PlacementFact
+  alias Gallformers.Taxa.ActFacts.SplitFact
+  alias Gallformers.Taxa.ActFacts.SynonymyFact
   alias Gallformers.Taxa.Taxon
   alias Gallformers.Taxa.TaxonName
 
@@ -403,6 +410,225 @@ defmodule Gallformers.Import.FactsView do
       stage_as_written: nil,
       statement_text: nil
     }
+  end
+
+  # -- taxonomic statements (matter `f923` Task 10) -----------------------------
+
+  @doc """
+  The entries of the taxonomic statements `attributions` (Sources'
+  attributions of act Facts, with their evidence and names), in the order
+  given, shaped as the preview's acts: `category: :taxonomy`, the act's
+  `kind` (`:placement`, `:name`, `:synonymy`, `:split`, `:common_name`),
+  its `value` (`%{taxon, parent, name, accepted, into, common_name}`, those
+  that apply: a placement's `parent` nil at the root, a name act's `name`
+  only when it differs from the taxon's), the Source's words (with `status_as_written` and
+  `authorship_as_written`) and the Fact's standing. Each also has its
+  `source` (`%{source_id, name}`) and the curator's `decision`:
+  `%{state: :accepted | :declined | :awaiting, by, at, reason}` (`by` the
+  curator's name, nil for a system process), or nil for a statement of
+  Gallformers' own Sources, which counts without one.
+  """
+  @spec act_entries([Attribution.t()]) :: [entry()]
+  def act_entries([]), do: []
+
+  def act_entries(attributions) when is_list(attributions) do
+    fact_ids = attributions |> Enum.map(& &1.fact_id) |> Enum.uniq()
+    facts = Repo.all(from(f in Fact, where: f.id in ^fact_ids)) |> Map.new(&{&1.id, &1})
+    details = act_details(fact_ids)
+    taxa = details |> Map.values() |> Enum.flat_map(&act_taxa/1) |> Enum.uniq() |> taxon_names()
+    items = items(attributions)
+    sources = source_names(attributions)
+    own = Sources.own_source_ids()
+
+    curators =
+      attributions
+      |> Enum.flat_map(&[&1.accepted_by_user_id, &1.declined_by_user_id])
+      |> Enum.filter(&is_integer/1)
+      |> Accounts.display_names()
+
+    for a <- attributions, %{} = detail <- [details[a.fact_id]] do
+      fact = facts[a.fact_id]
+
+      %{
+        ref: nil,
+        batch_id: a.batch_id,
+        fact_id: a.fact_id,
+        kind: act_kind(detail),
+        category: :taxonomy,
+        gall: nil,
+        value: act_value(detail, taxa),
+        words:
+          Map.merge(words(a, items), %{
+            status_as_written: a.status_as_written,
+            authorship_as_written: a.authorship_as_written
+          }),
+        stance: a.stance,
+        status: nil,
+        standing: fact && fact.standing,
+        slot: fact && fact.slot,
+        question: nil,
+        why: nil,
+        edits: [],
+        source: %{source_id: a.source_id, name: sources[a.source_id]},
+        decision: if(a.source_id not in own, do: decision(a, curators))
+      }
+    end
+  end
+
+  @act_schemas [PlacementFact, NameFact, SynonymyFact, SplitFact, CommonNameFact]
+
+  defp act_details(fact_ids) do
+    @act_schemas
+    |> Enum.flat_map(&Repo.all(from(d in &1, where: d.fact_id in ^fact_ids)))
+    |> Map.new(&{&1.fact_id, &1})
+  end
+
+  defp act_kind(%PlacementFact{}), do: :placement
+  defp act_kind(%NameFact{}), do: :name
+  defp act_kind(%SynonymyFact{}), do: :synonymy
+  defp act_kind(%SplitFact{}), do: :split
+  defp act_kind(%CommonNameFact{}), do: :common_name
+
+  defp act_taxa(%PlacementFact{taxon_id: t, parent_id: p}), do: Enum.reject([t, p], &is_nil/1)
+  defp act_taxa(%SynonymyFact{accepted_taxon_id: t}), do: [t]
+  defp act_taxa(%SplitFact{taxon_id: t, into_taxon_ids: into}), do: [t | into]
+  defp act_taxa(%{taxon_id: t}), do: [t]
+
+  defp act_value(%PlacementFact{} = p, taxa),
+    do: %{taxon: taxon(taxa, p.taxon_id), parent: p.parent_id && taxon(taxa, p.parent_id)}
+
+  defp act_value(%NameFact{} = n, taxa) do
+    taxon = taxon(taxa, n.taxon_id)
+    %{taxon: taxon, name: if(n.name != taxon.name, do: n.name)}
+  end
+
+  defp act_value(%SynonymyFact{} = s, taxa),
+    do: %{name: s.name, accepted: taxon(taxa, s.accepted_taxon_id)}
+
+  defp act_value(%SplitFact{} = s, taxa),
+    do: %{taxon: taxon(taxa, s.taxon_id), into: Enum.map(s.into_taxon_ids, &taxon(taxa, &1))}
+
+  defp act_value(%CommonNameFact{} = c, taxa),
+    do: %{taxon: taxon(taxa, c.taxon_id), common_name: c.common_name}
+
+  defp taxon(taxa, id), do: Map.get(taxa, id, %{taxon_id: id, name: nil, rank: nil})
+
+  defp decision(%Attribution{accepted_at: %DateTime{} = at} = a, curators),
+    do: %{state: :accepted, by: curators[a.accepted_by_user_id], at: at, reason: nil}
+
+  defp decision(%Attribution{declined_at: %DateTime{} = at} = a, curators),
+    do: %{state: :declined, by: curators[a.declined_by_user_id], at: at, reason: a.decline_reason}
+
+  defp decision(_attribution, _curators), do: %{state: :awaiting, by: nil, at: nil, reason: nil}
+
+  @doc """
+  Where taxon `taxon_id` stands in the Facts, and on whose word:
+
+    * `placement` — its current placement, `%{fact_id, parent, source}`
+      (`parent` nil at the root), or nil when no current Fact places it;
+    * `name` — its current name, `%{fact_id, name, rank, authorship,
+      sensu, source}`, or nil;
+    * `disagreeing` — the papers that say otherwise and do not count, as
+      `act_entries/1` gives them, newest first: a statement awaiting a
+      curator, or declined, that confirms what is not current (another
+      parent, another name, a synonym or common name the taxon lacks, a
+      split) or denies what is.
+
+  A position's `source` (`%{source_id, name}`) is the Source whose
+  statement decides it: the newest of the statements that count.
+  """
+  @spec position(integer()) :: %{
+          placement: map() | nil,
+          name: map() | nil,
+          disagreeing: [entry()]
+        }
+  def position(taxon_id) when is_integer(taxon_id) do
+    facts =
+      Repo.all(
+        from(f in Fact,
+          where:
+            f.slot in ^["taxon:#{taxon_id}:placement", "taxon:#{taxon_id}:name"] or
+              f.id in subquery(about_taxon(taxon_id))
+        )
+      )
+
+    attributions =
+      facts
+      |> Enum.map(& &1.id)
+      |> Facts.list_attributions_for_facts()
+
+    ctx = %{
+      facts: facts,
+      attributions: attributions,
+      own: Sources.own_source_ids(),
+      details: facts |> Enum.map(& &1.id) |> act_details(),
+      sources: attributions |> Map.values() |> List.flatten() |> source_names()
+    }
+
+    names =
+      ctx.details |> Map.values() |> Enum.flat_map(&act_taxa/1) |> Enum.uniq() |> taxon_names()
+
+    %{
+      placement:
+        with {p, source} <- current_position(ctx, :placement) do
+          %{fact_id: p.fact_id, parent: p.parent_id && names[p.parent_id], source: source}
+        end,
+      name:
+        with {n, source} <- current_position(ctx, :name) do
+          %{
+            fact_id: n.fact_id,
+            name: n.name,
+            rank: n.rank,
+            authorship: n.authorship,
+            sensu: n.sensu,
+            source: source
+          }
+        end,
+      disagreeing:
+        ctx
+        |> disagreeing()
+        |> Enum.sort_by(&{&1.stated_on != nil, stated_days(&1.stated_on), &1.id}, :desc)
+        |> act_entries()
+    }
+  end
+
+  # The current Fact of `kind` among the taxon's, with the Source deciding it.
+  defp current_position(ctx, kind) do
+    Enum.find_value(ctx.facts, fn fact ->
+      with :current <- fact.standing,
+           %{} = detail <- ctx.details[fact.id],
+           ^kind <- act_kind(detail),
+           %Attribution{} = by <- deciding(fact, ctx.attributions[fact.id] || [], ctx.own) do
+        {detail, %{source_id: by.source_id, name: ctx.sources[by.source_id]}}
+      else
+        _ -> nil
+      end
+    end)
+  end
+
+  # The statements that don't count and say otherwise than the Facts do.
+  defp disagreeing(ctx) do
+    for f <- ctx.facts,
+        a <- Map.get(ctx.attributions, f.id, []),
+        a.source_id not in ctx.own,
+        not Facts.counts?(f.kind, a, ctx.own),
+        (a.stance == :confirm and f.standing != :current) or
+          (a.stance == :deny and f.standing == :current),
+        do: a
+  end
+
+  # The synonymy, common-name and split Facts about a taxon.
+  defp about_taxon(taxon_id) do
+    from(s in SynonymyFact, where: s.accepted_taxon_id == ^taxon_id, select: s.fact_id)
+    |> union_all(^from(c in CommonNameFact, where: c.taxon_id == ^taxon_id, select: c.fact_id))
+    |> union_all(^from(s in SplitFact, where: s.taxon_id == ^taxon_id, select: s.fact_id))
+  end
+
+  # The attribution deciding a current Fact: the newest confirmation that counts.
+  defp deciding(fact, attributions, own) do
+    attributions
+    |> Enum.filter(&(&1.stance == :confirm and Facts.counts?(fact.kind, &1, own)))
+    |> Enum.max_by(&{&1.stated_on != nil, stated_days(&1.stated_on), &1.id}, fn -> nil end)
   end
 
   # -- grouping -----------------------------------------------------------------
