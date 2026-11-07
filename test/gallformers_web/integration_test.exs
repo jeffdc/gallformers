@@ -17,7 +17,7 @@ defmodule GallformersWeb.IntegrationTest do
 
     test "home page renders as LiveView", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/")
-      assert html =~ "Identify a plant gall"
+      assert html =~ "What plant is it on?"
     end
 
     test "about page loads successfully", %{conn: conn} do

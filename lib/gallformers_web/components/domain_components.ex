@@ -18,8 +18,179 @@ defmodule GallformersWeb.DomainComponents do
   import GallformersWeb.Helpers, only: [format_number: 1, list_separator: 2, time_ago: 1]
   import GallformersWeb.PageComponents, only: [panel: 1]
 
+  alias Gallformers.Catalog.GallName
+  alias Gallformers.TaxonName
   alias GallformersWeb.TaxonomyURL
   alias Phoenix.LiveView.JS
+
+  @doc """
+  A Gall's name as a reader should see it. A described Gall's name is a
+  scientific name (`taxon_name`). An undescribed Gall is named by what it
+  is, from its placeholder name (`Gallformers.Catalog.GallName.undescribed/1`):
+  "Undescribed red bud gall", "Undescribed *Neuroterus* new growth swelling
+  (sexgen)"; the placeholder ("Unknown (Cynipidae) q-stellata-red-bud-gall")
+  is kept in the title, for those who know the codes. `article` starts it
+  "An undescribed", for a name standing alone as a heading.
+
+  Style it from outside (size, weight, color); it sets only italics.
+
+      <.gall_name name={gall.name} undescribed={gall.undescribed} />
+  """
+  attr :name, :string, required: true, doc: "the Gall's name"
+  attr :undescribed, :boolean, default: false, doc: "the Gall has no species-rank Inducer"
+  attr :article, :boolean, default: false, doc: ~s|"An undescribed …" rather than "Undescribed …"|
+  attr :class, :any, default: nil
+
+  def gall_name(assigns) do
+    assigns =
+      assign(assigns, :parts, if(assigns.undescribed, do: GallName.undescribed(assigns.name)))
+
+    ~H"""
+    <span :if={@parts} data-part="gall-name" title={@name} class={@class}>
+      {undescribed_html(
+        @parts,
+        @article
+      )}
+    </span>
+    <.taxon_name :if={!@parts} name={@name} class={@class} />
+    """
+  end
+
+  # One string, so no template whitespace falls between the words.
+  defp undescribed_html(parts, article) do
+    words =
+      [
+        if(article, do: "An undescribed", else: "Undescribed"),
+        parts.genus && ["<em>", html_text(parts.genus), "</em>"],
+        html_text(parts.description),
+        parts.qualifiers && html_text(parts.qualifiers)
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.intersperse(" ")
+
+    Phoenix.HTML.raw(words)
+  end
+
+  @doc """
+  The cynipid mark: Gallformers' stipple drawing of a cynipid wasp, as
+  decoration (hidden from screen readers). It takes the text color, so set
+  one (`text-brand`) and a size; the drawing keeps its proportions (3:2).
+
+      <.cynipid_mark class="h-28 w-44 text-brand" />
+  """
+  attr :class, :any, default: nil, doc: "size and color"
+
+  def cynipid_mark(assigns) do
+    ~H"""
+    <span aria-hidden="true" data-part="cynipid-mark" class={["gf-cynipid-mark", @class]}></span>
+    """
+  end
+
+  @doc """
+  One plain sentence of where a Gall is found, on which Hosts and when, from
+  what search results and the random Gall load (`Catalog.gall_search_details/1`):
+  "Found on the stem of *Quercus alba* and *Quercus rubra* and 2 more, in
+  spring and fall." An undescribed Gall says which Gallformers make it, when
+  its name names a family ("Made by one of the gall midges, on …").
+
+  A plant part that is already a phrase ("between leaf veins") is used as
+  one; several plant parts follow the Hosts in brackets. Seasons run through
+  the year. Hosts are set as scientific names.
+
+      <.gall_summary hosts={d.hosts} plant_part={d.plant_part} season={d.season}
+        name={gall.name} undescribed={gall.undescribed} />
+  """
+  attr :hosts, :list, default: [], doc: "the Hosts' names"
+  attr :plant_part, :list, default: [], doc: "plant part values"
+  attr :season, :list, default: [], doc: "season values"
+  attr :name, :string, default: nil, doc: "the Gall's name, for an undescribed Gall's group"
+  attr :undescribed, :boolean, default: false
+  attr :max_hosts, :integer, default: 2, doc: "Hosts named before \"and N more\""
+  attr :class, :any, default: nil
+
+  def gall_summary(assigns) do
+    group =
+      if assigns.undescribed && assigns.name,
+        do: (GallName.undescribed(assigns.name) || %{})[:group]
+
+    known? =
+      group != nil or Enum.any?([assigns.hosts, assigns.plant_part, assigns.season], &(&1 != []))
+
+    assigns = assign(assigns, :html, known? && summary_html(assigns, group))
+
+    ~H"""
+    <span :if={@html} data-part="gall-summary" class={@class}>{@html}</span>
+    """
+  end
+
+  @seasons ~w(spring summer fall winter)
+  @phrase_part ~r/^(at|between|in|on|under) /
+
+  defp summary_html(assigns, group) do
+    hosts = hosts_html(assigns.hosts, assigns.max_hosts)
+    parts = Enum.map(assigns.plant_part, &String.downcase/1)
+
+    Phoenix.HTML.raw([
+      html_text(summary_lead(group)),
+      summary_where(parts, hosts),
+      summary_when(assigns.season),
+      "."
+    ])
+  end
+
+  defp summary_lead(nil), do: "Found"
+
+  defp summary_lead(group),
+    do: "Made by one of the #{group |> String.downcase() |> String.trim_leading("other ")},"
+
+  defp summary_where([], []), do: []
+  defp summary_where([], hosts), do: [" on " | hosts]
+
+  defp summary_where([one], hosts) do
+    of_hosts = if hosts == [], do: [], else: [" of " | hosts]
+    [if(one =~ @phrase_part, do: " ", else: " on the "), html_text(one) | of_hosts]
+  end
+
+  defp summary_where(many, hosts),
+    do: [" on ", hosts, " (", html_text(Enum.join(many, ", ")), ")"]
+
+  defp summary_when([]), do: []
+
+  defp summary_when(season) do
+    words =
+      season
+      |> Enum.map(&String.downcase/1)
+      |> Enum.sort_by(&(Enum.find_index(@seasons, fn s -> s == &1 end) || 99))
+      |> join_words("and")
+
+    [", in ", html_text(words)]
+  end
+
+  defp hosts_html(hosts, max) do
+    {shown, more} = Enum.split(hosts, max)
+
+    names =
+      shown
+      |> Enum.map(fn name ->
+        Enum.map(TaxonName.segments(name), fn
+          {text, :italic} -> ["<em>", html_text(text), "</em>"]
+          {text, :upright} -> html_text(text)
+        end)
+      end)
+      |> Enum.intersperse(" and ")
+
+    if more == [], do: names, else: [names, " and #{length(more)} more"]
+  end
+
+  # "spring", "spring and fall", "spring, summer and fall"
+  defp join_words([one], _joiner), do: one
+
+  defp join_words(words, joiner) do
+    {init, [last]} = Enum.split(words, -1)
+    Enum.join(init, ", ") <> " #{joiner} " <> last
+  end
+
+  defp html_text(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
   @doc """
   A Gall at a glance, for photo grids (ID results, rank pages, browse, the

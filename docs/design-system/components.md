@@ -31,6 +31,9 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `empty_state` | DataComponents | Data | Built | ad hoc "Nothing here" text |
 | `taxon_name` | DataDisplayComponents | Domain | Built | — |
 | `gall_card` | DomainComponents | Domain | Built | the ID grid card, `species_card` |
+| `gall_name` | DomainComponents | Domain | Built | an undescribed Gall's placeholder name shown raw |
+| `gall_summary` | DomainComponents | Domain | Built | — |
+| `cynipid_mark` | DomainComponents | Domain | Built | — |
 | `source_entry` | DomainComponents | Domain | Built | the Gall page's Further Information cards, `source_citation`, `source_list` |
 | `photo_viewer` | DomainComponents | Domain | Built | `image_gallery` and the ImageGallery hook (retired) |
 | `range_map` | DomainComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
@@ -245,6 +248,23 @@ A Gall at a glance: the photo (square, `rounded-panel`), the name (italic), and 
 - Attributes (plain values, so any page maps its own read model onto them): `navigate` (required; the whole card is one link), `name` (required; set through `taxon_name`), `image_url`, `image_alt` (defaults to "Photo of …"; `""` when the name beside it says enough), `subtitle` (the distinguishing traits, e.g. "stem · abrupt swelling · Spring"), `size` (`:md`, `:sm`). Slot `chip` (e.g. Undescribed).
 - Lay cards out in `<div class="gf-photo-grid">`: photos fill the row at a minimum of 280px, so a wider screen shows more photos, never smaller ones (four across at 1312px, six at 1920px). Photos are the most important thing on an identification page; don't shrink them to fit more. `data-size="sm"` (at least 176px, two across on phones) is for overview rows (home page tiles, rank pages).
 - A Gall with no photo shows the gall icon on `bg-surface-2`, not an empty grey box.
+
+### `gall_name`
+
+A Gall's name as a reader should see it. A described Gall's name goes through `taxon_name`. An undescribed Gall is named by what it is, read from its placeholder name by `Gallformers.Catalog.GallName.undescribed/1` (the inverse of `derive/1`): "Undescribed red bud gall", "Undescribed *Neuroterus* new growth swelling (sexgen)". The descriptor's Host code is dropped and one likening it to another gall says so ("gall like rosaria"). The placeholder stays in the `title`, for those who know the codes. For anywhere a Gall's name is shown to readers: the home page, search results, cards.
+
+- Attributes: `name` (required), `undescribed` (the Gall has no species-rank Inducer; read models carry the flag), `article` ("An undescribed …", for a name standing alone as a heading), `class`. It sets only italics; size, weight and color come from outside.
+
+### `gall_summary`
+
+One plain sentence of where a Gall is found, on which Hosts and when: "Found on the stem of *Quercus alba* and *Quercus rubra* and 2 more, in spring and fall." An undescribed Gall whose name names a family says which Gallformers make it: "Made by one of the gall midges, on …". From the data `Catalog.gall_search_details/1` loads (search results, the random Gall).
+
+- A plant part that is already a phrase ("between leaf veins") is used as one; several follow the Hosts in brackets. Seasons run through the year. Hosts are set as scientific names. With nothing known it renders nothing.
+- Attributes: `hosts`, `plant_part`, `season` (lists of names and values), `name` and `undescribed` (for the group), `max_hosts` (default 2, then "and N more"), `class`.
+
+### `cynipid_mark`
+
+Gallformers' stipple drawing of a cynipid wasp (`priv/static/images/cynipid_R.svg`), drawn as a mask (`.gf-cynipid-mark`) so it takes the text color in light and dark. Decoration, hidden from screen readers. Set a color (`text-brand`) and a size; it keeps its 3:2 proportions. Use it sparingly, once on a page at most: the home page beside the counts, and places that want a little of the site's character (an empty state, an error page).
 
 ### `source_entry`
 

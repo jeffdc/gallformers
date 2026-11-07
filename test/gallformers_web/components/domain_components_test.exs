@@ -375,6 +375,125 @@ defmodule GallformersWeb.DomainComponentsTest do
     end
   end
 
+  describe "gall_name" do
+    test "a described Gall's name is a scientific name" do
+      assigns = %{}
+      html = rendered_to_string(~H|<.gall_name name="Andricus weldi (agamic)" />|)
+
+      assert text(html, "em") == "Andricus weldi"
+      assert html =~ "(agamic)"
+    end
+
+    test "an undescribed Gall is named by what it is, its placeholder name in the title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.gall_name name="Unknown (Cynipidae) q-stellata-red-bud-gall" undescribed />
+        """)
+
+      assert text(html, "[data-part=gall-name]") == "Undescribed red bud gall"
+
+      assert attr(html, "[data-part=gall-name]", "title") == [
+               "Unknown (Cynipidae) q-stellata-red-bud-gall"
+             ]
+    end
+
+    test "an undescribed Gall's genus is italic, its qualifiers upright; article adds An" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.gall_name name="Neuroterus q-gambelii-new-growth-swelling (sexgen)" undescribed article />
+        """)
+
+      assert text(html, "[data-part=gall-name]") ==
+               "An undescribed Neuroterus new growth swelling (sexgen)"
+
+      assert text(html, "em") == "Neuroterus"
+    end
+  end
+
+  describe "cynipid_mark" do
+    test "decoration, colored and sized from outside" do
+      assigns = %{}
+      html = rendered_to_string(~H|<.cynipid_mark class="h-28 w-44 text-brand" />|)
+
+      assert attr(html, "[data-part=cynipid-mark]", "aria-hidden") == ["true"]
+
+      assert attr(html, "[data-part=cynipid-mark]", "class") == [
+               "gf-cynipid-mark h-28 w-44 text-brand"
+             ]
+    end
+  end
+
+  describe "gall_summary" do
+    test "where it's found, on which Hosts and when, the Hosts as scientific names" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.gall_summary
+          hosts={["Quercus alba", "Quercus rubra", "Quercus velutina", "Quercus coccinea"]}
+          plant_part={["stem"]}
+          season={["Fall", "Spring"]}
+        />
+        """)
+
+      assert text(html, "[data-part=gall-summary]") ==
+               "Found on the stem of Quercus alba and Quercus rubra and 2 more, in spring and fall."
+
+      assert count(html, "em") == 2
+    end
+
+    test "a plant part that is already a phrase is used as one" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.gall_summary hosts={["Malus fusca"]} plant_part={["between leaf veins"]} />
+        """)
+
+      assert text(html, "[data-part=gall-summary]") == "Found between leaf veins of Malus fusca."
+    end
+
+    test "several plant parts follow the Hosts" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.gall_summary hosts={["Tilia americana"]} plant_part={["lower leaf", "upper leaf"]} />
+        """)
+
+      assert text(html, "[data-part=gall-summary]") ==
+               "Found on Tilia americana (lower leaf, upper leaf)."
+    end
+
+    test "nothing known, nothing said" do
+      assigns = %{}
+      html = rendered_to_string(~H|<.gall_summary />|)
+
+      assert count(html, "[data-part=gall-summary]") == 0
+    end
+
+    test "an undescribed Gall says which Gallformers make it" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.gall_summary
+          name="Unknown (Cecidomyiidae) s-alba-stem-gall"
+          undescribed
+          hosts={["Salix alba"]}
+          plant_part={["stem"]}
+        />
+        """)
+
+      assert text(html, "[data-part=gall-summary]") ==
+               "Made by one of the gall midges, on the stem of Salix alba."
+    end
+  end
+
   describe "category_tile" do
     test "a row: one link with a decorative photo, the name and the count" do
       assigns = %{}

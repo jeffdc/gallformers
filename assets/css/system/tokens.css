@@ -62,6 +62,7 @@
 
 :root {
   /* Reading density (default) */
+  --gf-fs-display: clamp(2.5rem, 1.75rem + 2.2vw, 3.25rem); /* 40–52px: the home page's one headline */
   --gf-fs-page: 2.125rem;        /* 34px page title */
   --gf-fs-section: 1.375rem;     /* 22px section heading */
   --gf-fs-subsection: 1.125rem;  /* 18px */
@@ -197,6 +198,8 @@
   --font-sans: "Source Sans 3", "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
 
+  --text-display: var(--gf-fs-display);
+  --text-display--line-height: 1.05;
   --text-page: var(--gf-fs-page);
   --text-page--line-height: 1.15;
   --text-section: var(--gf-fs-section);

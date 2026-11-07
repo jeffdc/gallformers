@@ -18,10 +18,10 @@ Colors are semantic tokens. Templates use the Tailwind utilities generated from 
 
 | Token | Utility | Light | Dark | Use for |
 |---|---|---|---|---|
-| `--gf-maroon` | `text-brand` | #661419 | #e48a8f | The wordmark, active navigation, brand text. Not page titles, not links. |
+| `--gf-maroon` | `text-brand` | #661419 | #e48a8f | The wordmark, active navigation, brand text, the home page's display headline and the cynipid mark. Not other page titles, not links. |
 | `--gf-maroon-fill` | `bg-brand-fill` | #661419 | #8c2a31 | The fill of the one primary action on a screen. |
 | `--gf-maroon-hover` | `bg-brand-hover` | #4f0f13 | #a5343c | Hover on a primary action. |
-| `--gf-sky` | `bg-sky` | #c1e0f3 | #1d3445 | The site header band and selected rows only. |
+| `--gf-sky` | `bg-sky` | #c1e0f3 | #1d3445 | The site header band, the home page's identify band, and selected rows. |
 | `--gf-sky-soft` | `bg-sky-soft` | #eaf4fb | #172a37 | Info surfaces (ID Notes, notices) and row hover. |
 | `--gf-autumn` | `bg-autumn`, `border-autumn` | #bc6428 | #e0915a | "Needs you": marks, dots, stripes, counts' fills. |
 | `--gf-autumn-ink` | `text-autumn-ink` | #a0521d | #e0915a | "Needs you" as text (counts such as Review 358). |
@@ -101,6 +101,7 @@ Sizes are semantic and depend on the density context. Use the utility named for 
 
 | Utility | Role | Reading | Working |
 |---|---|---|---|
+| `text-display` | The home page's one headline, in League Spartan and the brand color | 40–52px (by width) | — |
 | `text-page` | The page title (h1) | 34px | 28px |
 | `text-section` | A section heading (h2) | 22px | 19px |
 | `text-subsection` | A heading inside a section (h3) | 18px | 16px |
@@ -166,6 +167,8 @@ Nothing else rounds. Elevation is flat: panels have a 1px `border-line`, not a s
 ## Icons
 
 Phosphor icons (`ph-*`, MIT) for interface actions and Gallformers' own domain icons (`gf-*`: gall, host, taxon, source, place) via the `.icon` component. Icons sit at 1em beside text and inherit its color. An icon-only button has an accessible label. Icons never replace a word where the word is clearer.
+
+The cynipid mark (`cynipid_mark`) is not an icon: it is Gallformers' own drawing, used as decoration, once on a page at most.
 
 ## Motion
 

@@ -1,23 +1,25 @@
 defmodule GallformersWeb.HomeLive do
   @moduledoc """
-  The home page (design system, matter bc0d): the Host typeahead that opens
-  the ID tool, a random Gall with "Show me another", the counts, the Host
-  genera and Gallformer groups to start from, and the Sources changed most
-  recently.
+  The home page (design system, matter bc0d): a headline in the brand's own
+  voice, the Host typeahead that opens the ID tool on a sky band, the counts
+  as a sentence with the cynipid mark, a random Gall large with "Show me
+  another" (named and summed up by `gall_name` and `gall_summary`), the
+  Gallformer groups as photos and the Host genera to start from, and the
+  Source changed most recently.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Catalog, Images, Sources, Taxa}
+  alias Gallformers.{Catalog, Sources, Taxa}
 
   @impl true
   def mount(_params, _session, socket) do
     # Only fetch data when connected to avoid fetching twice
     {random_gall, stats, lists} =
       if connected?(socket) do
-        {Catalog.random_gall(), fetch_stats(), fetch_lists()}
+        {random_gall(), fetch_stats(), fetch_lists()}
       else
-        {nil, %{galls: 0, hosts: 0, sources: 0, images: 0},
-         %{genera: [], groups: [], sources: []}}
+        {nil, %{galls: 0, undescribed: 0, hosts: 0, sources: 0},
+         %{genera: [], groups: [], newest: nil}}
       end
 
     {:ok,
@@ -32,7 +34,7 @@ defmodule GallformersWeb.HomeLive do
        stats: stats,
        genera: lists.genera,
        groups: lists.groups,
-       sources: lists.sources,
+       newest: lists.newest,
        # Quick ID tool state
        host_query: "",
        host_results: [],
@@ -41,20 +43,53 @@ defmodule GallformersWeb.HomeLive do
   end
 
   defp fetch_stats do
+    counts = Catalog.gall_counts()
+
     %{
-      galls: Catalog.count_galls(),
+      galls: counts.galls,
+      undescribed: counts.undescribed,
       hosts: Taxa.count_plants(),
-      sources: Sources.count_sources(),
-      images: Images.count_images()
+      sources: Sources.count_sources()
     }
   end
 
   defp fetch_lists do
     %{
-      genera: Catalog.top_host_genera(12),
-      groups: Enum.take(Catalog.inducer_groups(), 12),
-      sources: Sources.list_recently_changed(8)
+      genera: Catalog.top_host_genera(8),
+      groups:
+        Catalog.inducer_groups()
+        |> Enum.take(12)
+        |> Enum.map(&%{&1 | image_url: medium(&1.image_url)}),
+      newest: newest(Sources.list_recently_changed(8))
     }
+  end
+
+  # Group photos come small; a photo tile wants the medium size.
+  defp medium(nil), do: nil
+  defp medium(url), do: String.replace(url, ~r/_small(\.\w+)$/, "_medium\\1")
+
+  # The random Gall with what `gall_summary` says of it.
+  defp random_gall do
+    case Catalog.random_gall() do
+      nil ->
+        nil
+
+      gall ->
+        details = Map.get(Catalog.gall_search_details([gall.id]), gall.id, %{})
+
+        Map.merge(
+          %{hosts: [], plant_part: [], season: []},
+          Map.take(details, [:hosts, :plant_part, :season])
+        )
+        |> Map.merge(gall)
+    end
+  end
+
+  # The Source changed most recently, and how many others since the eighth.
+  defp newest([]), do: nil
+
+  defp newest([source | rest] = sources) do
+    %{source: source, others: length(rest), since: List.last(sources).changed_at}
   end
 
   defp build_website_json_ld do
@@ -79,7 +114,7 @@ defmodule GallformersWeb.HomeLive do
 
   @impl true
   def handle_event("shuffle", _params, socket) do
-    {:noreply, assign(socket, random_gall: Catalog.random_gall())}
+    {:noreply, assign(socket, random_gall: random_gall())}
   end
 
   # Quick ID tool events
@@ -131,9 +166,6 @@ defmodule GallformersWeb.HomeLive do
 
   defp format_host_display(%{name: name}), do: name
 
-  defp change_label(:added), do: "Added"
-  defp change_label(:updated), do: "Updated"
-
   defp present?(value), do: value not in [nil, ""]
 
   @impl true
@@ -142,25 +174,17 @@ defmodule GallformersWeb.HomeLive do
     <Layouts.app flash={@flash} current_user={@current_user}>
       <div class="flex flex-col gap-section">
         <div class="grid items-start gap-section xl:grid-cols-12">
-          <div class="flex flex-col gap-4 xl:col-span-5 xl:pt-4">
-            <.page_header>
-              <:title>Welcome to Gallformers</:title>
-              <:description>
-                Plant galls are abnormal growths of plant tissues—similar to tumors or warts in
-                animals—caused by insects, mites, fungi, bacteria, or other organisms. They're often
-                intricate structures that can identify the species that made them, even when that
-                organism isn't visible.
-                <.link href="/articles/idguide" class="whitespace-nowrap">Learn more →</.link>
-              </:description>
-            </.page_header>
-            <div class="flex flex-col gap-1 pt-2">
-              <h2 class="text-section">Identify a plant gall</h2>
-              <p class="max-w-text text-body text-ink-2">
-                Start with the plant it's on, and Gallformers narrows {format_number(@stats.galls)} galls
-                to the ones it could be.
-              </p>
-            </div>
-            <div class="max-w-xl">
+          <div class="flex flex-col gap-6 xl:col-span-5 xl:pt-6">
+            <h1 class="font-brand text-display font-semibold text-brand text-balance">
+              Found something odd growing on a plant?
+            </h1>
+            <p class="max-w-text text-lead text-ink-2">
+              It's probably a gall: plant tissue that a wasp, midge, mite or fungus has rebuilt
+              into a home. Tell Gallformers the plant, and it narrows {format_number(@stats.galls)} galls to the ones yours could be.
+              <.link href="/articles/idguide" class="whitespace-nowrap">Learn more →</.link>
+            </p>
+
+            <div class="flex flex-col gap-2 rounded-panel bg-sky p-panel">
               <.typeahead
                 id="home-host-picker"
                 label="What plant is it on?"
@@ -180,15 +204,29 @@ defmodule GallformersWeb.HomeLive do
                   </.chip>
                 </:result>
               </.typeahead>
+              <p class="text-meta text-ink-2">
+                Or <.link href="/globalsearch">search by name</.link>, or <.link navigate="/galls">browse the galls</.link>.
+              </p>
             </div>
-            <p class="text-meta text-muted">
-              Or <.link href="/globalsearch">search by name</.link>, or <.link navigate="/galls">browse the galls</.link>.
-            </p>
-            <div class="flex flex-wrap gap-x-10 gap-y-3 pt-2">
-              <.stat value={@stats.galls} label="Galls" navigate="/galls" />
-              <.stat value={@stats.hosts} label="Host plants" navigate="/hosts" />
-              <.stat value={@stats.sources} label="Sources" />
-              <.stat value={@stats.images} label="Photos" />
+
+            <div class="flex items-end gap-4">
+              <p id="home-counts" class="max-w-text flex-1 text-body text-ink-2">
+                Gallformers knows
+                <.link navigate="/galls" class="font-semibold tabular-nums">
+                  {format_number(@stats.galls)} galls
+                </.link>
+                on <.link navigate="/hosts" class="font-semibold tabular-nums">{format_number(@stats.hosts)} host plants</.link>,
+                drawn from
+                <span class="font-semibold tabular-nums text-ink">
+                  {format_number(@stats.sources)}
+                </span>
+                Sources.
+                <span class="font-semibold tabular-nums text-ink">
+                  {format_number(@stats.undescribed)}
+                </span>
+                of them are still undescribed, waiting for someone to rear the maker and name it.
+              </p>
+              <.cynipid_mark class="hidden h-28 w-44 shrink-0 text-brand sm:block" />
             </div>
           </div>
 
@@ -198,25 +236,39 @@ defmodule GallformersWeb.HomeLive do
             class="flex flex-col gap-3 xl:col-span-7"
             aria-label="A gall to meet"
           >
-            <.link
-              navigate={"/gall/#{@random_gall.id}"}
-              class="flex h-120 items-center justify-center overflow-hidden rounded-panel bg-surface-2"
-            >
-              <img
-                src={@random_gall.image_url}
-                alt={"Photo of #{@random_gall.name}"}
-                class="mx-auto max-h-120 w-full object-contain"
+            <div class="relative overflow-hidden rounded-panel bg-surface-2">
+              <.link navigate={"/gall/#{@random_gall.id}"} class="block">
+                <img
+                  src={@random_gall.image_url}
+                  alt={"Photo of #{@random_gall.name}"}
+                  class="aspect-4/3 w-full object-cover"
+                />
+              </.link>
+              <.button icon="ph-shuffle" phx-click="shuffle" class="absolute bottom-4 right-4">
+                Show me another
+              </.button>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <.link
+                navigate={"/gall/#{@random_gall.id}"}
+                class="font-brand text-page font-semibold text-ink text-balance"
+              >
+                <.gall_name name={@random_gall.name} undescribed={@random_gall.undescribed} article />
+              </.link>
+              <.gall_summary
+                hosts={@random_gall.hosts}
+                plant_part={@random_gall.plant_part}
+                season={@random_gall.season}
+                name={@random_gall.name}
+                undescribed={@random_gall.undescribed}
+                class="text-lead text-ink-2"
               />
-            </.link>
-            <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
-              <div class="flex min-w-0 flex-col gap-0.5">
-                <.link
-                  navigate={"/gall/#{@random_gall.id}"}
-                  class="text-section font-semibold text-ink"
-                >
-                  <.taxon_name name={@random_gall.name} />
-                </.link>
-                <span :if={@random_gall.image_creator} class="text-caption text-muted">
+              <p
+                :if={@random_gall.image_creator || @random_gall.image_license}
+                class="text-caption text-muted"
+              >
+                <span :if={@random_gall.image_creator}>
                   Photo:
                   <a
                     :if={present?(@random_gall.image_sourcelink)}
@@ -229,82 +281,66 @@ defmodule GallformersWeb.HomeLive do
                   <span :if={!present?(@random_gall.image_sourcelink)}>
                     {@random_gall.image_creator}
                   </span>
-                  <%= if @random_gall.image_license do %>
-                    ·
-                    <a
-                      :if={present?(@random_gall.image_licenselink)}
-                      href={@random_gall.image_licenselink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {@random_gall.image_license}
-                    </a>
-                    <span :if={!present?(@random_gall.image_licenselink)}>
-                      {@random_gall.image_license}
-                    </span>
-                  <% end %>
                 </span>
-              </div>
-              <div class="ml-auto flex flex-wrap items-center gap-2">
-                <.chip :if={@random_gall.undescribed} variant={:info}>Undescribed</.chip>
-                <.button navigate={"/gall/#{@random_gall.id}"}>See this gall</.button>
-                <.button variant="ghost" icon="ph-shuffle" phx-click="shuffle">
-                  Show me another
-                </.button>
-              </div>
+                <span :if={@random_gall.image_license}>
+                  ·
+                  <a
+                    :if={present?(@random_gall.image_licenselink)}
+                    href={@random_gall.image_licenselink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {@random_gall.image_license}
+                  </a>
+                  <span :if={!present?(@random_gall.image_licenselink)}>
+                    {@random_gall.image_license}
+                  </span>
+                </span>
+              </p>
             </div>
           </section>
         </div>
 
-        <div class="grid gap-section lg:grid-cols-2">
-          <.section title="Start from the plant">
-            <:aside><.link navigate="/hosts">All host plants</.link></:aside>
-            <ul id="home-host-genera" class="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-              <li :for={genus <- @genera}>
-                <.category_tile
-                  navigate={~p"/id?g=#{genus.name}"}
-                  name={genus.name}
-                  count={genus.count}
-                  image_url={genus.image_url}
-                  icon="gf-host"
-                  italic
-                />
-              </li>
-            </ul>
-          </.section>
-          <.section title="Browse by what causes them">
-            <:aside><.link navigate="/galls">All galls</.link></:aside>
-            <ul id="home-inducer-groups" class="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-              <li :for={group <- @groups}>
-                <.category_tile
-                  navigate={"/galls#group-#{group.slug}"}
-                  name={group.name}
-                  count={group.count}
-                  image_url={group.image_url}
-                />
-              </li>
-            </ul>
-          </.section>
-        </div>
-
-        <.section title="Recently changed">
-          <:aside>Sources added or updated</:aside>
-          <.data_table id="changed-sources" rows={@sources} row_navigate={&"/source/#{&1.id}"}>
-            <:col :let={s} label="Date">{Calendar.strftime(s.changed_at, "%b %-d, %Y")}</:col>
-            <:col :let={s} label="Change">
-              <.chip variant={if s.change == :added, do: :ok, else: :info}>
-                {change_label(s.change)}
-              </.chip>
-            </:col>
-            <:col :let={s} label="Source" field={:title} grow>{s.title}</:col>
-            <:col :let={s} label="Authors" field={:authors} hide_below={:md}>{s.authors}</:col>
-            <:col :let={s} label="Year" field={:year} numeric hide_below={:md}>{s.year}</:col>
-          </.data_table>
+        <.section title="The gallformers">
+          <:aside><.link navigate="/galls">All galls</.link></:aside>
+          <ul id="home-inducer-groups" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <li :for={{group, i} <- Enum.with_index(@groups)} class={i >= 6 && "hidden sm:block"}>
+              <.category_tile
+                navigate={"/galls#group-#{group.slug}"}
+                name={group.name}
+                count={group.count}
+                image_url={group.image_url}
+                layout={:tile}
+              />
+            </li>
+          </ul>
         </.section>
+
+        <.section title="Start from the plant">
+          <:aside><.link navigate="/hosts">All host plants</.link></:aside>
+          <ul id="home-host-genera" class="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-4">
+            <li :for={genus <- @genera}>
+              <.category_tile
+                navigate={~p"/id?g=#{genus.name}"}
+                name={genus.name}
+                count={genus.count}
+                image_url={genus.image_url}
+                icon="gf-host"
+                italic
+              />
+            </li>
+          </ul>
+        </.section>
+
+        <p :if={@newest} id="newest-source" class="max-w-text text-body text-ink-2">
+          Newest in the library: <.link navigate={"/source/#{@newest.source.id}"}>{@newest.source.title}</.link>{newest_after(
+            @newest
+          )}
+        </p>
 
         <.panel variant={:info}>
           <div class="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-ui">
-            <span>Gallformers is made by volunteers.</span>
+            <span>Gallformers is made by volunteers who caught the gall bug.</span>
             <a href="https://www.patreon.com/gallformers" target="_blank" rel="noreferrer">
               Support it on Patreon ↗
             </a>
@@ -317,5 +353,20 @@ defmodule GallformersWeb.HomeLive do
       </div>
     </Layouts.app>
     """
+  end
+
+  # " (InfluentialPoints, 2026), added Nov 4. 7 more Sources were added or updated since Sep 2."
+  defp newest_after(%{source: source, others: others, since: since}) do
+    by = [source.authors, source.year] |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(", ")
+    verb = if source.change == :added, do: "added", else: "updated"
+
+    others_text =
+      if others > 0,
+        do:
+          " #{others} more Sources were added or updated since #{Calendar.strftime(since, "%b %-d")}.",
+        else: ""
+
+    "#{if by != "", do: " (#{by})"}, #{verb} #{Calendar.strftime(source.changed_at, "%b %-d")}." <>
+      others_text
   end
 end

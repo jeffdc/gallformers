@@ -44,6 +44,7 @@ defmodule Gallformers.Catalog.GallName do
   import Ecto.Query, only: [from: 2]
 
   alias Gallformers.Catalog.Gall
+  alias Gallformers.Catalog.InducerGroups
   alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Repo
@@ -113,6 +114,70 @@ defmodule Gallformers.Catalog.GallName do
         select: r.subject_taxon_id
       )
     )
+  end
+
+  @typedoc """
+  What an undescribed Gall's name says (`undescribed/1`): its Inducer's
+  genus or family (nil when not named), the family's Gallformer group
+  (`Gallformers.Catalog.InducerGroups`), the descriptor in words, and the
+  qualifiers as written.
+  """
+  @type undescribed :: %{
+          genus: String.t() | nil,
+          family: String.t() | nil,
+          group: String.t() | nil,
+          description: String.t(),
+          qualifiers: String.t() | nil
+        }
+
+  @doc """
+  An undescribed Gall's name read back into what it says, the inverse of
+  `derive/1`; nil for a name with no descriptor. Pass only the names of
+  undescribed Galls: a genus and descriptor ("Rabdophaga like-rosaria")
+  looks like a binomial.
+
+  The descriptor goes into words: its Host code is dropped
+  ("q-stellata-red-bud-gall" is a "red bud gall") and one likening it to
+  another gall says so ("like-rosaria" is a "gall like rosaria").
+
+      iex> undescribed("Unknown (Cynipidae) q-stellata-red-bud-gall (agamic)")
+      %{genus: nil, family: "Cynipidae", group: "Gall wasps",
+        description: "red bud gall", qualifiers: "(agamic)"}
+  """
+  @spec undescribed(String.t()) :: undescribed() | nil
+  def undescribed(name) when is_binary(name) do
+    case Regex.run(~r/^(?:Unknown \(([^)]+)\)|([A-Z][a-z]+)) (\S+)(.*)$/, name) do
+      [_, family, genus, descriptor, rest] ->
+        family = if family in ["", "Unknown"], do: nil, else: family
+
+        %{
+          genus: blank_nil(genus),
+          family: family,
+          group: group(family),
+          description: descriptor_words(descriptor),
+          qualifiers: blank_nil(rest)
+        }
+
+      nil ->
+        nil
+    end
+  end
+
+  defp group(nil), do: nil
+
+  defp group(family) do
+    case InducerGroups.group_of(family) do
+      "Other" -> nil
+      group -> group
+    end
+  end
+
+  # "q-stellata-red-bud-gall" -> "red bud gall"; "like-rosaria" -> "gall like rosaria"
+  defp descriptor_words(descriptor) do
+    descriptor
+    |> String.replace(~r/^[a-z]-[a-z]+-(?=.)/, "")
+    |> String.replace("-", " ")
+    |> String.replace(~r/^(like|near|on) /, "gall \\1 ")
   end
 
   # -- the base ----------------------------------------------------------------

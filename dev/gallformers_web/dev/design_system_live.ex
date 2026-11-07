@@ -24,7 +24,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
        sample_view: "photos",
        sample_choice: "0",
        sample_selected: MapSet.new([2]),
@@ -104,6 +104,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
   ]
 
   @type_scale [
+    {"text-display", "The home page's headline", "Found something odd?"},
     {"text-page", "Page title (h1)", "Callirhytis quercuscornigera"},
     {"text-section", "Section heading (h2)", "Possible range"},
     {"text-subsection", "Heading in a section (h3)", "Further reading"},
@@ -190,7 +191,8 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
                 <span class={[
                   class,
                   "text-ink truncate",
-                  class in ~w(text-page text-section text-subsection) && "font-brand font-semibold",
+                  class in ~w(text-display text-page text-section text-subsection) &&
+                    "font-brand font-semibold",
                   class == "text-caption" && "text-muted"
                 ]}>
                   {sample}
@@ -1398,6 +1400,67 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
               <:chip variant={:info}>Undescribed</:chip>
             </.gall_card>
           </div>
+        </.example>
+
+        <.example
+          id="gall_name"
+          title="gall_name"
+          code={
+            ~S'''
+            <.gall_name name="Andricus weldi (agamic)" />
+            <.gall_name name="Unknown (Cynipidae) q-stellata-red-bud-gall" undescribed />
+            <.gall_name name="Neuroterus q-gambelii-new-growth-swelling (sexgen)" undescribed article />
+            '''
+          }
+        >
+          <div class="flex flex-col gap-1 text-ui text-ink">
+            <.gall_name name="Andricus weldi (agamic)" />
+            <.gall_name name="Unknown (Cynipidae) q-stellata-red-bud-gall" undescribed />
+            <.gall_name
+              name="Neuroterus q-gambelii-new-growth-swelling (sexgen)"
+              undescribed
+              article
+              class="font-brand text-page font-semibold"
+            />
+          </div>
+        </.example>
+
+        <.example
+          id="gall_summary"
+          title="gall_summary"
+          code={
+            ~S'''
+            <.gall_summary hosts={d.hosts} plant_part={d.plant_part} season={d.season}
+              name={gall.name} undescribed={gall.undescribed} class="text-lead text-ink-2" />
+            '''
+          }
+        >
+          <div class="flex max-w-text flex-col gap-2 text-ui text-ink-2">
+            <.gall_summary
+              hosts={["Quercus alba", "Quercus rubra", "Quercus velutina", "Quercus coccinea"]}
+              plant_part={["stem"]}
+              season={["Fall", "Spring"]}
+            />
+            <.gall_summary
+              hosts={["Malus fusca"]}
+              plant_part={["between leaf veins", "upper leaf"]}
+              season={["Summer"]}
+              name="Unknown (Eriophyidae) m-fusca-pink-erineum"
+              undescribed
+            />
+          </div>
+        </.example>
+
+        <.example
+          id="cynipid_mark"
+          title="cynipid_mark"
+          code={
+            ~S'''
+            <.cynipid_mark class="h-28 w-44 text-brand" />
+            '''
+          }
+        >
+          <.cynipid_mark class="h-28 w-44 text-brand" />
         </.example>
 
         <.example

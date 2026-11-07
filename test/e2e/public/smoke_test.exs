@@ -11,7 +11,7 @@ defmodule GallformersWeb.E2E.SmokeTest do
     test "loads with real data", %{conn: conn} do
       conn
       |> visit("/")
-      |> assert_has("h1", text: "Welcome to Gallformers")
+      |> assert_has("h1", text: "Found something odd growing on a plant?")
     end
   end
 

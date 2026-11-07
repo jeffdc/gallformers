@@ -48,7 +48,7 @@ site_shell
 - Changing the Host is the most frequent action: the picker is never behind a click.
 - Photos are the most important thing on the page. They stay at least 280px; a wider screen adds columns.
 
-**Home page:** the ID tool's first step (the real Host typeahead), the numbers, and **a gall to meet** as the page's centerpiece: a large photo shown whole (letterboxed, never cropped: many images are plates and drawings), its name and credit, "See this gall" and "Show me another". Below it, "Start from the plant" and "Browse by what causes them" as compact two-column lists of `category_tile` rows (not photo walls), then "Recently changed" (`Sources.list_recently_changed/1` in a `data_table`). Built: `GallformersWeb.HomeLive`.
+**Home page:** the page with the most personality, in the brand's own voice. A display headline (`text-display`, `text-brand`), a line on what galls are, the ID tool's first step (the real Host typeahead) on a `bg-sky` band, and the counts as a sentence (Galls, Host plants, Sources, and how many Galls are still undescribed) beside the `cynipid_mark`. **A gall to meet** is the centerpiece: a large photo cropped to fill a 4:3 frame (plates and drawings crop too; a trade made for the photographs), "Show me another" on it, the name (`gall_name`, "An undescribed …" for an undescribed Gall), one sentence of where and when (`gall_summary`) and the credit. Below: "The gallformers", the Gallformer groups as `category_tile` photo tiles, six across (six on phones, the rest hidden); "Start from the plant", eight Host genera as `category_tile` rows; the Source changed most recently in a sentence; the volunteers band. Built: `GallformersWeb.HomeLive`.
 
 **Rank pages** (a genus or family of Gallformers):
 

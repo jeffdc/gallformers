@@ -182,6 +182,15 @@
      <div class="gf-photo-grid"> for identification (photos at least 280px),
      data-size="sm" for overview rows (at least 176px; two across on phones).
      --------------------------------------------------------------------- */
+  /* The cynipid mark (DomainComponents.cynipid_mark): the stipple cynipid
+     drawing as a mask, so it takes the text color, in light and dark. */
+  .gf-cynipid-mark {
+    display: inline-block;
+    background-color: currentColor;
+    -webkit-mask: url("/images/cynipid_R.svg") center / contain no-repeat;
+    mask: url("/images/cynipid_R.svg") center / contain no-repeat;
+  }
+
   .gf-photo-grid {
     display: grid;
     gap: 1rem;
