@@ -340,6 +340,17 @@ defmodule GallformersWeb.Router do
           {GallformersWeb.Live.ContinentScope, :default}
         ] do
         live "/design-system", DesignSystemLive
+
+        # Every Fact edit in the Facts panel (matter d3b0); read-only.
+        live "/mockups/gall-facts/:id", Mockups.GallFactsLive
+        live "/mockups/genus-facts/:name", Mockups.GenusFactsLive
+        live "/mockups/species-facts/:id", Mockups.SpeciesFactsLive
+
+        # The Fact inspector: the Fact viewer and editor as one (matter d3b0).
+        live "/mockups/fact-inspector/:id", Mockups.FactInspectorLive
+
+        # A Source's review as one view: checking our reading (6611, f14c).
+        live "/mockups/source-reading/:package_id", Mockups.SourceReadingLive
       end
     end
   end

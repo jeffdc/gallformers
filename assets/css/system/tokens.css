@@ -97,6 +97,24 @@
   --gf-page-x: 1.75rem;
 }
 
+/* PROPOSED (mockup: the review, one thing at a time): back to the Reading
+   sizes inside the admin shell, for admin pages that are reading work. */
+.gf-density-reading {
+  --gf-fs-page: 2.125rem;
+  --gf-fs-section: 1.375rem;
+  --gf-fs-subsection: 1.125rem;
+  --gf-fs-lead: 1.1875rem;
+  --gf-fs-body: 1rem;
+  --gf-fs-ui: 0.9375rem;
+  --gf-fs-meta: 0.875rem;
+  --gf-fs-caption: 0.75rem;
+  --gf-row-h: 2.25rem;
+  --gf-ctl-h: 2.25rem;
+  --gf-gap-section: 2rem;
+  --gf-gap-block: 1rem;
+  --gf-pad-panel: 1rem;
+}
+
 /* Dark values. Applied where data-theme="dark" is set (a chosen theme on
    <html>, or a previewed region), and by the OS setting when <html> has no
    data-theme (docs/design-system/foundations.md, "Dark mode"). */

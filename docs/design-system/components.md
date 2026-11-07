@@ -34,6 +34,8 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `gall_name` | DomainComponents | Domain | Built | an undescribed Gall's placeholder name shown raw |
 | `gall_summary` | DomainComponents | Domain | Built | — |
 | `cynipid_mark` | DomainComponents | Domain | Built | — |
+| `fact_ref` | FactsComponents | Domain | Approved | the "in Facts" links and per-row Fact actions on pages in Edit mode |
+| `fact_inspector` | FactsComponents | Domain | Approved | the Gall page's Edit-mode Fact rows and chips, the Facts panel as the place to edit, `ObservationIntake`'s dialog |
 | `source_entry` | DomainComponents | Domain | Built | the Gall page's Further Information cards, `source_citation`, `source_list` |
 | `photo_viewer` | DomainComponents | Domain | Built | `image_gallery` and the ImageGallery hook (retired) |
 | `range_map` | DomainComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
@@ -265,6 +267,18 @@ One plain sentence of where a Gall is found, on which Hosts and when: "Found on 
 ### `cynipid_mark`
 
 Gallformers' stipple drawing of a cynipid wasp (`priv/static/images/cynipid_R.svg`), drawn as a mask (`.gf-cynipid-mark`) so it takes the text color in light and dark. Decoration, hidden from screen readers. Set a color (`text-brand`) and a size; it keeps its 3:2 proportions. Use it sparingly, once on a page at most: the home page beside the counts, and places that want a little of the site's character (an empty state, an error page).
+
+### `fact_ref`
+
+A Fact-backed value on a page (an Inducer, a Host, a Trait value, a range place, a common name) as it reads to everyone: the value with a dotted underline (`decoration-line-strong`, darker on hover), hover text "Who says so?". Selecting it opens the `fact_inspector` on that Fact; the selected value sits on `bg-sky-soft`. A page with `fact_ref`s shows readers a dismissible hint once ("Underlined values show the Sources that state them"). In Edit mode the page doesn't change shape: each group gains one Add, nothing else. Design and build: matter `87a1`; mockup `/dev/mockups/fact-inspector/:id`.
+
+### `fact_inspector`
+
+Who says so, and in Edit mode what to do about it, for one Fact, beside the page: in the rail's place on wide screens, a bottom sheet on phones. The kind ("Host"), the value, what it is of ("A Host of *Diplolepis rosae*"), its standing ("Holds · Stated by 2 Sources", or "Unconfirmed" when only Gallformers' undated original data states it), then **Who says so**: one block per Source, the same template for each ("**{Source}** says so · date", its words as written, up to two quotes), Gallformers pinned first, the others newest first.
+
+- **Edit mode** puts each action in its Source's block: Gallformers' has Change…, Deny…, Add a note… (and Confirm… when it hasn't stated the Fact); "Found an error in a Source reading?" reveals "Fix our reading…" on the others' blocks. Each opens a short form in the panel and adds to the tray.
+- **States:** a Fact; a new Fact (from a group's Add); an observation ("Add from observation…": the observation's card and grade, a warning when its taxon isn't the Gall's Inducer, its proposals ticked and previewed on the page, its photos, one "Add N to your tray").
+- Replaces the Edit-mode Fact rows and chips, the Facts panel as the place to edit (it stays as the full record), and the observation dialog. Design and build: matter `87a1`.
 
 ### `source_entry`
 
