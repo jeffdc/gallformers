@@ -9,39 +9,58 @@ defmodule GallformersWeb.PaletteLive do
   the groups of `GallformersWeb.Palette`; ↑ ↓ move the selection, Enter
   follows it (the hook clicks the selected row), Esc or a click outside
   closes. Following a row closes the palette.
+
+  For a curator, it shows their tray (`Gallformers.Curation.summary/1`,
+  read each time it opens). Its Review and apply rows open the tray's own
+  Review and apply: they push `tray_review` to `GallformersWeb.TrayLive`
+  (`#tray`), as the tray bar's button does.
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.Accounts
+  alias Gallformers.Curation
+  alias GallformersWeb.Live.UserAuth
   alias GallformersWeb.Palette
 
   @impl true
   def mount(_params, session, socket) do
     socket =
       socket
-      |> assign(admin?: Accounts.admin?(session["current_user"]), open: false)
+      |> assign(
+        admin?: Accounts.admin?(session["current_user"]),
+        user: session["current_user"],
+        changes: nil,
+        open: false
+      )
       |> reset()
 
     {:ok, socket, layout: false}
   end
 
   defp reset(socket),
-    do:
-      assign(socket,
-        query: "",
-        groups: Palette.groups("", admin?: socket.assigns.admin?),
-        active: 0
-      )
+    do: assign(socket, query: "", groups: groups(socket, ""), active: 0)
+
+  defp groups(socket, q),
+    do: Palette.groups(q, admin?: socket.assigns.admin?, changes: socket.assigns.changes)
+
+  # The curator's tray as it is now.
+  defp read_changes(%{assigns: %{admin?: false}} = socket), do: socket
+
+  defp read_changes(socket) do
+    case UserAuth.curator(socket.assigns.user) do
+      nil -> socket
+      curator -> assign(socket, changes: Curation.summary(curator))
+    end
+  end
 
   @impl true
   def handle_event("open", _params, socket),
-    do: {:noreply, socket |> reset() |> assign(open: true)}
+    do: {:noreply, socket |> read_changes() |> reset() |> assign(open: true)}
 
   def handle_event("close", _params, socket), do: {:noreply, assign(socket, open: false)}
 
   def handle_event("search", %{"q" => q}, socket) do
-    {:noreply,
-     assign(socket, query: q, groups: Palette.groups(q, admin?: socket.assigns.admin?), active: 0)}
+    {:noreply, assign(socket, query: q, groups: groups(socket, q), active: 0)}
   end
 
   def handle_event("key", %{"key" => "ArrowDown"}, socket),
@@ -54,6 +73,11 @@ defmodule GallformersWeb.PaletteLive do
     do: {:noreply, assign(socket, open: false)}
 
   def handle_event("key", _params, socket), do: {:noreply, socket}
+
+  # Following a row closes the palette; a Review and apply row also opens
+  # the tray's Review and apply.
+  defp click(%{action: :review}), do: JS.push("close") |> JS.push("tray_review", target: "#tray")
+  defp click(_row), do: "close"
 
   defp last(groups), do: max(Enum.sum(Enum.map(groups, &length(&1.rows))) - 1, 0)
 
@@ -116,7 +140,7 @@ defmodule GallformersWeb.PaletteLive do
                 href={row.href}
                 role="option"
                 aria-selected={to_string(row.index == @active)}
-                phx-click="close"
+                phx-click={click(row)}
                 class={[
                   "mx-2 flex items-center gap-3 rounded-ctl px-2 py-1.5 text-ui text-ink hover:no-underline",
                   if(row.index == @active, do: "bg-sky-soft", else: "hover:bg-surface-2")

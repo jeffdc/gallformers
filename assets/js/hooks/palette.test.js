@@ -31,6 +31,40 @@ describe('Palette hook', () => {
     expect(enter.defaultPrevented).toBe(true)
   })
 
+  // The arrows move the selection (PaletteLive's phx-window-keydown). In a
+  // text field the browser's own ↑ also moves the caret to the start (↓ to
+  // the end), so the next letters typed went in front of the query.
+  test('↑ and ↓ in the field leave the caret where it is', () => {
+    const field = hook.el.querySelector('#palette-q')
+
+    for (const key of ['ArrowUp', 'ArrowDown']) {
+      const arrow = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      field.dispatchEvent(arrow)
+      expect(arrow.defaultPrevented).toBe(true)
+    }
+  })
+
+  test('↑ and ↓ still reach the window, where the palette moves the selection', () => {
+    const seen = []
+    const onKey = e => seen.push(e.key)
+    window.addEventListener('keydown', onKey)
+
+    for (const key of ['ArrowUp', 'ArrowDown']) {
+      hook.el.querySelector('#palette-q').dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+    }
+
+    window.removeEventListener('keydown', onKey)
+    expect(seen).toEqual(['ArrowUp', 'ArrowDown'])
+  })
+
+  test('other keys in the field are left alone', () => {
+    for (const key of ['a', 'ArrowLeft', 'ArrowRight', 'Home', 'Backspace']) {
+      const press = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      hook.el.querySelector('#palette-q').dispatchEvent(press)
+      expect(press.defaultPrevented).toBe(false)
+    }
+  })
+
   test('the selected row is kept in view', () => {
     const row = hook.el.querySelector('#palette-row-1')
     let scrolled = false
