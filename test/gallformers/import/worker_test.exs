@@ -55,6 +55,14 @@ defmodule Gallformers.Import.WorkerTest do
     refute Enum.any?(package.problems, &(&1["level"] == "error"))
   end
 
+  test "with no Oban running (a release task such as the replay), the step is taken at once" do
+    content = example("gallformers-statement") |> unique_batch_id()
+    package = register(batch_files([{"gall.json", content}]))
+
+    assert {:ok, nil} = Import.enqueue_package(test_actor(), package, :no_such_oban)
+    assert Import.get_package!(package.id).status == :awaiting_review
+  end
+
   defmodule Listener do
     @moduledoc false
     @behaviour Gallformers.Import.Events

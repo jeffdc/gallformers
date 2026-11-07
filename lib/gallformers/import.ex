@@ -2671,13 +2671,26 @@ defmodule Gallformers.Import do
 
   @doc """
   Enqueues the import worker for `package`, acting as `actor`: one waiting
-  job per package (a newer enqueue replaces the waiting job's actor).
+  job per package (a newer enqueue replaces the waiting job's actor),
+  through the Oban instance `oban`. Where that instance is not running (a
+  release task such as the replay, `Gallformers.Release`), the job's step
+  is taken at once instead: `{:ok, nil}`, or the step's error.
   """
-  @spec enqueue_package(Actor.t(), Package.t()) :: {:ok, Oban.Job.t()} | {:error, term()}
-  def enqueue_package(%Actor{} = actor, %Package{id: id}) do
-    %{"package_id" => id, "actor" => Actor.to_meta(actor)}
-    |> Worker.new(replace: [available: [:args], scheduled: [:args], retryable: [:args]])
-    |> Oban.insert()
+  @spec enqueue_package(Actor.t(), Package.t(), Oban.name()) ::
+          {:ok, Oban.Job.t() | nil} | {:error, term()}
+  def enqueue_package(%Actor{} = actor, %Package{id: id}, oban \\ Oban) do
+    args = %{"package_id" => id, "actor" => Actor.to_meta(actor)}
+
+    if Oban.whereis(oban) == nil do
+      case Worker.perform(%Oban.Job{args: args}) do
+        :ok -> {:ok, nil}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      args
+      |> Worker.new(replace: [available: [:args], scheduled: [:args], retryable: [:args]])
+      |> then(&Oban.insert(oban, &1))
+    end
   end
 
   @doc """
