@@ -28,6 +28,14 @@ Rules:
 8. **Delete** is only for data added by mistake: a true exception outside the rules.
 9. **Split and lump are taxonomic acts, so Facts:** they happen under the authority of the Source whose statement decides them.
 
+## Decided (Jeff, 2026-11-07)
+
+- **Review edits are under the Source's authority.** Edits during review correct import errors or map what the original couldn't be read for; every review action states Facts *from the Source*, not from Gallformers or the curator (who is in the audit). So review decisions that change the non-plant tree become that Source's statements.
+- **Corrections are the same act as review**, lower ceremony: under the original Source's authority. No second code path that creates Facts.
+- **ID notes are 100% editorial.**
+- **One edit framework** first, then rebuild the editors onto it (open point 4: agreed).
+- The Gallformers Source's structure is still being explored (below).
+
 ## Open (to settle in this order, proposed)
 
 1. Structure of the Gallformers Source: append-only, dated per change, curator recorded; separate from ID notes. Explore the solution space (per-change-set Sources was only one idea).
