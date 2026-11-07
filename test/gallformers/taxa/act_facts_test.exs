@@ -411,11 +411,11 @@ defmodule Gallformers.Taxa.ActFactsTest do
              ) == into
     end
 
-    test "needs two distinct daughters other than the taxon itself", ctx do
+    test "needs two distinct daughters", ctx do
       a = taxon_fixture(name: "Andricus a")
       source = source_fixture("A", "1990")
 
-      for into <- [[a.id], [a.id, a.id], [a.id, ctx.species.id]] do
+      for into <- [[a.id], [a.id, a.id], [ctx.species.id]] do
         assert {:error, changeset} =
                  Taxa.assert_split(
                    test_actor(),
@@ -425,6 +425,19 @@ defmodule Gallformers.Taxa.ActFactsTest do
 
         assert %{into_taxon_ids: [_]} = errors_on(changeset)
       end
+    end
+
+    test "the taxon itself may be a daughter: kept in its narrow sense", ctx do
+      a = taxon_fixture(name: "Andricus a")
+
+      assert {:ok, %{detail: %SplitFact{into_taxon_ids: into}}} =
+               Taxa.assert_split(
+                 test_actor(),
+                 %{taxon_id: ctx.species.id, into_taxon_ids: [a.id, ctx.species.id]},
+                 confirm(source_fixture("A", "1990"))
+               )
+
+      assert into == Enum.sort([a.id, ctx.species.id])
     end
 
     test "a daughter must be a taxon", ctx do

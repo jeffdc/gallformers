@@ -66,9 +66,26 @@ defmodule Gallformers.Catalog.GallRenames do
 
   @doc "The Galls without an override whose derived name `event` may change, as `t:change/0`s."
   @spec name_changes(Event.t()) :: [change()]
-  def name_changes(%Event{type: type, taxon_id: taxon_id}) when type in [:move, :rename] do
-    gall_ids = candidates(type, taxon_id)
+  def name_changes(%Event{type: type, taxon_id: taxon_id}) when type in [:move, :rename],
+    do: type |> candidates(taxon_id) |> galls_name_changes()
 
+  # A lump's Galls are the survivor's by now (`Gallformers.Import.TaxonMerges`
+  # runs first), and a rank change reaches the same Galls as a rename.
+  def name_changes(%Event{type: :merge, into_taxon_id: id}),
+    do: name_changes(%Event{type: :rename, taxon_id: id})
+
+  def name_changes(%Event{type: :rank, taxon_id: id}),
+    do: name_changes(%Event{type: :rename, taxon_id: id})
+
+  def name_changes(%Event{}), do: []
+
+  @doc """
+  The Galls among `gall_ids` without an override, with the name their
+  parts give now, as `t:change/0`s: for a change to a Gall's own Inducer
+  (a split's answer, `f923`), which no taxon event reaches.
+  """
+  @spec galls_name_changes([integer()]) :: [change()]
+  def galls_name_changes(gall_ids) when is_list(gall_ids) do
     galls =
       Repo.all(
         from(g in Gall, where: g.id in ^gall_ids and is_nil(g.name_override), order_by: g.id)
@@ -83,16 +100,6 @@ defmodule Gallformers.Catalog.GallRenames do
       }
     end
   end
-
-  # A lump's Galls are the survivor's by now (`Gallformers.Import.TaxonMerges`
-  # runs first), and a rank change reaches the same Galls as a rename.
-  def name_changes(%Event{type: :merge, into_taxon_id: id}),
-    do: name_changes(%Event{type: :rename, taxon_id: id})
-
-  def name_changes(%Event{type: :rank, taxon_id: id}),
-    do: name_changes(%Event{type: :rename, taxon_id: id})
-
-  def name_changes(%Event{}), do: []
 
   defp candidates(type, taxon_id) do
     subtree = [taxon_id] |> Taxa.subtree_ids() |> Map.get(taxon_id, [taxon_id])

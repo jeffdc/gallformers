@@ -1018,10 +1018,16 @@ defmodule GallformersWeb.FactsComponents do
 
   defp fact_value(%{entry: %{kind: :relationship, category: category, value: v}} = assigns)
        when category in [:inducer, :hosts] do
-    assigns = assign(assigns, taxon: v.subject)
+    assigns = assign(assigns, taxon: v.subject, broad_sense: v[:broad_sense])
 
     ~H"""
     <.endpoint value={@taxon} show_rank={@entry.category == :hosts} />
+    <span
+      :if={@broad_sense}
+      class="text-ink-2"
+    >
+      · in its old broad sense, before {@broad_sense.source || "a Source"} split it; which taxon induces it is not known yet
+    </span>
     """
   end
 

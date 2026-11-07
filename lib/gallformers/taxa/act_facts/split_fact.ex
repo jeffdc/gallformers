@@ -2,7 +2,8 @@ defmodule Gallformers.Taxa.ActFacts.SplitFact do
   @moduledoc """
   A split Fact's details: the taxon was divided into the daughter taxa. It
   states the division only; assigning records to the daughters is curator
-  work (phase 2).
+  work (phase 2: `Gallformers.Import.SplitQuestions`). The taxon itself may
+  be one of the daughters, kept in its narrow sense ("A into A and B").
 
   The natural key is the taxon + the set of daughters, held canonically as
   `into_taxon_ids` sorted and distinct, so the same division stated in any
@@ -51,13 +52,10 @@ defmodule Gallformers.Taxa.ActFacts.SplitFact do
   end
 
   defp validate_into(changeset) do
-    taxon_id = get_field(changeset, :taxon_id)
-
     validate_change(changeset, :into_taxon_ids, fn :into_taxon_ids, into ->
       cond do
         length(Enum.uniq(into)) != length(into) -> [into_taxon_ids: "lists a taxon twice"]
         length(into) < 2 -> [into_taxon_ids: "needs at least two taxa"]
-        taxon_id in into -> [into_taxon_ids: "can't include the taxon split"]
         true -> []
       end
     end)

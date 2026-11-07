@@ -37,7 +37,7 @@ defmodule Gallformers.Import.RecordRefs do
                   chosen_host_taxon_id inducer_id gallformers_gall_id gallformers_taxon_id
                   candidate_ids candidates proposed best accepted_taxon_id subject_taxon_id
                   object_taxon_id subject_gall_id object_gall_id merged_gall_id survivor_id
-                  absorbed_id)
+                  absorbed_id into_taxon_ids)
   @fact_keys ~w(fact_id fact_ids)
 
   @settled [:applied, :denied]

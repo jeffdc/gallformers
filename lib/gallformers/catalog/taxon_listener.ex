@@ -34,8 +34,9 @@ defmodule Gallformers.Catalog.TaxonListener do
     * `:merge` (a lump, `f923`) — the generation groups listing the absorbed
       taxon list the survivor, and both get a rename's refresh. Its gall
       Facts are moved by `Gallformers.Import.TaxonMerges`, registered next.
-    * `:split` — nothing yet: the curator questions about the split
-      taxon's Galls are `f923` Task 7.
+    * `:split` — nothing here: the questions about the split taxon's
+      Galls are `Gallformers.Import.SplitQuestions`'s, and re-pointing a
+      Gall's Inducer refreshes it as any Fact change does.
   """
   @behaviour Gallformers.Taxa.Events
 

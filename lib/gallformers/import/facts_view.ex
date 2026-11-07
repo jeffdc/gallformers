@@ -31,8 +31,10 @@ defmodule Gallformers.Import.FactsView do
       }
 
   `value` by kind: a Relationship `%{type, label, subject, object,
-  gall_context}` (each `%{taxon_id, name, rank}` or `%{gall_id, name}`, an
-  ID nil for one only the preview creates, or nil); a Trait `%{trait,
+  gall_context, broad_sense}` (each endpoint `%{taxon_id, name, rank}` or
+  `%{gall_id, name}`, an ID nil for one only the preview creates, or nil;
+  `broad_sense` `%{source}` for an Inducer known only in its old broad
+  sense, before that Source's split, else nil); a Trait `%{trait,
   value}`; a range `%{adjustment, place}` and an occurrence `%{place}`
   (`%{id, code, name}`); an alias `%{name, kind}`; a description `%{}` (its
   text is its evidence); a qualifier `%{qualifier, value, of_ref}`.
@@ -52,6 +54,7 @@ defmodule Gallformers.Import.FactsView do
   import Ecto.Query, only: [from: 2, union_all: 2]
 
   alias Gallformers.Accounts
+  alias Gallformers.Catalog
   alias Gallformers.Catalog.Facts.AliasFact
   alias Gallformers.Catalog.Facts.DescriptionFact
   alias Gallformers.Catalog.Facts.OccurrenceFact
@@ -266,7 +269,11 @@ defmodule Gallformers.Import.FactsView do
     value_ids = for %TraitFact{trait_value_id: id} <- rows, uniq: true, do: id
     place_ids = for %{place_id: id} <- rows, is_integer(id), uniq: true, do: id
 
+    split_ids =
+      for %RelationshipFact{broad_sense_split_id: id} <- rows, is_integer(id), uniq: true, do: id
+
     %{
+      splits: Catalog.split_sources(split_ids),
       taxa: taxon_names(taxon_ids),
       galls: gall_names(gall_ids),
       values:
@@ -318,7 +325,8 @@ defmodule Gallformers.Import.FactsView do
       label: type && type.label,
       subject: endpoint(r.subject_taxon_id, r.subject_gall_id, names),
       object: endpoint(r.object_taxon_id, r.object_gall_id, names),
-      gall_context: endpoint(nil, r.gall_context_id, names)
+      gall_context: endpoint(nil, r.gall_context_id, names),
+      broad_sense: broad_sense(r.broad_sense_split_id, names)
     }
 
     # A Gall-to-Gall Relationship goes under its subject, the others under their Gall.
@@ -350,6 +358,17 @@ defmodule Gallformers.Import.FactsView do
 
     {:qualifier, %{qualifier: q.qualifier, value: q.value, of_fact_id: q.of_fact_id, of_ref: nil},
      gall}
+  end
+
+  # An Inducer known only in its old broad sense, before a split (`f923`
+  # "Splits"): the splitting Source, by name.
+  defp broad_sense(nil, _names), do: nil
+
+  defp broad_sense(split_id, names) do
+    case Map.get(names.splits, split_id, []) do
+      [%{source: source} | _] -> %{source: source}
+      [] -> %{source: nil}
+    end
   end
 
   defp endpoint(taxon_id, _gall_id, names) when is_integer(taxon_id),

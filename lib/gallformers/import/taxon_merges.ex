@@ -9,6 +9,11 @@ defmodule Gallformers.Import.TaxonMerges do
   package under review naming the taxon refuses the merge
   (`{:error, {:blocked, blockers}}`).
 
+  First, the taxonomy questions about the statements the lump declined
+  itself (`Gallformers.Taxa.Lump`: "B was merged into A") are closed as
+  declined, with that reason (`Gallformers.Import.TaxonomyQueue.settle_decided/1`):
+  they are decided, so they neither stay open nor block the merge.
+
   Registered after `Gallformers.Catalog.TaxonListener` and before
   `Gallformers.Import.GallRenames`, so the rename proposals see the Galls'
   Inducers re-pointed.
@@ -17,11 +22,13 @@ defmodule Gallformers.Import.TaxonMerges do
 
   alias Gallformers.Audit
   alias Gallformers.Import.Merge
+  alias Gallformers.Import.TaxonomyQueue
   alias Gallformers.Taxa.Event
 
   @impl true
   def taxon_changed(%Event{type: :merge} = event) do
     {:ok, actor} = Audit.current_actor()
+    :ok = TaxonomyQueue.settle_decided(actor)
 
     Merge.repoint_lumped_taxon(actor, event.taxon_id, event.into_taxon_id, event.fact_map, %{
       absorbed: event.old_name,

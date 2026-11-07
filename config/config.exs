@@ -117,12 +117,14 @@ config :gallformers, :private_storage, bucket: "gallformers-private"
 # change's transaction. Registered here so Taxa never references its
 # listeners. Rename proposals for the Galls whose derived names change
 # (`86e7` §3) are admin queue items, so Import listens too, after the Catalog;
-# before them, Import moves what a lump's absorbed taxon held (`f923`).
+# before them, Import moves what a lump's absorbed taxon held (`f923`). A
+# split asks which taxon induces each of its Galls (`f923` "Splits").
 config :gallformers, Gallformers.Taxa.Events,
   listeners: [
     Gallformers.Catalog.TaxonListener,
     Gallformers.Import.TaxonMerges,
-    Gallformers.Import.GallRenames
+    Gallformers.Import.GallRenames,
+    Gallformers.Import.SplitQuestions
   ]
 
 # "Facts changed" listeners, called inside each attribution write's

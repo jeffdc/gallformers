@@ -11,6 +11,7 @@ defmodule Gallformers.Import.Proposals do
   | a statement set aside | `%{"keep" => true}` |
   | a Trait term (`Gallformers.Import.TraitTerms`) | `%{"category" => c}`, when the producer and the checkers agree on `c` for every Gall it covers |
   | a rename proposal | `%{"accept" => true}` |
+  | a split question (`Gallformers.Import.SplitQuestions`) | nothing: a daughter suggested by a shared Host is only a suggestion (weak) |
 
   `"proposed"` is set only where resolution is confident
   (`Gallformers.Import.Resolver`, `Gallformers.Import.GallMatcher`,
@@ -46,6 +47,11 @@ defmodule Gallformers.Import.Proposals do
 
   defp answer(%QueueItem{kind: :gall_rename, proposal: %{"to" => to}}) when is_binary(to),
     do: {:ok, %{"accept" => true}}
+
+  # A split question's suggestion (a shared Host) is only one to check.
+  defp answer(%QueueItem{kind: :split_inducer, proposal: %{"taxon_id" => id}})
+       when is_integer(id),
+       do: {:none, :weak}
 
   defp answer(%QueueItem{kind: :set_aside_statement} = item) do
     if item.proposal["keep"] == true,

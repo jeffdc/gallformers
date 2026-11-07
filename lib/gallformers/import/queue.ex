@@ -87,6 +87,7 @@ defmodule Gallformers.Import.Queue do
   alias Gallformers.Import.HostDecisions
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.SetAside
+  alias Gallformers.Import.SplitQuestions
   alias Gallformers.Import.SynonymDecisions
   alias Gallformers.Import.TaxonomyQueue
   alias Gallformers.Import.TraitTerms
@@ -108,6 +109,7 @@ defmodule Gallformers.Import.Queue do
   def blocking?(%{kind: kind}, _batch_type) when kind in @blocking, do: true
   def blocking?(%{kind: :taxonomy_disagreement}, :gall), do: true
   def blocking?(%{kind: :taxonomy_acceptance}, _batch_type), do: false
+  def blocking?(%{kind: :split_inducer}, _batch_type), do: false
   def blocking?(_item, _batch_type), do: false
 
   # -- validating decisions ----------------------------------------------------
@@ -132,6 +134,13 @@ defmodule Gallformers.Import.Queue do
   defp check_note(%{"note" => note}) when not is_binary(note), do: {:error, "note must be text"}
   defp check_note(_rest), do: :ok
 
+  # The questions of no package take their own shapes.
+  defp check_host_or_choice(%QueueItem{kind: :taxonomy_acceptance}, choice),
+    do: TaxonomyQueue.check(choice)
+
+  defp check_host_or_choice(%QueueItem{kind: :split_inducer} = item, choice),
+    do: SplitQuestions.check(item, choice)
+
   defp check_host_or_choice(item, choice) do
     cond do
       new_taxon_parent?(item, choice) ->
@@ -148,9 +157,6 @@ defmodule Gallformers.Import.Queue do
 
       SynonymDecisions.synonym?(item) ->
         or_choice(SynonymDecisions.check(item, choice), item, choice)
-
-      item.kind == :taxonomy_acceptance ->
-        TaxonomyQueue.check(choice)
 
       item.kind == :dispute and Disputes.host_extras?(choice) ->
         {extras, choice} = Disputes.split(choice)

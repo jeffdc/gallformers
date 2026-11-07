@@ -174,6 +174,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
     :hedge_gall,
     :hedge_other,
     :taxonomy_acceptance,
+    :split_inducer,
     :source
   ]
 
@@ -462,6 +463,17 @@ defmodule GallformersWeb.Admin.Review.Questions do
        "Doesn't hold approval: the tree waits until you decide",
        "If you leave it: the tree keeps following the paper it follows now."}
 
+  defp copy(:split_inducer, who),
+    do:
+      {"Galls whose Inducer was split",
+       "#{cap(who)} splits the taxon these Galls are on, and #{poss(who)} own statements don't " <>
+         "say which daughter induces them. Choose the taxon that induces each Gall now, or " <>
+         "keep it on the old name in its broad sense until a later Source settles it. Only " <>
+         "the Inducer changes: the Gall's other Facts and their Sources stay, and older " <>
+         "papers keep the name they wrote.", false,
+       "Doesn't hold approval: the Gall stays on the old name until you decide",
+       "If you leave it: the Gall stays on the old name."}
+
   defp copy(:gall_rename, _who),
     do:
       {"Gall names a change in the tree would change",
@@ -662,6 +674,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp section_id(%QueueItem{kind: :gall_rename}, _ctx), do: :gall_rename
   defp section_id(%QueueItem{kind: :taxonomy_acceptance}, _ctx), do: :taxonomy_acceptance
+  defp section_id(%QueueItem{kind: :split_inducer}, _ctx), do: :split_inducer
 
   defp section_id(%QueueItem{statement_ref: ref}, _ctx) when ref in ["source", "retracts"],
     do: :source
@@ -1345,6 +1358,51 @@ defmodule GallformersWeb.Admin.Review.Questions do
     }
   end
 
+  # A Gall on a taxon an accepted split divided, which the splitting paper's
+  # own statements don't settle (`Gallformers.Import.SplitQuestions`): each
+  # daughter (the split taxon itself in its narrow sense), or not known yet.
+  # A daughter the paper's Galls share a Host with is suggested, never firm.
+  defp build(:split_inducer, item, ctx) do
+    s = item.subject
+    gall = name(ctx, :galls, s["gall_id"])
+    split_id = s["taxon_id"]
+    split = name(ctx, :taxa, split_id)
+    into = List.wrap(s["into_taxon_ids"])
+    daughters = and_list(Enum.map(into, &name(ctx, :taxa, &1)))
+    suggested = item.proposal["taxon_id"]
+
+    %{
+      written: gall,
+      context: "Its Inducer: #{split}",
+      question:
+        "#{cap(ctx.who)} splits #{split} into #{daughters}. Which taxon induces #{gall} now?",
+      scope:
+        "Only the Gall's Inducer changes. Older papers' statements move with it and keep the " <>
+          "name they wrote.",
+      proposal:
+        suggested &&
+          proposal(
+            name(ctx, :taxa, suggested),
+            item.proposal["why"],
+            %{
+              "taxon_id" => suggested
+            },
+            firm: false
+          ),
+      choices:
+        Enum.map(into, &daughter_choice(ctx, &1, split_id, gall)) ++
+          [
+            %Choice{
+              label: "Not known yet",
+              hint:
+                "It stays on #{split}, marked as the name in its old broad sense (before " <>
+                  "#{poss(ctx.who)} split), until a later Source settles it.",
+              decision: %{"not_known" => true}
+            }
+          ]
+    }
+  end
+
   defp build(:gall_rename, item, _ctx) do
     %{"from" => from, "to" => to} = item.proposal
     collision? = item.proposal["collision"] == true
@@ -1375,6 +1433,26 @@ defmodule GallformersWeb.Admin.Review.Questions do
           decision: %{"reject" => true}
         }
       ]
+    }
+  end
+
+  defp daughter_choice(ctx, split_id, split_id, _gall) do
+    split = name(ctx, :taxa, split_id)
+
+    %Choice{
+      label: "#{split}, in its narrow sense",
+      hint: "It stays on #{split}, as the split leaves it: no rename.",
+      decision: %{"taxon_id" => split_id}
+    }
+  end
+
+  defp daughter_choice(ctx, taxon_id, _split_id, gall) do
+    taxon = name(ctx, :taxa, taxon_id)
+
+    %Choice{
+      label: taxon,
+      hint: "#{gall}'s Inducer becomes #{taxon}; the Gall gets a rename proposal.",
+      decision: %{"taxon_id" => taxon_id}
     }
   end
 
