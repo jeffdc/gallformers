@@ -982,6 +982,33 @@ defmodule Gallformers.Import.TraitTermsTest do
       end
     end
 
+    test "a placement the vocabulary already holds is done when no question asks it" do
+      # The cutover rehearsal: the term's mapping replays first, so the
+      # replayed import never asks the question its decision answered.
+      {:ok, _} = Import.place_term(test_actor(), "color", "pale tan", "tan")
+      package = disagreeing()
+      assert questions(package) == []
+
+      [batch | _] = Import.list_batches(package)
+
+      entry = %{
+        kind: :queue_decision,
+        key: %{
+          "package" => package.key,
+          "batch_id" => batch.producer_batch_id,
+          "kind" => "trait_term",
+          "statement_ref" => TraitTerms.statement_ref("color", "pale tan")
+        },
+        payload: %{"decision" => %{"place" => "tan"}}
+      }
+
+      assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+
+      # A placement the vocabulary doesn't hold is still a question missing.
+      other = put_in(entry, [:payload, "decision"], %{"place" => "white"})
+      assert {:error, %{reason: {:no_queue_item, _}}} = Replay.run([other], actor: test_actor())
+    end
+
     test "a placement by agreement replays before its batch" do
       package = deliver(gall_batch([trait("f6", "g1", "color", "pale tan", "tan")]))
       entries = undone(fn -> approve!(package) end)

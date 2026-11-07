@@ -98,6 +98,8 @@ defmodule Gallformers.Import.Replay do
   can be fixed and run again.
   """
   alias Gallformers.Audit.Actor
+  alias Gallformers.Catalog
+  alias Gallformers.Catalog.Vocab.TraitTermMapping
   alias Gallformers.Import
   alias Gallformers.Import.Batch
   alias Gallformers.Import.CurationNotes
@@ -244,7 +246,9 @@ defmodule Gallformers.Import.Replay do
           end
 
         {:error, {:no_queue_item, _key}} = error ->
-          if host_done?(package, key, decision), do: :ok, else: error
+          if host_done?(package, key, decision) or term_done?(key, decision),
+            do: :ok,
+            else: error
 
         {:error, reason} ->
           {:error, reason}
@@ -515,6 +519,23 @@ defmodule Gallformers.Import.Replay do
       _ -> false
     end
   end
+
+  # A trait term's placement the vocabulary already holds (its mapping
+  # replayed before the decision): the replayed import asks no question,
+  # so the decision is done. A long term's ref is hashed and can't be read
+  # back, so it stays a missing question.
+  defp term_done?(%{"kind" => "trait_term", "statement_ref" => "u:" <> rest}, %{
+         "place" => place
+       }) do
+    with [trait, term] <- String.split(rest, ":", parts: 2),
+         %{status: :placed, categories: categories} <- Catalog.get_term(trait, term) do
+      TraitTermMapping.same_categories?(categories, place)
+    else
+      _ -> false
+    end
+  end
+
+  defp term_done?(_key, _decision), do: false
 
   # The item an undo entry's key names, as its decision's entry finds it,
   # with its package (nil for a question of no package).
