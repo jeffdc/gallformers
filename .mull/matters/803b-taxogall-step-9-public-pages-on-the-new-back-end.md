@@ -317,3 +317,6 @@ Missed in this plan: a Gall is not a species, and the organism had no public pag
 - **Edit mode** like the other pages: name, placement, synonyms through "Based on which Source?" (f923 Task 8); Galls edited on their own pages.
 - The Gall page's Inducer, the palette's inducer results and search link here; sitemap entries. No legacy redirects needed (no old species URLs).
 
+
+Built 2026-11-06 (`a2d8440a`): `/species/:id` (non-plant species and below; plants → `/host/:id`; higher ranks → their pages; merged taxa redirect) with header, Galls (all generations, `RankGalls`), Taxonomy (`taxonomic_position`, synonyms, split/lump history), the Galls' ranges together, Sources; Edit mode through "Based on which Source?". Linked from the Gall page (breadcrumb ends with the Inducer; Edit-mode Inducer links), `TaxonomyURL.taxon_path/1` (change links), global search and the palette ("Gallformers" group), the sitemap. API v2 search unchanged.
+
