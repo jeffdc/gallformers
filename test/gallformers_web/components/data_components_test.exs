@@ -115,7 +115,7 @@ defmodule GallformersWeb.DataComponentsTest do
 
   describe "chip" do
     test "each variant has its class and keeps its word" do
-      for variant <- [:ok, :warn, :danger, :info, :rank, :neutral, :count] do
+      for variant <- [:ok, :warn, :danger, :info, :rank, :neutral, :count, :recommended] do
         assigns = %{variant: variant}
         html = rendered_to_string(~H|<.chip variant={@variant}>Complete</.chip>|)
         assert count(html, "span.gf-chip.gf-chip-#{variant}") == 1
@@ -373,6 +373,133 @@ defmodule GallformersWeb.DataComponentsTest do
       assert count(html, "tbody input[checked]") == 1
       assert count(html, "tbody tr:nth-child(2) input[checked]") == 1
       assert count(html, "tbody tr[data-selected]") == 1
+    end
+
+    test "row_attrs puts the page's attributes on each row" do
+      assigns = %{rows: @sources}
+
+      html =
+        rendered_to_string(~H"""
+        <.data_table id="sources" rows={@rows} row_attrs={&%{"data-source-id" => &1.id}}>
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert attr(html, "tbody tr", "data-source-id") == ["1", "2"]
+    end
+
+    test "row_state tints a row and names its state; selection is a state" do
+      assigns = %{rows: @sources}
+
+      html =
+        rendered_to_string(~H"""
+        <.data_table
+          id="sources"
+          rows={@rows}
+          row_state={&if(&1.id == 1, do: :warn)}
+          selectable
+          selected={[2]}
+        >
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert attr(html, "tbody tr", "data-state") == ["warn", "selected"]
+      assert count(html, "tbody tr.bg-warn-bg") == 1
+      assert count(html, "tbody tr.bg-sky") == 1
+    end
+
+    test "selection can use the page's event and go to a LiveComponent" do
+      assigns = %{rows: @sources}
+
+      html =
+        rendered_to_string(~H"""
+        <.data_table
+          id="sources"
+          rows={@rows}
+          selectable
+          select_event="toggle_copy_target"
+          target="#images"
+          selectable_row={&(&1.id != 1)}
+          select_disabled
+        >
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert count(html, "tbody input[type=checkbox]") == 1
+      assert attr(html, "tbody input", "phx-click") == ["toggle_copy_target"]
+      assert attr(html, "tbody input", "phx-target") == ["#images"]
+      assert attr(html, "tbody input", "phx-value-id") == ["2"]
+      assert count(html, "tbody input[disabled]") == 1
+      # The row without a checkbox keeps its cell, so the columns line up.
+      assert count(html, "tbody tr:first-child td") == 2
+    end
+
+    test "select_all adds a header checkbox, ticked when every selectable row is" do
+      assigns = %{rows: @sources}
+
+      none =
+        rendered_to_string(~H"""
+        <.data_table
+          id="sources"
+          rows={@rows}
+          selectable
+          selected={[1]}
+          select_all="select_all"
+          select_none="deselect_all"
+          target="#hosts"
+        >
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert attr(none, "thead input[type=checkbox]", "id") == ["sources-select-all"]
+      assert attr(none, "thead input", "aria-label") == ["Select all"]
+      assert attr(none, "thead input", "phx-click") == ["select_all"]
+      assert attr(none, "thead input", "phx-target") == ["#hosts"]
+      assert count(none, "thead input[checked]") == 0
+
+      all =
+        rendered_to_string(~H"""
+        <.data_table
+          id="sources"
+          rows={@rows}
+          selectable
+          selected={MapSet.new([2])}
+          selectable_row={&(&1.id == 2)}
+          select_all="select_all"
+          select_none="deselect_all"
+        >
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert count(all, "thead input[checked]") == 1
+      assert attr(all, "thead input", "phx-click") == ["deselect_all"]
+    end
+
+    test "without select_all the header has no checkbox; select_all alone toggles" do
+      assigns = %{rows: @sources}
+
+      plain =
+        rendered_to_string(~H"""
+        <.data_table id="sources" rows={@rows} selectable>
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert count(plain, "thead input") == 0
+
+      toggle =
+        rendered_to_string(~H"""
+        <.data_table id="sources" rows={@rows} selectable selected={[1, 2]} select_all="all">
+          <:col :let={s} label="Title">{s.title}</:col>
+        </.data_table>
+        """)
+
+      assert attr(toggle, "thead input", "phx-click") == ["all"]
+      assert count(toggle, "thead input[checked]") == 1
     end
 
     test "the checkbox label and id can come from the row" do

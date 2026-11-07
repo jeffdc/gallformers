@@ -247,6 +247,8 @@ const ImageUpload = {
     })
   },
 
+  // One bar per file, in the markup of the design system's progress_bar
+  // (GallformersWeb.FeedbackComponents.progress_bar/1, `.gf-progress`).
   showProgress() {
     if (this.progressContainer) {
       this.progressContainer.classList.remove("hidden")
@@ -256,8 +258,11 @@ const ImageUpload = {
             <span class="text-ink-2">${file.name}</span>
             <span class="text-muted" data-percent>0%</span>
           </div>
-          <div class="h-2 w-full rounded-full bg-surface-2">
-            <div class="h-2 w-0 rounded-full bg-brand-fill transition-all duration-200" data-bar></div>
+          <div class="gf-progress" role="progressbar" aria-label="Upload progress"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-progress>
+            <svg width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">
+              <rect data-bar data-tone="brand" x="0%" width="0%" height="100%"></rect>
+            </svg>
           </div>
         </div>
       `).join("")
@@ -273,8 +278,10 @@ const ImageUpload = {
     const item = this.progressContainer?.querySelector(`[data-progress-item="${index}"]`)
     if (item) {
       const bar = item.querySelector("[data-bar]")
+      const progress = item.querySelector("[data-progress]")
       const percentEl = item.querySelector("[data-percent]")
-      if (bar) bar.style.width = `${percent}%`
+      if (bar) bar.setAttribute("width", `${percent}%`)
+      if (progress) progress.setAttribute("aria-valuenow", `${percent}`)
       if (percentEl) percentEl.textContent = `${percent}%`
     }
   },

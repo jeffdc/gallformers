@@ -37,6 +37,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `source_quote` | DomainComponents | Domain | Built | `blockquote` styling, review "The Source wrote" text |
 | `button` | ActionComponents | Actions | Built | `button`, `edit_button`, `action_button`, `admin_edit_link`, 122 raw buttons |
 | `menu` | ActionComponents | Actions | Built | the header dropdowns, row-action menus |
+| `segmented_switch` | ActionComponents | Actions | Built | three hand copies of the rank pages' `view_switch` (rank pages, the image manager, the country drill-down) |
 | `tabs` | UIComponents | Navigation | Removed (unused) | — (page tabs are `tab_nav`; build in-page tabs anew if a page needs them) |
 | `tab_nav` | PageComponents | Navigation | Built | the Browse pages' hand-made tab links |
 | `pagination` | UIComponents | Navigation | Approved (restyle) | — |
@@ -44,7 +45,8 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `input`, `select`, `textarea`, `checkbox`, `toggle` | FormComponents | Forms | Built (restyled) | `.gf-input` and friends |
 | `search_field` | FormComponents | Forms | Built | `search_input`, three search-input classes, the header search |
 | `typeahead` | FormComponents | Forms | Approved (consolidate) | `typeahead`, `multi_select`, `multi_select_dropdown`, `multi_select_typeahead` |
-| `file_drop` | FormComponents | Forms | Approved (restyle) | `file_dropzone` |
+| `file_drop` | FormComponents | Forms | Built | `file_dropzone`, the image managers' hand-built drop boxes |
+| `radio_card` | FormComponents | Forms | Built | the review's hand-built option cards (`review_option`, `review_value_list`) |
 | `save_bar` | FormComponents | Forms | Approved (pending the save model) | per-section Save buttons |
 | `filter_select` | FormComponents | Forms | Built | the ID page's filter dropdowns |
 | `category_tile` | DomainComponents | Domain | Built | home page group and Host genus rows |
@@ -55,6 +57,8 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `dialog` | FeedbackComponents | Overlays | Built | `modal`, `dangerous_delete_modal`, `discard_confirm_modal` |
 | `tooltip` | UIComponents | Overlays | Approved (restyle) | `info_tip`, `glossary_tooltip` |
 | `skeleton`, `spinner` | FeedbackComponents | Feedback | Approved (`skeleton` to build when a page needs it; the old one was unused and removed) | `loading_spinner`, `loading_overlay` |
+| `loading_spinner` | UIComponents | Feedback | Built (restyled; `tone`) | — |
+| `progress_bar` | FeedbackComponents | Feedback | Built | host ranges' `<progress>`, the upload hooks' bars, `review_progress`'s bar |
 | `bar_chart` | DataComponents | Data | Built | the analytics chart, the `DailyChart` hook and d3 (removed) |
 | `share_list` | DataComponents | Data | Built | the analytics devices and browsers tables |
 | `prose` | PageComponents | Content | Built | the Tailwind typography plugin (removed) |
@@ -164,6 +168,8 @@ The one table. Rows are `--gf-row-h` tall and single-line: long text truncates, 
 
 - Column attributes: `label`, `field`, `sortable`, `numeric` (right-aligned, tabular), `grow` (takes the spare width), `wrap` (allow two lines), `hide_below` (`:md`, `:lg`: hide on narrow screens).
 - Table attributes: `id`, `rows` (a list or a stream), `row_id`, `row_item`, `row_navigate` or `row_click`, `sort` (`%{field:, dir:}`; a sortable head emits `sort` with `field`), `selectable` with `selected`, `select_id` and `select_label` (a checkbox column, emits `select` with `id`), `compact` (28px rows).
+- Per row: `row_attrs` (function row -> a map of attributes put on the `tr`, for the page's hooks and tests: `%{"data-image-id" => id}`) and `row_state` (function row -> `nil`, `:selected`, `:ok`, `:warn`, `:danger` or `:info`: the row's tint, each with its chip meaning, and `data-state`; a selected row is `:selected` by itself).
+- Selection, for a page or a LiveComponent: `select_event` (default `select`), `target` (a LiveComponent's `@myself`, for the checkboxes and the header's), `selectable_row` (function item -> boolean; a row it rejects has no checkbox and is left out of select-all), `select_disabled` (while a bulk action runs). `select_all` adds a checkbox in the header (labelled "Select all"), ticked when every selectable row is selected; it sends `select_all`'s event, or `select_none`'s when every row is already selected (default: the same event, a toggle).
 - Slots: `col`, `empty`, `footer` (pagination, totals).
 - Grey heads (`bg-surface-2`), caption-size uppercase labels, hairline rows, `bg-sky-soft` on hover.
 - A column that is empty for every row is not shown (columns with a `field`, list rows).
@@ -203,6 +209,7 @@ A small labelled state or category. Every variant has one meaning.
 | `:rank` | a taxonomic rank | Family |
 | `:neutral` | a category | Plantae |
 | `:count` | a number that needs you | 358 |
+| `:recommended` | the recommended answer to a question (brand tint) | Recommended · rec. |
 
 Attributes: `variant`, `icon`. Never a chip for decoration, never color without a word.
 
@@ -274,6 +281,21 @@ One button, as a `<button>` or a link (`navigate`, `patch`, `href`).
 
 A button that opens a list of links or actions (the header's Browse and Resources; a row's actions). Keyboard-navigable; closes on Escape and outside click. Uses `shadow-float`.
 
+### `segmented_switch`
+
+A few mutually exclusive choices as one joined row of buttons, the current one filled with the brand (`aria-pressed`): Photos | Table on rank pages, Grid | Table in the image manager, Native | Introduced in the country drill-down. For switching how a region shows its content or a mode of clicking, not for page tabs (`tab_nav`) or a form value (a `select` or radios).
+
+```heex
+<.segmented_switch label="View" value={@view} event="galls_view" param="view">
+  <:option value={:photos}>Photos</:option>
+  <:option value={:table}>Table</:option>
+</.segmented_switch>
+```
+
+- Attributes: `label` (the group's accessible name), `value` (the current choice; compared as strings), `event` (sent on a click, with `phx-value-<param>` set to the option's value), `param` (default `value`), `target` (a LiveComponent's `@myself`), `disabled`, `size` (`md`, `sm`), `id`, `class`.
+- `option` slot: `value` (required), `id` (the button's id, for tests and labels), `icon` (with no inner block an icon-only button), `label` (the accessible name and title of an icon-only option).
+- Clicking the current option sends the event again; the page decides.
+
 ### `pagination`
 
 Exists. Restyle to tokens. (`tabs`, the in-page tabs with the `Tabs` hook, was unused and is removed.)
@@ -312,7 +334,38 @@ Find and pick by name: one component for single and multiple selection (`multipl
 
 ### `file_drop`
 
-Exists. Restyle: one row ("Upload files… or drop JPG/PNG here") instead of a tall dashed box when space is short.
+Where to drop or choose files: a dashed box (`layout={:box}`, the default) with an icon, what to do and the limits, or one row (`layout={:row}`: "Choose files… or drop JPG or PNG images here") when space is short. It renders the `data-dropzone` element and its hidden `data-file-input` that the upload hooks (`ImageUpload`, `ContentImageUpload`) find inside their own element; the hook handles the click, the drop and its highlight (`border-brand`, `bg-sky-soft`). The preview, progress and Upload button stay the page's, inside the hook's element.
+
+```heex
+<div id="images-uploader" phx-hook="ImageUpload" phx-update="ignore" …>
+  <.file_drop accept="image/jpeg,image/png" multiple hint="Max 20 files. JPG or PNG only." />
+  <div data-preview-container …></div>
+  …
+</div>
+```
+
+- Attributes: `accept` (the input's `accept`), `multiple`, `label` (default "Drop images here, or click to choose"), `hint` (the limits), `icon` (default `ph-cloud-arrow-up`), `layout` (`:box`, `:row`), `class`.
+- For a single file in a form, use the file input with `.gf-file`; for an upload button beside a textarea (the article editor), a `button`.
+
+### `radio_card`
+
+One option of a question as a card: a radio (or a checkbox, `type="checkbox"`) with its name, what it does under it, and what it needs once chosen. The review's options (`review_option`) and Trait values (`review_value_list`) are built on it.
+
+```heex
+<div role="radiogroup" aria-label="Which plant is meant?" class="grid gap-1.5">
+  <.radio_card id="q-0" name="q" value={0} checked={@choice == 0} recommended
+    summary="The accepted name." phx-click="pick" phx-value-choice={0}>
+    <:label>Quercus lobata</:label>
+    <:aside>2 of 3 readers</:aside>
+    <:follow>…the input the option needs…</:follow>
+  </.radio_card>
+</div>
+```
+
+- States: plain (`border-line`), recommended (brand border, a `:recommended` chip "Recommended" after the label; `recommended_label` changes its words, `nil` hides it), chosen (brand border on a brand tint). The card carries `data-recommended` and `data-chosen`.
+- Attributes: `id` (the input's), `name`, `value`, `checked`, `type` (`radio`, `checkbox`), `recommended`, `recommended_label`, `summary` (under the label, muted: what it does), `size` (`:md`; `:sm` for long value lists), `class`; `rest` (`phx-click`, `phx-value-*`, `phx-target`) goes on the input.
+- Slots: `label` (required; chips may follow the name), `aside` (right of the label on wide screens: who recommends it, who chose it), `extra` (under the card's text, chosen or not), `follow` (shown only once chosen).
+- Put the cards in an element with `role="radiogroup"` and an `aria-label` (the question). For a short row of choices without descriptions use `segmented_switch` or plain radios.
 
 ### `save_bar`
 
@@ -355,7 +408,23 @@ An inline message in the page: `kind` `:info`, `:ok`, `:warn`, `:danger` (role `
 
 ### `toast`, `skeleton`, `spinner`
 
-`toast` and `spinner` exist: restyle to tokens; toasts use `shadow-float`. `skeleton` is to be built (to tokens) when a page first needs one; the old, unused one was removed.
+`toast` exists: restyle to tokens; toasts use `shadow-float`. `skeleton` is to be built (to tokens) when a page first needs one; the old, unused one was removed.
+
+### `loading_spinner`
+
+A spinning ring while something loads (`role="status"`, `label` its accessible name), with its words beside it ("Searching WCVP…"). Attributes: `size` (`sm`, `md`, `lg`), `label`, `tone` (`:brand`, the default, on a page or panel; `:current`, the text color around it, inside a button: on a primary button's fill it is `text-on-fill`), `class` (layout only). `loading_overlay` covers a region (a `relative` parent) with a large one.
+
+### `progress_bar`
+
+How far something has got: a sync of 120 Hosts, an upload, a Source's review. A thin rounded track (`bg-line`) filled from the left, drawn as SVG so the width needs no inline style. The words beside it say the numbers ("Syncing: 40 / 120"); the bar adds the picture.
+
+```heex
+<.progress_bar value={@done} max={@total} label="Hosts synced" />
+<.progress_bar max={@total} segments={[{@done, :ok}, {@proposed, :info}]} />
+```
+
+- Attributes: `value`, `max` (a zero `max` draws an empty bar), `label` (the accessible name: with it the bar is a `progressbar` with `aria-valuenow`; without it the bar is decorative, `aria-hidden`, because the text beside it says the numbers), `tone` (`:brand` default, `:ok`, `:info`, `:warn`), `segments` (in place of `value`: `{value, tone}` pairs drawn one after another, e.g. decided then proposed), `size` (`md` 8px, `sm` 6px), `id`, `class`.
+- The upload hooks draw the same markup from JavaScript (`.gf-progress`, a `rect[data-bar]` whose width they set).
 
 ## Overlays
 

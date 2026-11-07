@@ -24,7 +24,10 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card segmented_switch data_table-selection progress_bar loading_spinner chrome),
+       sample_view: "photos",
+       sample_choice: "0",
+       sample_selected: MapSet.new([2]),
        sample_sources: [
          %{
            title: "Cynipid galls of the eastern United States",
@@ -283,6 +286,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
             <.chip variant={:warn}>In progress</.chip>
             <.chip variant={:rank}>Family</.chip>
             <.chip variant={:count}>358</.chip>
+            <.chip variant={:recommended}>Recommended</.chip>
             <.chip on_remove={JS.push("remove")} remove_label="Remove Quercus rubra">Quercus rubra</.chip>
             '''
           }
@@ -295,6 +299,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
             <.chip variant={:rank}>Family</.chip>
             <.chip>Plantae</.chip>
             <.chip variant={:count}>358</.chip>
+            <.chip variant={:recommended}>Recommended</.chip>
             <.chip on_remove={JS.push("noop")} remove_label="Remove Quercus rubra">
               <em>Quercus rubra</em>
             </.chip>
@@ -828,6 +833,203 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
           }
         >
           <input type="file" class="gf-file" aria-label="Upload a file" />
+        </.example>
+
+        <.example
+          id="file_drop"
+          title="file_drop"
+          code={
+            ~S'''
+            <div id="uploader" phx-hook="ImageUpload" phx-update="ignore" data-max-files="20">
+              <.file_drop accept="image/jpeg,image/png" multiple hint="Max 20 files. JPG or PNG only." />
+              <div data-preview-container></div>
+            </div>
+            <.file_drop layout={:row} multiple label="Choose files… or drop JPG or PNG images here" />
+            '''
+          }
+        >
+          <.file_drop accept="image/jpeg,image/png" multiple hint="Max 20 files. JPG or PNG only." />
+          <.file_drop layout={:row} multiple label="Choose files… or drop JPG or PNG images here" />
+        </.example>
+
+        <.example
+          :let={theme}
+          id="radio_card"
+          title="radio_card"
+          code={
+            ~S'''
+            <div role="radiogroup" aria-label="Which plant does Weld mean?" class="grid gap-1.5">
+              <.radio_card id="q-0" name="q" value={0} checked={@choice == 0} recommended
+                summary="The accepted name; Weld's spelling is a variant." phx-click="pick" phx-value-choice={0}>
+                <:label>Quercus lobata</:label>
+                <:aside>2 of 3 readers</:aside>
+              </.radio_card>
+              <.radio_card id="q-1" name="q" value={1} checked={@choice == 1} … >
+                <:label>Another plant</:label>
+                <:follow>…the plant search…</:follow>
+              </.radio_card>
+            </div>
+            '''
+          }
+        >
+          <div role="radiogroup" aria-label="Which plant does Weld mean?" class="grid gap-1.5">
+            <.radio_card
+              :for={
+                {value, label, summary, rec} <- [
+                  {"0", "Quercus lobata", "The accepted name; Weld's spelling is a variant.", true},
+                  {"1", "Another plant", "Choose it from the plant search.", false},
+                  {"2", "Keep it as written", nil, false}
+                ]
+              }
+              id={"rc-#{theme}-#{value}"}
+              name={"rc-#{theme}"}
+              value={value}
+              checked={@sample_choice == value}
+              recommended={rec}
+              summary={summary}
+              phx-click="sample_choice"
+              phx-value-choice={value}
+            >
+              <:label>{label}</:label>
+              <:aside :if={rec}>2 of 3 readers</:aside>
+              <:follow :if={value == "1"}>
+                <span class="text-meta text-muted">The plant search goes here.</span>
+              </:follow>
+            </.radio_card>
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="segmented_switch"
+          title="segmented_switch"
+          code={
+            ~S'''
+            <.segmented_switch label="View" value={@view} event="galls_view" param="view">
+              <:option value={:photos}>Photos</:option>
+              <:option value={:table}>Table</:option>
+            </.segmented_switch>
+            <.segmented_switch label="View" value={@mode} event="toggle_view" param="view" target={@myself}>
+              <:option value={:grid} icon="ph-squares-four" label="Grid view" />
+              <:option value={:table} icon="ph-list" label="Table view" />
+            </.segmented_switch>
+            <.segmented_switch label="Click counties as" value={@type} event="set_type" param="type" size="sm">…</.segmented_switch>
+            '''
+          }
+        >
+          <div class="flex flex-wrap items-center gap-3">
+            <.segmented_switch
+              id={"sw-#{theme}"}
+              label="View"
+              value={@sample_view}
+              event="sample_view"
+              param="view"
+            >
+              <:option value="photos">Photos</:option>
+              <:option value="table">Table</:option>
+            </.segmented_switch>
+            <.segmented_switch label="View" value="grid" event="noop" param="view">
+              <:option value="grid" icon="ph-squares-four" label="Grid view" />
+              <:option value="table" icon="ph-list" label="Table view" />
+            </.segmented_switch>
+            <.segmented_switch label="Click counties as" value="native" event="noop" size="sm">
+              <:option value="native">Native</:option>
+              <:option value="introduced">Introduced</:option>
+            </.segmented_switch>
+            <.segmented_switch label="View" value="grid" event="noop" disabled>
+              <:option value="grid">Grid</:option>
+              <:option value="table">Table</:option>
+            </.segmented_switch>
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="data_table-selection"
+          title="data_table: selection, row state, row attributes"
+          code={
+            ~S'''
+            <.data_table
+              id="images-table"
+              rows={@images}
+              row_attrs={&%{"data-image-id" => &1.id}}
+              row_state={&if(unattributed?(&1), do: :warn)}
+              selectable
+              selected={@selected_ids}
+              selectable_row={&(&1.id != @source_id)}
+              select_event="toggle_copy_target"
+              select_all="select_all_targets"
+              target={@myself}
+            >
+              <:col :let={i} label="Caption" grow>{i.caption}</:col>
+            </.data_table>
+            '''
+          }
+        >
+          <.data_table
+            id={"dt-select-#{theme}"}
+            rows={@sample_sources |> Enum.with_index(1) |> Enum.map(fn {s, i} -> Map.put(s, :id, i) end)}
+            row_attrs={&%{"data-source-id" => &1.id}}
+            row_state={&if(&1.status == nil, do: :warn)}
+            selectable
+            selected={@sample_selected}
+            selectable_row={&(&1.id != 3)}
+            select_event="sample_select"
+            select_all="sample_select_all"
+            select_label={&"Select #{&1.title}"}
+          >
+            <:col :let={s} label="Title" grow>{s.title}</:col>
+            <:col :let={s} label="Year" numeric>{s.year}</:col>
+          </.data_table>
+          <p class="text-caption text-muted">
+            The second row is :warn (no status); the third can't be selected.
+          </p>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="progress_bar"
+          title="progress_bar"
+          code={
+            ~S'''
+            Syncing from WCVP: 40 / 120
+            <.progress_bar value={40} max={120} label="Syncing from WCVP" />
+            <.progress_bar max={30} segments={[{12, :ok}, {9, :info}]} size="sm" class="w-36" />
+            '''
+          }
+        >
+          <div class="flex flex-col gap-2 text-meta text-ink-2">
+            Syncing from WCVP: 40 / 120
+            <.progress_bar id={"pb-#{theme}"} value={40} max={120} label="Syncing from WCVP" />
+            <span>12 decided · 9 with a proposed answer, of 30</span>
+            <.progress_bar max={30} segments={[{12, :ok}, {9, :info}]} size="sm" class="w-36" />
+          </div>
+        </.example>
+
+        <.example
+          id="loading_spinner"
+          title="loading_spinner"
+          code={
+            ~S'''
+            <.loading_spinner size="sm" label="Searching WCVP…" /> Searching WCVP…
+            <.button variant="primary" disabled>
+              <.loading_spinner size="sm" tone={:current} label="Loading" /> Loading…
+            </.button>
+            '''
+          }
+        >
+          <div class="flex flex-wrap items-center gap-4">
+            <span class="flex items-center gap-2 text-meta text-muted">
+              <.loading_spinner size="sm" label="Searching WCVP…" /> Searching WCVP…
+            </span>
+            <.loading_spinner />
+            <.button variant="primary" disabled>
+              <.loading_spinner size="sm" tone={:current} label="Loading" /> Loading…
+            </.button>
+            <.button disabled>
+              <.loading_spinner size="sm" tone={:current} label="Loading" /> Loading…
+            </.button>
+          </div>
         </.example>
 
         <.example
@@ -1407,6 +1609,31 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
   end
 
   @impl true
+  def handle_event("sample_view", %{"view" => view}, socket),
+    do: {:noreply, assign(socket, sample_view: view)}
+
+  def handle_event("sample_choice", %{"choice" => choice}, socket),
+    do: {:noreply, assign(socket, sample_choice: choice)}
+
+  def handle_event("sample_select", %{"id" => id}, socket) do
+    id = String.to_integer(id)
+    selected = socket.assigns.sample_selected
+
+    selected =
+      if MapSet.member?(selected, id),
+        do: MapSet.delete(selected, id),
+        else: MapSet.put(selected, id)
+
+    {:noreply, assign(socket, sample_selected: selected)}
+  end
+
+  def handle_event("sample_select_all", _params, socket) do
+    selected = if MapSet.size(socket.assigns.sample_selected) == 2, do: [], else: [1, 2]
+    {:noreply, assign(socket, sample_selected: MapSet.new(selected))}
+  end
+
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
   def handle_event("sample_toggle", %{"key" => key}, socket) do
     {:noreply,
      assign(socket,

@@ -419,6 +419,43 @@ defmodule GallformersWeb.Admin.ImagesComponentTest do
       assert Images.get_image!(untouched.id).license == nil
       assert has_element?(view, "#images-flash-info", "Copied metadata to 1 image(s)")
     end
+
+    test "the table marks the source row and selects every other image from its header",
+         %{conn: conn} do
+      gall = gall_fixture()
+      from = image!({:gall, gall.id}, attributed())
+      a = image!({:gall, gall.id}, attributed())
+      b = image!({:gall, gall.id})
+
+      {:ok, view, _html} = mount_for(conn, {:gall, gall.id})
+      view |> element("#images button[phx-value-view=table]") |> render_click()
+      assert has_element?(view, "#images-table tr[data-image-id='#{b.id}'][data-state=warn]")
+
+      view
+      |> element("#images button[phx-click=start_copy][phx-value-id='#{from.id}']")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "tr[data-image-id='#{from.id}'][data-state=info] [data-copy-source]"
+             )
+
+      refute has_element?(view, "tr[data-image-id='#{from.id}'] input[type=checkbox]")
+
+      view |> element("#images-table-select-all") |> render_click()
+
+      for image <- [a, b] do
+        assert has_element?(
+                 view,
+                 "tr[data-image-id='#{image.id}'][data-state=selected] input[checked]"
+               )
+      end
+
+      assert has_element?(view, "#images button[phx-click=confirm_copy]", "Apply (2)")
+
+      view |> element("#images-table-select-all") |> render_click()
+      assert has_element?(view, "#images button[phx-click=confirm_copy]", "Apply (0)")
+    end
   end
 
   describe "delete" do

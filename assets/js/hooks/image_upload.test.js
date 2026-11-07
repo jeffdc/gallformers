@@ -264,6 +264,22 @@ describe('ImageUpload progress', () => {
     expect(hook.progressContainer.textContent).toContain('a.jpg')
     expect(hook.progressContainer.textContent).toContain('b.jpg')
   })
+
+  test('the bars are progress_bar markup, filled by updateProgress', () => {
+    const hook = mountHook(ImageUpload, uploadHTML())
+    hook.mounted()
+
+    hook.addFiles([fakeFile('a.jpg')])
+    hook.showProgress()
+    const progress = hook.progressContainer.querySelector('.gf-progress[role=progressbar]')
+    const bar = progress.querySelector('rect[data-bar]')
+    expect(bar.getAttribute('width')).toBe('0%')
+
+    hook.updateProgress('uploads/x.jpg', 40)
+    expect(bar.getAttribute('width')).toBe('40%')
+    expect(progress.getAttribute('aria-valuenow')).toBe('40')
+    expect(hook.progressContainer.querySelector('[data-percent]').textContent).toBe('40%')
+  })
 })
 
 // ============================================

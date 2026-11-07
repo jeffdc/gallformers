@@ -179,34 +179,19 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
             </div>
             <div :if={@country_level_on} class="flex items-center gap-2">
               <span class="text-caption text-muted">Type:</span>
-              <span
-                class="inline-flex overflow-hidden rounded-ctl border border-line-strong"
-                role="group"
-                aria-label="Country-level type"
+              <.segmented_switch
+                label="Country-level type"
+                value={@country_dist_type}
+                event="set_country_type"
+                param="type"
+                target={@myself}
+                size="sm"
               >
-                <button
-                  id={"country-type-native-#{@country.code}"}
-                  type="button"
-                  phx-click="set_country_type"
-                  phx-value-type="native"
-                  phx-target={@myself}
-                  aria-pressed={to_string(@country_dist_type == "native")}
-                  class={choice_class(@country_dist_type == "native")}
-                >
-                  Native
-                </button>
-                <button
-                  id={"country-type-introduced-#{@country.code}"}
-                  type="button"
-                  phx-click="set_country_type"
-                  phx-value-type="introduced"
-                  phx-target={@myself}
-                  aria-pressed={to_string(@country_dist_type == "introduced")}
-                  class={choice_class(@country_dist_type == "introduced")}
-                >
+                <:option value="native" id={"country-type-native-#{@country.code}"}>Native</:option>
+                <:option value="introduced" id={"country-type-introduced-#{@country.code}"}>
                   Introduced
-                </button>
-              </span>
+                </:option>
+              </.segmented_switch>
             </div>
             <p :if={@country_level_on} class="text-caption text-muted">
               All states shown as probable — check individual states to mark as documented.
@@ -225,34 +210,19 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
           <%!-- Exact subdivision editing --%>
           <div class="mb-3 flex flex-col gap-2 rounded-panel bg-surface-2 p-3">
             <div class="text-caption text-muted">Click counties as:</div>
-            <span
-              class="inline-flex self-start overflow-hidden rounded-ctl border border-line-strong"
-              role="group"
-              aria-label="Click counties as"
+            <.segmented_switch
+              label="Click counties as"
+              value={@exact_dist_type}
+              event="set_exact_click_type"
+              param="type"
+              target={@myself}
+              size="sm"
             >
-              <button
-                id={"exact-type-native-#{@country.code}"}
-                type="button"
-                phx-click="set_exact_click_type"
-                phx-value-type="native"
-                phx-target={@myself}
-                aria-pressed={to_string(@exact_dist_type == "native")}
-                class={choice_class(@exact_dist_type == "native")}
-              >
-                Native
-              </button>
-              <button
-                id={"exact-type-introduced-#{@country.code}"}
-                type="button"
-                phx-click="set_exact_click_type"
-                phx-value-type="introduced"
-                phx-target={@myself}
-                aria-pressed={to_string(@exact_dist_type == "introduced")}
-                class={choice_class(@exact_dist_type == "introduced")}
-              >
+              <:option value="native" id={"exact-type-native-#{@country.code}"}>Native</:option>
+              <:option value="introduced" id={"exact-type-introduced-#{@country.code}"}>
                 Introduced
-              </button>
-            </span>
+              </:option>
+            </.segmented_switch>
           </div>
 
           <%!-- Bulk buttons --%>
@@ -311,15 +281,6 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
   end
 
   # A segment of the Native / Introduced choice.
-  defp choice_class(selected?) do
-    [
-      "px-2 py-0.5 text-caption font-semibold",
-      if(selected?,
-        do: "bg-brand-fill text-on-fill",
-        else: "bg-surface text-ink-2 hover:bg-surface-2"
-      )
-    ]
-  end
 
   # How a subdivision stands in the range, as the map shows it.
   defp subdivision_state(code, assigns) do

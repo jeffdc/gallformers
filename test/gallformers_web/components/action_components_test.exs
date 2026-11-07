@@ -1,5 +1,5 @@
 defmodule GallformersWeb.ActionComponentsTest do
-  @moduledoc "The design system's button (docs/design-system/components.md)."
+  @moduledoc "The design system's actions: button, segmented_switch (docs/design-system/components.md)."
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
   import Phoenix.Component, only: [sigil_H: 2]
@@ -7,6 +7,7 @@ defmodule GallformersWeb.ActionComponentsTest do
 
   defp query(html, selector), do: html |> LazyHTML.from_fragment() |> LazyHTML.query(selector)
   defp count(html, selector), do: html |> query(selector) |> Enum.count()
+  defp attr(html, selector, name), do: html |> query(selector) |> LazyHTML.attribute(name)
 
   describe "button" do
     test "is a secondary button by default" do
@@ -63,6 +64,61 @@ defmodule GallformersWeb.ActionComponentsTest do
       html = rendered_to_string(~H|<.button icon="ph-plus">Add synonym</.button>|)
       assert html =~ "Add synonym"
       assert count(html, "button [class*=ph-plus]") == 1
+    end
+  end
+
+  describe "segmented_switch" do
+    test "a labelled group of buttons, the current one pressed, each sending the event" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.segmented_switch label="View" value={:table} event="galls_view" param="view">
+          <:option value={:photos}>Photos</:option>
+          <:option value={:table}>Table</:option>
+        </.segmented_switch>
+        """)
+
+      assert attr(html, "[role=group]", "aria-label") == ["View"]
+      assert count(html, "[role=group] button[type=button]") == 2
+      assert attr(html, "button", "phx-click") == ["galls_view", "galls_view"]
+      assert attr(html, "button", "phx-value-view") == ["photos", "table"]
+      assert attr(html, "button", "aria-pressed") == ["false", "true"]
+      assert count(html, "button[aria-pressed=true].bg-brand-fill") == 1
+      assert html =~ "Photos"
+    end
+
+    test "compares values as strings, sends value by default, and targets a component" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.segmented_switch label="Type" value="native" event="set_type" target="#drill">
+          <:option value={:native} id="type-native">Native</:option>
+          <:option value={:introduced} id="type-introduced">Introduced</:option>
+        </.segmented_switch>
+        """)
+
+      assert attr(html, "#type-native", "aria-pressed") == ["true"]
+      assert attr(html, "#type-introduced", "phx-value-value") == ["introduced"]
+      assert attr(html, "button", "phx-target") == ["#drill", "#drill"]
+    end
+
+    test "an icon-only option is named by its label, and the switch can be disabled" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.segmented_switch label="View" value={:grid} event="toggle_view" param="view" disabled>
+          <:option value={:grid} icon="ph-squares-four" label="Grid view" />
+          <:option value={:table} icon="ph-list" label="Table view" />
+        </.segmented_switch>
+        """)
+
+      assert attr(html, "button", "aria-label") == ["Grid view", "Table view"]
+      assert attr(html, "button", "title") == ["Grid view", "Table view"]
+      assert count(html, "button[disabled]") == 2
+      assert count(html, "button [class*=ph-squares-four]") == 1
     end
   end
 end

@@ -1,7 +1,7 @@
 defmodule GallformersWeb.FeedbackComponentsTest do
   @moduledoc """
-  The design system's feedback and overlays: notice, dialog
-  (docs/design-system/components.md).
+  The design system's feedback and overlays: notice, dialog, progress_bar,
+  loading_spinner (docs/design-system/components.md).
   """
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
@@ -225,6 +225,76 @@ defmodule GallformersWeb.FeedbackComponentsTest do
     test "both compose onto an existing command" do
       assert %JS{ops: [["push", %{event: "open"}] | _]} = show_dialog(JS.push("open"), "d")
       assert %JS{ops: [["push", %{event: "close"}] | _]} = hide_dialog(JS.push("close"), "d")
+    end
+  end
+
+  describe "progress_bar" do
+    test "with a label it is a progressbar with its value, filled to scale" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.progress_bar id="sync" value={30} max={120} label="Hosts synced" />
+        """)
+
+      assert attr(html, "#sync", "role") == "progressbar"
+      assert attr(html, "#sync", "aria-label") == "Hosts synced"
+      assert attr(html, "#sync", "aria-valuenow") == "30"
+      assert attr(html, "#sync", "aria-valuemax") == "120"
+      assert count(html, "#sync.gf-progress") == 1
+      assert attr(html, "#sync rect[data-bar]", "width") == "25.0%"
+      assert attr(html, "#sync rect[data-bar]", "data-tone") == "brand"
+    end
+
+    test "without a label it is decorative: the words beside it say the numbers" do
+      assigns = %{}
+      html = rendered_to_string(~H|<.progress_bar id="p" value={1} max={4} tone={:ok} />|)
+
+      assert attr(html, "#p", "aria-hidden") == "true"
+      assert count(html, "#p[role]") == 0
+      assert attr(html, "#p rect[data-bar]", "data-tone") == "ok"
+    end
+
+    test "segments are drawn one after another" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.progress_bar id="r" max={10} segments={[{2, :ok}, {5, :info}]} size="sm" />
+        """)
+
+      assert html |> query("#r rect[data-bar]") |> LazyHTML.attribute("width") == [
+               "20.0%",
+               "50.0%"
+             ]
+
+      assert html |> query("#r rect[data-bar]") |> LazyHTML.attribute("x") == ["0.0%", "20.0%"]
+      assert count(html, "#r.gf-progress-sm") == 1
+    end
+
+    test "a zero max draws an empty bar, and a value over max fills it" do
+      assigns = %{}
+      empty = rendered_to_string(~H|<.progress_bar id="e" value={0} max={0} />|)
+      assert attr(empty, "#e rect[data-bar]", "width") == "0.0%"
+
+      full = rendered_to_string(~H|<.progress_bar id="f" value={9} max={4} />|)
+      assert attr(full, "#f rect[data-bar]", "width") == "100.0%"
+    end
+  end
+
+  describe "loading_spinner" do
+    test "is brand by default and takes the text colour around it with tone :current" do
+      brand = render_component(&GallformersWeb.UIComponents.loading_spinner/1, size: "sm")
+      assert count(brand, "svg[role=status].text-brand") == 1
+
+      current =
+        render_component(&GallformersWeb.UIComponents.loading_spinner/1,
+          size: "sm",
+          tone: :current
+        )
+
+      assert count(current, "svg[role=status]") == 1
+      assert count(current, "svg.text-brand") == 0
     end
   end
 end

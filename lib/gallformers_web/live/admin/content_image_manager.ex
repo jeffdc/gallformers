@@ -144,17 +144,13 @@ defmodule GallformersWeb.Admin.ContentImageManager do
         data-accepted-types="image/jpeg,image/png,image/jpg"
         class="flex flex-col items-start gap-3"
       >
-        <div
-          data-dropzone
-          class="flex w-full cursor-pointer flex-col items-center gap-1 rounded-panel border-2 border-dashed border-line-strong p-6 text-center transition-colors hover:border-brand hover:bg-sky-soft"
-        >
-          <.icon name="ph-upload-simple" class="size-8 text-muted" />
-          <p class="text-ui text-ink-2">
-            Drop images here or <span class="font-semibold text-link">click to browse</span>
-          </p>
-          <p class="text-meta text-muted">JPG or PNG, up to 10 files</p>
-          <input data-file-input type="file" multiple hidden accept="image/jpeg,image/png" />
-        </div>
+        <.file_drop
+          accept="image/jpeg,image/png"
+          multiple
+          icon="ph-upload-simple"
+          label="Drop images here or click to browse"
+          hint="JPG or PNG, up to 10 files"
+        />
 
         <div data-preview-container class="flex flex-wrap gap-3"></div>
         <div data-progress-container class="hidden w-full"></div>

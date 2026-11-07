@@ -905,4 +905,111 @@ defmodule GallformersWeb.FormComponentsTest do
       assert count(html, ~s(option[value="30"][selected])) == 1
     end
   end
+
+  describe "file_drop/1" do
+    test "the drop box the upload hooks find: a dropzone holding a hidden file input" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <FormComponents.file_drop accept="image/jpeg,image/png" multiple hint="Max 20 files." />
+        """)
+
+      assert count(html, "[data-dropzone][data-layout=box]") == 1
+
+      assert count(html, "[data-dropzone] input[data-file-input][type=file][multiple][hidden]") ==
+               1
+
+      assert attr(html, "input[data-file-input]", "accept") == ["image/jpeg,image/png"]
+      assert text(html, "[data-dropzone]") =~ "Drop images here, or click to choose"
+      assert text(html, "[data-dropzone]") =~ "Max 20 files."
+    end
+
+    test "as one row, with its own words and a single file" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <FormComponents.file_drop layout={:row} label="Choose a file… or drop a JPG here" />
+        """)
+
+      assert count(html, "[data-dropzone][data-layout=row]") == 1
+      assert count(html, "input[data-file-input][multiple]") == 0
+      assert text(html, "[data-dropzone]") =~ "Choose a file… or drop a JPG here"
+    end
+  end
+
+  describe "radio_card/1" do
+    defp card(assigns) do
+      ~H"""
+      <FormComponents.radio_card
+        id="o-0"
+        name="q"
+        value={0}
+        checked={@checked}
+        recommended={@recommended}
+        phx-click="pick"
+        phx-value-choice={0}
+        phx-target="#row"
+        summary="The accepted name."
+      >
+        <:label>Quercus lobata</:label>
+        <:aside>2 of 3 readers</:aside>
+        <:extra>The comparison</:extra>
+        <:follow>The search</:follow>
+      </FormComponents.radio_card>
+      """
+    end
+
+    test "a radio in its label, with the events on the input" do
+      html = rendered_to_string(card(%{checked: false, recommended: false}))
+
+      assert count(html, "label[for=o-0] > input#o-0[type=radio][name=q][value='0']") == 1
+      assert attr(html, "input#o-0", "phx-click") == ["pick"]
+      assert attr(html, "input#o-0", "phx-value-choice") == ["0"]
+      assert attr(html, "input#o-0", "phx-target") == ["#row"]
+      assert text(html, "label") =~ "Quercus lobata"
+      assert text(html, "label") =~ "2 of 3 readers"
+      assert text(html, "label") =~ "The accepted name."
+      assert text(html, "[data-part=extra]") == "The comparison"
+      refute html =~ "The search"
+      assert count(html, "[data-recommended]") == 0
+      assert count(html, "[data-chosen]") == 0
+      assert count(html, ".gf-chip-recommended") == 0
+    end
+
+    test "recommended: a brand border and a Recommended chip; chosen: its follow-up shows" do
+      rec = rendered_to_string(card(%{checked: false, recommended: true}))
+      assert count(rec, "[data-recommended] > label .gf-chip-recommended") == 1
+      assert text(rec, ".gf-chip-recommended") == "Recommended"
+      refute rec =~ "The search"
+
+      chosen = rendered_to_string(card(%{checked: true, recommended: true}))
+      assert count(chosen, "[data-chosen] input[checked]") == 1
+      assert text(chosen, "[data-part=follow]") == "The search"
+    end
+
+    test "a checkbox card, and the recommended words can change or go" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <FormComponents.radio_card
+          id="v-green"
+          name="v[]"
+          value="green"
+          type="checkbox"
+          recommended
+          recommended_label={nil}
+          size={:sm}
+        >
+          <:label>green</:label>
+        </FormComponents.radio_card>
+        """)
+
+      assert count(html, "input#v-green[type=checkbox]") == 1
+      assert count(html, "[data-recommended]") == 1
+      assert count(html, ".gf-chip-recommended") == 0
+    end
+  end
 end

@@ -6,8 +6,9 @@ defmodule GallformersWeb.FormComponents do
   form-related UI elements that extend Phoenix's core form components.
 
   The design system's form components (docs/design-system/components.md,
-  "Forms") are `field`, `search_field` and `facet_group`; the others here
-  are restyled or retired as pages move onto the system.
+  "Forms") are `field`, `search_field`, `facet_group`, `filter_select`,
+  `file_drop` and `radio_card`; the others here are restyled or retired as
+  pages move onto the system.
   """
   use Phoenix.Component
   use Gettext, backend: GallformersWeb.Gettext
@@ -15,6 +16,7 @@ defmodule GallformersWeb.FormComponents do
   import GallformersWeb.CoreComponents, only: [icon: 1]
   import GallformersWeb.ActionComponents, only: [button: 1]
   import GallformersWeb.FeedbackComponents, only: [dialog: 1, notice: 1]
+  import GallformersWeb.DataComponents, only: [chip: 1]
 
   alias Gallformers.TextMatch
   alias GallformersWeb.Helpers
@@ -341,6 +343,165 @@ defmodule GallformersWeb.FormComponents do
         </option>
       </select>
     </form>
+    """
+  end
+
+  @doc """
+  Where to drop or choose files, for the upload hooks (`ImageUpload`,
+  `ContentImageUpload`). See docs/design-system/components.md (`file_drop`).
+
+  Renders the `data-dropzone` element and its hidden `data-file-input`; the
+  hook, on an enclosing element, handles the click, the drop and its
+  highlight. `layout={:box}` (the default) is a dashed box with an icon;
+  `:row` is one line, for tight spaces.
+
+  ## Examples
+
+      <div id="uploader" phx-hook="ImageUpload" phx-update="ignore">
+        <.file_drop accept="image/jpeg,image/png" multiple hint="Max 20 files. JPG or PNG only." />
+        <div data-preview-container></div>
+      </div>
+
+      <.file_drop layout={:row} label="Choose files… or drop JPG or PNG images here" multiple />
+  """
+  attr :accept, :string, default: "image/jpeg,image/png", doc: "the file input's accept"
+  attr :multiple, :boolean, default: false
+  attr :label, :string, default: "Drop images here, or click to choose"
+  attr :hint, :string, default: nil, doc: "the limits: how many, which types"
+  attr :icon, :string, default: "ph-cloud-arrow-up"
+  attr :layout, :atom, default: :box, values: [:box, :row]
+  attr :class, :any, default: nil, doc: "layout only"
+  attr :rest, :global
+
+  def file_drop(assigns) do
+    ~H"""
+    <div
+      data-dropzone
+      data-layout={@layout}
+      class={[
+        "flex w-full cursor-pointer border-dashed border-line-strong transition-colors",
+        "hover:border-brand hover:bg-sky-soft",
+        if(@layout == :row,
+          do: "items-center gap-2 rounded-ctl border px-3 py-1.5 text-left",
+          else: "flex-col items-center gap-1 rounded-panel border-2 p-6 text-center"
+        ),
+        @class
+      ]}
+      {@rest}
+    >
+      <.icon
+        name={@icon}
+        class={["shrink-0 text-muted", if(@layout == :row, do: "size-5", else: "size-8")]}
+      />
+      <span class="text-ui text-ink-2">{@label}</span>
+      <span :if={@hint} class="text-meta text-muted">{@hint}</span>
+      <input data-file-input type="file" accept={@accept} multiple={@multiple} hidden />
+    </div>
+    """
+  end
+
+  @doc """
+  One option of a question as a card: a radio (or checkbox) with its name,
+  what it does, and what it needs once chosen. See
+  docs/design-system/components.md (`radio_card`).
+
+  The card is plain, recommended (a brand border and a "Recommended" chip,
+  `data-recommended`) or chosen (a brand border on a brand tint,
+  `data-chosen`). `rest` (`phx-click`, `phx-value-*`, `phx-target`) goes on
+  the input. The `follow` slot shows only once chosen. Put the cards in an
+  element with `role="radiogroup"` and the question as its `aria-label`.
+
+  ## Examples
+
+      <div role="radiogroup" aria-label="Which plant is meant?" class="grid gap-1.5">
+        <.radio_card id="q-0" name="q" value={0} checked={@choice == 0} recommended
+          summary="The accepted name." phx-click="pick" phx-value-choice={0}>
+          <:label>Quercus lobata</:label>
+          <:aside>2 of 3 readers</:aside>
+          <:follow><.typeahead … /></:follow>
+        </.radio_card>
+      </div>
+  """
+  attr :id, :string, required: true, doc: "the input's id"
+  attr :name, :string, required: true
+  attr :value, :any, required: true
+  attr :checked, :boolean, default: false
+  attr :type, :string, default: "radio", values: ~w(radio checkbox)
+  attr :recommended, :boolean, default: false
+
+  attr :recommended_label, :string,
+    default: "Recommended",
+    doc: "the recommended chip's words; nil for no chip"
+
+  attr :summary, :string, default: nil, doc: "under the label, muted: what it does"
+  attr :size, :atom, default: :md, values: [:md, :sm], doc: ":sm for long value lists"
+  attr :class, :any, default: nil, doc: "layout only"
+  attr :rest, :global, doc: "for the input: phx-click, phx-value-*, phx-target"
+
+  slot :label, required: true, doc: "the option's name; chips may follow it"
+  slot :aside, doc: "right of the label on wide screens: who recommends it, who chose it"
+  slot :extra, doc: "under the card's text, chosen or not"
+  slot :follow, doc: "the input the option needs, shown once chosen"
+
+  def radio_card(assigns) do
+    ~H"""
+    <div
+      class={[
+        "rounded-ctl border",
+        if(@size == :sm, do: "px-2.5 py-1.5", else: "px-3 py-2"),
+        cond do
+          @checked -> "border-brand bg-brand/5"
+          @recommended -> "border-brand bg-surface"
+          true -> "border-line bg-surface hover:border-line-strong"
+        end,
+        @class
+      ]}
+      data-recommended={@recommended}
+      data-chosen={@checked}
+    >
+      <label for={@id} class="flex cursor-pointer flex-wrap items-start gap-x-2.5 gap-y-0.5 text-ui">
+        <input
+          type={@type}
+          id={@id}
+          name={@name}
+          value={@value}
+          checked={@checked}
+          class="mt-0.5 size-4 shrink-0 accent-brand-fill"
+          {@rest}
+        />
+        <span class={[
+          "min-w-0 flex-1 text-ink",
+          if(@size == :sm, do: "font-medium", else: "font-semibold")
+        ]}>
+          {render_slot(@label)}
+          <.chip
+            :if={@recommended and @recommended_label}
+            variant={:recommended}
+            size="sm"
+            data-role="recommended"
+            class="ml-1"
+          >
+            {@recommended_label}
+          </.chip>
+        </span>
+        <span
+          :if={@aside != []}
+          class={[
+            "max-w-72 basis-full pl-6.5 text-meta md:basis-auto md:pl-0 md:text-right",
+            if(@recommended, do: "font-semibold text-brand", else: "text-muted")
+          ]}
+        >
+          {render_slot(@aside)}
+        </span>
+        <span :if={@summary} class="basis-full pl-6.5 text-meta text-muted">{@summary}</span>
+      </label>
+      <div :if={@extra != []} data-part="extra" class="mt-1 ml-6.5 grid gap-1">
+        {render_slot(@extra)}
+      </div>
+      <div :if={@checked and @follow != []} data-part="follow" class="mt-2 grid gap-2 md:ml-6.5">
+        {render_slot(@follow)}
+      </div>
+    </div>
     """
   end
 
