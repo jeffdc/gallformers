@@ -190,6 +190,9 @@ defmodule Gallformers.Import.SourceEditTest do
       assert standing(fact) == :current
 
       assert {:ok, 4} = Replay.run(entries, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(entries, test_actor(), relogs: true)
+      # The details edit and the last retraction, in place, are skipped.
+      Gallformers.ImportFixtures.assert_replays_again([hd(entries), List.last(entries)])
       assert state([source.id, notice.id], fact) == after_edits
     end
 

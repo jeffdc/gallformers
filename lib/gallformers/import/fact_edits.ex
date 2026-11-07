@@ -38,7 +38,8 @@ defmodule Gallformers.Import.FactEdits do
   producer's `batch_id`, the statement ref and the kind; its value with
   stable references, `Gallformers.Import.StableRef`), as is each removal
   (`:fact_edit_removed`). Replayed before the batch is applied again, the
-  edit is made again (`replay/3`).
+  edit is made again (`replay/5`), unless the batch holds it already or is
+  applied or denied (a replay run again).
   """
 
   import Ecto.Query, only: [from: 2]
@@ -271,19 +272,30 @@ defmodule Gallformers.Import.FactEdits do
 
   @doc """
   Replays a `:fact_edit` or `:fact_edit_removed` entry (`key`, `payload`)
-  on `package` (ready: resolved), as `actor`. A removal of an edit that is
-  not there is done.
+  on `package` (ready: resolved), as `actor`. Done already (a replay run
+  again): an edit the batch holds with that value and note, a removal of
+  an edit that is not there, and either once the batch is applied or
+  denied.
   """
   @spec replay(Actor.t(), Package.t(), :fact_edit | :fact_edit_removed, map(), map()) ::
           :ok | {:error, term()}
   def replay(actor, package, kind, key, payload) do
     with {:ok, batch} <- batch(package, key["batch_id"]) do
       case kind do
+        # Its batch applied or denied, an edit has done its part (or can't).
+        _kind when batch.status in [:applied, :denied] ->
+          :ok
+
         :fact_edit ->
-          with {:ok, value} <- StableRef.decode_decision(payload["value"] || %{}),
-               {:ok, _edit} <-
-                 edit(actor, package, batch, key["statement_ref"], input(key, value, payload)) do
-            :ok
+          with {:ok, value} <- StableRef.decode_decision(payload["value"] || %{}) do
+            input = input(key, value, payload)
+
+            if held?(batch, key["statement_ref"], input) do
+              :ok
+            else
+              with {:ok, _edit} <- edit(actor, package, batch, key["statement_ref"], input),
+                   do: :ok
+            end
           end
 
         :fact_edit_removed ->
@@ -298,6 +310,17 @@ defmodule Gallformers.Import.FactEdits do
             stored -> with {:ok, _} <- remove(actor, stored), do: :ok
           end
       end
+    end
+  end
+
+  # Whether the batch holds the edit already, with that value and note.
+  defp held?(batch, ref, input) do
+    with {:ok, kind, value, note} <- parse(input),
+         %StatementEdit{value: ^value, note: ^note} <-
+           Repo.get_by(StatementEdit, batch_id: batch.id, statement_ref: ref, kind: kind) do
+      true
+    else
+      _ -> false
     end
   end
 

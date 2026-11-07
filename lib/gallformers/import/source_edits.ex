@@ -105,13 +105,17 @@ defmodule Gallformers.Import.SourceEdits do
   @doc """
   The edit a replay log entry records, its Sources found by their stable
   references; `:done` when the entry is already made (its Source renamed by
-  it, or no longer retracted).
+  it or holding its details, retracted by that notice on that date, no
+  longer retracted, or created), so a replay run again skips it.
   """
   @spec from_entry(map(), map()) :: {:ok, edit()} | :done | {:error, term()}
   def from_entry(%{"op" => "update_details", "source" => ref}, %{"attrs" => attrs}) do
     case StableRef.resolve_source(ref) do
-      {:ok, id} -> {:ok, {:update_details, id, attrs}}
-      {:error, reason} -> if renamed_already?(attrs), do: :done, else: {:error, reason}
+      {:ok, id} ->
+        if details_held?(id, attrs), do: :done, else: {:ok, {:update_details, id, attrs}}
+
+      {:error, reason} ->
+        if renamed_already?(attrs), do: :done, else: {:error, reason}
     end
   end
 
@@ -119,7 +123,10 @@ defmodule Gallformers.Import.SourceEdits do
     with {:ok, id} <- StableRef.resolve_source(ref),
          {:ok, notice_id} <- StableRef.resolve_source(notice),
          {:ok, date} <- Date.from_iso8601(on) do
-      {:ok, {:retract, id, notice_id, date}}
+      case Sources.get_source!(id) do
+        %Source{retracted_by_id: ^notice_id, retracted_on: ^date} -> :done
+        %Source{} -> {:ok, {:retract, id, notice_id, date}}
+      end
     end
   end
 
@@ -139,6 +146,15 @@ defmodule Gallformers.Import.SourceEdits do
   end
 
   def from_entry(key, _payload), do: {:error, {:unknown_source_edit, key}}
+
+  defp details_held?(id, attrs) do
+    id
+    |> Sources.get_source!()
+    |> Sources.change_source(attrs)
+    |> Map.fetch!(:changes)
+    |> Map.drop(@derived)
+    |> Kernel.==(%{})
+  end
 
   defp renamed_already?(%{"title" => title}) when is_binary(title),
     do: Sources.get_source_by_title(title) != nil

@@ -335,6 +335,7 @@ defmodule Gallformers.Import.SplitQuestionsTest do
       )
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
 
       assert %QueueItem{status: :decided, decision: %{"taxon_id" => beta}} =
                Repo.get!(QueueItem, ctx.item.id)

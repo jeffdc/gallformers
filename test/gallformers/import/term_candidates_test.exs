@@ -303,6 +303,7 @@ defmodule Gallformers.Import.TermCandidatesTest do
       Repo.delete!(Catalog.get_term("shape", "rounded"))
 
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      Gallformers.ImportFixtures.assert_replays_again(entries, test_actor())
       assert %{status: :placed, categories: ["globular"]} = Catalog.get_term("shape", "rounded")
     end
   end

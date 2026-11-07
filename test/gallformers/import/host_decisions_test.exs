@@ -328,6 +328,7 @@ defmodule Gallformers.Import.HostDecisionsTest do
 
       assert snapshot([lobatus, wcvp]) != after_decisions
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert snapshot([lobatus, wcvp]) == after_decisions
     end
 
@@ -344,11 +345,13 @@ defmodule Gallformers.Import.HostDecisionsTest do
 
       [synonym, decision] = entries
       assert {:ok, 1} = Replay.run([synonym], actor: test_actor())
+      assert_replays_again([synonym], test_actor())
       # Resolved again before the decision replays, the Host needs no one.
       {:ok, package} = Import.resolve_package(test_actor(), package)
       assert host_item(package) == nil
 
       assert {:ok, 1} = Replay.run([decision], actor: test_actor())
+      assert_replays_again([decision], test_actor())
       assert %{resolution: :resolved, taxon_id: id} = host_statement(package)
       assert id == ctx.lobata.id
     end

@@ -13,7 +13,7 @@ defmodule Gallformers.Import.DeletionTest do
 
   import Gallformers.CatalogFixtures
   import Gallformers.TaxaFixtures
-  import Gallformers.ImportFixtures, only: [applied_package!: 3]
+  import Gallformers.ImportFixtures, only: [applied_package!: 3, assert_replays_again: 2]
 
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Gall
@@ -304,10 +304,12 @@ defmodule Gallformers.Import.DeletionTest do
       # Made again on a database that still has it.
       {:ok, _} = Catalog.create_gall(test_actor(), %{id: gall.id, name: gall.name})
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert Catalog.get_gall(gall.id) == nil
 
       # Done already: skipped.
       assert {:ok, 1} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
     end
   end
 

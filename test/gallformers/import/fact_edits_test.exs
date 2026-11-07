@@ -325,6 +325,9 @@ defmodule Gallformers.Import.FactEditsTest do
       Repo.delete!(host)
       assert Import.list_fact_edits(package) == []
       assert {:ok, 3} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
+      # The Host edit, not taken back, is skipped.
+      assert_replays_again([hd(entries)])
 
       assert [%StatementEdit{statement_ref: "f2", kind: :host, note: "per the plate"} = replayed] =
                Import.list_fact_edits(package)
@@ -333,6 +336,10 @@ defmodule Gallformers.Import.FactEditsTest do
 
       package = approve!(package)
       assert relationship(statement(package, "f2").fact_id).subject_taxon_id == ctx.douglasii.id
+
+      # Its batch applied, an edit has done its part: replayed again, all
+      # are skipped, the drop taken back too.
+      assert_replays_again(entries)
     end
   end
 end

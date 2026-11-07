@@ -398,6 +398,138 @@ defmodule Gallformers.Import.ReplayTest do
     assert Taxa.accepted_name(renamed.parent_id) == "Andricus"
   end
 
+  # -- a stopped replay, run again ----------------------------------------------
+
+  describe "a stopped replay runs again" do
+    test "the backscan's log, replayed again, skips what is done" do
+      load_vocab!()
+      gallformers_source()
+      source_ids = Repo.all(from s in "source", select: s.id)
+      wipe!(source_ids)
+      backscan!(seed!())
+      before = snapshot()
+      entries = Import.list_replay_entries()
+      n = length(entries)
+
+      wipe!(source_ids)
+      seed!()
+      assert {:ok, ^n} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries)
+      assert snapshot() == before
+
+      # Stopped after `k` entries, then run from the start: those done are
+      # skipped, the rest made, and the log holds each once.
+      for k <- 1..(n - 1) do
+        wipe!(source_ids)
+        seed!()
+        assert {:ok, ^k} = Replay.run(Enum.take(entries, k), actor: test_actor())
+        assert {:ok, ^n} = Replay.run(entries, actor: test_actor())
+        assert snapshot() == before, "stopped after #{k} entries"
+      end
+    end
+
+    test "the Host-name step's and the taxonomy admin's edits, replayed again, are skipped" do
+      seed_tree = fn ->
+        quercus = plant_fixture(name: "Quercus", rank: :genus)
+        lobata = plant_fixture(name: "Quercus lobata", parent: quercus)
+        cynipini = taxon_fixture(name: "Cynipini", rank: :tribe, kingdom: "Animalia")
+        andricus = taxon_fixture(name: "Andricus", rank: :genus, kingdom: "Animalia")
+        %{quercus: quercus, lobata: lobata, cynipini: cynipini, andricus: andricus}
+      end
+
+      source_ids = Repo.all(from s in "source", select: s.id)
+      wipe!(source_ids)
+      t = seed_tree.()
+
+      {:ok, tinctoria} =
+        Import.record_plant_added(test_actor(), %{
+          name: "Quercus tinctoria",
+          rank: :species,
+          parent_id: t.quercus.id,
+          authorship: "Michx."
+        })
+
+      {:ok, _} = Import.record_synonym_added(test_actor(), t.lobata, "Quercus lobatus")
+
+      {:ok, _} =
+        Import.record_synonym_added(test_actor(), t.lobata, "Quercus alba", sensu: "auct.")
+
+      {:ok, sp} =
+        Import.record_taxonomy_edit(
+          test_actor(),
+          {:create_taxon, %{name: "Andricus exemplaris", rank: :species, kingdom: "Animalia"}}
+        )
+
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:place, sp, t.andricus})
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:place, t.andricus, t.cynipini})
+
+      {:ok, _} =
+        Import.record_taxonomy_edit(test_actor(), {:add_common_name, sp, "exemplary gall wasp"})
+
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:rename, sp, "Andricus exemplarius"})
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:add_common_name, sp, "oak wasp"})
+
+      [old] = Enum.filter(Taxa.list_synonyms(sp.id), &(&1.name == "Andricus exemplaris"))
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:remove_synonym, old})
+
+      [common] = Enum.filter(Taxa.list_common_names(sp.id), &(&1.name == "oak wasp"))
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:remove_common_name, common})
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:set_authorship, sp, "Smith, 1901"})
+
+      {:ok, _} =
+        Import.record_taxonomy_edit(
+          test_actor(),
+          {:update_editorial, tinctoria, %{datacomplete: true}}
+        )
+
+      {:ok, doomed} =
+        Import.record_taxonomy_edit(
+          test_actor(),
+          {:create_taxon, %{name: "Andricus doomed", rank: :species, parent_id: t.andricus.id}}
+        )
+
+      {:ok, _} = Import.record_taxonomy_edit(test_actor(), {:delete_taxon, doomed})
+
+      before = snapshot()
+      entries = Import.list_replay_entries()
+      n = length(entries)
+      assert n == 15
+
+      wipe!(source_ids)
+      seed_tree.()
+      assert {:ok, ^n} = Replay.run(entries, actor: test_actor())
+      assert snapshot() == before
+
+      # A common name added and removed, a taxon created and deleted: the
+      # data can't tell the first step was done, so both are made again
+      # (and logged again), ending where they ended. Everything else is
+      # skipped.
+      assert_replays_again(entries, test_actor(), relogs: true)
+      assert Map.delete(snapshot(), :log) == Map.delete(before, :log)
+
+      for k <- 1..(n - 1) do
+        wipe!(source_ids)
+        seed_tree.()
+        assert {:ok, ^k} = Replay.run(Enum.take(entries, k), actor: test_actor())
+        assert {:ok, ^n} = Replay.run(entries, actor: test_actor())
+
+        assert Map.delete(snapshot(), :log) == Map.delete(before, :log),
+               "stopped after #{k} entries"
+      end
+
+      # Without them, the log replayed again is skipped whole.
+      kept =
+        Enum.reject(entries, fn e ->
+          "oak wasp" in [e.key["name"], e.payload["name"]] or
+            "Andricus doomed" in [e.key["name"], e.key["taxon"]["name"]]
+        end)
+
+      assert length(kept) == n - 4
+
+      assert_replays_again(kept)
+    end
+  end
+
   test "a rename proposal's decision replays after the taxonomy edit that made it" do
     load_vocab!()
     # Sources outlive the wipe, so the seed's own is made once.
@@ -440,10 +572,12 @@ defmodule Gallformers.Import.ReplayTest do
     seed_gall.()
 
     assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+    assert_replays_again(entries, test_actor())
     assert snapshot() == before
 
     # A decision replayed again is skipped: its proposal is decided.
     assert {:ok, 1} = Replay.run([List.last(entries)], actor: test_actor())
+    assert_replays_again([List.last(entries)], test_actor())
     assert snapshot().galls == before.galls
   end
 

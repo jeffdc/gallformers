@@ -84,6 +84,8 @@ defmodule Gallformers.Import.TaxonomicDecisionsTest do
     assert Repo.get!(Attribution, ctx.statement.id).accepted_at == nil
 
     assert {:ok, 3} = Replay.run(logged, actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again(logged, test_actor(), relogs: true)
+    Gallformers.ImportFixtures.assert_replays_again([List.last(logged)])
 
     replayed = Repo.get!(Attribution, ctx.statement.id)
     assert %DateTime{} = replayed.accepted_at
@@ -95,6 +97,7 @@ defmodule Gallformers.Import.TaxonomicDecisionsTest do
     [entry] = entries()
 
     assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+    Gallformers.ImportFixtures.assert_replays_again([entry], test_actor())
     assert length(entries()) == 1
   end
 

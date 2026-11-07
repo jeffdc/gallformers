@@ -190,6 +190,7 @@ defmodule Gallformers.Import.UndoQuestionsTest do
         end)
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert parent_id(ctx.genus) == ctx.family.id
       assert %QueueItem{status: :open} = Repo.get!(QueueItem, item.id)
     end
@@ -359,6 +360,7 @@ defmodule Gallformers.Import.UndoQuestionsTest do
         end)
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert inducer_ids(ctx.gall) == [ctx.split.id]
       assert %QueueItem{status: :open} = Repo.get!(QueueItem, ctx.item.id)
     end
@@ -374,6 +376,7 @@ defmodule Gallformers.Import.UndoQuestionsTest do
         end)
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
 
       assert inducer_sources(ctx.gall) == %{
                ctx.split.id => [ctx.weld.id],
@@ -443,6 +446,7 @@ defmodule Gallformers.Import.UndoQuestionsTest do
         end)
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert Catalog.get_gall!(ctx.gall.id).name == "Undorena alba (agamic)"
       assert %QueueItem{status: :open} = Repo.get!(QueueItem, ctx.item.id)
     end
@@ -466,6 +470,7 @@ defmodule Gallformers.Import.UndoQuestionsTest do
         end)
 
       assert {:ok, 2} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor(), relogs: true)
       assert %QueueItem{status: :open} = Repo.get!(QueueItem, item.id)
     end
   end

@@ -166,7 +166,7 @@ defmodule Gallformers.Import.TaxonomicDecisions do
   end
 
   defp resolve(nil), do: {:ok, nil}
-  defp resolve(ref), do: StableRef.resolve_taxon(ref)
+  defp resolve(ref), do: StableRef.resolve_current_taxon(ref)
 
   defp resolve_all(refs) do
     Enum.reduce_while(refs, {:ok, []}, fn ref, {:ok, ids} ->

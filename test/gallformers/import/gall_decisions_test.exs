@@ -327,6 +327,7 @@ defmodule Gallformers.Import.GallDecisionsTest do
 
       assert after_decision == {[ctx.lobatae.id], [ctx.quercus.id]}
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert {host_ids(chosen.id), host_ids(other.id)} == after_decision
     end
   end
@@ -399,6 +400,7 @@ defmodule Gallformers.Import.GallDecisionsTest do
       assert generation == Catalog.get_generation_value("sexual").id
       assert created_gall(package) == nil
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert created_gall(package).generation_value_id == generation
     end
   end
@@ -453,6 +455,7 @@ defmodule Gallformers.Import.GallDecisionsTest do
 
       assert snapshot(package, ctx) != after_decision
       assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert snapshot(package, ctx) == after_decision
     end
   end

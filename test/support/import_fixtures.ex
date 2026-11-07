@@ -300,4 +300,84 @@ defmodule Gallformers.ImportFixtures do
       {name, sha256(package[name])}
     end
   end
+
+  @doc """
+  Replays `entries` again, as a stopped replay is run again
+  (`Gallformers.Import.Replay.run/2`), and asserts that each was replayed
+  and that the database holds what it held: an entry whose effect is in
+  place is skipped, never an error or a duplicate. Rows are compared
+  without their own IDs and timestamps, so a package resolved again (its
+  statements written afresh) is the same.
+
+  The replay log must not grow either, unless `relogs: true`: a log that
+  makes a change and later takes it back (a retraction lifted, a decision
+  undone) makes both again, logging them again, as nothing in the data
+  says the first was done. Even then each entry it logs is one of the
+  log's, and no table gains or loses a row (the rows made again are
+  compared by count; the test checks what they hold). Returns the
+  replay's result.
+  """
+  def assert_replays_again(entries, actor \\ test_actor(), opts \\ []) do
+    before = table_rows()
+    count = length(entries)
+    result = Gallformers.Import.Replay.run(entries, actor: actor)
+
+    ExUnit.Assertions.assert(
+      result == {:ok, count},
+      "replaying again gave #{inspect(result, limit: 12, printable_limit: 800)}"
+    )
+
+    now = table_rows()
+    {log_before, before} = Map.pop(before, "replay_log")
+    {log_now, now} = Map.pop(now, "replay_log")
+
+    changed =
+      for {table, rows} <- now, differ?(before[table], rows, opts[:relogs]) do
+        {table, removed: before[table] -- rows, added: rows -- before[table]}
+      end
+
+    ExUnit.Assertions.assert(
+      changed == [],
+      "replaying again changed #{inspect(changed, pretty: true, printable_limit: 4000)}"
+    )
+
+    relogged = log_now -- log_before
+
+    if opts[:relogs] do
+      ExUnit.Assertions.assert(
+        relogged -- log_before == [],
+        "replaying again logged new entries #{inspect(relogged -- log_before, pretty: true)}"
+      )
+    else
+      ExUnit.Assertions.assert(
+        relogged == [],
+        "replaying again logged #{inspect(relogged, pretty: true, printable_limit: 4000)}"
+      )
+    end
+
+    result
+  end
+
+  # Steps made again write their rows afresh (a Fact undone and made
+  # again is a new Fact, its attributions naming it): compared by count.
+  defp differ?(before, rows, true), do: length(before) != length(rows)
+  defp differ?(before, rows, _relogs), do: before != rows
+
+  # Each table's rows as JSON text, sorted, without their own IDs and
+  # timestamps; the replay log's as its kind, key and payload.
+  defp table_rows do
+    %{rows: tables} =
+      Gallformers.Repo.query!(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
+      )
+
+    for [table] <- tables, into: %{} do
+      %{rows: rows} =
+        Gallformers.Repo.query!(
+          ~s|SELECT (to_jsonb(t) - 'id' - 'inserted_at' - 'updated_at')::text FROM "#{table}" t ORDER BY 1|
+        )
+
+      {table, List.flatten(rows)}
+    end
+  end
 end

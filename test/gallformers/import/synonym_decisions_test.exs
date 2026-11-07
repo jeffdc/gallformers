@@ -139,6 +139,7 @@ defmodule Gallformers.Import.SynonymDecisionsTest do
 
       assert snapshot(package, ctx) != after_decision
       assert {:ok, 3} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert snapshot(package, ctx) == after_decision
     end
 
@@ -157,6 +158,7 @@ defmodule Gallformers.Import.SynonymDecisionsTest do
 
       assert snapshot(package, ctx) != after_decision
       assert {:ok, 3} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
       assert snapshot(package, ctx) == after_decision
     end
   end
