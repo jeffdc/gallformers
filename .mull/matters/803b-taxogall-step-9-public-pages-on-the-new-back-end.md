@@ -1,7 +1,7 @@
 ---
 status: planned
 created: 2026-10-26
-updated: 2026-10-27
+updated: 2026-11-06
 epic: taxonomy
 relates: [50ff, b5bd, 9449, 86e7, a856]
 ---
@@ -302,3 +302,18 @@ Rehearsal 2026-10-27: strict run clean, every line balances. Parity: 347 filter 
 Doubtful carried-over common names, for Jeff (not blocking): "Creeper" (Parthenocissus), "Plane" (Platanus), combined names ("Plums, Cherries, and Allies", "Rowans and Mountain Ash", "Aspens and White Poplars", "necklace or bigleaf poplars"), and "Bramble, cinquefoil, and rose inquiline gall wasps" (tribe Diastrophini).
 
 **Remaining then:** Tasks 11–14 — done 2026-10-27 (see Status above).
+
+
+## The species page (Jeff, 2026-11-06)
+
+Missed in this plan: a Gall is not a species, and the organism had no public page (the Gall page's Inducer linked to the admin taxonomy page). Agreed design:
+
+- `/species/:id`: non-plant taxa at species rank and below (plants keep `/host/:id`).
+- **Header:** name with authority and rank, lineage (family › genus, linked to their pages), common names.
+- **Its Galls:** every Gall it induces, all generations, as photo cards like the genus page (alternating generations seen together here).
+- **Taxonomy:** current placement and accepted name with the Source each comes from; synonyms; papers that disagree (accepted / declined); split and lump history (f923 Task 10 data).
+- **Where it occurs:** its Galls' ranges together on one map.
+- **Sources:** everything citing it or its Galls.
+- **Edit mode** like the other pages: name, placement, synonyms through "Based on which Source?" (f923 Task 8); Galls edited on their own pages.
+- The Gall page's Inducer, the palette's inducer results and search link here; sitemap entries. No legacy redirects needed (no old species URLs).
+
