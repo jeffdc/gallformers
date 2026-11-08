@@ -323,6 +323,19 @@ defmodule Gallformers.Catalog.VocabTest do
     end
   end
 
+  describe "trait_definitions/0" do
+    test "each Trait's values with their definitions, for the Trait value picker (87a1)" do
+      {:ok, _} = Catalog.load_vocab(test_actor())
+      definitions = Catalog.trait_definitions()
+
+      assert definitions["season"]["Spring"] == "The Gall forms and grows in spring."
+
+      for value <- Catalog.list_trait_values() do
+        assert Map.fetch!(definitions[value.trait], value.value) == value.definition
+      end
+    end
+  end
+
   describe "the leaf values (d213)" do
     test "are the contract's plant parts on the leaf; the petiole is not one" do
       parts = contract("traits.schema.json")["$defs"]["plant_part"]["enum"]

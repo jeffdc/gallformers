@@ -1059,6 +1059,36 @@ defmodule Gallformers.Taxa do
     to: Search,
     as: :genera_and_sections
 
+  @typedoc "A plant a Gall's Host may be (`host_choices/2`)."
+  @type host_choice :: %{
+          id: integer(),
+          name: String.t(),
+          rank: Rank.t(),
+          aliases: [String.t()],
+          group: :plants | :genera_and_sections
+        }
+
+  @doc """
+  The plants a Gall's Host may be, matching `query`: plants at species
+  rank or below (`search_plants/2`, `group: :plants`, with their synonyms
+  and common names as `aliases`), then plant genera, subgenera and sections
+  (`search_genera_and_sections/3`, `group: :genera_and_sections`), up to
+  `limit` of each. The one plant search for a Host (matter `87a1`): the
+  review, a Source's corrections and the Fact inspector use it.
+  """
+  @spec host_choices(String.t(), pos_integer()) :: [host_choice()]
+  def host_choices(query, limit) when is_binary(query) do
+    plants =
+      for p <- search_plants(query, limit),
+          do: %{id: p.id, name: p.name, rank: p.rank, aliases: p.aliases, group: :plants}
+
+    higher =
+      for g <- search_genera_and_sections(query, limit, kingdom: "Plantae"),
+          do: %{id: g.id, name: g.name, rank: g.rank, aliases: [], group: :genera_and_sections}
+
+    plants ++ higher
+  end
+
   # Global search (`Gallformers.Taxa.ReadModels.Search`).
 
   @doc """

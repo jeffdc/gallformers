@@ -9,12 +9,12 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
 
   The data is real, read through the read models:
   `Gallformers.Import.facts_for_gall/1` for a Gall's Facts,
-  `Gallformers.Facts.list_attributions_for_facts/1` for every Source's
+  `Gallformers.Import.FactsView.statements/1` for every Source's
   statement of each (date, words, whether it counts),
   `Gallformers.Import.taxonomic_position/1`, `taxon_splits/1` and
   `facts_for_source/2` for a taxon's taxonomic statements, and `Gallformers.Taxa`
   for what the tree holds without a statement. The searches in the forms
-  are real (`GallformersWeb.Admin.ReviewLive.Loader.host_choices/2`,
+  are real (`GallformersWeb.Choices.hosts/2`,
   `Gallformers.Taxa.search/2`).
 
   Every action is fake: it changes the LiveView's assigns only (the open
@@ -40,8 +40,8 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
   import GallformersWeb.FactsComponents, only: [fact_editor: 1, entries: 1]
   import GallformersWeb.ReviewComponents, only: [review_value_list: 1]
 
-  alias Gallformers.{Catalog, Facts, Import, Sources, Taxa}
-  alias GallformersWeb.Admin.ReviewLive.Loader
+  alias Gallformers.{Catalog, Import, Sources, Taxa}
+  alias Gallformers.Import.FactsView
   alias Phoenix.LiveView.Socket
 
   @results 8
@@ -394,7 +394,7 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
 
   # The search a form's taxon field runs: plants for a Host, other taxa for
   # an Inducer, a parent or an accepted taxon.
-  defp choices(%{kind: :host}, query), do: Loader.host_choices(query, @results)
+  defp choices(%{kind: :host}, query), do: GallformersWeb.Choices.hosts(query, @results)
 
   defp choices(_edit, query) do
     query
@@ -543,7 +543,7 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
   @spec gall_panel(integer()) :: [map()]
   def gall_panel(gall_id) do
     all = gall_id |> Import.facts_for_gall() |> entries()
-    lines = statement_lines(Enum.map(all, & &1.fact_id), %{})
+    lines = statement_lines(Enum.map(all, & &1.fact_id))
     {current, past} = all |> Enum.map(&gall_fact(&1, lines)) |> Enum.split_with(&current?/1)
     by = Enum.group_by(current, & &1.category)
     past_by = Enum.group_by(past, & &1.category)
@@ -735,8 +735,6 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
     acts = acts_about(taxon_id)
     act_ids = acts |> Enum.map(& &1.fact_id) |> Enum.uniq()
 
-    kinds = Map.new(acts, &{&1.fact_id, "taxon_#{&1.kind}"})
-
     split_ids = taxon_id |> Import.taxon_splits() |> Enum.map(& &1.fact_id)
 
     ids =
@@ -745,19 +743,7 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
       |> Kernel.++(act_ids ++ split_ids)
       |> Enum.uniq()
 
-    kinds =
-      kinds
-      |> Map.merge(Map.new(split_ids, &{&1, "taxon_split"}))
-      |> then(fn k ->
-        if position.placement,
-          do: Map.put(k, position.placement.fact_id, "taxon_placement"),
-          else: k
-      end)
-      |> then(fn k ->
-        if position.name, do: Map.put(k, position.name.fact_id, "taxon_name"), else: k
-      end)
-
-    lines = statement_lines(ids, kinds)
+    lines = statement_lines(ids)
     by_fact = acts |> Enum.uniq_by(& &1.fact_id) |> Enum.group_by(& &1.kind)
 
     {act_facts, act_past} =
@@ -1006,76 +992,15 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
 
   @doc """
   Every Source's statement of each of `fact_ids`, by Fact ID, oldest
-  first: `%{source_id, name, own?, gallformers?, date, stance, words,
-  statement, quotes, state, reason}`. `kinds` gives a Fact's kind where its
-  statements count only once a curator accepts them (the taxonomic kinds).
+  first: `Gallformers.Import.FactsView.statements/1`, an undated
+  statement's `date` "undated".
   """
-  @spec statement_lines([integer()], %{integer() => String.t()}) :: %{integer() => [map()]}
-  def statement_lines([], _kinds), do: %{}
-
-  def statement_lines(fact_ids, kinds) do
-    attributions = Facts.list_attributions_for_facts(fact_ids)
-
-    sources =
-      attributions
-      |> Map.values()
-      |> List.flatten()
-      |> Enum.map(& &1.source_id)
-      |> Enum.uniq()
-      |> Sources.list_sources_by_id()
-      |> Map.new(&{&1.id, &1})
-
-    own = Sources.own_source_ids()
-
-    Map.new(attributions, fn {fact_id, list} ->
-      {fact_id,
-       list
-       |> Enum.sort_by(
-         &{&1.stated_on != nil, &1.stated_on && Date.to_gregorian_days(&1.stated_on), &1.id}
-       )
-       |> Enum.map(&line(&1, sources[&1.source_id], own, Map.get(kinds, fact_id, "gall")))}
+  @spec statement_lines([integer()]) :: %{integer() => [map()]}
+  def statement_lines(fact_ids) do
+    Map.new(FactsView.statements(fact_ids), fn {fact_id, lines} ->
+      {fact_id, Enum.map(lines, &%{&1 | date: &1.date || "undated"})}
     end)
   end
-
-  defp line(a, source, own, kind) do
-    own? = a.source_id in own
-
-    %{
-      source_id: a.source_id,
-      name: source_name(source, own?) || "Source #{a.source_id}",
-      own?: own?,
-      gallformers?: source != nil and source.kind == :gallformers,
-      date:
-        if(a.stated_on,
-          do: stated(a.stated_on, a.stated_precision),
-          else: "undated"
-        ),
-      stance: a.stance,
-      words:
-        ([a.value_as_written, a.term, a.status_as_written, a.authorship_as_written] ++
-           Enum.map(a.names, & &1.name_as_written))
-        |> Enum.reject(&(&1 in [nil, ""]))
-        |> Enum.uniq_by(&String.downcase/1),
-      statement: a.statement_text,
-      quotes: for(e <- a.evidence, e.quote not in [nil, ""], do: %{quote: e.quote, page: e.page}),
-      state:
-        cond do
-          a.declined_at -> :declined
-          Facts.counts?(kind, a, own) -> :counts
-          true -> :awaiting
-        end,
-      reason: a.decline_reason
-    }
-  end
-
-  # A statement's date at its precision.
-  defp stated(date, :year), do: to_string(date.year)
-  defp stated(date, :month), do: date |> Date.to_iso8601() |> String.slice(0, 7)
-  defp stated(date, _precision), do: Date.to_iso8601(date)
-
-  defp source_name(nil, _own?), do: nil
-  defp source_name(source, true), do: source.title
-  defp source_name(source, false), do: Sources.short_name(source) || source.title
 
   @doc "The key of the Fact a main-view `ref` stands for, or nil."
   @spec key_for([map()], tuple()) :: String.t() | nil
@@ -1626,7 +1551,7 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
   defp text_label(:description), do: "The description"
   defp text_label(_kind), do: "What it should be"
 
-  defp trait_values(trait), do: Loader.definitions() |> Map.get(trait, %{}) |> Enum.sort()
+  defp trait_values(trait), do: Catalog.trait_definitions() |> Map.get(trait, %{}) |> Enum.sort()
 
   # The form an action opens.
   defp form_for_edit(%{action: "withdraw"}),

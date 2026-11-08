@@ -216,37 +216,59 @@ defmodule Gallformers.Places do
   """
   @spec search_places_grouped(String.t(), non_neg_integer(), String.t() | nil) :: [map()]
   def search_places_grouped(query, limit \\ 10, continent_code \\ nil) do
+    query
+    |> grouped_query(limit)
+    |> maybe_scope_to_continent(continent_code)
+    |> Repo.all()
+  end
+
+  defp grouped_query(query, limit) do
     like_query = "%#{String.downcase(query)}%"
 
-    base_query =
-      from(p in Place,
-        left_join: ph in "place_hierarchy",
-        on: ph.place_id == p.id,
-        left_join: parent in Place,
-        on: parent.id == ph.parent_id,
-        where: p.type in ["country", "state", "province"],
-        where: ilike(p.name, ^like_query),
-        order_by: [
-          fragment("CASE WHEN ? = 'country' THEN 0 ELSE 1 END", p.type),
-          p.name
-        ],
-        limit: ^limit,
-        select: %{
-          id: p.id,
-          name: p.name,
-          code: p.code,
-          type: p.type,
-          parent_name: parent.name,
-          group:
-            fragment(
-              "CASE WHEN ? = 'country' THEN 'Countries' ELSE 'States & Provinces' END",
-              p.type
-            )
-        }
-      )
+    from(p in Place,
+      left_join: ph in "place_hierarchy",
+      on: ph.place_id == p.id,
+      left_join: parent in Place,
+      on: parent.id == ph.parent_id,
+      where: p.type in ["country", "state", "province"],
+      where: ilike(p.name, ^like_query),
+      order_by: [
+        fragment("CASE WHEN ? = 'country' THEN 0 ELSE 1 END", p.type),
+        p.name
+      ],
+      limit: ^limit,
+      select: %{
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        type: p.type,
+        parent_name: parent.name,
+        group:
+          fragment(
+            "CASE WHEN ? = 'country' THEN 'Countries' ELSE 'States & Provinces' END",
+            p.type
+          )
+      }
+    )
+  end
 
-    base_query
-    |> maybe_scope_to_continent(continent_code)
+  @doc """
+  The places a Fact about a Gall may name, matching `query`, for the place
+  picker (matter `87a1`), as `search_places_grouped/3` gives them (with the
+  place each is in): for a recorded occurrence (`:occurrence`) the
+  selectable places (`list_places/0`: states, provinces and countries with
+  no subdivisions); for a range adjustment (`:range`) countries with
+  subdivisions too. Never a continent or region.
+  """
+  @spec search_fact_places(String.t(), :occurrence | :range, non_neg_integer()) :: [map()]
+  def search_fact_places(query, :range, limit), do: search_places_grouped(query, limit)
+
+  def search_fact_places(query, :occurrence, limit) do
+    has_children = from(ph in "place_hierarchy", select: ph.parent_id)
+
+    query
+    |> grouped_query(limit)
+    |> where([p], p.type != "country" or p.id not in subquery(has_children))
     |> Repo.all()
   end
 

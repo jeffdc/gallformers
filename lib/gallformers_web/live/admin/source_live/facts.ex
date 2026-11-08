@@ -27,17 +27,18 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
 
   The correction's form is the review Facts page's edit form
   (`GallformersWeb.FactsComponents.fact_editor/1`), with its plant search
-  (`GallformersWeb.Admin.ReviewLive.Loader.host_choices/2`), its edits
+  (`GallformersWeb.Choices.hosts/2`), its edits
   being for packages before approval.
   """
   use GallformersWeb, :live_component
 
   import GallformersWeb.FactsComponents
 
+  alias Gallformers.Catalog
   alias Gallformers.Import
   alias Gallformers.Sources
   alias Gallformers.Taxa
-  alias GallformersWeb.Admin.ReviewLive.Loader
+  alias GallformersWeb.Choices
 
   @results 10
   @all_limit 300
@@ -66,7 +67,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
          gall_results: [],
          gall: nil,
          corrections: Import.list_source_corrections(source.id),
-         definitions: Loader.definitions()
+         definitions: Catalog.trait_definitions()
        )
        |> close_editor()
        |> load()}
@@ -260,7 +261,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
 
   # Plants of any rank, and genera and sections, for a Host; other taxa
   # for a parent or an accepted taxon.
-  defp taxa("host", query), do: Loader.host_choices(query, @results)
+  defp taxa("host", query), do: Choices.hosts(query, @results)
 
   defp taxa(_kind, query) do
     query

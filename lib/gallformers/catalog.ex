@@ -141,6 +141,17 @@ defmodule Gallformers.Catalog do
   @spec list_trait_values() :: [TraitValue.t()]
   def list_trait_values, do: Repo.all(from(t in TraitValue, order_by: [t.trait, t.value]))
 
+  @doc """
+  Each Trait's values with their definitions, `%{trait => %{value =>
+  definition}}`: what the Trait value picker shows (matter `87a1`).
+  """
+  @spec trait_definitions() :: %{String.t() => %{String.t() => String.t() | nil}}
+  def trait_definitions do
+    list_trait_values()
+    |> Enum.group_by(& &1.trait)
+    |> Map.new(fn {trait, values} -> {trait, Map.new(values, &{&1.value, &1.definition})} end)
+  end
+
   @doc "A Trait value, or nil."
   @spec get_trait_value(String.t(), String.t()) :: TraitValue.t() | nil
   def get_trait_value(trait, value), do: Repo.get_by(TraitValue, trait: trait, value: value)

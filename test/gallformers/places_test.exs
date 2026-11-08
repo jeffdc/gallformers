@@ -172,6 +172,25 @@ defmodule Gallformers.PlacesTest do
     end
   end
 
+  describe "search_fact_places/3" do
+    defp codes(results), do: results |> Enum.map(& &1.code) |> Enum.sort()
+
+    test "a recorded occurrence: states, provinces and countries without subdivisions" do
+      assert codes(Places.search_fact_places("a", :occurrence, 50)) ==
+               ["BS", "CA-AB", "MX-JAL", "RO-B", "US-CA"]
+    end
+
+    test "a range adjustment: countries with subdivisions too, never a continent" do
+      assert codes(Places.search_fact_places("a", :range, 50)) ==
+               ["BS", "CA", "CA-AB", "MX-JAL", "RO", "RO-B", "US", "US-CA"]
+    end
+
+    test "each with the place it is in" do
+      assert [%{name: "Alberta", parent_name: "Canada", group: "States & Provinces"}] =
+               Places.search_fact_places("albert", :occurrence, 10)
+    end
+  end
+
   describe "search_places_grouped/3 with continent scope" do
     test "scoped to North America returns California" do
       results = Places.search_places_grouped("Cal", 10, "XN")

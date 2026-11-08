@@ -1279,42 +1279,12 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   def rejected?(item), do: match?(%DateTime{}, Map.get(item, :proposal_rejected_at))
 
   @doc """
-  The plants a Fact's Host may be, matching `query`, as typeahead results
-  (`%{id, name, meta, group}`): plants of any rank (`group` "Plants"), then
-  genera and sections ("Genera and sections"), up to `limit` of each;
-  `meta` is the rank and up to three aliases.
+  The Trait values' definitions, `%{trait => %{value => definition}}`:
+  `Gallformers.Catalog.trait_definitions/0`. Kept while the review pages
+  being rebuilt call it here (matter `87a1` task 12 removes it).
   """
-  @spec host_choices(String.t(), pos_integer()) :: [map()]
-  def host_choices(query, limit) when is_binary(query) do
-    plants =
-      for p <- Taxa.search_plants(query, limit),
-          do: %{id: p.id, name: p.name, meta: choice_meta(p.rank, p.aliases), group: "Plants"}
-
-    groups =
-      for g <- Taxa.search_genera_and_sections(query, limit, kingdom: "Plantae"),
-          do: %{
-            id: g.id,
-            name: g.name,
-            meta: choice_meta(g.rank, []),
-            group: "Genera and sections"
-          }
-
-    plants ++ groups
-  end
-
-  defp choice_meta(rank, aliases) do
-    [rank && to_string(rank), aliases != [] && "also " <> Enum.join(Enum.take(aliases, 3), ", ")]
-    |> Enum.filter(&is_binary/1)
-    |> Enum.join(" · ")
-  end
-
-  @doc "The Trait values' definitions, `%{trait => %{value => definition}}`."
   @spec definitions() :: %{String.t() => %{String.t() => String.t() | nil}}
-  def definitions do
-    Catalog.list_trait_values()
-    |> Enum.group_by(& &1.trait)
-    |> Map.new(fn {trait, values} -> {trait, Map.new(values, &{&1.value, &1.definition})} end)
-  end
+  def definitions, do: Catalog.trait_definitions()
 
   # The batch's names as written, by ref.
   defp written(%Batch{content: content}), do: written_in(content)

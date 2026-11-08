@@ -36,6 +36,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
   alias GallformersWeb.Admin.ReviewLive.Document
   alias GallformersWeb.Admin.ReviewLive.Loader
   alias GallformersWeb.Admin.ReviewLive.SourcePage
+  alias GallformersWeb.Choices
 
   @results 10
   @statuses ~w(new held conflict waiting dropped)
@@ -218,7 +219,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Facts do
     query = String.trim(query)
     socket = update(socket, :pick, &%{&1 | query: query})
 
-    results = if String.length(query) < 2, do: [], else: Loader.host_choices(query, @results)
+    results = Choices.hosts(query, @results)
     {:noreply, update(socket, :pick, &%{&1 | results: results})}
   end
 
