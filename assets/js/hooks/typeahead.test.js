@@ -113,6 +113,31 @@ describe('Typeahead keyboard navigation', () => {
     expect(emptyHook.highlightedIndex).toBe(-1)
   })
 
+  test('Escape closes the open results, keeps the text and pushes nothing', () => {
+    hook.input.value = 'Quercus'
+    keydown(hook.input, 'Escape')
+
+    expect(hook.resultsContainer.hidden).toBe(true)
+    expect(hook.input.value).toBe('Quercus')
+    expect(getPushedEvents(hook)).toEqual([])
+  })
+
+  test('typing again, or ArrowDown, opens the closed results', () => {
+    keydown(hook.input, 'Escape')
+    hook.input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(hook.resultsContainer.hidden).toBe(false)
+
+    keydown(hook.input, 'Escape')
+    keydown(hook.input, 'ArrowDown')
+    expect(hook.resultsContainer.hidden).toBe(false)
+  })
+
+  test('the results stay closed when the page updates', () => {
+    keydown(hook.input, 'Escape')
+    hook.updated()
+    expect(hook.resultsContainer.hidden).toBe(true)
+  })
+
   test('Escape resets highlight', () => {
     keydown(hook.input, 'ArrowDown')
     keydown(hook.input, 'ArrowDown')
