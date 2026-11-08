@@ -67,7 +67,13 @@ defmodule Gallformers.Import.Attributions do
     for %{} = e <- evidence,
         %{} = o <- List.wrap(e["observations"]),
         uniq: true,
-        do: %{provider: o["provider"], external_id: o["id"], url: o["url"]}
+        do: %{
+          provider: o["provider"],
+          external_id: o["id"],
+          url: o["url"],
+          quality_grade: o["quality_grade"],
+          thumbnail_url: o["thumbnail_url"]
+        }
   end
 
   defp statement_attrs(evidence, :gallformers) do

@@ -7,7 +7,7 @@ How to write a batch of Gallformers' own statements: a curator's correction, con
 - **Evidence** is a statement in place of a quote:
   - `statement.text`: the statement in plain words;
   - `statement.stated_on`: its date (YYYY-MM-DD);
-  - `observations` (optional): the Observations that support it, e.g. `{ "provider": "inaturalist", "id": "123456789" }`;
+  - `observations` (optional): the Observations that support it, e.g. `{ "provider": "inaturalist", "id": "123456789" }`; an iNaturalist observation may add its `quality_grade` when the statement was made (`research`, `needs_id`, `casual`) and a `thumbnail_url`, shown with the statement;
   - `cites` (optional): the Source the curator follows for it ("per Weld 1959"): `as_written`, the Source as the curator names it, and `source_id`, Gallformers' ID for it when known. The statement stays Gallformers' own, dated as made; the Source is recorded on it, and when that Source is brought in, its own statement joins the same Fact.
 - **Observations** appear only as cited evidence.
 - **A Trait** is stated as in Phase 3, "Traits": the statement's own word for it as the `term` (often the category itself), with the category.

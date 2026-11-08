@@ -275,7 +275,9 @@
         "properties": {
           "provider": { "enum": ["inaturalist", "bugguide", "other"] },
           "id": { "type": "string", "minLength": 1 },
-          "url": { "type": "string", "format": "uri" }
+          "url": { "type": "string", "format": "uri" },
+          "quality_grade": { "enum": ["research", "needs_id", "casual"], "description": "Optional: an iNaturalist observation's quality grade when the statement was made." },
+          "thumbnail_url": { "type": "string", "format": "uri", "description": "Optional: a small photo of the observation, shown with the statement." }
         },
         "additionalProperties": false
       }

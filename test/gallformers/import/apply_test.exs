@@ -307,6 +307,76 @@ defmodule Gallformers.Import.ApplyTest do
                fact_statement(package, "gall.json", "f2")
     end
 
+    test "an observation's quality grade and thumbnail stay on the statement (87a1)", ctx do
+      gallformers = gallformers_source()
+
+      batch = %{
+        "format" => "gallformers-import",
+        "format_version" => 3,
+        "vocabulary_version" => "2026-10-11",
+        "batch_type" => "gall",
+        "mode" => "add",
+        "batch_id" => "gf-#{System.unique_integer([:positive])}-0000",
+        "produced_at" => "2026-10-07T14:00:00Z",
+        "producer" => %{"name" => "curator", "version" => "0"},
+        "source" => %{"gallformers" => true},
+        "taxa" => [
+          %{
+            "ref" => "t1",
+            "name_as_written" => "Andricus quercuscalifornicus",
+            "rank" => "species"
+          },
+          %{"ref" => "t2", "name_as_written" => "Quercus douglasii", "rank" => "species"}
+        ],
+        "galls" => [
+          %{
+            "ref" => "g1",
+            "name_as_written" => "agamic gall",
+            "identified_by" => %{
+              "inducer" => "t1",
+              "generation" => %{"value" => "agamic", "as_written" => "agamic"}
+            }
+          }
+        ],
+        "facts" => [
+          %{
+            "id" => "f1",
+            "stance" => "confirm",
+            "kind" => "relationship",
+            "type" => "host_of",
+            "subject" => "t2",
+            "object" => "g1",
+            "evidence" => [
+              %{
+                "statement" => %{"text" => "Seen.", "stated_on" => "2026-10-07"},
+                "observations" => [
+                  %{
+                    "provider" => "inaturalist",
+                    "id" => "318135694",
+                    "quality_grade" => "needs_id",
+                    "thumbnail_url" =>
+                      "https://inaturalist-open-data.s3.amazonaws.com/photos/1/square.jpg"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+
+      package = [{"gall.json", batch}] |> batch_files() |> deliver!(review: false) |> approve!()
+      fact_id = fact_statement(package, "gall.json", "f1").fact_id
+
+      assert [
+               %{
+                 quality_grade: "needs_id",
+                 thumbnail_url:
+                   "https://inaturalist-open-data.s3.amazonaws.com/photos/1/square.jpg"
+               }
+             ] =
+               attribution(fact_id, gallformers.id).observations
+    end
+
     test "an older Gallformers statement does not replace a newer one", ctx do
       gallformers = gallformers_source()
 
