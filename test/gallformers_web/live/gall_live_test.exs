@@ -120,7 +120,8 @@ defmodule GallformersWeb.GallLiveTest do
       {:ok, view, _html} = live(conn, ~p"/gall/300")
 
       assert has_element?(view, "header", "seed oak apple")
-      assert has_element?(view, "#gall-names", "seed oak apple")
+      assert has_element?(view, "#gall-common-names button", "seed oak apple")
+      refute has_element?(view, "#gall-names", "seed oak apple")
       assert has_element?(view, "#gall-names", "Callirhytis seedii")
     end
 
@@ -208,10 +209,11 @@ defmodule GallformersWeb.GallLiveTest do
         })
     end
 
-    test "each category shows its Sources' terms; a waiting term shows as text", %{
-      conn: conn,
-      gall: gall
-    } do
+    test "each value is shown, its Sources' terms in who says so; a waiting term shows as text",
+         %{
+           conn: conn,
+           gall: gall
+         } do
       kinsey = source_fixture("Kinsey", "1959")
       weld = source_fixture("Weld", "1959")
 
@@ -224,16 +226,21 @@ defmodule GallformersWeb.GallLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
 
-      assert has_element?(view, "#gall-traits div", ~r/^\s*Shape\s*globular \(oval, ovoid\)\s*$/)
+      assert has_element?(view, "#gall-traits div", ~r/^\s*Shape\s*globular\s*$/)
       assert has_element?(view, "#gall-traits div", ~r/^\s*Color\s*red\s*$/)
 
       assert has_element?(
                view,
                "#gall-traits div",
-               ~r/^\s*Texture\s*hairless; also described as “reticulate”\s*$/
+               ~r/^\s*Texture\s*hairless\s*also described as “reticulate”\s*$/
              )
 
       assert has_element?(view, "#gall-traits div", ~r/^\s*Walls\s*described as “papery”\s*$/)
+
+      # The Sources' own words for the value, each in its block.
+      view |> element("#gall-traits button", "globular") |> render_click()
+      assert has_element?(view, "#fact-inspector [data-source='#{kinsey.id}']", "“ovoid”")
+      assert has_element?(view, "#fact-inspector [data-source='#{weld.id}']", "“oval”")
     end
   end
 
@@ -377,17 +384,23 @@ defmodule GallformersWeb.GallLiveTest do
   end
 
   describe "Host links" do
-    test "a species-rank Host links to its host page", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/gall/300")
+    test "a species-rank Host's page is linked from who says so", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/gall/300?fact=host:10")
 
-      assert has_element?(view, "a[href='/host/10']", "Notholithocarpus densiflorus")
+      assert has_element?(view, "#gall-hosts button", "Notholithocarpus densiflorus")
+      assert has_element?(view, "#fact-inspector [data-part=of] a[href='/host/10']", "Host page")
     end
 
-    test "a genus Host links to its genus page, marked genus-level", %{conn: conn} do
+    test "a genus Host is marked genus-level and links to its genus page", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/gall/304")
 
-      assert has_element?(view, "a[href='/genus/Notholithocarpus']", "(genus-level)")
-      assert has_element?(view, "a[href='/host/10']")
+      view |> element("#gall-hosts button", "(genus-level)") |> render_click()
+
+      assert has_element?(
+               view,
+               "#fact-inspector [data-part=of] a[href='/genus/Notholithocarpus']",
+               "Host page"
+             )
     end
   end
 

@@ -1,22 +1,17 @@
 defmodule GallformersWeb.GallLive.Editor do
   @moduledoc """
-  Edit mode's parts of the Gall page (matter ec2c; the order Jeff set:
-  Hosts and Traits first): the Inducer, the Hosts and the Traits, each
-  Fact with its Sources and its actions, as `GallformersWeb.GallLive`
-  shows them when a curator turns on Edit.
+  Edit mode's editorial parts of the Gall page (matter ec2c): the
+  editorial panel (completeness, abundance, the Gallformers code, the name
+  parts, the lead Source), the photos, the ID note and the range
+  exclusions' map. Each editorial change goes into the curator's tray
+  (`Gallformers.Curation`).
 
-  Every action adds an item to the curator's tray (`Gallformers.Curation`):
+  The Gall's Facts are edited through the Fact inspector
+  (`GallformersWeb.GallLive.FactActions`, matter `87a1`), not here, and Add
+  from observation is the inspector's (`GallformersWeb.GallLive.FromObservation`).
 
-    * a Host: Withdraw; Correct… (another plant in its place); Note…;
-    * the Inducer: Note… (correcting it is taxonomy, phase 2);
-    * a Trait value: ✕ withdraws it; a Trait's Add adds one;
-    * Add a host, found by name;
-    * Add from observation… (`GallformersWeb.ObservationIntake`, this Gall
-      given), opened from the page header's button beside the Edit toggle
-      (`open_observation`, targeted at this component).
-
-  What is already in the tray is marked on the page (`pending_for/2`). The
-  page refreshes this component when the tray changes elsewhere
+  What is already in the tray is marked beside its field (`pending_for/2`).
+  The page refreshes this component when the tray changes elsewhere
   (`send_update/3` with `refresh: true`).
   """
   use GallformersWeb, :live_component
@@ -25,42 +20,18 @@ defmodule GallformersWeb.GallLive.Editor do
   alias Gallformers.Curation
   alias Gallformers.Sources
   alias Gallformers.Taxa
-  alias GallformersWeb.FactKey
   alias GallformersWeb.GallNameParts
-
-  @traits [
-    {"Detachable", "detachable"},
-    {"Color", "color"},
-    {"Texture", "texture"},
-    {"Shape", "shape"},
-    {"Season", "season"},
-    {"Alignment", "alignment"},
-    {"Walls", "walls"},
-    {"Location", "plant_part"},
-    {"Form", "form"},
-    {"Cells", "cells"}
-  ]
 
   @impl true
   def mount(socket) do
     {:ok,
      assign(socket,
-       dialog: nil,
-       host_query: "",
-       host_results: [],
-       dialog_query: "",
-       dialog_results: [],
        code_dialog: nil,
        note_dialog: nil,
        name_dialog: nil,
-       observation_open: false,
        qualifier_query: "",
        qualifier_results: [],
-       abundances: Catalog.list_abundances(),
-       trait_options:
-         Map.new(Catalog.identify_options(), fn {trait, values} ->
-           {trait, Enum.map(values, & &1.value)}
-         end)
+       abundances: Catalog.list_abundances()
      )}
   end
 
@@ -72,7 +43,6 @@ defmodule GallformersWeb.GallLive.Editor do
       socket
       |> assign(id: assigns.id, gall: assigns.gall, curator: assigns.curator)
       |> assign(photos_open: Map.get(assigns, :photos_open, false))
-      |> assign(sources: source_labels(assigns.gall))
       |> load_record()
       |> load_pending()
 
@@ -95,97 +65,11 @@ defmodule GallformersWeb.GallLive.Editor do
     assign(socket, pending: Curation.pending_for(curator, {:gall, gall.id}))
   end
 
-  # Each attributing Source's short label, by ID: "Weld (1959)", the first
-  # author's surname and the year, else the title.
-  defp source_labels(gall) do
-    gall.attributions
-    |> Map.values()
-    |> List.flatten()
-    |> Enum.map(& &1.source_id)
-    |> Enum.uniq()
-    |> Sources.list_sources_by_id()
-    |> Map.new(&{&1.id, short_label(&1)})
-  end
-
-  defp short_label(%{author: author, pubyear: year}) when author not in [nil, ""] do
-    surname = author |> String.split([",", " "], trim: true) |> List.first()
-    if year in [nil, ""], do: surname, else: "#{surname} (#{year})"
-  end
-
-  defp short_label(source), do: source.title
-
   # -- events --------------------------------------------------------------------
-
-  @impl true
-  def handle_event("fact_action", %{"action" => "withdraw", "key" => key}, socket) do
-    {:noreply, with_key(socket, key, &add(socket, %{action: :withdraw, key: &1}))}
-  end
-
-  def handle_event("fact_action", %{"action" => action, "key" => key}, socket)
-      when action in ["correct", "note"] do
-    {:noreply,
-     with_key(socket, key, fn key ->
-       assign(socket,
-         dialog: %{action: String.to_existing_atom(action), key: key, label: label(socket, key)},
-         dialog_query: "",
-         dialog_results: []
-       )
-     end)}
-  end
-
-  def handle_event("close_dialog", _params, socket), do: {:noreply, assign(socket, dialog: nil)}
-
-  def handle_event("note", %{"text" => text}, socket) do
-    text = String.trim(text)
-    %{dialog: %{key: key}, gall: gall} = socket.assigns
-
-    if text == "" do
-      {:noreply, socket}
-    else
-      socket = tray(socket, %{kind: :note, gall_id: gall.id, key: key, text: text})
-      {:noreply, assign(socket, dialog: nil)}
-    end
-  end
-
-  def handle_event("search_dialog_plant", %{"value" => query}, socket),
-    do: {:noreply, assign(socket, dialog_query: query, dialog_results: plants(query))}
-
-  def handle_event("select_dialog_plant", %{"id" => id}, socket) do
-    %{dialog: %{key: key}} = socket.assigns
-    socket = add(socket, %{action: :correct, key: key, to: {:host, String.to_integer(id)}})
-    {:noreply, assign(socket, dialog: nil)}
-  end
-
-  def handle_event("clear_dialog_plant", _params, socket),
-    do: {:noreply, assign(socket, dialog_query: "", dialog_results: [])}
-
-  def handle_event("search_add_host", %{"value" => query}, socket),
-    do: {:noreply, assign(socket, host_query: query, host_results: plants(query))}
-
-  def handle_event("select_add_host", %{"id" => id}, socket) do
-    socket = add(socket, %{action: :add, key: {:host, String.to_integer(id)}})
-    {:noreply, assign(socket, host_query: "", host_results: [])}
-  end
-
-  def handle_event("clear_add_host", _params, socket),
-    do: {:noreply, assign(socket, host_query: "", host_results: [])}
-
-  def handle_event("add_trait", %{"trait" => trait, "value" => value}, socket)
-      when value != "" do
-    {:noreply, add(socket, %{action: :add, key: {:trait, trait, value}})}
-  end
-
-  def handle_event("add_trait", _params, socket), do: {:noreply, socket}
-
-  def handle_event("add_common_name", %{"name" => name}, socket) do
-    case String.trim(name) do
-      "" -> {:noreply, socket}
-      name -> {:noreply, add(socket, %{action: :add, key: {:alias, name}})}
-    end
-  end
 
   # -- the lead Source, photos and the ID note -----------------------------------------
 
+  @impl true
   def handle_event("lead_source", %{"default_source_id" => ""}, socket),
     do: {:noreply, editorial(socket, :default_source_id, nil)}
 
@@ -201,13 +85,6 @@ defmodule GallformersWeb.GallLive.Editor do
     do: {:noreply, push_patch(socket, to: "/gall/#{socket.assigns.gall.id}?edit")}
 
   def handle_event("open_note", _params, socket), do: {:noreply, load_notes(socket)}
-
-  # Add from observation (`GallformersWeb.ObservationIntake`), this Gall given.
-  def handle_event("open_observation", _params, socket),
-    do: {:noreply, assign(socket, observation_open: true)}
-
-  def handle_event("close_observation", _params, socket),
-    do: {:noreply, assign(socket, observation_open: false)}
 
   def handle_event("close_note", _params, socket),
     do: {:noreply, assign(socket, note_dialog: nil)}
@@ -403,16 +280,6 @@ defmodule GallformersWeb.GallLive.Editor do
     end
   end
 
-  defp with_key(socket, text, fun) do
-    case FactKey.decode(text) do
-      {:ok, key} -> fun.(key)
-      :error -> socket
-    end
-  end
-
-  defp add(socket, spec),
-    do: tray(socket, Map.merge(%{kind: :fact, gall_id: socket.assigns.gall.id}, spec))
-
   defp tray(socket, spec) do
     case Curation.add_item(socket.assigns.curator, spec) do
       {:ok, _item} -> load_pending(socket)
@@ -426,79 +293,16 @@ defmodule GallformersWeb.GallLive.Editor do
   defp refusal(:invalid_value), do: "That value isn't one of the Trait's."
   defp refusal(reason), do: "The change couldn't go in your tray (#{reason})."
 
+  # The plants a name's Host qualifier may be: species and below (a name
+  # is written "on" a plant).
   defp plants(query) do
     if String.length(String.trim(query)) >= 2, do: Taxa.search_plants(query, 20), else: []
   end
 
-  defp label(socket, {:host, id}), do: "host " <> host_name(socket.assigns.gall, id)
-  defp label(socket, {:inducer, id}), do: "inducer " <> inducer_name(socket.assigns.gall, id)
-  defp label(_socket, {:trait, trait, value}), do: "#{trait}: #{value}"
-  defp label(_socket, key), do: FactKey.encode(key)
-
-  defp host_name(gall, id),
-    do: Enum.find_value(gall.hosts, &(&1.taxon_id == id && &1.name)) || Taxa.accepted_name(id)
-
-  defp inducer_name(gall, id),
-    do: Enum.find_value(gall.inducers, &(&1.taxon_id == id && &1.name)) || Taxa.accepted_name(id)
-
   # -- what the page shows ---------------------------------------------------------
-
-  # The tray's mark for a key: its Fact item's action, else a note's.
-  defp pending(pending, key) do
-    case Map.get(pending, key, []) do
-      [] ->
-        nil
-
-      items ->
-        item = Enum.find(items, &(&1.kind == :fact)) || hd(items)
-        action = if item.kind == :fact, do: item.spec.action, else: :note
-        %{action: action, state: item.state}
-    end
-  end
-
-  # Hosts and Trait values the tray adds that the Gall doesn't have yet.
-  defp added(pending, match) do
-    for {key, items} <- pending,
-        match.(key),
-        Enum.any?(items, &(&1.kind == :fact and &1.spec.action == :add)),
-        do: key
-  end
-
-  defp sources(%{gall: gall, sources: labels}, key) do
-    gall.attributions
-    |> Map.get(key, [])
-    |> Enum.map(&labels[&1.source_id])
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq()
-  end
-
-  defp traits, do: @traits
 
   @impl true
   def render(assigns) do
-    host_ids = MapSet.new(assigns.gall.hosts, & &1.taxon_id)
-    values = assigns.gall.traits
-
-    assigns =
-      assign(assigns,
-        added_hosts:
-          added(assigns.pending, fn
-            {:host, id} -> not MapSet.member?(host_ids, id)
-            _ -> false
-          end),
-        added_names:
-          added(assigns.pending, fn
-            {:alias, name} -> name not in assigns.gall.common_names
-            _ -> false
-          end),
-        added_values: fn trait ->
-          added(assigns.pending, fn
-            {:trait, ^trait, value} -> value not in Map.get(values, trait, [])
-            _ -> false
-          end)
-        end
-      )
-
     ~H"""
     <div id={@id} class="flex flex-col gap-section">
       <.panel id="editorial" title="Editorial">
@@ -642,174 +446,6 @@ defmodule GallformersWeb.GallLive.Editor do
           name={@gall.name}
         />
       </.panel>
-
-      <.section title="Inducer">
-        <ul :if={@gall.inducers != []} class="flex flex-col divide-y divide-line">
-          <.fact_row
-            :for={inducer <- @gall.inducers}
-            fact_key={{:inducer, inducer.taxon_id}}
-            sources={sources(assigns, {:inducer, inducer.taxon_id})}
-            actions={[:note]}
-            pending={pending(@pending, {:inducer, inducer.taxon_id})}
-            target={@myself}
-          >
-            <.taxon_name name={inducer.name} />
-          </.fact_row>
-        </ul>
-        <p :if={@gall.inducers == []} class="text-ui text-muted">
-          No Inducer recorded: the Gall is undescribed.
-        </p>
-        <.edit_scope
-          :if={@gall.inducers != []}
-          kind={:elsewhere}
-          href={GallformersWeb.TaxonomyURL.inducer_path(hd(@gall.inducers), edit: true)}
-        >
-          Correcting the Inducer is taxonomy: on <i>{hd(@gall.inducers).name}</i>'s page.
-        </.edit_scope>
-      </.section>
-
-      <.section title="Hosts" count={length(@gall.hosts)}>
-        <ul class="flex flex-col divide-y divide-line">
-          <.fact_row
-            :for={host <- @gall.hosts}
-            fact_key={{:host, host.taxon_id}}
-            sources={sources(assigns, {:host, host.taxon_id})}
-            pending={pending(@pending, {:host, host.taxon_id})}
-            target={@myself}
-          >
-            <.taxon_name name={host.name} genus_placeholder={host.rank == :genus} />
-          </.fact_row>
-          <.fact_row
-            :for={{:host, id} = key <- @added_hosts}
-            fact_key={key}
-            pending={pending(@pending, key)}
-            target={@myself}
-          >
-            <.taxon_name name={Taxa.accepted_name(id)} />
-          </.fact_row>
-        </ul>
-        <.typeahead
-          id="add-host"
-          label="Add a host"
-          placeholder="A plant's name"
-          query={@host_query}
-          results={@host_results}
-          search_event="search_add_host"
-          select_event="select_add_host"
-          clear_event="clear_add_host"
-          display_fn={& &1.name}
-          target={@myself}
-          class="mt-2 max-w-md"
-        >
-          <:result :let={plant}><.taxon_name name={plant.name} /></:result>
-        </.typeahead>
-      </.section>
-
-      <.section title="Common names" count={length(@gall.common_names)}>
-        <ul class="flex flex-col divide-y divide-line">
-          <.fact_row
-            :for={name <- @gall.common_names}
-            fact_key={{:alias, name}}
-            sources={sources(assigns, {:alias, name})}
-            actions={[:withdraw, :note]}
-            pending={pending(@pending, {:alias, name})}
-            target={@myself}
-          >
-            {name}
-          </.fact_row>
-          <.fact_row
-            :for={{:alias, name} = key <- @added_names}
-            fact_key={key}
-            pending={pending(@pending, key)}
-            target={@myself}
-          >
-            {name}
-          </.fact_row>
-        </ul>
-        <form
-          id="add-common-name"
-          phx-submit="add_common_name"
-          phx-target={@myself}
-          class="mt-2 flex max-w-md items-end gap-2"
-        >
-          <div class="min-w-0 flex-1">
-            <label class="gf-label" for="add-common-name-name">Add a common name</label>
-            <input id="add-common-name-name" name="name" class="gf-input" autocomplete="off" />
-          </div>
-          <.button type="submit" variant="secondary">Add</.button>
-        </form>
-      </.section>
-
-      <.section id="gall-traits-section" title="Traits">
-        <dl class="flex flex-col divide-y divide-line text-ui">
-          <div
-            :for={{label, trait} <- traits()}
-            class="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5"
-          >
-            <dt class="w-24 shrink-0 text-meta text-muted">{label}</dt>
-            <dd class="flex flex-1 flex-wrap items-center gap-1.5">
-              <.fact_chip
-                :for={value <- Map.get(@gall.traits, trait, [])}
-                fact_key={{:trait, trait, value}}
-                sources={sources(assigns, {:trait, trait, value})}
-                pending={pending(@pending, {:trait, trait, value})}
-                target={@myself}
-              >
-                {value}
-              </.fact_chip>
-              <.fact_chip
-                :for={key <- @added_values.(trait)}
-                fact_key={key}
-                pending={pending(@pending, key)}
-              >
-                {elem(key, 2)}
-              </.fact_chip>
-              <form id={"add-trait-#{trait}"} phx-change="add_trait" phx-target={@myself}>
-                <input type="hidden" name="trait" value={trait} />
-                <select
-                  name="value"
-                  class="gf-select h-7 w-auto text-meta"
-                  aria-label={"Add a #{label} value"}
-                >
-                  <option value="">+ Add</option>
-                  <option
-                    :for={v <- Map.get(@trait_options, trait, []) -- Map.get(@gall.traits, trait, [])}
-                    value={v}
-                  >
-                    {v}
-                  </option>
-                </select>
-              </form>
-            </dd>
-          </div>
-        </dl>
-      </.section>
-
-      <.dialog
-        :if={@observation_open}
-        id="observation-dialog"
-        title="Add from observation"
-        size={:lg}
-        show
-        on_cancel={JS.push("close_observation", target: @myself)}
-      >
-        <.live_component
-          module={GallformersWeb.ObservationIntake}
-          id="observation-intake"
-          curator={@curator}
-          gall={%{id: @gall.id, name: @gall.name}}
-        />
-        <:actions>
-          <.button
-            type="button"
-            variant="secondary"
-            phx-click="close_observation"
-            phx-target={@myself}
-          >
-            Done
-          </.button>
-        </:actions>
-      </.dialog>
 
       <.dialog
         :if={@note_dialog}
@@ -986,49 +622,6 @@ defmodule GallformersWeb.GallLive.Editor do
           </.form>
         </div>
       </.dialog>
-
-      <.dialog
-        :if={@dialog}
-        id="fact-dialog"
-        title={dialog_title(@dialog)}
-        show
-        on_cancel={JS.push("close_dialog", target: @myself)}
-      >
-        <.typeahead
-          :if={@dialog.action == :correct}
-          id="fact-dialog-plant"
-          label="The plant it should be"
-          placeholder="A plant's name"
-          query={@dialog_query}
-          results={@dialog_results}
-          search_event="search_dialog_plant"
-          select_event="select_dialog_plant"
-          clear_event="clear_dialog_plant"
-          display_fn={& &1.name}
-          target={@myself}
-        >
-          <:result :let={plant}><.taxon_name name={plant.name} /></:result>
-        </.typeahead>
-        <form
-          :if={@dialog.action == :note}
-          id="fact-dialog-note"
-          phx-submit="note"
-          phx-target={@myself}
-          class="flex flex-col gap-block"
-        >
-          <div>
-            <label class="gf-label" for="fact-dialog-note-text">Note</label>
-            <textarea id="fact-dialog-note-text" name="text" rows="3" class="gf-textarea"></textarea>
-            <p class="gf-hint">Shown with the Fact. A note doesn't change what the Fact says.</p>
-          </div>
-          <div class="flex justify-end gap-2">
-            <.button type="button" variant="ghost" phx-click="close_dialog" phx-target={@myself}>
-              Cancel
-            </.button>
-            <.button type="submit" variant="primary">Add to tray</.button>
-          </div>
-        </form>
-      </.dialog>
     </div>
     """
   end
@@ -1055,7 +648,4 @@ defmodule GallformersWeb.GallLive.Editor do
 
   defp lock_reason({:locked, :no_sources}), do: "it has no Sources yet"
   defp lock_reason({:locked, :undescribed}), do: "it's undescribed (no species-rank Inducer)"
-
-  defp dialog_title(%{action: :correct, label: label}), do: "Correct the #{label}"
-  defp dialog_title(%{action: :note, label: label}), do: "A note on the #{label}"
 end

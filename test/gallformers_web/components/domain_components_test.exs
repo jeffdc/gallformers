@@ -28,6 +28,7 @@ defmodule GallformersWeb.DomainComponentsTest do
               id: 123,
               change: :added,
               what: "host: Quercus alba",
+              key: {:host, 7},
               gall: %{id: 821, name: "Callirhytis quercuscornigera"},
               taxon: nil
             },
@@ -35,6 +36,7 @@ defmodule GallformersWeb.DomainComponentsTest do
               id: 124,
               change: :withdrawn,
               what: "common name \"Horned oak gall\"",
+              key: nil,
               gall: nil,
               taxon: %{id: 40, name: "Quercus alba", rank: "species", kingdom: "Plantae"}
             }
@@ -72,11 +74,20 @@ defmodule GallformersWeb.DomainComponentsTest do
                "/genus/Andricus?edit"
              ]
 
+      # A Gall's Fact opens its inspector there (`?fact=`, matter 87a1).
       assert attr(html, "[data-part=facts] li:first-child a", "href") ==
-               ["/gall/821#fact-123", "/gall/821?edit#fact-123"]
+               ["/gall/821?fact=host:7", "/gall/821?edit&fact=host:7"]
 
       assert attr(html, "[data-part=facts] li:last-child a", "href") ==
                ["/host/40#fact-124", "/host/40?edit#fact-124"]
+    end
+
+    test "a Gall's Fact with no key of its own links the Gall" do
+      [fact | _] = change().facts
+      html = entry(%{change() | facts: [%{fact | key: nil}]})
+
+      assert attr(html, "[data-part=facts] li:first-child a", "href") ==
+               ["/gall/821", "/gall/821?edit"]
     end
 
     test "an inducer species links to its species page, and to it in Edit mode" do

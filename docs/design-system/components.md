@@ -34,14 +34,14 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `gall_name` | DomainComponents | Domain | Built | an undescribed Gall's placeholder name shown raw |
 | `gall_summary` | DomainComponents | Domain | Built | — |
 | `cynipid_mark` | DomainComponents | Domain | Built | — |
-| `fact_ref` | FactsComponents | Domain | Approved | the "in Facts" links and per-row Fact actions on pages in Edit mode |
-| `fact_inspector` | FactsComponents | Domain | Approved | the Gall page's Edit-mode Fact rows and chips, the Facts panel as the place to edit, `ObservationIntake`'s dialog |
+| `fact_ref` | FactsComponents | Domain | Built (Gall page; `proposed`) | the "in Facts" links and per-row Fact actions on pages in Edit mode |
+| `fact_inspector` | FactsComponents | Domain | Built (Gall page: reading, Edit mode, a new Fact, an observation; "Fix our reading…" to come) | the Gall page's Edit-mode Fact rows and chips, the Facts panel as the place to edit, `ObservationIntake`'s dialog (removed) |
 | `source_entry` | DomainComponents | Domain | Built | the Gall page's Further Information cards, `source_citation`, `source_list` |
 | `photo_viewer` | DomainComponents | Domain | Built | `image_gallery` and the ImageGallery hook (retired) |
 | `range_map` | DomainComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
 | `source_quote` | DomainComponents | Domain | Built | `blockquote` styling, review "The Source wrote" text |
 | `taxonomic_position` | FactsComponents | Domain | Built | — |
-| `button` | ActionComponents | Actions | Built | `button`, `edit_button`, `action_button`, `admin_edit_link`, 122 raw buttons |
+| `button` | ActionComponents | Actions | Built; extension Approved (`link`) | `button`, `edit_button`, `action_button`, `admin_edit_link`, 122 raw buttons |
 | `menu` | ActionComponents | Actions | Built | the header dropdowns, row-action menus |
 | `segmented_switch` | ActionComponents | Actions | Built | three hand copies of the rank pages' `view_switch` (rank pages, the image manager, the country drill-down) |
 | `tabs` | UIComponents | Navigation | Removed (unused) | — (page tabs are `tab_nav`; build in-page tabs anew if a page needs them) |
@@ -76,8 +76,8 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `chip_nav` | PageComponents | Navigation | Built | the Articles list's tag pills |
 | `link_tile` | PageComponents | Navigation | Built | — |
 | `change_entry` | DomainComponents | Domain | Built | — |
-| `edit_toggle`, `edit_scope`, `fact_row`, `fact_chip` | CurationComponents | Editing | Built (Gall page: Inducer, Hosts, Traits; plant page: Edit mode) | the admin's Gall and taxon edit screens, in time |
-| `change_tray`, `review_apply` | CurationComponents | Editing | Built (`GallformersWeb.TrayLive`, on every page) | — |
+| `edit_toggle`, `edit_scope` | CurationComponents | Editing | Built (Gall page and plant page: Edit mode; `fact_row` and `fact_chip` removed 2026-11-08, replaced by `fact_ref` and `fact_inspector`) | the admin's Gall and taxon edit screens, in time |
+| `change_tray`, `review_apply` | CurationComponents | Editing | Built (`GallformersWeb.TrayLive`, on every page); grouping by authority Approved | — |
 | `key_couplet` | KeyComponents | Domain | Built | `couplet`, `lead`, `destination_badge`, `lead_images` |
 | `key_path` | KeyComponents | Domain | Built | `path_tracker` |
 
@@ -272,15 +272,34 @@ Gallformers' stipple drawing of a cynipid wasp (`priv/static/images/cynipid_R.sv
 
 ### `fact_ref`
 
-A Fact-backed value on a page (an Inducer, a Host, a Trait value, a range place, a common name) as it reads to everyone: the value with a dotted underline (`decoration-line-strong`, darker on hover), hover text "Who says so?". Selecting it opens the `fact_inspector` on that Fact; the selected value sits on `bg-sky-soft`. A page with `fact_ref`s shows readers a dismissible hint once ("Underlined values show the Sources that state them"). In Edit mode the page doesn't change shape: each group gains one Add, nothing else. Design and build: matter `87a1`; mockup `/dev/mockups/fact-inspector/:id`.
+A Fact-backed value on a page (an Inducer, a Host, a Trait value, a range place, a common name) as it reads to everyone: the value with a dotted underline (`decoration-line-strong`, darker on hover), hover text "Who says so?". Selecting it opens the `fact_inspector` on that Fact; the selected value sits on `bg-sky-soft`. The dotted underline is `fact_ref`'s alone: nothing else on a page draws one (glossary terms are links: see `prose`). In Edit mode the page doesn't change shape: each group gains one Add (a `link` `button` with `ph-plus`: "Add a host"), and the Traits not recorded are each an add ("+ color"). Design and build: matter `87a1`; mockup `/dev/mockups/fact-inspector/:id`.
+
+```heex
+<.fact_ref fact={host} selected={@selected} on_select="select_fact" />
+```
+
+- A `<button>` with `aria-pressed` (selected or not) and `aria-controls` the inspector's id; it sends `on_select` with the Fact's key (`GallformersWeb.FactKey`: `host:7`).
+- Attributes: `fact` (required: a Fact from `Gallformers.Import.gall_facts/1`), `selected` (the selected key, or nil), `on_select` (required), `inspector` (the inspector's id, default `fact-inspector`), `target`; the inner block is the value, when the caller shows it differently from the Fact's own words (a Host's `taxon_name`).
+- **Approved state: `proposed`.** A value that isn't held yet but an open action would add (an observation's ticked proposals; an add in the tray): on `bg-sky-soft` with a "proposed" `chip` (`:info`, `:sm`) after it, no underline, not selectable. `<.fact_ref proposed text="recorded in Indiana" />`.
+- **Approved: the readers' hint.** A page with `fact_ref`s shows readers, once, "Underlined values show the Sources that state them. Select one to see who says so." with a Dismiss button (`ph-x`). Dismissing it is remembered in the browser by the `Dismissible` hook (`data-key`, `localStorage`; the server renders it hidden-until-checked so it never flashes). Not shown in Edit mode.
 
 ### `fact_inspector`
 
-Who says so, and in Edit mode what to do about it, for one Fact, beside the page: in the rail's place on wide screens, a bottom sheet on phones. The kind ("Host"), the value, what it is of ("A Host of *Diplolepis rosae*"), its standing ("Holds · Stated by 2 Sources", or "Unconfirmed" when only Gallformers' undated original data states it), then **Who says so**: one block per Source, the same template for each ("**{Source}** says so · date", its words as written, up to two quotes), Gallformers pinned first, the others newest first.
+Who says so, and in Edit mode what to do about it, for one Fact, beside the page: in the rail's place on wide screens (it takes the whole rail while a Fact is selected; closing it brings the rail back), a bottom sheet on phones. The kind ("Host"), the value, what it is of ("A Host of *Diplolepis rosae*"), its standing ("Holds · Stated by 2 Sources", or "Unconfirmed" when only Gallformers' undated original data states it), then **Who says so**: one block per Source, the same template for each ("**{Source}** says so · date", or "says it isn't so"; its words as written, each Source's own terms included; up to two quotes in `source_quote`, the rest counted), Gallformers pinned first ("original data, undated" for the old site's data), the others newest first. A Host's block of the Fact links its page.
 
-- **Edit mode** puts each action in its Source's block: Gallformers' has Change…, Deny…, Add a note… (and Confirm… when it hasn't stated the Fact); "Found an error in a Source reading?" reveals "Fix our reading…" on the others' blocks. Each opens a short form in the panel and adds to the tray.
-- **States:** a Fact; a new Fact (from a group's Add); an observation ("Add from observation…": the observation's card and grade, a warning when its taxon isn't the Gall's Inducer, its proposals ticked and previewed on the page, its photos, one "Add N to your tray").
-- Replaces the Edit-mode Fact rows and chips, the Facts panel as the place to edit (it stays as the full record), and the observation dialog. Design and build: matter `87a1`.
+```heex
+<.fact_inspector id="fact-inspector" fact={@fact} of={@gall} editing={@editing} on_close="close_fact" />
+```
+
+- Attributes: `id` (required; `aria-controls` of each `fact_ref`), `state` (`:fact` or `:new`; default `:fact`), `fact` (a Fact from `Gallformers.Import.gall_facts/1`, for `:fact`), `new` (what a new Fact will be, "Host", for `:new`: the head reads "New Host", then "For *Gall*"), `of` (the Gall: its name for "A Host of …"), `editing` (Gallformers' block is always shown, "Gallformers hasn't stated this" when it hasn't, holding the `actions`), `on_close` (required), `target`. Slots: `actions` (Edit mode: the page's actions and forms, in Gallformers' block; not rendered when reading), `inner_block` (the `:new` state's form). "Fix our reading…" on the other Sources' blocks comes with matter `87a1` task 9; the `:observation` state with task 10. On the Gall page the Edit-mode actions are `GallformersWeb.GallLive.FactActions`.
+- Placement: `gf-sheet` (below). The head has the kind and Close (`ph-x`, `on_close`).
+- **Edit mode** puts each action in its Source's block: Gallformers' has Change…, Deny…, Add a note… (and Confirm… when it hasn't stated the Fact; its block then reads "Gallformers hasn't stated this"); "Found an error in a Source reading?" (a `link` `button`) reveals "Fix our reading…" on the others' blocks. Each opens a short form in the panel (the value through the shared picker where there is one, and Why: an observation's link, a paper, a reason) and adds to the tray. While the Fact has a change in the tray, the Gallformers block says so ("In your tray: Deny the Host …") with Take out, in place of the actions.
+- **States:** a Fact; a new Fact (from a group's Add: the same form, no Sources yet); an observation ("Add from observation…": the observation's card and grade as a `chip`, a warning when its taxon isn't the Gall's Inducer naming its taxon and linking its Gall, "Not Research Grade" made clear, its proposals ticked, each New or Already held, and previewed on the page as `proposed` `fact_ref`s, a missing Host asked for, its photos, one "Add N to your tray").
+- Replaces the Edit-mode Fact rows and chips, the Facts panel as the place to edit (it stays as the full record, linked from the inspector), and the observation dialog. Design and build: matter `87a1`.
+
+#### Approved: `gf-sheet`
+
+The inspector's placement, as one class in `components.css` (`@layer components`), so no template needs arbitrary heights: on phones a bottom sheet (fixed to the foot, `rounded-t-panel`, `border-t border-line`, `shadow-float`, at most `--gf-sheet-max-h` tall, 70% of the viewport, scrolling inside); from `lg` a panel in the rail (`border-line`, flat), sticky under the header (`top-header` plus the section gap) and at most the viewport less the header tall (`--gf-sheet-rail-max-h`), scrolling inside. The two heights are tokens in `tokens.css` with a line in [foundations.md](foundations.md). While the sheet is open on a phone, the change tray sits above it, collapsed to its count.
 
 ### `source_entry`
 
@@ -327,6 +346,10 @@ One button, as a `<button>` or a link (`navigate`, `patch`, `href`).
 - Variants: `:primary` (maroon fill: one per region), `:secondary` (surface, line-strong border: the default), `:ghost` (no border, link color: low-emphasis actions), `:danger` (destructive, confirms through a dialog).
 - Attributes: `variant`, `icon`, `icon_only` (requires `label` for `aria-label`), `size` (`:default` follows density, `:sm`), `disabled`, `loading`.
 - Labels say exactly what happens ("Approve 9 notes", "Rename", "Add synonym").
+
+#### Approved extension: `link`
+
+A text action that reads as a link: link color, no border or fill, an optional leading icon at 1em, the meta or UI size of the text around it (`size`), underline on hover. For an action that sits in running content and must stay quiet beside it: a group's Add on a page with `fact_ref`s ("+ Add a host", "+ color"), "Found an error in a Source reading?". Not for navigation (use a link) or for a form's main action (use `:primary` or `:secondary`). Matter `87a1`.
 
 ### `menu`
 
@@ -563,7 +586,7 @@ A link to another part of the site as a small tile: an icon on a sky square, a n
 
 ### `prose`
 
-Running text: rendered Markdown (`markdown` attribute, through `Gallformers.Markdown`, glossary terms linked) or the page's own markup (inner block). Styles headings (Markdown's `#` and `##` both at section size, since the page header holds the `h1`), paragraphs, links, lists, quotes (serif), images and captions, tables (scrolling sideways when wide), code, rules and `details` from tokens. Glossary links keep the text's color with a dotted underline. It sets no width: put it in a `max-w-text` column. Attributes: `markdown`, `size` (`:sm` 14px, `:base` 16, `:lg` 18, `:xl` 20; the source reader's A−/A+ steps through them), `font` (`:sans`, `:serif` for ID Notes and Source text), `class`. Used by articles (`:lg`), Privacy (`:lg`), the Gall page's ID Notes (`:sm`, serif) and source reader, and the admin article preview (`:sm`). Replaces the Tailwind typography plugin.
+Running text: rendered Markdown (`markdown` attribute, through `Gallformers.Markdown`, glossary terms linked) or the page's own markup (inner block). Styles headings (Markdown's `#` and `##` both at section size, since the page header holds the `h1`), paragraphs, links, lists, quotes (serif), images and captions, tables (scrolling sideways when wide), code, rules and `details` from tokens. Glossary links keep the text's color with a dotted underline. **Approved change** (matter `87a1`, Jeff 2026-11-08): the dotted underline is `fact_ref`'s alone, so glossary terms here and the generation qualifier's `glossary_tooltip` ("(agamic)") become plain links to their glossary entry (`/glossary#word`), with the definition in a `tooltip` on hover and keyboard focus; the link still works on touch, where the tooltip doesn't show. It sets no width: put it in a `max-w-text` column. Attributes: `markdown`, `size` (`:sm` 14px, `:base` 16, `:lg` 18, `:xl` 20; the source reader's A−/A+ steps through them), `font` (`:sans`, `:serif` for ID Notes and Source text), `class`. Used by articles (`:lg`), Privacy (`:lg`), the Gall page's ID Notes (`:sm`, serif) and source reader, and the admin article preview (`:sm`). Replaces the Tailwind typography plugin.
 
 ### `article_card`
 
@@ -579,10 +602,11 @@ Curators edit on the pages themselves (matter ec2c). These take data in the chan
 
 - **`edit_toggle`**: in a page header, for admins: "Edit", or "Editing · Done" filled with the brand; a link to the page with `?edit` or without it. Attributes `editing`, `path`.
 - **`edit_scope`**: with Edit on, what isn't edited here. `:elsewhere` (↗, edited on another page: says where, with Open ↗) or `:follows` (ⓘ, follows from other data: says from what, muted). The Editing notice keys the three kinds: ✎ actions (edit here), ↗, ⓘ. Attributes `kind`, `href`, `class`.
-- **`fact_row`**: one Fact in a list with Edit on: what it says, the Sources stating it, and its actions (Withdraw, Correct…, Note…, as three text buttons) sending `fact_action` with the action and key. In the tray it shows "in your tray" (struck through when withdrawn) or, once submitted, "waiting to apply", and has no actions. Attributes `fact_key`, `sources`, `actions`, `pending`, `target` (a LiveComponent's, for the actions).
-- **`fact_chip`**: one value of a Trait with Edit on, as a chip: the value, its Sources as its title, ✕ to withdraw it (`fact_action`). In the tray it has no ✕: struck through when withdrawn, marked green (`data-pending`) when added. Attributes `fact_key`, `sources`, `pending`, `target`.
+- **`fact_row`** and **`fact_chip`**: removed on 2026-11-08 (matter `87a1`): the Gall page edits its Facts through `fact_ref` and `fact_inspector`.
 - **`change_tray`**: pinned at the foot of every page while the curator's tray holds changes: the count, the changes on one line, Discard (`tray_discard`; the page confirms) and Review and apply (`tray_review`). Attribute `summary` (`%{count, lines, oldest_at}`).
+  - **Approved: grouped by authority** (matter `d3b0`, `87a1`). Each change belongs to the authority it's made under: Gallformers (a Gallformers change), a Source whose reading is being fixed, or editorial. The bar shows the count, then one `chip` (`:neutral`, `:sm`) per group ("Gallformers · 3", "Readings fixed: Weld 1959 · 1", "Editorial · 2"), with Show/Hide for the list on narrow screens. `summary` gains `groups` (`[%{authority, title, short, count}]`). Applying makes one package per group.
 - **`review_apply`**: the body of the Review and apply dialog. Each change with its flags as chips (new ok; already held neutral; supersedes, changed since, needs confirmation warn; editorial and adds-statement info; needs a reason, blocked danger; each flag carries `data-flag` and `data-variant`), "I'm sure" for one needing confirmation (`toggle_confirm`), Apply for it alone (`apply_item`; not while it needs a reason, is blocked, awaits confirmation or is already submitted) and Take out (`remove_item`); under a Fact change with evidence of its own (Add from observation's), that evidence (`data-part="evidence"`: its text, its observations as links, its Source linked); the evidence for the Fact changes without their own, asked once and saying so (why, observations, a Source; `set_evidence`), not shown when every Fact change has its own; Apply all (`apply_all`). Attributes `id`, `items` (each may carry its own `evidence`: `%{text, observations, source}`), `evidence`, `confirmed`, and for the Source picker (a `typeahead` outside the evidence form: `search_evidence_source`, `select_evidence_source`, `clear_evidence_source`) `source`, `source_query`, `source_results`. Observations show as their links (iNaturalist, BugGuide), so a pasted link round-trips.
+  - **Approved: grouped by authority.** One `section` (level 3) per group, titled by its authority ("Gallformers", "Readings fixed: Weld 1959", "Editorial") with its count, each saying in one line what applying it does: "Applies as one Gallformers change: one package of the Gallformers Source, dated when you apply, audited as yours."; "Applies as one package of Weld 1959: under its authority, at its date; you and each misreading are audited."; "Not Facts: applied to the record itself, not as a package of any Source." Apply all applies every group; each item can still be applied alone.
 
 ### `key_couplet`
 

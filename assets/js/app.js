@@ -12,6 +12,7 @@ import AdminNav from "./hooks/admin_nav"
 import ArticleImageUpload from "./hooks/article_image_upload"
 import AutoDismiss from "./hooks/auto_dismiss"
 import ContentImageUpload from "./hooks/content_image_upload"
+import Dismissible from "./hooks/dismissible"
 import CopyToClipboard from "./hooks/copy_to_clipboard"
 import Palette from "./hooks/palette"
 import PhotoViewer from "./hooks/photo_viewer"
@@ -31,7 +32,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
-  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, ImageUpload, IndeterminateCheckbox, InputEvent, LeaveEdit, Palette, PhotoViewer, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, SourceReader, Typeahead},
+  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, Dismissible, ImageUpload, IndeterminateCheckbox, InputEvent, LeaveEdit, Palette, PhotoViewer, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, SourceReader, Typeahead},
 })
 
 // Show progress bar on live navigation and form submits

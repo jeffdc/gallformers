@@ -24,6 +24,26 @@ defmodule GallformersWeb.ActionComponentsTest do
       end
     end
 
+    test "link: a text action that reads as a link (87a1)" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(
+          ~H|<.button variant="link" icon="ph-plus" phx-click="add">Add a host</.button>|
+        )
+
+      assert count(html, "button.gf-btn.gf-btn-link[phx-click=add]") == 1
+      assert count(html, "button .ph-plus") == 1
+    end
+
+    test "every variant but secondary (the base .gf-btn) has its style" do
+      css = File.read!(Path.expand("../../../assets/css/system/components.css", __DIR__))
+
+      for variant <- ~w(primary ghost danger link) do
+        assert css =~ ".gf-btn-#{variant} {", "no .gf-btn-#{variant} rule in components.css"
+      end
+    end
+
     test "maps retiring variants onto the system's" do
       assigns = %{}
       html = rendered_to_string(~H|<.button variant="soft">Go</.button>|)

@@ -106,6 +106,23 @@ defmodule GallformersWeb.TrayLiveTest do
       assert has_element?(view, "#review-item-#{item.id} [data-flag=needs_reason]")
     end
 
+    test "a section per authority, each saying what applying it does (87a1)", ctx do
+      item = withdraw_host!(ctx)
+      {:ok, view, _html} = tray(ctx.conn)
+
+      assert has_element?(view, "#change-tray [data-authority=gallformers]", "Gallformers · 1")
+
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      assert has_element?(view, "#review [data-authority=gallformers] #review-item-#{item.id}")
+
+      assert has_element?(
+               view,
+               "#review [data-authority=gallformers] [data-part=applies]",
+               "one package of the Gallformers Source"
+             )
+    end
+
     test "a change taken out leaves the tray", ctx do
       item = withdraw_host!(ctx)
       {:ok, view, _html} = tray(ctx.conn)

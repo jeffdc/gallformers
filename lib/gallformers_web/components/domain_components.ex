@@ -20,6 +20,7 @@ defmodule GallformersWeb.DomainComponents do
 
   alias Gallformers.Catalog.GallName
   alias Gallformers.TaxonName
+  alias GallformersWeb.FactKey
   alias GallformersWeb.TaxonomyURL
   alias Phoenix.LiveView.JS
 
@@ -1242,13 +1243,20 @@ defmodule GallformersWeb.DomainComponents do
     end
   end
 
-  defp fact_view(%{gall: %{id: id}} = f), do: "/gall/#{id}#fact-#{f.id}"
+  # A Gall's Fact opens its inspector on the Gall's page (matter 87a1); one
+  # with no key (a description) opens the page.
+  defp fact_view(%{gall: %{id: id}} = f), do: "/gall/#{id}" <> fact_query(f, [])
   defp fact_view(%{taxon: %{} = t} = f), do: anchored(taxon_view(t), TaxonomyURL.taxon_path(t), f)
   defp fact_view(_), do: nil
 
-  defp fact_edit(%{gall: %{id: id}} = f), do: "/gall/#{id}?edit#fact-#{f.id}"
+  defp fact_edit(%{gall: %{id: id}} = f), do: "/gall/#{id}" <> fact_query(f, ["edit"])
   defp fact_edit(%{taxon: %{} = t} = f), do: anchored(taxon_edit(t), TaxonomyURL.taxon_path(t), f)
   defp fact_edit(_), do: nil
+
+  defp fact_query(fact, params) do
+    params = params ++ if(fact[:key], do: ["fact=" <> FactKey.param(fact.key)], else: [])
+    if params == [], do: "", else: "?" <> Enum.join(params, "&")
+  end
 
   # A Fact on a taxon's own page is anchored there; a search or the taxonomy
   # admin isn't.

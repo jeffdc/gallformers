@@ -56,6 +56,21 @@
   }
   .gf-btn-ghost:hover:not(:disabled) { background: var(--gf-sky-soft); color: var(--gf-link-hover); }
 
+  /* link (87a1): a quiet text action in running content ("+ Add a host"):
+     link color, no border or fill, the size of the text around it. */
+  .gf-btn-link {
+    height: auto;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--gf-link);
+    font-size: inherit;
+    font-weight: 400;
+    line-height: inherit;
+    gap: 0.25rem;
+  }
+  .gf-btn-link:hover:not(:disabled) { color: var(--gf-link-hover); text-decoration: underline; }
+
   .gf-btn-danger { color: var(--gf-danger); }
   .gf-btn-danger:hover:not(:disabled) {
     background: var(--gf-danger-bg);
@@ -66,6 +81,7 @@
   .gf-btn-sm { height: 1.75rem; padding: 0 0.5rem; font-size: var(--gf-fs-meta); }
   .gf-btn-icon { width: var(--gf-ctl-h); padding: 0; }
   .gf-btn-sm.gf-btn-icon { width: 1.75rem; }
+  .gf-btn-sm.gf-btn-link { height: auto; padding: 0; }
   /* lg and pill are retiring: they render as the default size and shape */
   .gf-btn-lg, .gf-btn-pill { /* no change */ }
 
@@ -174,6 +190,38 @@
     .gf-with-rail:has(> aside[data-width="wide"]) { grid-template-columns: minmax(0, 1fr) 420px; column-gap: 2.5rem; }
     .gf-with-rail:has(> aside[data-width="narrow"]) { grid-template-columns: minmax(0, 1fr) 300px; column-gap: 2.25rem; }
     .gf-with-rail > aside[data-stack="first"] { order: 0; }
+  }
+
+  /* ---------------------------------------------------------------------
+     gf-sheet (FactsComponents.fact_inspector's placement, matter 87a1):
+     on phones a bottom sheet over the page's foot; from lg a panel in the
+     rail, sticky under the header. It scrolls inside at both sizes.
+     --------------------------------------------------------------------- */
+  .gf-sheet {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    max-height: var(--gf-sheet-max-h);
+    overflow-y: auto;
+    padding: var(--gf-pad-panel);
+    background: var(--gf-surface);
+    border-top: 1px solid var(--gf-line);
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    box-shadow: var(--gf-shadow-float);
+  }
+  @media (min-width: 1024px) {
+    .gf-sheet {
+      position: sticky;
+      top: calc(var(--spacing-header) + var(--gf-gap-block));
+      z-index: auto;
+      max-height: var(--gf-sheet-rail-max-h);
+      border: 1px solid var(--gf-line);
+      border-radius: var(--radius-panel);
+      box-shadow: none;
+    }
   }
 
   /* ---------------------------------------------------------------------

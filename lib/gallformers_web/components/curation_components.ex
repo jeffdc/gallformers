@@ -1,24 +1,24 @@
 defmodule GallformersWeb.CurationComponents do
   @moduledoc """
   Inline editing (design system, matters bc0d and ec2c): `edit_toggle`,
-  `edit_scope`, `fact_row`, `fact_chip`, `change_tray` and `review_apply`.
+  `edit_scope`, `change_tray` and `review_apply`. A Fact is edited through
+  the Fact inspector (`GallformersWeb.FactsComponents.fact_inspector/1`,
+  matter `87a1`).
 
   They take data in the change-set contract's shapes (`Gallformers.Curation`,
   matter ec2c): items with their display text and flags, each flag
   `%{kind: atom, text: String.t()}` with its words from the back end. Their
-  events go to the page (or the tray's LiveView): `fact_action`,
-  `tray_review`, `tray_discard`, `remove_item`, `apply_item`, `apply_all`,
-  `toggle_confirm`, `set_evidence`. Fact keys travel as strings
-  (`GallformersWeb.FactKey`).
+  events go to the page (or the tray's LiveView): `tray_review`, `tray_discard`, `remove_item`, `apply_item`, `apply_all`,
+  `toggle_confirm`, `set_evidence`.
   """
   use Phoenix.Component
+
+  alias Phoenix.LiveView.JS
 
   import GallformersWeb.ActionComponents, only: [button: 1]
   import GallformersWeb.CoreComponents, only: [icon: 1]
   import GallformersWeb.DataComponents, only: [chip: 1]
   import GallformersWeb.FormComponents, only: [typeahead: 1]
-
-  alias GallformersWeb.FactKey
 
   @doc """
   Edit mode's switch in a page header: "Edit" (off) or "Editing · Done"
@@ -79,113 +79,10 @@ defmodule GallformersWeb.CurationComponents do
   end
 
   @doc """
-  One Fact with Edit on, in a list: what it says (the inner block), the
-  Sources stating it, and its actions (`:withdraw`, `:correct`, `:note`),
-  each sending `fact_action` with its action and key. Once in the tray
-  (`pending`: `%{action, state: :in_tray | :waiting}`) it is marked, struck
-  through when withdrawn, and has no actions.
-  """
-  attr :fact_key, :any, required: true, doc: "the Fact's key (`GallformersWeb.FactKey`)"
-  attr :sources, :list, default: []
-  attr :actions, :list, default: [:withdraw, :correct, :note]
-  attr :pending, :map, default: nil
-  attr :target, :any, default: nil, doc: "phx-target for the actions (a LiveComponent's)"
-  slot :inner_block, required: true
-
-  def fact_row(assigns) do
-    assigns = assign(assigns, :key, FactKey.encode(assigns.fact_key))
-
-    ~H"""
-    <li
-      id={"fact-" <> String.replace(@key, ~r/[^a-zA-Z0-9]+/, "-")}
-      class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5"
-    >
-      <span
-        data-part="fact"
-        class={["text-ui", @pending && @pending.action == :withdraw && "text-muted line-through"]}
-      >
-        {render_slot(@inner_block)}
-      </span>
-      <span data-part="sources" class="min-w-0 flex-1 truncate text-meta text-muted">
-        {Enum.join(@sources, " · ")}
-      </span>
-      <span :if={@pending} data-part="pending">
-        <.chip variant={:info} size="sm">{pending_word(@pending.state)}</.chip>
-      </span>
-      <span :if={!@pending} class="flex gap-1">
-        <.button
-          :for={action <- @actions}
-          variant="ghost"
-          size="sm"
-          phx-click="fact_action"
-          phx-value-action={action}
-          phx-value-key={@key}
-          phx-target={@target}
-        >
-          {action_label(action)}
-        </.button>
-      </span>
-    </li>
-    """
-  end
-
-  @doc """
-  One value of a Trait with Edit on, as a chip: the value (the inner
-  block), its Sources as its title, and ✕ to withdraw it (`fact_action`,
-  action `withdraw`). In the tray (`pending`: `%{action, state}`) it has no
-  ✕: struck through when withdrawn, marked (`data-pending`) when added.
-  """
-  attr :fact_key, :any, required: true, doc: "the Fact's key (`GallformersWeb.FactKey`)"
-  attr :sources, :list, default: []
-  attr :pending, :map, default: nil
-  attr :target, :any, default: nil, doc: "phx-target for ✕ (a LiveComponent's)"
-  slot :inner_block, required: true
-
-  def fact_chip(assigns) do
-    assigns = assign(assigns, :key, FactKey.encode(assigns.fact_key))
-
-    ~H"""
-    <span
-      id={"fact-" <> String.replace(@key, ~r/[^a-zA-Z0-9]+/, "-")}
-      title={@sources != [] && Enum.join(@sources, " · ")}
-      data-pending={@pending && to_string(@pending.action)}
-      class={[
-        "inline-flex items-center gap-1 rounded-ctl border px-2 py-0.5 text-ui",
-        cond do
-          @pending && @pending.action == :withdraw -> "border-line bg-surface text-muted line-through"
-          @pending -> "border-ok bg-ok-bg text-ok"
-          true -> "border-line bg-surface text-ink"
-        end
-      ]}
-    >
-      {render_slot(@inner_block)}
-      <button
-        :if={!@pending}
-        type="button"
-        phx-click="fact_action"
-        phx-value-action="withdraw"
-        phx-value-key={@key}
-        phx-target={@target}
-        aria-label="Withdraw"
-        class="text-muted hover:text-danger"
-      >
-        <.icon name="ph-x" class="size-3" />
-      </button>
-    </span>
-    """
-  end
-
-  defp pending_word(:waiting), do: "waiting to apply"
-  defp pending_word(_), do: "in your tray"
-
-  defp action_label(:withdraw), do: "Withdraw"
-  defp action_label(:correct), do: "Correct…"
-  defp action_label(:note), do: "Note…"
-
-  @doc """
   The curator's tray, pinned at the foot of every page while it holds
-  changes (`summary`: `%{count, lines, oldest_at}`): the count, the
-  changes, Discard (`tray_discard`, confirmed by the page) and Review and
+  changes (`summary`: `%{count, lines, oldest_at, groups}`): the count, a
+  chip per authority ("Gallformers · 3", matter `87a1`), the changes (on a
+  phone behind "Show the changes"), Discard (`tray_discard`, confirmed by the page) and Review and
   apply (`tray_review`). Nothing when empty.
   """
   attr :summary, :map, default: nil
@@ -201,9 +98,27 @@ defmodule GallformersWeb.CurationComponents do
         <span data-part="count" class="font-semibold text-ink">
           {@summary.count} {if @summary.count == 1, do: "change", else: "changes"} in your tray
         </span>
-        <span data-part="lines" class="min-w-0 flex-1 truncate text-meta text-muted">
+        <span data-part="groups" class="flex flex-wrap gap-1.5">
+          <span :for={group <- Map.get(@summary, :groups, [])} data-authority={group.authority}>
+            <.chip variant={:neutral} size="sm">{group.short} · {group.count}</.chip>
+          </span>
+        </span>
+        <span
+          id="change-tray-lines"
+          data-part="lines"
+          class="order-last hidden w-full min-w-0 truncate text-meta text-muted md:order-none md:block md:w-auto md:flex-1"
+        >
           {Enum.join(@summary.lines, " · ")}
         </span>
+        <.button
+          variant="ghost"
+          size="sm"
+          class="md:hidden"
+          data-part="toggle-lines"
+          phx-click={JS.toggle_class("hidden", to: "#change-tray-lines")}
+        >
+          Show the changes
+        </.button>
         <.button variant="ghost" size="sm" phx-click="tray_discard">Discard</.button>
         <.button variant="primary" size="sm" phx-click="tray_review">Review and apply</.button>
       </div>
@@ -229,6 +144,12 @@ defmodule GallformersWeb.CurationComponents do
       "maps with `id`, `kind`, `text`, `flags`, optional `state` and `evidence` " <>
         "(the item's own: `%{text, observations, source}`, `source` `%{id, title}` or nil)"
 
+  attr :groups, :list,
+    default: nil,
+    doc:
+      "the authorities (`Gallformers.Curation.summary/1`'s `groups`): a section each, " <>
+        "its items those with its `authority`; nil for one list"
+
   attr :evidence, :map, required: true, doc: "`%{text, observations, source_id}`"
   attr :confirmed, :list, default: []
   attr :source, :map, default: nil, doc: "the Source chosen as evidence: `%{id, title}`"
@@ -238,79 +159,25 @@ defmodule GallformersWeb.CurationComponents do
   def review_apply(assigns) do
     ~H"""
     <div id={@id} class="flex flex-col gap-section">
-      <ul class="flex flex-col divide-y divide-line">
-        <li :for={item <- @items} id={"#{@id}-item-#{item.id}"} class="flex flex-col gap-1.5 py-2">
-          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span data-part="text" class="min-w-0 flex-1 text-ui text-ink">{item.text}</span>
-            <span :if={item[:state] == :waiting} data-part="state" class="text-meta text-muted">
-              Waiting to apply
-            </span>
-            <.button
-              variant="ghost"
-              size="sm"
-              phx-click="apply_item"
-              phx-value-id={item.id}
-              disabled={not appliable?(item, @confirmed)}
-            >
-              Apply
-            </.button>
-            <button
-              type="button"
-              phx-click="remove_item"
-              phx-value-id={item.id}
-              class="text-muted hover:text-danger"
-              aria-label={"Take out: #{item.text}"}
-            >
-              <.icon name="ph-x" class="size-4" />
-            </button>
-          </div>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span
-              :for={flag <- item.flags}
-              data-flag={flag.kind}
-              data-variant={flag_variant(flag.kind)}
-            >
-              <.chip variant={flag_variant(flag.kind)} size="sm">{flag.text}</.chip>
-            </span>
-            <label
-              :if={needs?(item, :needs_confirmation)}
-              class="flex items-center gap-1.5 text-meta text-ink-2"
-            >
-              <input
-                type="checkbox"
-                class="gf-checkbox"
-                phx-click="toggle_confirm"
-                phx-value-id={item.id}
-                checked={item.id in @confirmed}
-              /> I'm sure
-            </label>
-          </div>
-          <div
-            :if={item[:evidence]}
-            data-part="evidence"
-            class="flex flex-col gap-0.5 text-meta text-ink-2"
-          >
-            <span class="text-muted">Its own evidence</span>
-            <span :if={item.evidence.text}>{item.evidence.text}</span>
-            <span :if={item.evidence.observations != []} class="flex flex-wrap gap-x-3">
-              <a
-                :for={observation <- item.evidence.observations}
-                href={observation_url(observation)}
-                target="_blank"
-                rel="noopener"
-              >
-                {observation_url(observation)}
-              </a>
-            </span>
-            <span :if={item.evidence.source}>
-              Source:
-              <a href={"/source/#{item.evidence.source.id}"} target="_blank" rel="noopener">
-                {item.evidence.source.title}
-              </a>
-            </span>
-          </div>
-        </li>
-      </ul>
+      <%= if @groups do %>
+        <section
+          :for={group <- @groups}
+          data-authority={group.authority}
+          class="flex flex-col gap-1"
+        >
+          <h3 class="flex items-baseline gap-2 text-subsection">
+            {group.title}<span class="text-meta font-normal text-muted">{group.count}</span>
+          </h3>
+          <p data-part="applies" class="text-meta text-muted">{group.applies}</p>
+          <.review_items
+            id={@id}
+            items={Enum.filter(@items, &(&1[:authority] == group.authority))}
+            confirmed={@confirmed}
+          />
+        </section>
+      <% else %>
+        <.review_items id={@id} items={@items} confirmed={@confirmed} />
+      <% end %>
 
       <form
         :if={shared_evidence?(@items)}
@@ -362,6 +229,89 @@ defmodule GallformersWeb.CurationComponents do
         </.button>
       </div>
     </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :items, :list, required: true
+  attr :confirmed, :list, required: true
+
+  # Review's changes, each with its flags, Apply and Take out.
+  defp review_items(assigns) do
+    ~H"""
+    <ul class="flex flex-col divide-y divide-line">
+      <li :for={item <- @items} id={"#{@id}-item-#{item.id}"} class="flex flex-col gap-1.5 py-2">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span data-part="text" class="min-w-0 flex-1 text-ui text-ink">{item.text}</span>
+          <span :if={item[:state] == :waiting} data-part="state" class="text-meta text-muted">
+            Waiting to apply
+          </span>
+          <.button
+            variant="ghost"
+            size="sm"
+            phx-click="apply_item"
+            phx-value-id={item.id}
+            disabled={not appliable?(item, @confirmed)}
+          >
+            Apply
+          </.button>
+          <button
+            type="button"
+            phx-click="remove_item"
+            phx-value-id={item.id}
+            class="text-muted hover:text-danger"
+            aria-label={"Take out: #{item.text}"}
+          >
+            <.icon name="ph-x" class="size-4" />
+          </button>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span
+            :for={flag <- item.flags}
+            data-flag={flag.kind}
+            data-variant={flag_variant(flag.kind)}
+          >
+            <.chip variant={flag_variant(flag.kind)} size="sm">{flag.text}</.chip>
+          </span>
+          <label
+            :if={needs?(item, :needs_confirmation)}
+            class="flex items-center gap-1.5 text-meta text-ink-2"
+          >
+            <input
+              type="checkbox"
+              class="gf-checkbox"
+              phx-click="toggle_confirm"
+              phx-value-id={item.id}
+              checked={item.id in @confirmed}
+            /> I'm sure
+          </label>
+        </div>
+        <div
+          :if={item[:evidence]}
+          data-part="evidence"
+          class="flex flex-col gap-0.5 text-meta text-ink-2"
+        >
+          <span class="text-muted">Its own evidence</span>
+          <span :if={item.evidence.text}>{item.evidence.text}</span>
+          <span :if={item.evidence.observations != []} class="flex flex-wrap gap-x-3">
+            <a
+              :for={observation <- item.evidence.observations}
+              href={observation_url(observation)}
+              target="_blank"
+              rel="noopener"
+            >
+              {observation_url(observation)}
+            </a>
+          </span>
+          <span :if={item.evidence.source}>
+            Source:
+            <a href={"/source/#{item.evidence.source.id}"} target="_blank" rel="noopener">
+              {item.evidence.source.title}
+            </a>
+          </span>
+        </div>
+      </li>
+    </ul>
     """
   end
 

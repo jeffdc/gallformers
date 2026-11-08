@@ -63,126 +63,6 @@ defmodule GallformersWeb.CurationComponentsTest do
     end
   end
 
-  describe "fact_row" do
-    test "a Fact, the Sources stating it, and its actions, each sending its key" do
-      assigns = %{}
-
-      html =
-        rendered_to_string(~H"""
-        <ul>
-          <.fact_row
-            fact_key={{:host, 7}}
-            sources={["Weld (1959)", "Felt (1940)"]}
-            actions={[:withdraw, :correct, :note]}
-          >
-            Quercus alba
-          </.fact_row>
-        </ul>
-        """)
-
-      assert attr(html, "li", "id") == ["fact-host-7"]
-      assert text(html, "[data-part=fact]") == "Quercus alba"
-      assert text(html, "[data-part=sources]") == "Weld (1959) · Felt (1940)"
-
-      assert attr(html, "button[phx-click=fact_action]", "phx-value-action") ==
-               ~w(withdraw correct note)
-
-      assert attr(html, "button[phx-click=fact_action]", "phx-value-key") |> Enum.uniq() == [
-               "host:7"
-             ]
-    end
-
-    test "in the tray: marked, struck through when withdrawn, no actions" do
-      assigns = %{}
-
-      html =
-        rendered_to_string(~H"""
-        <ul>
-          <.fact_row fact_key={{:host, 7}} pending={%{action: :withdraw, state: :in_tray}}>
-            Quercus alba
-          </.fact_row>
-        </ul>
-        """)
-
-      assert text(html, "[data-part=pending]") == "in your tray"
-      assert count(html, "[data-part=fact].line-through") == 1
-      assert count(html, "button[phx-click=fact_action]") == 0
-    end
-
-    test "submitted: waiting for its outcome" do
-      assigns = %{}
-
-      html =
-        rendered_to_string(~H"""
-        <ul>
-          <.fact_row fact_key={{:host, 7}} pending={%{action: :add, state: :waiting}}>
-            Quercus alba
-          </.fact_row>
-        </ul>
-        """)
-
-      assert text(html, "[data-part=pending]") == "waiting to apply"
-    end
-  end
-
-  describe "fact_chip" do
-    test "a Trait value: its Sources as its title, ✕ withdraws it" do
-      assigns = %{}
-
-      html =
-        rendered_to_string(~H"""
-        <.fact_chip fact_key={{:trait, "season", "Spring"}} sources={["Weld (1959)"]} target="#ed">
-          Spring
-        </.fact_chip>
-        """)
-
-      assert attr(html, "span#fact-trait-season-Spring", "title") == ["Weld (1959)"]
-      assert attr(html, "button[phx-click=fact_action]", "phx-value-action") == ["withdraw"]
-
-      assert attr(html, "button[phx-click=fact_action]", "phx-value-key") == [
-               "trait:season:Spring"
-             ]
-
-      assert attr(html, "button[phx-click=fact_action]", "phx-target") == ["#ed"]
-    end
-
-    test "withdrawn in the tray: struck through; added in the tray: marked; neither has ✕" do
-      assigns = %{}
-
-      html =
-        rendered_to_string(~H"""
-        <.fact_chip
-          fact_key={{:trait, "season", "Spring"}}
-          pending={%{action: :withdraw, state: :in_tray}}
-        >
-          Spring
-        </.fact_chip>
-        <.fact_chip fact_key={{:trait, "season", "Summer"}} pending={%{action: :add, state: :in_tray}}>
-          Summer
-        </.fact_chip>
-        """)
-
-      assert count(html, "#fact-trait-season-Spring.line-through") == 1
-      assert count(html, "#fact-trait-season-Summer[data-pending]") == 1
-      assert count(html, "button") == 0
-    end
-  end
-
-  describe "fact_row's target" do
-    test "its actions go to the given target" do
-      assigns = %{}
-
-      html =
-        rendered_to_string(~H"""
-        <ul>
-          <.fact_row fact_key={{:host, 7}} target="#ed">Quercus alba</.fact_row>
-        </ul>
-        """)
-
-      assert attr(html, "button[phx-click=fact_action]", "phx-target") |> Enum.uniq() == ["#ed"]
-    end
-  end
-
   describe "change_tray" do
     test "nothing in the tray: nothing shown" do
       assigns = %{}
@@ -212,6 +92,99 @@ defmodule GallformersWeb.CurationComponentsTest do
 
       assert count(html, "#change-tray button[phx-click=tray_discard]") == 1
       assert count(html, "#change-tray button[phx-click=tray_review]") == 1
+    end
+  end
+
+  describe "change_tray, by authority (87a1)" do
+    test "one chip per authority with its count, the list shown or hidden on a phone" do
+      assigns = %{
+        summary: %{
+          count: 3,
+          lines: ["a", "b", "c"],
+          oldest_at: nil,
+          groups: [
+            %{
+              authority: :gallformers,
+              short: "Gallformers",
+              title: "Gallformers",
+              count: 2,
+              applies: ""
+            },
+            %{
+              authority: :editorial,
+              short: "Editorial",
+              title: "Editorial",
+              count: 1,
+              applies: ""
+            }
+          ]
+        }
+      }
+
+      html = rendered_to_string(~H|<.change_tray summary={@summary} />|)
+
+      assert html
+             |> query("#change-tray [data-part=groups] [data-authority]")
+             |> Enum.map(&LazyHTML.text/1)
+             |> Enum.map(&String.trim/1) ==
+               ["Gallformers · 2", "Editorial · 1"]
+
+      assert count(html, "#change-tray button[data-part=toggle-lines]") == 1
+    end
+  end
+
+  describe "review_apply, by authority (87a1)" do
+    test "a section per authority: its title and count, what applying it does, its changes" do
+      assigns = %{
+        items: [
+          %{
+            id: 1,
+            kind: :fact,
+            text: "Deny host: Quercus alba",
+            flags: [],
+            authority: :gallformers
+          },
+          %{id: 3, kind: :editorial, text: "Abundance: common", flags: [], authority: :editorial},
+          %{id: 2, kind: :fact, text: "Add color: red", flags: [], authority: :gallformers}
+        ],
+        groups: [
+          %{
+            authority: :gallformers,
+            title: "Gallformers",
+            short: "Gallformers",
+            count: 2,
+            applies: "Applies as one Gallformers change."
+          },
+          %{
+            authority: :editorial,
+            title: "Editorial",
+            short: "Editorial",
+            count: 1,
+            applies: "Not Facts."
+          }
+        ]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.review_apply
+          id="review"
+          items={@items}
+          groups={@groups}
+          evidence={%{text: "", observations: [], source_id: nil}}
+        />
+        """)
+
+      gallformers = "#review [data-authority=gallformers]"
+      assert text(html, "#{gallformers} h3") =~ "Gallformers"
+
+      assert text(html, "#{gallformers} [data-part=applies]") ==
+               "Applies as one Gallformers change."
+
+      assert count(html, "#{gallformers} #review-item-1") == 1
+      assert count(html, "#{gallformers} #review-item-2") == 1
+      assert count(html, "#review [data-authority=editorial] #review-item-3") == 1
+      assert text(html, "#review [data-authority=editorial] [data-part=applies]") == "Not Facts."
     end
   end
 

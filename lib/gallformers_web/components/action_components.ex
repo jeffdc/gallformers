@@ -10,7 +10,7 @@ defmodule GallformersWeb.ActionComponents do
 
   alias Phoenix.LiveView.JS
 
-  @variants ~w(primary secondary ghost danger)
+  @variants ~w(primary secondary ghost danger link)
   # Retiring values from the old button, still passed by unmigrated templates.
   @retiring %{"soft" => "secondary", "warning" => "secondary"}
 
@@ -19,7 +19,8 @@ defmodule GallformersWeb.ActionComponents do
 
   Variants: `primary` (maroon fill, one per region), `secondary` (the
   default), `ghost` (low emphasis, link color), `danger` (destructive; confirm
-  through a dialog). Height follows the density context; `size="sm"` is a
+  through a dialog), `link` (a quiet text action in running content: "+ Add
+  a host"; not for navigation). Height follows the density context; `size="sm"` is a
   compact button for dense rows.
 
   Labels say exactly what happens: "Approve 9 notes", "Add synonym".

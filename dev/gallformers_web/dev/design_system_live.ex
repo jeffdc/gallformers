@@ -24,7 +24,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_ref fact_inspector review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
        sample_view: "photos",
        sample_choice: "0",
        sample_selected: MapSet.new([2]),
@@ -605,31 +605,55 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
         </.example>
 
         <.example
-          id="fact_row"
-          title="fact_row"
+          :let={theme}
+          id="fact_ref"
+          title="fact_ref"
           code={
             ~S'''
-            <.fact_row fact_key={{:host, h.taxon_id}} sources={@sources[key]} pending={@pending[key]}>
-              <.taxon_name name={h.name} />
-            </.fact_row>
+            <FactsComponents.fact_ref :for={host <- @facts.hosts} fact={host}
+              selected={@selected} on_select="select_fact" />
+            <FactsComponents.fact_ref proposed text="recorded in Indiana" />
             '''
           }
         >
-          <ul class="flex max-w-form flex-col divide-y divide-line">
-            <.fact_row fact_key={{:host, 1}} sources={["Weld (1959)", "Felt (1940)"]}>
-              <.taxon_name name="Quercus alba" />
-            </.fact_row>
-            <.fact_row
-              fact_key={{:host, 2}}
-              sources={["Gallformers legacy data"]}
-              pending={%{action: :withdraw, state: :in_tray}}
+          <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <GallformersWeb.FactsComponents.fact_ref
+              fact={sample_fact()}
+              on_select="noop"
+              inspector={"fact-inspector-#{theme}"}
+            />
+            <GallformersWeb.FactsComponents.fact_ref
+              fact={%{sample_fact() | key: {:host, 2}}}
+              selected={{:host, 2}}
+              on_select="noop"
+              inspector={"fact-inspector-#{theme}"}
             >
-              <.taxon_name name="Quercus bicolor" />
-            </.fact_row>
-            <.fact_row fact_key={{:host, 3}} pending={%{action: :add, state: :waiting}}>
-              <.taxon_name name="Quercus macrocarpa" />
-            </.fact_row>
-          </ul>
+              <.taxon_name name="Rosa blanda" />
+            </GallformersWeb.FactsComponents.fact_ref>
+            <GallformersWeb.FactsComponents.fact_ref proposed text="recorded in Indiana" />
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="fact_inspector"
+          title="fact_inspector"
+          code={
+            ~S'''
+            <FactsComponents.fact_inspector :if={@fact} id="fact-inspector" fact={@fact}
+              of={@gall} on_close="close_fact" />
+            '''
+          }
+        >
+          <%!-- transform-gpu holds the sheet (fixed on phones) inside the example --%>
+          <div class="max-w-md transform-gpu">
+            <GallformersWeb.FactsComponents.fact_inspector
+              id={"fact-inspector-#{theme}"}
+              fact={sample_fact()}
+              of={%{name: "Diplolepis rosae", undescribed?: false}}
+              on_close="noop"
+            />
+          </div>
         </.example>
 
         <.example
@@ -678,35 +702,6 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
                 }
               ]}
             />
-          </div>
-        </.example>
-
-        <.example
-          id="fact_chip"
-          title="fact_chip"
-          code={
-            ~S'''
-            <.fact_chip :for={v <- @values} fact_key={{:trait, "season", v}} sources={@sources[v]}
-              pending={@pending[v]} target={@myself}>{v}</.fact_chip>
-            '''
-          }
-        >
-          <div class="flex flex-wrap gap-1.5">
-            <.fact_chip fact_key={{:trait, "season", "Spring"}} sources={["Weld (1959)"]}>
-              Spring
-            </.fact_chip>
-            <.fact_chip
-              fact_key={{:trait, "season", "Summer"}}
-              pending={%{action: :withdraw, state: :in_tray}}
-            >
-              Summer
-            </.fact_chip>
-            <.fact_chip
-              fact_key={{:trait, "season", "Fall"}}
-              pending={%{action: :add, state: :in_tray}}
-            >
-              Fall
-            </.fact_chip>
           </div>
         </.example>
 
@@ -1858,6 +1853,67 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
       </div>
     </.section>
     """
+  end
+
+  # A Host of Diplolepis rosae, as `Gallformers.Import.gall_facts/1` gives it.
+  defp sample_fact do
+    line = fn attrs ->
+      Map.merge(
+        %{
+          source_id: 60,
+          name: "Kinsey 1920",
+          own?: false,
+          gallformers?: false,
+          stated_on: ~D[1920-01-01],
+          precision: :year,
+          date: "1920",
+          stance: :confirm,
+          words: [],
+          statement: nil,
+          quotes: [],
+          observations: [],
+          state: :counts,
+          reason: nil
+        },
+        attrs
+      )
+    end
+
+    %{
+      key: {:host, 1},
+      fact_id: 1,
+      kind: :host,
+      trait: nil,
+      value: %{
+        type: "host_of",
+        subject: %{taxon_id: 1, name: "Rosa carolina", rank: :species},
+        object: %{gall_id: 5076, name: "Diplolepis rosae"}
+      },
+      standing: {:holds, 3},
+      gallformers:
+        line.(%{
+          source_id: 1,
+          name: "Gallformers legacy data",
+          own?: true,
+          stated_on: nil,
+          precision: nil,
+          date: nil
+        }),
+      sources: [
+        line.(%{
+          source_id: 61,
+          name: "Shorthouse 2010",
+          date: "2010",
+          words: ["Rosa humilis"],
+          quotes: [
+            %{quote: "Galls are common on Rosa humilis and R. blanda.", page: "112"},
+            %{quote: "Also on cultivated roses.", page: nil},
+            %{quote: "Rare on R. acicularis.", page: "113"}
+          ]
+        }),
+        line.(%{})
+      ]
+    }
   end
 
   # Renders its content in a light panel and a dark panel, side by side on

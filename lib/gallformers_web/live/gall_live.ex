@@ -24,12 +24,14 @@ defmodule GallformersWeb.GallLive do
     Places
   }
 
-  import GallformersWeb.FactsComponents, only: [facts_view: 1, entries: 1]
+  import GallformersWeb.FactsComponents,
+    only: [facts_view: 1, entries: 1, fact_ref: 1, fact_inspector: 1, trait_label: 1]
 
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
   alias Gallformers.Taxa.Rank
   alias GallformersWeb.Admin.PlaceDrillDown
+  alias GallformersWeb.FactKey
   alias GallformersWeb.GallLive.RangeEdit
   alias GallformersWeb.SEO
   alias GallformersWeb.TaxonomyURL
@@ -87,6 +89,10 @@ defmodule GallformersWeb.GallLive do
        editing: false,
        photos_open: false,
        others_pending: [],
+       pending: %{},
+       adding: nil,
+       observation: nil,
+       observing: [],
        range_edit: nil,
        range_bounds_edit: nil
      )}
@@ -101,8 +107,50 @@ defmodule GallformersWeb.GallLive do
       socket
       |> assign(editing: editing, photos_open: editing and Map.has_key?(params, "photos"))
       |> load_others_pending()
+      |> select_fact(params["fact"])
+      |> observe(editing && params["observation"])
 
     {:noreply, select_source(socket, params["source"])}
+  end
+
+  # The Fact `?fact=` names (`GallformersWeb.FactKey`), when it is one of the
+  # page's; anything else opens nothing.
+  defp select_fact(socket, text) when is_binary(text) do
+    with {:ok, key} <- FactKey.decode(text),
+         %{} = fact <- find_fact(socket.assigns.gall_facts, key) do
+      assign(socket, selected: key, fact: fact, adding: nil)
+    else
+      _ -> assign(socket, selected: nil, fact: nil)
+    end
+  end
+
+  defp select_fact(socket, _none), do: assign(socket, selected: nil, fact: nil)
+
+  # `?edit&observation=<id>` (from `/admin/observation`): the inspector on
+  # that observation, read at once.
+  defp observe(socket, id) when is_binary(id) and id != "",
+    do: assign(socket, adding: "observation", observation: id)
+
+  defp observe(socket, _none), do: assign(socket, observation: nil)
+
+  defp find_fact(facts, key) do
+    traits = Enum.flat_map(facts.traits, & &1.facts)
+
+    Enum.find(
+      facts.inducer ++ facts.hosts ++ traits ++ facts.range ++ facts.aliases,
+      &(&1.key == key)
+    )
+  end
+
+  # The page's path with the Fact `key` selected (nil: none), in Edit mode
+  # still when it is on.
+  defp fact_path(socket, key) do
+    query =
+      [socket.assigns.editing && "edit", key && "fact=" <> FactKey.param(key)]
+      |> Enum.filter(& &1)
+      |> Enum.join("&")
+
+    "/gall/#{socket.assigns.gall.id}" <> if(query == "", do: "", else: "?" <> query)
   end
 
   defp select_source(socket, nil), do: socket
@@ -117,10 +165,16 @@ defmodule GallformersWeb.GallLive do
     end
   end
 
-  defp load_others_pending(%{assigns: %{editing: true, curator: curator, gall: gall}} = socket),
-    do: assign(socket, others_pending: Curation.others_pending({:gall, gall.id}, curator))
+  # Edit mode: the curator's tray items here (marked on the page and in the
+  # inspector), and other curators' unapplied changes.
+  defp load_others_pending(%{assigns: %{editing: true, curator: curator, gall: gall}} = socket) do
+    assign(socket,
+      others_pending: Curation.others_pending({:gall, gall.id}, curator),
+      pending: Curation.pending_for(curator, {:gall, gall.id})
+    )
+  end
 
-  defp load_others_pending(socket), do: assign(socket, others_pending: [])
+  defp load_others_pending(socket), do: assign(socket, others_pending: [], pending: %{})
 
   # The tray changed (this curator's, or another's about this Gall): refresh
   # Edit mode's marks.
@@ -169,6 +223,21 @@ defmodule GallformersWeb.GallLive do
   def handle_info({event, _payload}, socket) when event in [:records_merged, :records_deleted],
     do: {:noreply, socket}
 
+  # The inspector put something in the tray (`GallLive.FactActions`,
+  # `GallLive.FromObservation`).
+  def handle_info({module, :added}, socket)
+      when module in [
+             GallformersWeb.GallLive.FactActions,
+             GallformersWeb.GallLive.FromObservation
+           ],
+      do:
+        {:noreply,
+         socket |> assign(adding: nil, observing: []) |> put_flash(:info, "Added to your tray")}
+
+  # What an observation would add, ticked: previewed on the page.
+  def handle_info({GallformersWeb.GallLive.FromObservation, :proposing, keys}, socket),
+    do: {:noreply, assign(socket, observing: keys)}
+
   # Photos imported from an observation (Add from observation).
   def handle_info({:inat_import_complete, _owner}, socket), do: {:noreply, reload_gall(socket)}
 
@@ -187,6 +256,7 @@ defmodule GallformersWeb.GallLive do
       Map.take(socket.assigns, [
         :editing,
         :selected_source,
+        :selected,
         :modal_font_size,
         :sources_expanded,
         :sources_order,
@@ -194,10 +264,20 @@ defmodule GallformersWeb.GallLive do
       ])
 
     case load_gall(socket, socket.assigns.gall.id) do
-      {:ok, reloaded} -> assign(reloaded, keep)
+      {:ok, reloaded} -> reloaded |> assign(keep) |> reselect()
       {:redirect, to} -> push_navigate(socket, to: ~p"/gall/#{to}")
     end
   end
+
+  # The selected Fact as it is now; gone, the inspector closes.
+  defp reselect(%{assigns: %{selected: key}} = socket) when key != nil do
+    case find_fact(socket.assigns.gall_facts, key) do
+      nil -> assign(socket, selected: nil, fact: nil)
+      fact -> assign(socket, fact: fact)
+    end
+  end
+
+  defp reselect(socket), do: socket
 
   defp load_gall(socket, gall_id) do
     case Catalog.gall_page(gall_id) do
@@ -268,7 +348,10 @@ defmodule GallformersWeb.GallLive do
            sources_expanded: false,
            sources_order: :asc,
            map_open: false,
-           facts: load_facts(socket, gall_id)
+           facts: load_facts(socket, gall_id),
+           # Every Fact-backed value on the page, on the first render too
+           # (what search engines read).
+           gall_facts: Import.gall_facts(gall_id)
          )}
     end
   end
@@ -338,6 +421,102 @@ defmodule GallformersWeb.GallLive do
     traits ++ [{"Abundance", blank(gall.abundance)}]
   end
 
+  # Each Trait's row: its values as Facts, and its Sources' words with no
+  # value of their own ("also described as “reticulate”"), kept as text.
+  defp trait_rows(facts, gall) do
+    by_trait = Map.new(facts.traits, &{&1.trait, &1.facts})
+
+    for {_label, trait} <- @traits do
+      values = Map.get(by_trait, trait, [])
+      text_terms = Map.get(gall.text_terms, trait, [])
+
+      %{
+        trait: trait,
+        label: trait_label(trait),
+        facts: values,
+        text_terms: text_terms,
+        shown?: values != [] or text_terms != []
+      }
+    end
+  end
+
+  # A Trait value as the page shows it (Detachable's labelled).
+  defp trait_shown(%{trait: "detachable", value: %{value: value}}),
+    do: Map.get(@detachable_values, value, value)
+
+  defp trait_shown(%{value: %{value: value}}), do: value
+
+  defp common_names(facts), do: Enum.filter(facts.aliases, &(&1.value[:kind] == :common_name))
+
+  # What the curator's tray adds here that the Gall doesn't hold yet, in
+  # words, by group (`:host`, `{:trait, trait}`, `:range`, `:alias`): shown
+  # on the page as proposed.
+  defp proposed(pending, observing, facts) do
+    held = MapSet.new(all_facts(facts), & &1.key)
+
+    adds =
+      for {key, items} <- pending,
+          Enum.any?(items, &match?(%{kind: :fact, spec: %{action: :add}}, &1)),
+          do: key
+
+    for key <- Enum.uniq(adds ++ observing),
+        not MapSet.member?(held, key),
+        group = proposed_group(key),
+        group != nil,
+        reduce: %{} do
+      acc -> Map.update(acc, group, [proposed_words(key)], &(&1 ++ [proposed_words(key)]))
+    end
+  end
+
+  defp all_facts(facts) do
+    facts.inducer ++
+      facts.hosts ++ Enum.flat_map(facts.traits, & &1.facts) ++ facts.range ++ facts.aliases
+  end
+
+  defp proposed_group({:host, _id}), do: :host
+  defp proposed_group({:trait, trait, _value}), do: {:trait, trait}
+  defp proposed_group({kind, _id}) when kind == :occurrence, do: :range
+  defp proposed_group({:range, _adjustment, _id}), do: :range
+  defp proposed_group({:alias, _name}), do: :alias
+  defp proposed_group(_key), do: nil
+
+  defp proposed_words({:occurrence, _} = key), do: "recorded in " <> Curation.value_words(key)
+  defp proposed_words({:range, :exclude, _} = key), do: "not in " <> Curation.value_words(key)
+  defp proposed_words({:range, :only, _} = key), do: "only in " <> Curation.value_words(key)
+  defp proposed_words(key), do: Curation.value_words(key)
+
+  attr :group, :string, required: true
+  attr :small, :boolean, default: false
+  slot :inner_block, required: true
+
+  # A group's Add (Edit mode).
+  defp add(assigns) do
+    ~H"""
+    <.button
+      variant="link"
+      icon="ph-plus"
+      size={if @small, do: "sm", else: "md"}
+      phx-click="add_fact"
+      phx-value-group={@group}
+    >
+      {render_slot(@inner_block)}
+    </.button>
+    """
+  end
+
+  attr :values, :list, default: nil
+
+  # What the tray would add here, marked proposed.
+  defp proposed(%{values: values} = assigns) when values in [nil, []], do: ~H""
+
+  defp proposed(assigns) do
+    ~H"""
+    <span class="mt-2 flex flex-wrap gap-2">
+      <.fact_ref :for={value <- @values} proposed text={value} />
+    </span>
+    """
+  end
+
   defp blank(value) when value in [nil, ""], do: nil
   defp blank(value), do: value
 
@@ -374,9 +553,6 @@ defmodule GallformersWeb.GallLive do
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
   end
-
-  defp host_href(%{link: {:host, id}}), do: "/host/#{id}"
-  defp host_href(%{link: {rank, name}}), do: "/#{rank}/#{name}"
 
   defp build_species_json_ld(gall, url, description, image) do
     json_ld = %{
@@ -481,6 +657,30 @@ defmodule GallformersWeb.GallLive do
   def handle_event("range_to_tray", _params, %{assigns: %{range_edit: %{}}} = socket),
     do: {:noreply, RangeEdit.to_tray(socket)}
 
+  # -- the Fact inspector (matter 87a1) ---------------------------------------------
+
+  def handle_event("select_fact", %{"key" => text}, socket) do
+    case FactKey.decode(text) do
+      {:ok, key} -> {:noreply, push_patch(socket, to: fact_path(socket, key))}
+      :error -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_fact", _params, %{assigns: %{selected: nil}} = socket),
+    do: {:noreply, assign(socket, adding: nil, observing: [])}
+
+  def handle_event("close_fact", _params, socket),
+    do: {:noreply, push_patch(socket, to: fact_path(socket, nil))}
+
+  # A group's Add (Edit mode): the inspector on a new Fact of that group.
+  def handle_event("add_fact", %{"group" => group}, %{assigns: %{editing: true}} = socket) do
+    socket = assign(socket, adding: group, observing: [])
+
+    if socket.assigns.selected,
+      do: {:noreply, push_patch(socket, to: fact_path(socket, nil))},
+      else: {:noreply, socket}
+  end
+
   def handle_event("clipboard_copy_success", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied to clipboard")}
   end
@@ -579,7 +779,9 @@ defmodule GallformersWeb.GallLive do
       assign(assigns,
         note: Enum.find(assigns.sources, & &1.note?),
         listed: listed_sources(assigns.sources, assigns.sources_order),
-        fact_entries: entries(assigns.facts || [])
+        fact_entries: entries(assigns.facts || []),
+        trait_rows: trait_rows(assigns.gall_facts, assigns.gall),
+        proposed: proposed(assigns.pending, assigns.observing, assigns.gall_facts)
       )
 
     ~H"""
@@ -628,13 +830,12 @@ defmodule GallformersWeb.GallLive do
             {trait_value(@traits, label)}
           </:meta>
           <:action :if={@editing}>
-            <%!-- The dialog is the Editor's (GallLive.Editor). --%>
             <.button
               id="add-from-observation"
               variant="secondary"
               icon="ph-eye"
-              phx-click="open_observation"
-              phx-target="#gall-editor"
+              phx-click="add_fact"
+              phx-value-group="observation"
             >
               Add from observation…
             </.button>
@@ -645,9 +846,6 @@ defmodule GallformersWeb.GallLive do
         </.page_header>
 
         <div :if={@editing} id="editing" class="flex flex-col gap-2">
-          <.notice kind={:info} title="Editing">
-            Each change goes into your tray at the foot of the screen. Nothing changes until you Review and apply; Fact history is kept, so nothing is lost.
-          </.notice>
           <.notice :if={@others_pending != []} id="others-pending" kind={:warn}>
             <span :for={{other, i} <- Enum.with_index(@others_pending)}>
               {if i > 0, do: "; "}{other.user.name} has {other.count} unapplied {if other.count == 1,
@@ -718,25 +916,142 @@ defmodule GallformersWeb.GallLive do
               photos_open={@photos_open}
             />
 
-            <.section :if={!@editing} title="Hosts" count={length(@gall.hosts)}>
-              <.name_list items={@gall.hosts} columns={4}>
+            <%!-- The readers' hint: the underline means something (matter 87a1).
+                 Hidden until the Dismissible hook finds it wasn't dismissed. --%>
+            <p
+              :if={!@editing}
+              id="fact-hint"
+              phx-hook="Dismissible"
+              data-key="gf-fact-hint"
+              hidden
+              class="flex items-start gap-2 text-ui text-ink-2"
+            >
+              <.icon name="ph-info" class="mt-0.5 size-4 shrink-0 text-muted" />
+              <span class="flex-1">
+                Underlined values show the Sources that state them. Select one to see who says so.
+              </span>
+              <.button
+                size="sm"
+                variant="ghost"
+                icon="ph-x"
+                icon_only
+                label="Dismiss"
+                data-dismiss
+              />
+            </p>
+
+            <.notice :if={@editing} id="editing-how" title="Editing">
+              Select a value to change it, or Add to a group. The page stays as readers see it; every change waits in your tray until you apply it.
+            </.notice>
+
+            <.section id="gall-inducer" title="Inducer">
+              <div class="flex flex-col gap-1">
+                <.fact_ref
+                  :for={inducer <- @gall_facts.inducer}
+                  fact={inducer}
+                  selected={@selected}
+                  on_select="select_fact"
+                />
+                <p :if={@gall_facts.inducer == []} class="text-ui text-muted">
+                  No Inducer: the Gall is undescribed.
+                </p>
+              </div>
+            </.section>
+
+            <.section id="gall-hosts" title="Hosts" count={length(@gall_facts.hosts)}>
+              <:aside :if={@editing}>
+                <.add group="host">Add a host</.add>
+              </:aside>
+              <.name_list items={@gall_facts.hosts} columns={4}>
                 <:item :let={host}>
-                  <.link navigate={host_href(host)}>
-                    <.taxon_name name={host.name} genus_placeholder={host.rank == :genus} />
-                  </.link>
+                  <.fact_ref fact={host} selected={@selected} on_select="select_fact" />
                 </:item>
               </.name_list>
+              <.proposed values={@proposed[:host]} />
             </.section>
 
             <.section
-              :if={!@editing}
               id="gall-traits-section"
               title="Traits"
               count={"#{Enum.count(@traits, &elem(&1, 1))} of #{length(@traits)} recorded"}
             >
-              <.fact_list id="gall-traits" columns={2}>
-                <:item :for={{label, value} <- @traits} label={label} value={value} />
+              <.fact_list
+                id="gall-traits"
+                columns={2}
+                missing_label={if @editing, do: nil, else: "Not recorded"}
+              >
+                <:item :for={row <- @trait_rows} :if={row.shown?} label={row.label}>
+                  <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <.fact_ref
+                      :for={fact <- row.facts}
+                      fact={fact}
+                      selected={@selected}
+                      on_select="select_fact"
+                    >
+                      {trait_shown(fact)}
+                    </.fact_ref>
+                    <span :if={row.text_terms != []} class="text-ink-2">
+                      {if row.facts == [], do: "described as", else: "also described as"} {quoted(
+                        row.text_terms
+                      )}
+                    </span>
+                    <.proposed values={@proposed[{:trait, row.trait}]} />
+                    <.add :if={@editing} group={"trait:" <> row.trait} small>Add</.add>
+                  </span>
+                </:item>
+                <:item :for={row <- @trait_rows} :if={!row.shown?} label={row.label} value={nil} />
+                <:item label="Abundance" value={@gall.abundance} />
               </.fact_list>
+              <p
+                :if={@editing and Enum.any?(@trait_rows, &(!&1.shown?))}
+                class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-meta text-muted"
+              >
+                Not recorded:
+                <.add
+                  :for={row <- Enum.reject(@trait_rows, & &1.shown?)}
+                  group={"trait:" <> row.trait}
+                  small
+                >
+                  {String.downcase(row.label)}
+                </.add>
+              </p>
+            </.section>
+
+            <.section :if={@editing or @gall_facts.range != []} id="gall-range" title="Range">
+              <:aside :if={@editing}>
+                <.add group="range">Add a place</.add>
+              </:aside>
+              <p class="mb-2 text-meta text-muted">
+                Where the Hosts grow, adjusted by these places.
+              </p>
+              <div class="flex flex-wrap gap-x-4 gap-y-1">
+                <.fact_ref
+                  :for={place <- @gall_facts.range}
+                  fact={place}
+                  selected={@selected}
+                  on_select="select_fact"
+                />
+              </div>
+              <.proposed values={@proposed[:range]} />
+            </.section>
+
+            <.section
+              :if={@editing or common_names(@gall_facts) != []}
+              id="gall-common-names"
+              title="Common names"
+            >
+              <:aside :if={@editing}>
+                <.add group="alias">Add a common name</.add>
+              </:aside>
+              <div class="flex flex-wrap gap-x-4 gap-y-1">
+                <.fact_ref
+                  :for={name <- common_names(@gall_facts)}
+                  fact={name}
+                  selected={@selected}
+                  on_select="select_fact"
+                />
+              </div>
+              <.proposed values={@proposed[:alias]} />
             </.section>
 
             <.panel :if={@note} id="id-notes" variant={:info}>
@@ -878,96 +1193,121 @@ defmodule GallformersWeb.GallLive do
           </div>
 
           <.rail width={:wide}>
-            <.photo_viewer
-              id="gall-images"
-              photos={@images}
-              name={@gall.name}
-              edit_href={"/gall/#{@gall.id}?edit&photos"}
-              admin={Accounts.admin?(@current_user)}
-            />
-
-            <.panel title="Possible range">
-              <:header_action>
-                <.button
-                  :if={not @range_unknown?}
-                  variant="ghost"
-                  size="sm"
-                  icon="ph-arrows-out"
-                  phx-click="open_map"
-                >
-                  Enlarge
-                </.button>
-              </:header_action>
-              <p :if={@range_unknown?} class="text-ui text-muted">
-                Range unknown: no host range data.
-              </p>
-              <.range_map
-                :if={not @range_unknown? and not @map_open}
-                id="gall-range-map"
-                class="h-72"
-                in_range={@range}
-                inherited_range={@inherited_range}
-                introduced_range={@introduced_range}
-                bounds={@range_bounds}
-                navigable
-              />
-              <:footer :if={not @range_unknown?}>
-                <.range_map_legend
-                  :if={@inherited_range != [] or @introduced_range != []}
-                  mode={:public}
-                />
-                <p class="text-caption text-muted">
-                  Where the {length(@gall.hosts)} hosts grow, not where the gall was found.
-                </p>
-              </:footer>
-            </.panel>
-
-            <dl class="flex flex-col gap-3 text-ui">
-              <div :if={@name_rows != [] or @common_names != []}>
-                <dt class="text-meta text-muted">
-                  Also known as
-                </dt>
-                <dd id="gall-names" class="text-ink-2">
-                  <span :for={{name, i} <- Enum.with_index(@common_names)}>
-                    {if i > 0, do: " · "}{name}<span class="text-meta text-muted"> (common name)</span>
-                  </span>{if @common_names !=
-                                                                                                                                                                                                            [] and
-                                                                                                                                                                                                            @name_rows !=
-                                                                                                                                                                                                              [],
-                                                                                                                                                                                                          do:
-                                                                                                                                                                                                            " · "}
-                  <span :for={{a, i} <- Enum.with_index(@name_rows)}>
-                    {if i > 0, do: " · "}<.taxon_name :if={not a.label?} name={a.name} />
-                    <span :if={a.label?}>
-                      {a.name}
-                    </span>
-                    <span
-                      :if={a.type != "synonym" or a.notes}
-                      class="text-meta text-muted"
-                    >
-                      ({[a.type != "synonym" && a.type, a.notes]
-                      |> Enum.filter(& &1)
-                      |> Enum.join(", ")})
-                    </span>
-                  </span>
-                </dd>
-              </div>
-            </dl>
-            <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed?} />
-
-            <.record_metadata inserted_at={@gall.inserted_at} updated_at={@gall.updated_at} />
-
             <.live_component
-              :if={@editing}
-              module={GallformersWeb.RecordRemoval}
-              id="record-removal"
-              subject={{:gall, @gall.id}}
-              name={@gall.name}
-              actor={@curator}
-              merge={:gall}
-              deleted_path={~p"/galls"}
-              merged_path={&"/gall/#{&1}?edit"}
+              :if={@editing and @adding == "observation"}
+              module={GallformersWeb.GallLive.FromObservation}
+              id="from-observation"
+              gall={@gall}
+              curator={@curator}
+              observation={@observation}
             />
+            <.live_component
+              :if={@editing and (@fact || (@adding && @adding != "observation"))}
+              module={GallformersWeb.GallLive.FactActions}
+              id="fact-actions"
+              fact={@fact}
+              new={@adding}
+              gall={@gall}
+              curator={@curator}
+              pending={(@fact && Map.get(@pending, @fact.key)) || []}
+            />
+            <.fact_inspector
+              :if={!@editing and @fact}
+              id="fact-inspector"
+              fact={@fact}
+              of={@gall}
+              on_close="close_fact"
+            />
+            <%!-- While a Fact is open the inspector takes the rail's place on
+                 wide screens; on phones it is a sheet over the page. --%>
+            <div
+              data-part="rail-content"
+              data-inspecting={(@fact || @adding) && true}
+              class={["flex flex-col gap-block", (@fact || @adding) && "lg:hidden"]}
+            >
+              <.photo_viewer
+                id="gall-images"
+                photos={@images}
+                name={@gall.name}
+                edit_href={"/gall/#{@gall.id}?edit&photos"}
+                admin={Accounts.admin?(@current_user)}
+              />
+
+              <.panel title="Possible range">
+                <:header_action>
+                  <.button
+                    :if={not @range_unknown?}
+                    variant="ghost"
+                    size="sm"
+                    icon="ph-arrows-out"
+                    phx-click="open_map"
+                  >
+                    Enlarge
+                  </.button>
+                </:header_action>
+                <p :if={@range_unknown?} class="text-ui text-muted">
+                  Range unknown: no host range data.
+                </p>
+                <.range_map
+                  :if={not @range_unknown? and not @map_open}
+                  id="gall-range-map"
+                  class="h-72"
+                  in_range={@range}
+                  inherited_range={@inherited_range}
+                  introduced_range={@introduced_range}
+                  bounds={@range_bounds}
+                  navigable
+                />
+                <:footer :if={not @range_unknown?}>
+                  <.range_map_legend
+                    :if={@inherited_range != [] or @introduced_range != []}
+                    mode={:public}
+                  />
+                  <p class="text-caption text-muted">
+                    Where the {length(@gall.hosts)} hosts grow, not where the gall was found.
+                  </p>
+                </:footer>
+              </.panel>
+
+              <dl class="flex flex-col gap-3 text-ui">
+                <div :if={@name_rows != []}>
+                  <dt class="text-meta text-muted">
+                    Also known as
+                  </dt>
+                  <dd id="gall-names" class="text-ink-2">
+                    <span :for={{a, i} <- Enum.with_index(@name_rows)}>
+                      {if i > 0, do: " · "}<.taxon_name :if={not a.label?} name={a.name} />
+                      <span :if={a.label?}>
+                        {a.name}
+                      </span>
+                      <span
+                        :if={a.type != "synonym" or a.notes}
+                        class="text-meta text-muted"
+                      >
+                        ({[a.type != "synonym" && a.type, a.notes]
+                        |> Enum.filter(& &1)
+                        |> Enum.join(", ")})
+                      </span>
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed?} />
+
+              <.record_metadata inserted_at={@gall.inserted_at} updated_at={@gall.updated_at} />
+
+              <.live_component
+                :if={@editing}
+                module={GallformersWeb.RecordRemoval}
+                id="record-removal"
+                subject={{:gall, @gall.id}}
+                name={@gall.name}
+                actor={@curator}
+                merge={:gall}
+                deleted_path={~p"/galls"}
+                merged_path={&"/gall/#{&1}?edit"}
+              />
+            </div>
           </.rail>
         </div>
       </div>

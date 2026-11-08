@@ -124,8 +124,9 @@ defmodule GallformersWeb.IntegrationTest do
 
       {:ok, view, _html} = live(conn, ~p"/gall/#{gall_id}")
 
-      # The Gall page links its species Host to the host page.
-      assert has_element?(view, ~s(a[href="/host/#{host_id}"]))
+      # The Host opens who says so, which links the host page (matter 87a1).
+      view |> element(~s(#gall-hosts button[phx-value-key="host:#{host_id}"])) |> render_click()
+      assert has_element?(view, ~s(#fact-inspector a[href="/host/#{host_id}"]))
     end
 
     test "search results navigate to correct pages", %{conn: conn} do

@@ -152,6 +152,7 @@ Lay out siblings with flex or grid and `gap`, not margins on each element.
 
 - **Public pages** fill the screen up to `max-w-page` (1920px) with `px-page-x` gutters (16px on phones). A wide screen shows more, never wider margins: photo grids add columns (`gf-photo-grid`), card grids add a column at `2xl`. Running text stays within `max-w-text`. Detail pages use a main column and a 420px rail; the rail stacks under the title on phones, with the photo first.
 - **Admin pages** fill the space beside a 212px sidebar. Edit pages use a main column and a 300px rail for facts about the record.
+- **The Fact inspector's sheet** (`gf-sheet`): `--gf-sheet-max-h` (70% of the viewport) is the most a phone's bottom sheet covers; `--gf-sheet-rail-max-h` (the viewport below the header, less a block gap above and below) is the most the inspector is tall in the rail, where it sticks under the header. Both in `tokens.css`; the sheet scrolls inside.
 - **Sticky chrome budget: 100px.** The public header is 64px, with a 48px logo, and Identify as its one filled button. The admin top bar is 44px (plus a 40px step bar on review steps). The footer is never fixed.
 - Long lists of short names (families, Hosts, a Source's Galls) flow into columns instead of one narrow column.
 - At phone width (about 400px) every row wraps or stacks; only tables, maps and code scroll sideways, each in its own container.

@@ -35,6 +35,13 @@ defmodule GallformersWeb.GallLiveEditTest do
     end
   end
 
+  defp tray(actor) do
+    case Curation.open_set(actor) do
+      nil -> []
+      set -> set.items
+    end
+  end
+
   describe "the switch" do
     test "a visitor: no Edit, and ?edit shows the public page", ctx do
       conn = Phoenix.ConnTest.build_conn()
@@ -61,130 +68,264 @@ defmodule GallformersWeb.GallLiveEditTest do
       {:ok, view, _html} = edit(ctx)
 
       assert has_element?(view, "#editing a[href='/species/#{ctx.wasp.id}?edit']")
-      assert has_element?(view, "#gall-editor a[href='/species/#{ctx.wasp.id}?edit']")
       refute has_element?(view, "a[href='/admin/taxonomy/#{ctx.wasp.id}']")
     end
   end
 
-  describe "Hosts" do
-    test "each Host with its Sources and actions", ctx do
-      {:ok, view, _html} = edit(ctx)
-      row = "#fact-host-#{ctx.oak.id}"
+  # Edit mode acts through the Fact inspector (matter 87a1, task 7): each
+  # action in Gallformers' block of the selected Fact, each group's Add.
+  defp open_fact(ctx, key), do: live(ctx.conn, ~p"/gall/#{ctx.gall.id}?edit&fact=#{key}")
 
-      assert has_element?(view, "#{row} [data-part=fact]", "Quercus webcurata")
-      assert has_element?(view, "#{row} [data-part=sources]", "Weld")
+  defp act(view, action),
+    do: view |> element("#fact-inspector button[phx-value-action=#{action}]") |> render_click()
 
-      assert has_element?(view, "#{row} button[phx-value-action=withdraw]")
-      assert has_element?(view, "#{row} button[phx-value-action=correct]")
-      assert has_element?(view, "#{row} button[phx-value-action=note]")
+  defp submit_why(view, why),
+    do: view |> form("#fact-action-form", %{"why" => why}) |> render_submit()
+
+  describe "Gallformers' actions in the inspector" do
+    test "a Fact's Gallformers block has Change…, Deny… and Add a note…; Confirm… when Gallformers hasn't stated it",
+         ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+      gallformers = "#fact-inspector [data-source=gallformers]"
+
+      assert has_element?(view, gallformers, "Gallformers hasn't stated this")
+
+      for {action, words} <- [
+            confirm: "Confirm…",
+            correct: "Change…",
+            withdraw: "Deny…",
+            note: "Add a note…"
+          ] do
+        assert has_element?(view, "#{gallformers} button[phx-value-action=#{action}]", words)
+      end
     end
 
-    test "Withdraw puts it in the tray, and the row says so", ctx do
-      {:ok, view, _html} = edit(ctx)
+    test "Deny… puts Gallformers' denial in the tray with its reason, and the block says so",
+         ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
 
-      view
-      |> element("#fact-host-#{ctx.oak.id} button[phx-value-action=withdraw]")
-      |> render_click()
+      act(view, "withdraw")
+      submit_why(view, "Not on oaks: a misidentified maple.")
 
       assert [{:fact, %{action: :withdraw, key: {:host, oak_id}}}] = items(ctx.actor)
       assert oak_id == ctx.oak.id
-      assert has_element?(view, "#fact-host-#{ctx.oak.id} [data-part=pending]", "in your tray")
+      assert [%{evidence: %{text: "Not on oaks: a misidentified maple."}}] = tray(ctx.actor)
+
+      assert has_element?(
+               view,
+               "#fact-inspector [data-source=gallformers] [data-part=pending]",
+               "In your tray: Deny host: Quercus webcurata"
+             )
+
+      refute has_element?(view, "#fact-inspector button[phx-value-action=withdraw]")
     end
 
-    test "Correct… replaces it with another plant", ctx do
+    test "Take out takes it out of the tray, and the actions come back", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+      act(view, "withdraw")
+      submit_why(view, "")
+
+      view |> element("#fact-inspector button", "Take out") |> render_click()
+
+      assert items(ctx.actor) == []
+      assert has_element?(view, "#fact-inspector button[phx-value-action=withdraw]")
+    end
+
+    test "a change taken out elsewhere comes off the inspector too", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+      act(view, "withdraw")
+      submit_why(view, "")
+
+      [item] = Curation.open_set(ctx.actor).items
+      :ok = Curation.remove_item(ctx.actor, item.id)
+
+      refute has_element?(view, "#fact-inspector [data-part=pending]")
+      assert has_element?(view, "#fact-inspector button[phx-value-action=withdraw]")
+    end
+
+    test "Change… a Host to another plant, found by the plant search", ctx do
       rubra = plant_fixture(name: "Quercus rubrawebcurata")
-      {:ok, view, _html} = edit(ctx)
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+
+      act(view, "correct")
 
       view
-      |> element("#fact-host-#{ctx.oak.id} button[phx-value-action=correct]")
-      |> render_click()
+      |> with_target("#fact-actions")
+      |> render_hook("search_plant", %{"value" => "rubraweb"})
 
-      assert has_element?(view, "#fact-dialog", "Quercus webcurata")
-
-      view
-      |> with_target("#gall-editor")
-      |> render_hook("search_dialog_plant", %{"value" => "rubraweb"})
-
-      view |> element("#fact-dialog-plant [phx-value-id='#{rubra.id}']") |> render_click()
+      view |> element("#fact-action-plant [phx-value-id='#{rubra.id}']") |> render_click()
+      submit_why(view, "")
 
       assert [{:fact, %{action: :correct, key: {:host, _}, to: {:host, to}}}] = items(ctx.actor)
       assert to == rubra.id
-      refute has_element?(view, "#fact-dialog")
     end
 
-    test "Note… records a note on the Host's Fact", ctx do
-      {:ok, view, _html} = edit(ctx)
+    test "Change… a Trait value to another of its values", ctx do
+      {:ok, view, _html} = open_fact(ctx, "trait:season:Spring")
 
-      view
-      |> element("#fact-host-#{ctx.oak.id} button[phx-value-action=note]")
-      |> render_click()
+      act(view, "correct")
+      view |> element("#fact-action-values-Summer") |> render_click()
+      submit_why(view, "")
 
-      view |> form("#fact-dialog form", %{"text" => "Only on young leaves."}) |> render_submit()
+      assert [{:fact, %{action: :correct, key: {:trait, "season", "Spring"}, to: to}}] =
+               items(ctx.actor)
 
+      assert to == {:trait, "season", "Summer"}
+    end
+
+    test "Change… with nothing chosen says what's missing and adds nothing", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+
+      act(view, "correct")
+      submit_why(view, "")
+
+      assert has_element?(view, "#fact-action-error", "Choose the plant it should be.")
+      assert items(ctx.actor) == []
+    end
+
+    test "Add a note… is a note on the Fact, not a statement; it needs its words", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+
+      act(view, "note")
+      submit_why(view, "  ")
+      assert has_element?(view, "#fact-action-error", "Write the note.")
+
+      submit_why(view, "Only on young leaves.")
       assert [{:note, %{key: {:host, _}, text: "Only on young leaves."}}] = items(ctx.actor)
     end
 
-    test "Add a host: found by name, shown as added", ctx do
+    test "an observation's link in Why becomes the statement's Observation", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+
+      act(view, "confirm")
+      submit_why(view, "Seen here: https://www.inaturalist.org/observations/318135694")
+
+      assert [%{evidence: %{observations: [%{provider: "inaturalist", id: "318135694"}]}}] =
+               tray(ctx.actor)
+    end
+
+    test "Cancel closes the form", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+
+      act(view, "withdraw")
+      view |> element("#fact-action-form button", "Cancel") |> render_click()
+
+      refute has_element?(view, "#fact-action-form")
+      assert items(ctx.actor) == []
+    end
+
+    test "the Inducer: a note only; its taxonomy is edited on its page", ctx do
+      {:ok, view, _html} = open_fact(ctx, "inducer:#{ctx.wasp.id}")
+
+      assert has_element?(view, "#fact-inspector button[phx-value-action=note]")
+      refute has_element?(view, "#fact-inspector button[phx-value-action=withdraw]")
+      assert has_element?(view, "#fact-inspector a[href='/species/#{ctx.wasp.id}?edit']")
+    end
+
+    test "readers never see the actions", ctx do
+      conn = Phoenix.ConnTest.build_conn()
+      {:ok, view, _html} = live(conn, ~p"/gall/#{ctx.gall.id}?edit&fact=host:#{ctx.oak.id}")
+
+      assert has_element?(view, "#fact-inspector")
+      refute has_element?(view, "#fact-inspector button[phx-value-action]")
+    end
+  end
+
+  describe "adding" do
+    test "each group has its Add; the Traits not recorded are each an add", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      assert has_element?(
+               view,
+               "#gall-hosts button[phx-click=add_fact][phx-value-group=host]",
+               "Add a host"
+             )
+
+      assert has_element?(view, "#gall-range button[phx-value-group=range]", "Add a place")
+
+      assert has_element?(
+               view,
+               "#gall-common-names button[phx-value-group=alias]",
+               "Add a common name"
+             )
+
+      assert has_element?(view, "#gall-traits button[phx-value-group='trait:season']", "Add")
+
+      assert has_element?(
+               view,
+               "#gall-traits-section button[phx-value-group='trait:color']",
+               "color"
+             )
+    end
+
+    test "Add a host: a new Fact through the plant search, then shown as proposed", ctx do
       rubra = plant_fixture(name: "Quercus rubrawebcurata")
       {:ok, view, _html} = edit(ctx)
 
-      view
-      |> with_target("#gall-editor")
-      |> render_hook("search_add_host", %{"value" => "rubraweb"})
+      view |> element("#gall-hosts button[phx-click=add_fact]") |> render_click()
+      assert has_element?(view, "#fact-inspector [data-part=kind]", "New Host")
 
-      view |> element("#add-host [phx-value-id='#{rubra.id}']") |> render_click()
+      view
+      |> with_target("#fact-actions")
+      |> render_hook("search_plant", %{"value" => "rubraweb"})
+
+      view |> element("#fact-action-plant [phx-value-id='#{rubra.id}']") |> render_click()
+      submit_why(view, "On red oak at the arboretum.")
 
       assert [{:fact, %{action: :add, key: {:host, id}}}] = items(ctx.actor)
       assert id == rubra.id
-      assert has_element?(view, "#fact-host-#{rubra.id} [data-part=pending]", "in your tray")
+      assert has_element?(view, "#gall-hosts [data-proposed]", "Quercus rubrawebcurata")
     end
-  end
 
-  describe "Traits" do
-    test "a value's ✕ withdraws it; Add adds one", ctx do
+    test "+ color: values of a Trait not recorded, one change each", ctx do
       {:ok, view, _html} = edit(ctx)
 
-      view |> element("#fact-trait-season-Spring button[phx-click=fact_action]") |> render_click()
-
       view
-      |> form("#add-trait-season", %{"trait" => "season", "value" => "Summer"})
-      |> render_change()
-
-      assert [
-               {:fact, %{action: :withdraw, key: {:trait, "season", "Spring"}}},
-               {:fact, %{action: :add, key: {:trait, "season", "Summer"}}}
-             ] = items(ctx.actor)
-
-      assert has_element?(view, "#fact-trait-season-Spring.line-through")
-      assert has_element?(view, "#fact-trait-season-Summer[data-pending]")
-    end
-  end
-
-  describe "Common names" do
-    test "each with its actions; Add a common name", ctx do
-      {:ok, _} =
-        Gallformers.Catalog.assert_alias(
-          ctx.actor,
-          %{gall_id: ctx.gall.id, name: "Webby knot"},
-          Gallformers.CatalogFixtures.confirm(ctx.weld)
-        )
-
-      {:ok, view, _html} = edit(ctx)
-
-      assert has_element?(view, "#fact-alias-Webby-knot [data-part=fact]", "Webby knot")
-
-      view
-      |> element("#fact-alias-Webby-knot button[phx-value-action=withdraw]")
+      |> element("#gall-traits-section button[phx-value-group='trait:color']")
       |> render_click()
 
-      view |> form("#add-common-name", %{"name" => " Horned webgall "}) |> render_submit()
+      assert has_element?(view, "#fact-inspector [data-part=kind]", "New Color")
 
-      assert [
-               {:fact, %{action: :withdraw, key: {:alias, "Webby knot"}}},
-               {:fact, %{action: :add, key: {:alias, "Horned webgall"}}}
-             ] = items(ctx.actor)
+      view |> element("#fact-action-values-red") |> render_click()
+      view |> element("#fact-action-values-brown") |> render_click()
+      submit_why(view, "")
 
-      assert has_element?(view, "#fact-alias-Horned-webgall [data-part=pending]", "in your tray")
+      assert ctx.actor
+             |> items()
+             |> Enum.map(fn {:fact, %{action: :add, key: key}} -> key end)
+             |> Enum.sort() ==
+               [{:trait, "color", "brown"}, {:trait, "color", "red"}]
+    end
+
+    test "Add a common name: written in", ctx do
+      {:ok, view, _html} = edit(ctx)
+
+      view |> element("button[phx-value-group=alias]") |> render_click()
+
+      view
+      |> form("#fact-action-form", %{"value" => " Horned webgall ", "why" => ""})
+      |> render_submit()
+
+      assert [{:fact, %{action: :add, key: {:alias, "Horned webgall"}}}] = items(ctx.actor)
+    end
+
+    test "Add a place: one of the three kinds, the place through the place search", ctx do
+      {:ok, view, _html} = edit(ctx)
+      alberta = Gallformers.CatalogFixtures.place_id("CA-AB")
+
+      view |> element("button[phx-value-group=range]") |> render_click()
+
+      view
+      |> with_target("#fact-actions")
+      |> render_hook("search_place", %{"value" => "albert"})
+
+      view |> element("#fact-action-place [phx-value-id='#{alberta}']") |> render_click()
+
+      view
+      |> form("#fact-action-form", %{"adjustment" => "occurrence", "why" => ""})
+      |> render_submit()
+
+      assert [{:fact, %{action: :add, key: {:occurrence, ^alberta}}}] = items(ctx.actor)
     end
   end
 
@@ -266,20 +407,6 @@ defmodule GallformersWeb.GallLiveEditTest do
 
     assert has_element?(view, "#editorial-abundance-select option[selected][value='#{first.id}']")
     refute has_element?(view, "#editorial-abundance [data-part=pending]")
-  end
-
-  test "the marks follow the tray: a change taken out elsewhere is unmarked", ctx do
-    {:ok, view, _html} = edit(ctx)
-
-    view
-    |> element("#fact-host-#{ctx.oak.id} button[phx-value-action=withdraw]")
-    |> render_click()
-
-    [item] = Curation.open_set(ctx.actor).items
-    :ok = Curation.remove_item(ctx.actor, item.id)
-
-    refute has_element?(view, "#fact-host-#{ctx.oak.id} [data-part=pending]")
-    assert has_element?(view, "#fact-host-#{ctx.oak.id} button[phx-value-action=withdraw]")
   end
 
   test "another curator's unapplied changes here are named", ctx do

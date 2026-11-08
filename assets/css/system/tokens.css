@@ -79,6 +79,14 @@
   --gf-page-x: 2rem;             /* page side gutter (wide screens) */
 }
 
+:root {
+  /* The Fact inspector's sheet (gf-sheet): a bottom sheet on phones, at
+     most this tall; in the rail on wide screens, at most the viewport
+     below the header. */
+  --gf-sheet-max-h: 70dvh;
+  --gf-sheet-rail-max-h: calc(100dvh - var(--spacing-header) - 2 * var(--gf-gap-block));
+}
+
 /* Working density: admin. Set once by the admin shell. */
 .gf-density-working {
   --gf-fs-page: 1.75rem;         /* 28px */

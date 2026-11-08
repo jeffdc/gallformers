@@ -29,6 +29,15 @@ defmodule GallformersWeb.FactKey do
   def encode({:range, adjustment, place_id}), do: "range:#{adjustment}:#{place_id}"
   def encode({:occurrence, place_id}), do: "occurrence:#{place_id}"
 
+  @doc """
+  The key as a query parameter's value (`?fact=host:7`): its string, with
+  what would end or join a parameter (`&`, `=`, `#`, `+`, spaces) escaped.
+  """
+  @spec param(t()) :: String.t()
+  def param(key), do: key |> encode() |> URI.encode(&param_char?/1)
+
+  defp param_char?(char), do: URI.char_unescaped?(char) and char not in ~c"&=#+"
+
   @doc "The key a string names, or `:error`."
   @spec decode(String.t()) :: {:ok, t()} | :error
   def decode("inducer:" <> id), do: with_id(id, &{:inducer, &1})

@@ -28,7 +28,9 @@ defmodule GallformersWeb.FactsComponents do
   (with "Show the passage" where the page gives `on_passage`). A Gall's
   categories sit in two columns on a wide screen.
 
-  Also here: the line saying whether the Source is ready to approve
+  Also here: a Fact-backed value on a page (`fact_ref/1`) and who says so
+  about it (`fact_inspector/1`; matter `87a1`); the line saying whether the
+  Source is ready to approve
   (`facts_readiness/1`), the counts as filter chips (`facts_filter/1`),
   the taxonomy changes (`facts_taxonomy/1`): once applied, each
   taxonomic statement with the curator's mark (accepted, declined with the
@@ -39,14 +41,17 @@ defmodule GallformersWeb.FactsComponents do
 
   import GallformersWeb.ActionComponents, only: [button: 1]
   import GallformersWeb.CoreComponents, only: [icon: 1]
-  import GallformersWeb.DataComponents, only: [fact_list: 1]
+  import GallformersWeb.DataComponents, only: [chip: 1, fact_list: 1]
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
+  import GallformersWeb.DomainComponents, only: [source_quote: 1]
   import GallformersWeb.FormComponents, only: [typeahead: 1]
 
   import GallformersWeb.ReviewComponents,
     only: [review_quote: 1, review_passage: 1, review_value_list: 1]
 
   alias Gallformers.Catalog.RelationshipTypes
+  alias GallformersWeb.FactKey
+  alias GallformersWeb.TaxonomyURL
   alias Phoenix.LiveView.JS
 
   @category_titles [
@@ -1404,6 +1409,368 @@ defmodule GallformersWeb.FactsComponents do
     |> Enum.uniq_by(&String.downcase/1)
     |> Enum.reject(&MapSet.member?(shown, String.downcase(&1)))
   end
+
+  # -- the Fact inspector (matter 87a1) ------------------------------------------
+
+  @trait_labels %{
+    "detachable" => "Detachable",
+    "color" => "Color",
+    "texture" => "Texture",
+    "shape" => "Shape",
+    "season" => "Season",
+    "alignment" => "Alignment",
+    "walls" => "Walls",
+    "plant_part" => "Location",
+    "form" => "Form",
+    "cells" => "Cells"
+  }
+
+  @species_ranks [:species, :subspecies, :variety, :form]
+
+  @doc "A Trait's name on the Gall page (`plant_part` is Location)."
+  @spec trait_label(String.t()) :: String.t()
+  def trait_label(trait),
+    do: Map.get(@trait_labels, trait, trait |> humanize() |> String.capitalize())
+
+  @doc """
+  A Fact-backed value on a page (`components.md`, `fact_ref`): the value
+  with a dotted underline, a button that sends `on_select` with the Fact's
+  key (`GallformersWeb.FactKey`) to open the `fact_inspector` on it. The
+  Fact is one of `Gallformers.Import.gall_facts/1`'s. With `proposed`, a
+  value an open action would add: `text`, marked proposed, not selectable.
+  """
+  attr :fact, :map, default: nil, doc: "a Fact from `Gallformers.Import.gall_facts/1`"
+  attr :selected, :any, default: nil, doc: "the selected Fact's key, or nil"
+  attr :on_select, :string, default: nil
+  attr :inspector, :string, default: "fact-inspector", doc: "the inspector's id"
+  attr :target, :any, default: nil
+  attr :proposed, :boolean, default: false
+  attr :text, :string, default: nil, doc: "a proposed value's words"
+  attr :class, :any, default: nil, doc: "layout only"
+  slot :inner_block, doc: "the value, when the page shows it otherwise"
+
+  def fact_ref(%{proposed: true} = assigns) do
+    ~H"""
+    <span
+      data-proposed
+      class={[
+        "inline-flex w-fit items-center gap-2 rounded-ctl bg-sky-soft px-1 text-ui text-ink",
+        @class
+      ]}
+    >
+      {@text}<.chip size="sm" variant={:info}>proposed</.chip>
+    </span>
+    """
+  end
+
+  def fact_ref(assigns) do
+    assigns = assign(assigns, selected?: assigns.selected == assigns.fact.key)
+
+    ~H"""
+    <button
+      type="button"
+      phx-click={@on_select}
+      phx-target={@target}
+      phx-value-key={FactKey.encode(@fact.key)}
+      aria-pressed={to_string(@selected?)}
+      aria-controls={@inspector}
+      title="Who says so?"
+      class={[
+        "w-fit rounded-ctl px-0.5 text-left text-ui text-ink underline decoration-line-strong decoration-dotted underline-offset-4 hover:decoration-ink",
+        @selected? && "bg-sky-soft decoration-ink",
+        @class
+      ]}
+    >
+      <%= if @inner_block != [] do %>
+        {render_slot(@inner_block)}
+      <% else %>
+        <.ref_value fact={@fact} />
+      <% end %>
+    </button>
+    """
+  end
+
+  attr :fact, :map, required: true
+
+  # A Fact's value as a page writes it (the Facts panel's `fact_value/1`
+  # adds ranks and kinds; a page doesn't).
+  defp ref_value(%{fact: %{kind: kind, value: %{subject: subject}}} = assigns)
+       when kind in [:host, :inducer] do
+    assigns = assign(assigns, subject: subject)
+
+    ~H"""
+    <.taxon_name
+      name={@subject.name}
+      rank={rank(@subject.rank)}
+      genus_placeholder={@fact.kind == :host and @subject.rank == :genus}
+    />
+    """
+  end
+
+  defp ref_value(%{fact: %{kind: kind, value: %{place: place} = v}} = assigns)
+       when kind in [:range, :occurrence] do
+    assigns =
+      assign(assigns, prefix: range_prefix(kind, v[:adjustment]), place: place.name || place.code)
+
+    ~H"""
+    <span class="text-muted">{@prefix}</span> {@place}
+    """
+  end
+
+  defp ref_value(%{fact: %{kind: :trait}} = assigns), do: ~H|{@fact.value.value}|
+  defp ref_value(%{fact: %{kind: :alias}} = assigns), do: ~H|{@fact.value.name}|
+
+  @doc """
+  Who says so about one Fact, beside the page (`components.md`,
+  `fact_inspector`): its kind, its value, what it is of, its standing, and
+  one block per Source, Gallformers first, then the others newest first
+  (`Gallformers.Import.gall_facts/1` orders them). A labelled region
+  placed by `gf-sheet`: a bottom sheet on phones, in the rail on wide
+  screens; each `fact_ref` controls it by `id`.
+  """
+  attr :id, :string, required: true
+  attr :state, :atom, default: :fact, values: [:fact, :new, :observation]
+
+  attr :fact, :map,
+    default: nil,
+    doc: "a Fact from `Gallformers.Import.gall_facts/1` (the `:fact` state)"
+
+  attr :new, :string, default: nil, doc: ~s|what a new Fact will be ("Host"), for `:new`|
+  attr :of, :map, required: true, doc: "the Gall: `name`, `undescribed?`"
+  attr :editing, :boolean, default: false, doc: "Edit mode: Gallformers' block and its actions"
+  attr :on_close, :string, required: true
+  attr :target, :any, default: nil
+  slot :actions, doc: "Edit mode: the actions in Gallformers' block"
+  slot :inner_block, doc: "a new Fact's form (`:new`), or the observation's (`:observation`)"
+
+  def fact_inspector(%{state: state} = assigns) when state in [:new, :observation] do
+    assigns =
+      assign(assigns,
+        title: if(state == :observation, do: "Add from observation", else: "New " <> assigns.new)
+      )
+
+    ~H"""
+    <section id={@id} aria-label={@title} class="gf-sheet">
+      <.inspector_head kind={@title} on_close={@on_close} target={@target} />
+      <p data-part="of" class="text-meta text-muted">
+        For
+        <GallformersWeb.DomainComponents.gall_name
+          name={@of.name}
+          undescribed={Map.get(@of, :undescribed?, false)}
+        />
+      </p>
+      <div class="mt-3">{render_slot(@inner_block)}</div>
+    </section>
+    """
+  end
+
+  def fact_inspector(assigns) do
+    ~H"""
+    <section id={@id} aria-label={"Who says so: " <> kind_label(@fact)} class="gf-sheet">
+      <.inspector_head kind={kind_label(@fact)} on_close={@on_close} target={@target} />
+
+      <div class="flex flex-col gap-1">
+        <p data-part="value" class="font-brand text-section text-ink"><.ref_value fact={@fact} /></p>
+        <p data-part="of" class="text-meta text-muted">
+          {of_words(@fact)}
+          <GallformersWeb.DomainComponents.gall_name
+            name={@of.name}
+            undescribed={Map.get(@of, :undescribed?, false)}
+          />
+          <span :if={host_page(@fact)}>
+            · <.link navigate={host_page(@fact)}>Host page</.link>
+          </span>
+        </p>
+      </div>
+
+      <p data-part="standing" class="mt-3 flex flex-wrap items-center gap-2 text-ui text-ink-2">
+        <%= case @fact.standing do %>
+          <% :unconfirmed -> %>
+            <.chip variant={:warn}>Unconfirmed</.chip>
+            <span>Only in Gallformers' original data; no other Source states it.</span>
+          <% {:holds, n} -> %>
+            <.chip variant={:ok}>Holds</.chip>
+            <span>Stated by {n} {if n == 1, do: "Source", else: "Sources"}.</span>
+        <% end %>
+      </p>
+
+      <div class="mt-4 flex flex-col border-t border-line">
+        <div class="flex items-baseline justify-between gap-2 pt-3">
+          <h3 class="text-meta font-semibold text-muted">Who says so</h3>
+          <span class="text-caption text-muted">Gallformers, then newest first</span>
+        </div>
+        <.statement
+          :if={@fact.gallformers || @editing}
+          line={@fact.gallformers}
+          gallformers
+          actions={if @editing, do: @actions, else: []}
+        />
+        <.statement :for={line <- @fact.sources} line={line} />
+      </div>
+    </section>
+    """
+  end
+
+  attr :kind, :string, required: true
+  attr :on_close, :string, required: true
+  attr :target, :any, default: nil
+
+  defp inspector_head(assigns) do
+    ~H"""
+    <div class="mb-2 flex items-center justify-between gap-2">
+      <span data-part="kind" class="text-meta font-semibold text-muted">{@kind}</span>
+      <.button
+        size="sm"
+        variant="ghost"
+        icon="ph-x"
+        icon_only
+        label="Close"
+        phx-click={@on_close}
+        phx-target={@target}
+      />
+    </div>
+    """
+  end
+
+  attr :line, :map, default: nil, doc: "nil: Gallformers hasn't stated it (Edit mode)"
+  attr :gallformers, :boolean, default: false
+  attr :actions, :list, default: [], doc: "the actions slot, in Edit mode"
+
+  # Gallformers in Edit mode, with nothing stated yet: its block, its actions.
+  defp statement(%{line: nil} = assigns) do
+    ~H"""
+    <article
+      data-part="statement"
+      data-source="gallformers"
+      class="flex flex-col gap-1 border-b border-line py-3 last:border-b-0"
+    >
+      <p class="text-ui">
+        <span class="font-semibold text-ink">Gallformers</span>
+        <span class="text-ink-2">hasn't stated this</span>
+      </p>
+      <div :if={@actions != []} data-part="actions" class="flex flex-col gap-2 pt-1">
+        {render_slot(@actions)}
+      </div>
+    </article>
+    """
+  end
+
+  # One Source's statement: the same template for every Source.
+  defp statement(assigns) do
+    assigns =
+      assign(assigns,
+        shown: Enum.take(assigns.line.quotes, 2),
+        more: max(length(assigns.line.quotes) - 2, 0)
+      )
+
+    ~H"""
+    <article
+      data-part="statement"
+      data-source={if @gallformers, do: "gallformers", else: @line.source_id}
+      class="flex flex-col gap-1 border-b border-line py-3 last:border-b-0"
+    >
+      <p class="text-ui">
+        <span :if={@gallformers} class="font-semibold text-ink">Gallformers</span>
+        <.link :if={!@gallformers} navigate={"/source/#{@line.source_id}"} class="font-semibold">
+          {@line.name}
+        </.link>
+        <span class="text-ink">
+          {if @line.stance == :deny, do: "says it isn't so", else: "says so"}
+        </span>
+        <span class="text-meta text-muted">
+          · {when_words(@line, @gallformers)}{state_words(@line)}
+        </span>
+      </p>
+      <p :if={@line.words != []} data-part="words" class="text-meta text-ink-2">
+        Written as {Enum.map_join(@line.words, ", ", &"“#{&1}”")}
+      </p>
+      <p
+        :for={o <- @line.observations}
+        data-part="observation"
+        class="flex items-center gap-2 text-meta text-ink-2"
+      >
+        <img
+          :if={o[:thumbnail_url]}
+          src={o.thumbnail_url}
+          alt=""
+          class="size-10 shrink-0 rounded-ctl object-cover"
+        />
+        <span>
+          Based on
+          <.link href={observation_href(o)} target="_blank" rel="noreferrer">
+            {observation_name(o)} {o.id}
+          </.link>
+          <span :if={grade_words(o[:quality_grade])}>({grade_words(o[:quality_grade])})</span>
+        </span>
+      </p>
+      <.source_quote :for={q <- @shown} page={q.page && "p. #{q.page}"} class="text-meta">
+        <span class="line-clamp-4">{q.quote}</span>
+      </.source_quote>
+      <p :if={@more > 0} data-part="more-quotes" class="text-caption text-muted">
+        {@more} more {if @more == 1, do: "quote", else: "quotes"}
+      </p>
+      <div :if={@actions != []} data-part="actions" class="flex flex-col gap-2 pt-1">
+        {render_slot(@actions)}
+      </div>
+    </article>
+    """
+  end
+
+  defp observation_href(%{url: url}) when is_binary(url) and url != "", do: url
+
+  defp observation_href(%{provider: provider, id: id}) when provider in [:bugguide, "bugguide"],
+    do: "https://bugguide.net/node/view/#{id}"
+
+  defp observation_href(%{id: id}), do: "https://www.inaturalist.org/observations/#{id}"
+
+  defp observation_name(%{provider: provider}) when provider in [:bugguide, "bugguide"],
+    do: "BugGuide observation"
+
+  defp observation_name(_observation), do: "iNaturalist observation"
+
+  @doc "An iNaturalist quality grade in words (nil for none)."
+  @spec grade_words(String.t() | nil) :: String.t() | nil
+  def grade_words("research"), do: "Research Grade"
+  def grade_words("needs_id"), do: "Needs ID"
+  def grade_words("casual"), do: "Casual"
+  def grade_words(_grade), do: nil
+
+  defp when_words(%{date: nil}, true), do: "original data, undated"
+  defp when_words(%{date: nil}, false), do: "undated"
+  defp when_words(%{date: date}, _gallformers), do: date
+
+  defp state_words(%{state: :awaiting}), do: " · awaiting a curator"
+
+  defp state_words(%{state: :declined, reason: reason}) when reason not in [nil, ""],
+    do: " · declined: #{reason}"
+
+  defp state_words(%{state: :declined}), do: " · declined"
+  defp state_words(_line), do: ""
+
+  defp kind_label(%{kind: :host}), do: "Host"
+  defp kind_label(%{kind: :inducer}), do: "Inducer"
+  defp kind_label(%{kind: :trait, trait: trait}), do: trait_label(trait)
+  defp kind_label(%{kind: kind}) when kind in [:range, :occurrence], do: "Range"
+  defp kind_label(%{kind: :alias, value: %{kind: :former_label}}), do: "Former label"
+  defp kind_label(%{kind: :alias}), do: "Common name"
+
+  defp of_words(%{kind: :host}), do: "A Host of"
+  defp of_words(%{kind: :inducer}), do: "The Inducer of"
+  defp of_words(%{kind: :trait}), do: "A Trait of"
+  defp of_words(%{kind: kind}) when kind in [:range, :occurrence], do: "The range of"
+  defp of_words(%{kind: :alias, value: %{kind: :former_label}}), do: "A former label of"
+  defp of_words(%{kind: :alias}), do: "A common name of"
+
+  # A Host's own page: a species or below its Host page, a genus or
+  # section its rank page.
+  defp host_page(%{kind: :host, value: %{subject: %{taxon_id: id, rank: rank}}})
+       when rank in @species_ranks,
+       do: "/host/#{id}"
+
+  defp host_page(%{kind: :host, value: %{subject: %{rank: rank, name: name}}}),
+    do: TaxonomyURL.public_path(%{rank: rank, name: name})
+
+  defp host_page(_fact), do: nil
 
   defp humanize(nil), do: ""
   defp humanize(text), do: text |> to_string() |> String.replace("_", " ")
