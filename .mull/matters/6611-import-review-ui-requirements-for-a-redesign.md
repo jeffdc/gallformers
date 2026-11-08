@@ -335,3 +335,67 @@ Delete `ReviewLive.Step`, the Facts page's LiveView (its preview loading moves i
 Package 115 at desktop and phone, light and dark: every kind of question, a batch, a Trait card with several Galls, a dispute, the hedges, the facts step, approve. Jeff walks a Source through.
 
 **Order:** 1 → 2 → 3 → (4, 5, 6 in any order) → 7 → 8 → 9 → 10 → 11. **Not in this build:** the Sources list, the Gallformers notes page, `c8c3` item 10 (singular and plural as one term, back end), the dry run's cost at scale (`c90c`).
+
+
+## Task 1: what the back end can do (mapped 2026-11-08)
+
+Every write is a public `Gallformers.Import` function taking an `Actor`, so the new review calls them directly. Decision shapes per kind are authoritative in `Import.Queue` (moduledoc table); `Questions.picked_decision/2` shows how the test bed builds them.
+
+- **Deciding:** `decide_queue_item/3` → `{:ok, item}` or `:already_decided | :gone | Changeset | {:rejected, listener, reason}` (tree refusal, text via `taxonomy_refusal/1`). `decide_group/3` for identical disputes, with `"except" => [ids]` for unticked Galls. `accept_proposals/2` never refuses as a whole: `%{decided, skipped: [{item, reason}]}`; the batch card shows the skipped ones.
+- **Undo:** `undo_decision/2` (and all-or-none `undo_decisions/2`); refusals have text via `undo_refusal/1` with an optional link to the taxon or Gall.
+- **Notes:** `add_note/3`, on open or decided items. **Approve / Deny:** `approve_package/2`, `deny_package/3` (reason required). **Facts edits:** `edit_fact/5` (drop, Host, values, note), `remove_fact_edit/2`.
+- **Reads:** `Loader.entries/3` (question, quotes, holds, accept `{:firm|:suggestion, decision}`, rejected, comparison, genera and new_plant for Hosts, members for dispute groups); `ReviewContext.host/2` (WCVP panel), `.taxon/1`, `.gall/2`; `preview_package/2` (dry run, run in the background as the Facts page does).
+- **Pending options:** none today; every `pending:` is false.
+
+**Gaps the build must close (back end already supports them):**
+- A Trait term's firm proposal is `%{"category" => c}` (these Galls only); the test bed recommends `place` (every Source) and never sends `category`. The new card sends `categories` per Gall, which covers both.
+- Per-Gall `categories` take a list of values; the test bed sent one value or nil. The new card sends lists.
+- Trait disputes carry `subject["facts" | "suggestions" | "placements"]`; the test bed read only the `findings` prose. The new card pre-ticks from them.
+- "Another Gall…" found by search sends a bare `gall_id` with no drop / Host-reading settling.
+- An ambiguous Host name also accepts `%{"new" => true}`; the test bed doesn't offer it.
+
+**Test-bed affordances not in the mockup (questions for Jeff, 2026-11-08):** Reject the suggestion (keeps it open and out of the batch: the batch's untick covers this?), "Leave the rest out" for hedges, undo of a decided question (with refusals shown in place), refusals shown on the card, the per-question note box and note list, "Create a new plant ↗" and the POWO/IPNI links, the Facts page's per-statement edits (Drop, Change Host, Change values, Note, each with Undo), synonym follow-ups ("Source is right: change the tree"), a new taxon's parent pick, a new Gall's generation pick, per-statement keep / leave / other plant on Gall disagreements.
+
+
+**Jeff's answers (2026-11-08):**
+- **Undo:** on the last answer. After answering, the next card says "Saved: … Undo"; older answers are undone from the Everything view. Refusals show in place with their text and link.
+- **Facts edits:** keep them, plainly. Each statement on the last step gets "Change…" (Drop, Host, Values, Note); an edited one shows what changed and an Undo.
+- **Reject:** no button. Unticking in the batch is enough; unticked suggestions come up next on their own.
+- **Notes:** "Add a note…" in the footer, and the card lists earlier notes on the question under the quotes.
+
+**Settled without asking (inputs a decision needs, drawn as an option's `follow`):** a new taxon's parent pick, a new Gall's generation pick, per-statement keep / leave / another plant on a Gall disagreement, the synonym tree edits ("The Source is right: change the tree"), refusals shown on the card. "Add a new plant ↗" is the test bed's "Create a new plant ↗". No "Leave the rest out" for hedges: they never hold approval and stay out unless stated.
+
+
+## Build progress (2026-11-08)
+
+**Built (uncommitted until Jeff says):**
+- Tasks 1–6 as planned: the capability map (above), the copy pass (`Questions`: "we" for Gallformers' catalog, Gall questions as "Which Gall does <Source> mean by “…”?", "It's another generation: add a new Gall", "Leaves out N statements: …", Trait questions "What does “…” mean for these N Galls?"), `Units`, `review_option use` (plus `href` for "Add a new plant ↗"), `review_rail`, `review_card` (question, batch, hedges, facts), each in the style guide.
+- `Units` keeps "Add a new Gall" and Gall-by-Gall answers out of batches even if firm, and puts "Which Source this is" first.
+- `ReviewLive.Answer`: `ItemRow`'s picking, searching, deciding and follow-up inputs, moved out so the new card shares them (`ItemRow` stays for the Renames page and the old step pages until they go).
+- `ReviewLive.QuestionCard` (Task 7): one-click answers, "Search…" opening the input then "Use this", Suggested / Best guess, Add a new plant, undescribed Galls' candidates first then "If not:", notes, and the Trait card Gall by Gall (Keep as text / Map to values, values pre-ticked from what most readers chose, each reader's values marked, "Use this for the other N Galls", Save). Each Gall's pipeline sentence and marked values come from `Questions` (`line`, `suggested`; a Trait dispute is one Gall).
+- `ReviewLive.Review` (Task 8) on `/admin/review/sources/:id` and `/admin/review/packages/:package_id`: one at a time with the rail, Everything (rows with Suggested / Best guess and Accept, a row opens its card), batches, Skip, "Saved: … Undo", hedges, what approving will add (dry run in the background), Approve, Deny, the taxonomy-queue notice. The Gallformers notes moved to `/admin/review/notes` (the Source LiveView is now only that page); the Sources list opens a Source's review.
+
+**Still to do:** the hedges card's "Add it…" (opens the statement's "Add it…" input); the Facts edits on the last step (Jeff: keep them); Task 9 (keys); Task 10 (retire the step and Facts pages, porting their tests' decision flows to the card's tests; redirect their URLs; remove the overview-only components); Task 11.
+
+**Process note:** Tasks 7 and 8 were written before their LiveView tests (the TDD rule slipped); the tests were added after and caught three bugs.
+
+**Dropped with the old overview, for Jeff to decide:** the Source head (citation, kind, counts, link to the Source in Gallformers); "Names no batch declares" (`UnusedNames`); on Host questions, the WCVP panel with its POWO and IPNI links; on Gall questions, the candidate's side-by-side comparison with what the Source says. None is in the mockup.
+
+
+**Jeff on the dropped overview aids (2026-11-08):** (1) link to the Source when it's already in Gallformers; no citation; the counts are redundant. Done: the rail links "The Source in Gallformers →" under the title. (2) "Names no batch declares", (3) the WCVP panel, (4) the candidate Gall comparison: to discuss.
+
+
+**Decided (Jeff, 2026-11-08):** (2) "Names no batch declares" is shown only once it can be acted on: the action is back-end work, `c8c3` item 12. (3) Host questions get one plain WCVP line (built: `review_wcvp_panel` `line`, read in the background; POWO and IPNI only when WCVP has nothing). (4) Each candidate Gall's summary is its comparison in a sentence, the side-by-side behind "Compare" (built; `Questions` gives the sentence as the comparison's `brief`).
+
+
+**Jeff, 2026-11-08 (walk-through of 115, paused to align):** a Source is authoritative for what it says. Every statement goes in credited to it, including ones that disagree with what we have; the review asks only what Gallformers can't tell (which plant, Gall or term) and what the pipeline's AIs disputed. So a candidate Gall is always one click: its comparison (sentence + Compare) is evidence for the identity call, not statements to settle. Done: `Questions` no longer makes a disagreeing candidate a `:statements` follow-up; leaving out one statement is the Facts edits' Drop / Change Host. The settling code left in `Answer` (`settle`, `:statements`), `Questions.picked_decision({:statements, …})` and `review_settle_list` are now unused by any page: remove them in Task 10. Also: answers needing input say "Search…" for a name and "Choose…" for a value; Esc in any typeahead closes its results keeping the text (the shared hook; its doc promised it). A one-Gall species asked only for an unnamed generation is `c8c3` item 13.
+
+
+**Fixed (2026-11-08, from Jeff's walk-through):** accepting a batch went through `Import.accept_proposals/2`, which takes only proposals the back end stored; a Trait term's suggestion is the readers' majority, worked out by `Questions`, so every one was skipped ("None of them could be accepted") and the same batch came back. The page now decides each suggestion as it shows it (`decide_queue_item/3`); a refused one, like an unticked one, comes up on its own afterwards, and unticked ones stay out of later batches.
+
+
+**Jeff, 2026-11-08:** the Trait card's value list took too much room with each definition under its value; back to the mockup's columns of checkboxes, the definition on hover. Built: `review_value_list` `compact` (columns of plain inputs, a defined value underlined dotted, its definition in a `tooltip`), and the catalog's `tooltip` component itself (Approved, never built until now; `glossary_tooltip` still to move onto it). Hover and keyboard focus only: on a phone the definitions don't show.
+
+
+**Jeff, 2026-11-08:** the dotted underline is `fact_ref`'s alone ("who says so"); a definition must not look like one. The Trait list's definitions have no underline: "Hover a value to see its definition." above the values, the definition in a `tooltip`. `glossary_tooltip`'s dotted underline clashes the same way on the public pages; the Fact inspector build (`87a1`, its own session and worktree) was sent the note to settle it there.
+

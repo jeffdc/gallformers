@@ -359,7 +359,7 @@ defmodule GallformersWeb.Admin.ReviewLive.NamesStepTest do
       assert has_element?(
                view,
                "#item-#{torymus.id}-choices",
-               "Drops 1 statement: the parasitoid of the large stem galls."
+               "Leaves out 1 statement: the parasitoid of the large stem galls."
              )
     end
 

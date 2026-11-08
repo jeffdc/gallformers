@@ -53,9 +53,9 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `typeahead` | FormComponents | Forms | Approved (consolidate) | `typeahead`, `multi_select`, `multi_select_dropdown`, `multi_select_typeahead` |
 | `file_drop` | FormComponents | Forms | Built | `file_dropzone`, the image managers' hand-built drop boxes |
 | `radio_card` | FormComponents | Forms | Built | the review's hand-built option cards (`review_option`, `review_value_list`) |
-| `review_option` | ReviewComponents | Forms | Built; extension Approved (`use`) | — |
-| `review_rail` | ReviewComponents | Page structure | Approved | the review overview's "Where this Source stands" table, the step tab bar, the repeated Source card and "holds approval" lines |
-| `review_card` | ReviewComponents | Page structure | Approved | `ReviewLive.ItemRow`'s expanding rows and the step pages' sections |
+| `review_option` | ReviewComponents | Forms | Built (`use` included) | — |
+| `review_rail` | ReviewComponents | Page structure | Built | the review overview's "Where this Source stands" table, the step tab bar, the repeated Source card and "holds approval" lines |
+| `review_card` | ReviewComponents | Page structure | Built (the `:trait` body comes with the review page) | `ReviewLive.ItemRow`'s expanding rows and the step pages' sections |
 | `fact_editor` | FactsComponents | Forms | Built | the review Facts page's and the admin Source page's two copies of the form under a Fact |
 | `save_bar` | FormComponents | Forms | Approved (pending the save model) | per-section Save buttons |
 | `filter_select` | FormComponents | Forms | Built | the ID page's filter dropdowns |
@@ -65,7 +65,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `notice` | FeedbackComponents | Feedback | Built | `alert`, `error_message`, `.gf-admin-info`, info banners |
 | `toast` | CoreComponents (flash) | Feedback | Approved (restyle) | `flash` |
 | `dialog` | FeedbackComponents | Overlays | Built | `modal`, `dangerous_delete_modal`, `discard_confirm_modal` |
-| `tooltip` | UIComponents | Overlays | Approved (restyle) | `info_tip`, `glossary_tooltip` |
+| `tooltip` | UIComponents | Overlays | Built (`glossary_tooltip` still to move onto it) | `info_tip`, `glossary_tooltip` |
 | `skeleton`, `spinner` | FeedbackComponents | Feedback | Approved (`skeleton` to build when a page needs it; the old one was unused and removed) | `loading_spinner`, `loading_overlay` |
 | `loading_spinner` | UIComponents | Feedback | Built (restyled; `tone`) | — |
 | `progress_bar` | FeedbackComponents | Feedback | Built | host ranges' `<progress>`, the upload hooks' bars, `review_progress`'s bar |
@@ -436,7 +436,7 @@ One answer to a curator's question, as a `radio_card`: what it is, what choosing
 - Slots: `extra` (under it, chosen or not: a comparison), `follow` (shown once chosen, in a `data-role="follow"` grid).
 - Put the options in a `role="radiogroup"` element labelled with the question, as `radio_card`'s. For a Trait's values use `review_value_list`.
 
-#### Approved extension: `use`
+#### `use`
 
 For the one-at-a-time review (`6611`, mockup `/dev/mockups/source-reading/:package_id`). With `use`, the option is decided in one click: a button at its right ("Use this") sends `on_pick`, and no separate Decide button is needed. An option that needs input first (a plant or Gall search) shows "Search…" in its place, which opens its `follow`. The recommended option's button is primary. Without `use` the option behaves as today (a radio, then Decide).
 
@@ -489,7 +489,7 @@ It is also the browse tree. Its toggle opens the card across the grid to every g
 
 A filter with counts: a legend and options, each with how many results it would leave ("leaf 41 · stem 22 · bud 12"). For the ID page and browse pages. Options with zero results are dimmed, not hidden; options past `limit` hide behind "Show N more". Attributes: `id`, `title`, `name`, `options` (`%{value:, label:, count:, selected:}`), `multiple` (checkboxes named `name[]`, with an empty value so clearing all still sends the param), `limit`, `italic`. It sits inside the page's `<form phx-change>`.
 
-### `review_rail` (Approved)
+### `review_rail`
 
 The side of a Source's review page: where the curator is, and how to move. Pinned beside the review card on wide screens, below it on phones. Top to bottom:
 
@@ -501,13 +501,13 @@ The side of a Source's review page: where the curator is, and how to move. Pinne
 
 Every count on the page comes from one tally: questions answered and to go, the ones that must be answered before approving among them, the hedged statements apart. Attributes: `tally`, `stages`, `next`, `hedged`, `title`; events `stage`, `hedges`, `approve`, `deny`. Mockup: `/dev/mockups/source-reading/:package_id`.
 
-### `review_card` (Approved)
+### `review_card`
 
 One unit of a Source's review, the one thing on the page (`6611`). A panel holding, top to bottom: the kind of question in small type ("Host plants · needed before you can approve"); **Affects**, the Galls and which of their Facts the answer settles; the question as the heading (headings wrap normally, `text-wrap`, not balanced); the Source's words (`source_quote`, two at most); the answers; a footer with Add a note…, Read the Source and Skip for now. Variants (`kind`):
 
-- `:question`: the answers are `review_option`s with `use` (one click each). A Host nothing matches offers Search…, Add a new plant… ↗ and Leave this Host out, in that order. An undescribed Gall first asks "Is it one of these Galls we already have?", listing the genus's undescribed Galls with the one whose Host the Source names first.
+- `:question`: the answers are `review_option`s with `use` (one click each). A Host nothing matches offers Search…, Add a new plant… ↗ and Leave this Host out, in that order. An undescribed Gall first asks "Is it one of these Galls we already have?", listing the genus's undescribed Galls with the one whose Host the Source names first. A Host question says in one plain line what WCVP has for the name (`review_wcvp_panel` with `line`; POWO and IPNI links only when WCVP has nothing). Each candidate Gall's summary is its comparison in a sentence ("Agrees on 2 of 3: Host and where on the plant. Conflicts on generation and season."), the side-by-side (`review_gall_comparison`) behind "Compare".
 - `:batch`: a group's firm suggested answers as a checklist, ticked by default ("9 of the 13 Traits questions have suggested answers. They look right to us. Untick any you want to check yourself."); each row "texture: lumpy → Keep as text"; "Accept all 9" / "Accept the 8 ticked". Unticked ones come next on their own. "Create a new Gall" and "It depends on the Gall" are never batched.
-- `:trait`: a Trait term or a Trait dispute, one block per Gall it covers: the Gall, the Source's sentence, one line on what the pipeline made of it ("The import pipeline couldn't agree how to map “lumpy” to a texture value." / "The producer mapped “fleshy” to succulent. A checker disagreed: …"), "What each AI said" folded away, then two `radio_card`s: "Keep “lumpy” as text" or "Map it to texture values", which opens every value of the Trait as checkboxes (`review_value_list`), each side's values pre-ticked and marked. "Use this for the other N Galls" copies one Gall's answer to the rest. Save waits until each Gall has an answer.
+- `:trait`: a Trait term or a Trait dispute, one block per Gall it covers: the Gall, the Source's sentence, one line on what the pipeline made of it ("The import pipeline couldn't agree how to map “lumpy” to a texture value." / "The producer mapped “fleshy” to succulent. A checker disagreed: …"), "What each AI said" folded away, then two `radio_card`s: "Keep “lumpy” as text" or "Map it to texture values", which opens every value of the Trait as checkboxes in columns (`review_value_list` `compact`: each definition in a `tooltip` on its value, "Hover a value to see its definition." above them; no underline, as a dotted underline is `fact_ref`'s), each side's values pre-ticked and marked. "Use this for the other N Galls" copies one Gall's answer to the rest. Save waits until each Gall has an answer.
 - `:hedges`: the hedged statements, grouped, each with Add it…, and Back to the questions.
 - `:facts`: the last step before Approve: what approving will add, by Gall (`facts_view`).
 
@@ -549,7 +549,7 @@ Confirmation and discarding are patterns, not variants (see the component's docs
 
 ### `tooltip`
 
-Exists. Restyle: `bg-ink text-paper`, `shadow-float`, caption size.
+A short explanation of what it wraps, shown below it on hover or keyboard focus: `bg-ink text-paper`, `shadow-float`, caption size; the wrapped content is described by it (`aria-describedby`). It doesn't show on touch screens, so nothing may depend on it. Attributes: `id`, `text`, `class`; the inner block is what it explains. The review's Trait card shows each value's definition with it (`review_value_list` `compact`).
 
 ## Content
 

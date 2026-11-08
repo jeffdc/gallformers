@@ -24,7 +24,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_row fact_chip review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option review_option-use review_value_list-compact tooltip review_rail review_card taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
        sample_view: "photos",
        sample_choice: "0",
        sample_selected: MapSet.new([2]),
@@ -944,6 +944,203 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
                 <span class="text-meta text-muted">The reason goes here.</span>
               </:follow>
             </GallformersWeb.ReviewComponents.review_option>
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="review_option-use"
+          title="review_option, use"
+          code={
+            ~S'''
+            <ReviewComponents.review_option use id="u-0" name="u" value="0" recommended
+              label="Quercus alba" summary="WCVP: accepted. Held in the tree." on_pick="pick" />
+            <ReviewComponents.review_option use id="u-1" name="u" value="1"
+              label="Another plant…" on_pick="pick">
+              <:follow>…the plant search…</:follow>
+            </ReviewComponents.review_option>
+            '''
+          }
+        >
+          <div class="gf-density-reading grid gap-2">
+            <GallformersWeb.ReviewComponents.review_option
+              use
+              id={"u-#{theme}-0"}
+              name={"u-#{theme}"}
+              value="0"
+              recommended
+              label="Quercus alba"
+              summary="WCVP: accepted. Held in the tree."
+              on_pick="noop"
+            />
+            <GallformersWeb.ReviewComponents.review_option
+              use
+              id={"u-#{theme}-1"}
+              name={"u-#{theme}"}
+              value="1"
+              label="Another plant…"
+              on_pick="noop"
+            >
+              <:follow>
+                <span class="text-meta text-muted">The plant search goes here.</span>
+              </:follow>
+            </GallformersWeb.ReviewComponents.review_option>
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="review_value_list-compact"
+          title="review_value_list, compact"
+          code={
+            ~S'''
+            <ReviewComponents.review_value_list id="g1-list" type="checkbox" compact
+              values={[{"tan", "Tan to light brown."}, …]} selected={["tan"]}
+              noted={["tan", "white"]} note="suggested" on_pick="trait_value" params={%{ref: "g1"}} />
+            '''
+          }
+        >
+          <div class="gf-density-reading">
+            <GallformersWeb.ReviewComponents.review_value_list
+              id={"vl-#{theme}"}
+              type="checkbox"
+              compact
+              values={[
+                {"tan", "Tan to light brown, the color of a paper bag."},
+                {"white", "White or nearly so."},
+                {"brown", "Brown, darker than tan."},
+                {"red", "Red to pink."},
+                {"green", nil}
+              ]}
+              selected={["tan"]}
+              noted={["tan", "white"]}
+              note="suggested"
+              on_pick="noop"
+            />
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="tooltip"
+          title="tooltip"
+          code={
+            ~S'''
+            <.tooltip id="def-tan" text="Tan to light brown.">tan</.tooltip>
+            '''
+          }
+        >
+          <p class="text-ui text-ink">
+            Hover or tab to
+            <GallformersWeb.UIComponents.tooltip
+              id={"tip-#{theme}"}
+              text="Tan to light brown, the color of a paper bag."
+            >
+              <span tabindex="0" class="cursor-help font-semibold">
+                tan
+              </span>
+            </GallformersWeb.UIComponents.tooltip>
+          </p>
+        </.example>
+
+        <.example
+          :let={_theme}
+          id="review_rail"
+          title="review_rail"
+          code={
+            ~S'''
+            <ReviewComponents.review_rail title={@source.title} tally={Units.tally(@entries)}
+              stages={Units.stages(@entries, @unit)} next={Enum.map(Units.next(@units), &Units.label/1)}
+              approval={@approval} on_stage="stage" on_hedges="hedges" on_approve="approve" on_deny="deny" />
+            '''
+          }
+        >
+          <div class="max-w-sm">
+            <GallformersWeb.ReviewComponents.review_rail
+              title="Field Guide to the Herb & Bramble Gall Wasps"
+              tally={%{done: 12, left: 23, total: 35, holding: 22, hedged: 81}}
+              stages={[
+                %{id: :names, title: "Names", state: :done, left: 0},
+                %{id: :galls, title: "Galls", state: :current, left: 9},
+                %{id: :disputes, title: "Disputes", state: :done, left: 0},
+                %{id: :traits, title: "Traits", state: :todo, left: 14}
+              ]}
+              next={["Galls: Diastrophus s-rubus-stem-gall", "Trait terms: lumpy"]}
+              approval={{:waiting, ["Galls"]}}
+              on_stage="noop"
+              on_hedges="noop"
+              on_approve="noop"
+              on_deny="noop"
+            />
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="review_card"
+          title="review_card"
+          code={
+            ~S'''
+            <ReviewComponents.review_card id="card" section="Host plants" holds
+              heading="Which plant is “N. crepideneus”?" quotes={@quotes} affects={@affects}
+              item_id={@item.id} skip_key="q-7" on_note="note" on_read="read" on_skip="skip">
+              …review_option use, one per answer…
+            </ReviewComponents.review_card>
+            <ReviewComponents.review_card id="batch" kind={:batch} section="Trait terms" stage="Traits"
+              of={13} rows={@rows} unticked={@unticked} skip_key="batch-trait_terms"
+              on_tick="tick" on_accept="accept" on_skip="skip" />
+            '''
+          }
+        >
+          <div class="gf-density-reading grid gap-4">
+            <GallformersWeb.ReviewComponents.review_card
+              id={"card-#{theme}"}
+              section="Host plants"
+              holds
+              heading="Which plant is “N. crepideneus”?"
+              affects={[%{name: "Diastrophus nebulosus", undescribed: false, what: "its Host"}]}
+              quotes={[%{text: "Galls on N. crepideneus, common about Ithaca.", where: "p. 12"}]}
+              item_id={7}
+              skip_key="q-7"
+              on_note="noop"
+              on_read="noop"
+              on_skip="noop"
+            >
+              <GallformersWeb.ReviewComponents.review_option
+                use
+                id={"cu-#{theme}-0"}
+                name={"cu-#{theme}"}
+                value="0"
+                recommended
+                label="Nabalus crepidineus"
+                summary="WCVP: accepted. The Source misspells it."
+                on_pick="noop"
+              />
+            </GallformersWeb.ReviewComponents.review_card>
+            <GallformersWeb.ReviewComponents.review_card
+              id={"batch-#{theme}"}
+              kind={:batch}
+              section="Trait terms"
+              stage="Traits"
+              of={13}
+              rows={[
+                %{id: 1, trait: "texture", term: "lumpy", answer: "Keep as text", covers: 1},
+                %{id: 2, trait: "color", term: "reddish", answer: "red", covers: 4}
+              ]}
+              unticked={MapSet.new([2])}
+              skip_key="batch-trait_terms"
+              on_tick="noop"
+              on_accept="noop"
+              on_skip="noop"
+            />
+            <GallformersWeb.ReviewComponents.review_card
+              id={"hedges-#{theme}"}
+              kind={:hedges}
+              groups={[{"Host plants", [%{id: 4, text: "possibly also on Q. rubra"}]}]}
+              on_add="noop"
+              on_back="noop"
+            />
+            <GallformersWeb.ReviewComponents.review_card id={"facts-#{theme}"} kind={:facts} loading />
           </div>
         </.example>
 

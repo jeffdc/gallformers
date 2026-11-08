@@ -445,6 +445,36 @@ defmodule GallformersWeb.UIComponents do
   def legacy_source_text, do: @legacy_source_text
 
   @doc """
+  A short explanation of what it wraps, shown on hover or keyboard focus
+  (`bg-ink text-paper`, caption size, `shadow-float`), below it. The
+  wrapped content is described by it (`aria-describedby`). Hover only: on a
+  touch screen it doesn't show, so nothing must depend on it.
+
+  ## Examples
+
+      <.tooltip id="def-tan" text="Tan to light brown.">tan</.tooltip>
+  """
+  attr :id, :string, required: true
+  attr :text, :string, required: true
+  attr :class, :any, default: nil, doc: "layout only"
+  slot :inner_block, required: true
+
+  def tooltip(assigns) do
+    ~H"""
+    <span id={@id} class={["group/tip relative inline-flex", @class]}>
+      <span aria-describedby={"#{@id}-text"}>{render_slot(@inner_block)}</span>
+      <span
+        id={"#{@id}-text"}
+        role="tooltip"
+        class="pointer-events-none absolute top-full left-0 z-50 mt-1 hidden w-64 rounded-ctl bg-ink px-3 py-2 text-caption font-normal text-paper shadow-float group-focus-within/tip:block group-hover/tip:block"
+      >
+        {@text}
+      </span>
+    </span>
+    """
+  end
+
+  @doc """
   Renders a glossary term with hover tooltip showing its definition.
 
   Displays the term inline with a dotted underline and help cursor.

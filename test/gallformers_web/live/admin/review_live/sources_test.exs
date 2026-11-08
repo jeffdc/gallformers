@@ -93,8 +93,8 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcesTest do
     assert {:error, {:live_redirect, %{to: to}}} =
              view |> element("#{row} a", "Galls of the oaks") |> render_click()
 
-    # A Source opens at its first step with work left.
-    assert to == ~p"/admin/review/packages/#{package.id}/names"
+    # A Source opens at its review.
+    assert to == ~p"/admin/review/packages/#{package.id}"
   end
 
   test "groups the packages of a Source Gallformers holds under it", %{conn: conn} do
@@ -114,7 +114,7 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcesTest do
     assert {:error, {:live_redirect, %{to: to}}} =
              view |> element("#source-#{source.id} a", source.title) |> render_click()
 
-    assert to == ~p"/admin/review/sources/#{source.id}/names"
+    assert to == ~p"/admin/review/sources/#{source.id}"
   end
 
   test "the Gallformers notes are one Source, listing its notes", %{conn: conn} do
@@ -137,7 +137,7 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcesTest do
     assert has_element?(view, "#source-#{gallformers.id}", "2 notes")
 
     # Each waits on a Host name ("Q. lobata"), so it needs the curator.
-    {:ok, page, _html} = live(conn, ~p"/admin/review/sources/#{gallformers.id}?tab=needs")
+    {:ok, page, _html} = live(conn, ~p"/admin/review/notes?tab=needs")
 
     for note <- notes do
       assert has_element?(page, "#note-#{note.id}", "the large stem galls")

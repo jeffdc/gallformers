@@ -156,10 +156,10 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
       q = present(both_conflict())
 
       assert q.question ==
-               "Which Gall is Osten Sacken 1862's “the woolly twig gall of C. q. operator”?"
+               "Which Gall does Osten Sacken 1862 mean by “the woolly twig gall of C. q. operator”?"
 
       assert q.scope ==
-               "Osten Sacken 1862 doesn't name its generation. Gallformers holds 2 Galls for the " <>
+               "Osten Sacken 1862 doesn't say which generation. We have 2 Galls for the " <>
                  "species."
     end
 
@@ -198,8 +198,25 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
                 "Woolly masses on the staminate flowers."}
 
       assert it.comparison.meta == "Agrees on 0 of 2 stated fields · 3 photos · 2 Sources"
+      assert it.comparison.brief == "Differs on Host. Conflicts on where on the plant."
       assert it.comparison.quoted_in == nil
       assert [%{kind: :conflict, text: "Conflicts: where on the plant"}] = it.tags
+    end
+
+    test "the comparison in a sentence: what agrees, then what differs and conflicts" do
+      fields = %{
+        "host" => "agree",
+        "where" => "agree",
+        "detachable" => "none",
+        "generation" => "conflict",
+        "form" => "none"
+      }
+
+      item = named(%{"candidate_ids" => [501], "comparisons" => [comparison(501, fields)]})
+      it = choice(present(item), "It's Callirhytis quercusoperator (sexgen)")
+
+      assert it.comparison.brief ==
+               "Agrees on 2 of 3: Host and where on the plant. Conflicts on generation and season."
     end
 
     test "a Gall whose description comes from this Source says so" do
@@ -266,90 +283,13 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
       assert choice(q, "It's Callirhytis quercusoperator (sexgen)").proposed == true
     end
 
-    test "a candidate the Source disagrees with is settled statement by statement" do
+    test "a candidate the Source disagrees with is still one click: what differs is shown" do
       q = present(both_conflict())
       it = choice(q, "It's Callirhytis quercusoperator (sexgen)")
 
-      assert it.picker == :statements
-      assert it.decision == nil
-      assert it.base == %{"gall_id" => 501}
-
-      assert it.statements == [
-               %{
-                 key: "host",
-                 label: "Host: “Q. nigra”",
-                 refs: ["f2"],
-                 keep: "Keep it as Quercus nigra",
-                 reading: "Q. nigra",
-                 as: nil,
-                 other: "He means another plant",
-                 note:
-                   "Records what Osten Sacken 1862 means by “Q. nigra”, for every use of it " <>
-                     "in Osten Sacken 1862.",
-                 left: "Osten Sacken 1862's “Q. nigra” is left out.",
-                 read:
-                   "Osten Sacken 1862's “Q. nigra” is read as %{taxon} throughout Osten Sacken 1862."
-               },
-               %{
-                 key: "where",
-                 label: "Where on the plant: “on the twigs”",
-                 refs: ["f7"],
-                 keep: "Keep it",
-                 reading: nil,
-                 as: nil,
-                 other: nil,
-                 note: nil,
-                 left: "Osten Sacken 1862's “on the twigs” is left out.",
-                 read: nil
-               }
-             ]
-
-      assert Questions.picked_decision(it, {:statements, %{"host" => :keep, "where" => :keep}}) ==
-               %{"gall_id" => 501}
-
-      assert Questions.picked_decision(
-               it,
-               {:statements, %{"host" => {:reading, 99}, "where" => :leave}}
-             ) == %{
-               "gall_id" => 501,
-               "drop" => ["f7"],
-               "host_reading" => %{"name" => "Q. nigra", "taxon_id" => 99}
-             }
-
-      assert Questions.picked_decision(it, {:statements, %{"host" => :leave, "where" => :leave}}) ==
-               %{"gall_id" => 501, "drop" => ["f2", "f7"]}
-    end
-
-    test "a Host above species rank goes on another plant for this Gall only, not read" do
-      genus = %{name: "Quercus", written: "Quercus", refs: ["f2"], rank: :genus}
-      sections = [%{id: 7, name: "Lobatae", common_name: "Red Oaks"}]
-
-      q =
-        present(both_conflict(), %{
-          gall_view: %{view() | source: %{@source | hosts: [genus]}},
-          host_sections: sections
-        })
-
-      it = choice(q, "It's Callirhytis quercusoperator (sexgen)")
-      assert it.sections == sections
-      host = Enum.find(it.statements, &(&1.key == "host"))
-
-      assert %{
-               reading: "Quercus",
-               as: "host_taxon_id",
-               other: "On another plant",
-               note:
-                 "Puts this Gall's “Quercus” on the plant you pick, for this Gall only: " <>
-                   "Osten Sacken 1862's other “Quercus” statements stay as they are.",
-               read:
-                 "Osten Sacken 1862's “Quercus” goes in on %{taxon}, for this Gall only. " <>
-                   "Osten Sacken 1862's other “Quercus” statements stay as they are."
-             } = host
-
-      assert Questions.picked_decision(
-               it,
-               {:statements, %{"host" => {:reading, 99}, "where" => :leave}}
-             ) == %{"gall_id" => 501, "drop" => ["f7"], "host_taxon_id" => 99}
+      assert it.decision == %{"gall_id" => 501}
+      assert it.picker == nil
+      assert it.comparison.brief == "Differs on Host. Conflicts on where on the plant."
     end
 
     test "another generation's Gall asks for its generation, the held ones not offered" do
@@ -359,7 +299,7 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
           "comparisons" => [comparison(501, fields("agree", "agree"))]
         })
 
-      create = choice(present(item), "It's another generation's Gall: create it")
+      create = choice(present(item), "It's another generation: add a new Gall")
 
       assert create.picker == :generation
       assert create.decision == nil
@@ -375,7 +315,7 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
                %{"new" => true, "generation" => "agamic"}
 
       # With every generation held, it is created as it is.
-      both = choice(present(both_conflict()), "It's another generation's Gall: create it")
+      both = choice(present(both_conflict()), "It's another generation: add a new Gall")
       assert both.decision == %{"new" => true}
       assert both.picker == nil
     end
@@ -392,8 +332,8 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
       q = present(item)
       galls = Enum.filter(labels(q), &(&1 =~ ~r/^It's (Callirhytis|Gall)/))
       assert length(galls) == 3
-      assert "Choose from 2 more possible Galls…" in labels(q)
-      assert choice(q, "Choose from 2 more possible Galls…").picker == :gall
+      assert "2 more Galls that could be it…" in labels(q)
+      assert choice(q, "2 more Galls that could be it…").picker == :gall
       assert q.others == [%{id: 504, name: "Gall four"}, %{id: 505, name: "Gall five"}]
     end
   end
@@ -417,9 +357,9 @@ defmodule GallformersWeb.Admin.Review.GallsQuestionsTest do
       q = present(item)
 
       assert q.question ==
-               "Is Osten Sacken 1862's “wart-like excrescences” a Gall Gallformers holds?"
+               "Which Gall does Osten Sacken 1862 mean by “wart-like excrescences”?"
 
-      assert q.scope == "Gallformers holds 2 undescribed Galls that could be it."
+      assert q.scope == "We have 2 undescribed Galls that could be it."
       refute q.proposal.firm
       assert q.proposal.check == "Best match: confirm it"
       assert [%{kind: :best, text: "Best match: confirm it"}] = choice(q, "It's Gall three").tags

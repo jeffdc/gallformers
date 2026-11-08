@@ -306,21 +306,21 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp copy(:called_new, who),
     do:
-      {"Names #{who} calls new that Gallformers already holds",
+      {"Names #{who} calls new that we already have",
        "#{cap(who)} describes these as new. Gallformers holds the same species under a later " <>
          "genus or another spelling. Accepting uses that taxon and creates no duplicate.", true,
        "Holds approval: a wrong choice creates a duplicate taxon", @blocks}
 
   defp copy(:not_held, who),
     do:
-      {"Names Gallformers doesn't hold",
+      {"Names we don't have",
        "Gallformers has no taxon by these names. Where it holds one in another spelling or " <>
          "genus, that is proposed; otherwise choose the taxon #{who} means, or create it.", true,
        "Holds approval", @blocks}
 
   defp copy(:several_species, who),
     do:
-      {"Names Gallformers holds under more than one species",
+      {"Names we have for more than one species",
        "Gallformers holds this name for more than one species, as happens with misapplied or " <>
          "invalid names. Compare what each species is with what #{who} describes. (A name held " <>
          "twice by the same species is no question: it resolves to that species.)", true,
@@ -328,7 +328,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp copy(:synonyms, who),
     do:
-      {"#{cap(poss(who))} names that Gallformers now treats as synonyms",
+      {"#{cap(poss(who))} names we now treat as synonyms",
        "#{cap(who)} treats these as valid species; later work sank them into other species. " <>
          "Following Gallformers puts #{poss(who)} statements on the current species. " <>
          "#{cap(poss(who))} name is kept as the original combination.", true,
@@ -343,7 +343,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp copy(:gall_match, who),
     do:
-      {"Galls that match more than one Gall entry",
+      {"Galls that could be one of several we have",
        "Gallformers holds several Galls each of these could be. Pick the one #{who} describes.",
        true, "Holds these Galls' statements", @blocks}
 
@@ -363,7 +363,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp copy(:new_galls, _who),
     do:
-      {"Galls Gallformers doesn't hold",
+      {"Galls we don't have",
        "No Gall Gallformers holds matches these. Create each one, or pick the entry it is.", true,
        "Holds these Galls' statements", @blocks}
 
@@ -375,7 +375,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp copy(:trait_terms, who),
     do:
-      {"Trait terms to settle",
+      {"Trait terms",
        "Words #{who} uses for a Trait (a color, a form, a texture…) that Gallformers doesn't " <>
          "know yet. Until you settle a term, the Galls that use it show the Source's own words " <>
          "for that Trait and have no Gallformers value for it, so the ID tool can't find them " <>
@@ -773,7 +773,9 @@ defmodule GallformersWeb.Admin.Review.Questions do
           [
             %Choice{
               label: "Leave this Host out",
-              hint: drops_text(item.statement_ref, ctx) <> " The Galls' other statements go in.",
+              hint:
+                drops_text(item.statement_ref, ctx) <>
+                  " Everything else #{ctx.who} says about the Galls still goes in.",
               decision: %{"skip" => true}
             }
           ]
@@ -902,9 +904,9 @@ defmodule GallformersWeb.Admin.Review.Questions do
     %{
       written: written,
       context: gall_context(item, ctx),
-      question: "Which Gall is #{poss(ctx.who)} “#{written}”?",
+      question: "Which Gall does #{ctx.who} mean by “#{written}”?",
       scope:
-        "#{cap(ctx.who)} doesn't name its generation. Gallformers holds #{n} " <>
+        "#{cap(ctx.who)} doesn't say which generation. We have #{n} " <>
           "#{plural(n, "Gall", "Galls")} for the species.",
       proposal: gall_proposal(item, ctx, firm_gall_why(item)),
       undecided: gall_undecided(item, ctx),
@@ -922,8 +924,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
     %{
       written: written,
       context: gall_context(item, ctx),
-      question: "Which Gall is #{poss(ctx.who)} “#{written}”?",
-      scope: "Gallformers holds #{n} #{plural(n, "Gall", "Galls")} it could be.",
+      question: "Which Gall does #{ctx.who} mean by “#{written}”?",
+      scope: "We have #{n} #{plural(n, "Gall", "Galls")} it could be.",
       proposal: gall_proposal(item, ctx, firm_gall_why(item)),
       undecided: gall_undecided(item, ctx),
       choices:
@@ -989,8 +991,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
     %{
       written: written,
       context: gall_context(item, ctx),
-      question: "Is #{poss(ctx.who)} “#{written}” a Gall Gallformers holds?",
-      scope: "Gallformers holds #{n} undescribed #{plural(n, "Gall", "Galls")} that could be it.",
+      question: "Which Gall does #{ctx.who} mean by “#{written}”?",
+      scope: "We have #{n} undescribed #{plural(n, "Gall", "Galls")} that could be it.",
       proposal: gall_proposal(item, ctx, why),
       undecided: gall_undecided(item, ctx),
       choices:
@@ -1007,8 +1009,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
       if item.proposal["proposed"] == "new",
         do:
           proposal(
-            "Create it as a new Gall",
-            "no Gall Gallformers holds matches it",
+            "Add it as a new Gall",
+            "none of our Galls matches it",
             %{"new" => true},
             firm: false
           ),
@@ -1017,15 +1019,15 @@ defmodule GallformersWeb.Admin.Review.Questions do
     %{
       written: written,
       context: gall_context(item, ctx),
-      question: "Gallformers holds no Gall that matches “#{written}”. Create it?",
+      question: "We don't have a Gall that matches “#{written}”. Add it as a new one?",
       proposal: proposal,
       undecided: gall_undecided(item, ctx),
       choices:
         gall_choices(item, ctx) ++
           [
             %Choice{
-              label: "Create it as a new Gall",
-              hint: "Adds a new Gall for #{poss(ctx.who)} description.",
+              label: "Add it as a new Gall",
+              hint: "Adds a new Gall from what #{ctx.who} says about it.",
               decision: %{"new" => true}
             },
             another_gall(item, ctx),
@@ -1061,7 +1063,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
           read_host(ctx.fact, ctx.who, ctx),
           %Choice{
             label: "Drop it",
-            hint: "It is left out; #{poss(ctx.who)} words stay in the Source's text.",
+            hint: "It's left out. #{cap(poss(ctx.who))} words stay in the Source's text.",
             decision: %{"skip" => true}
           }
         ]
@@ -1076,30 +1078,30 @@ defmodule GallformersWeb.Admin.Review.Questions do
     trait = item.subject["trait"]
     tn = trait_name(trait)
     gall = disputed_gall(ctx.fact, ctx)
+    sides = sides(item)
 
     %{
       written: term,
       trait: trait,
       tag: "Disputed",
       context: gall,
-      question: "Should “#{term}” go in as #{if gall, do: poss(gall), else: "the Gall's"} #{tn}?",
+      question: "What does “#{term}” mean for #{gall || "this Gall"}?",
       proposal: nil,
       undecided: disputed(),
-      sides: sides(item),
+      sides: sides,
       voices: voices(item),
+      galls: [dispute_gall(item, gall, term, sides)],
       statement: "“#{term}” (#{tn})",
       about: gall,
       choices: [
         %Choice{
-          label: "Keep it",
-          hint:
-            "It goes in as the producer wrote it: the Gall gets the #{tn} value “#{term}” is " <>
-              "placed under.",
+          label: "Keep the producer's value",
+          hint: "The Gall gets the #{tn} value the producer chose for “#{term}”.",
           decision: %{"keep" => true}
         },
         %Choice{
-          label: "Drop it",
-          hint: "The Gall keeps “#{term}” as text, with no #{tn} value.",
+          label: "Keep it as text",
+          hint: "The Gall shows “#{term}” in the Source's words, with no #{tn} value.",
           decision: %{"skip" => true}
         }
       ]
@@ -1111,7 +1113,6 @@ defmodule GallformersWeb.Admin.Review.Questions do
   defp build(:trait_terms, %QueueItem{kind: :trait_term} = item, ctx) do
     term = item.subject["term"]
     trait = item.subject["trait"]
-    tn = trait_name(trait)
     ambiguous? = item.subject["status"] == "ambiguous"
     reading = term_reading(item, ctx)
     galls = term_galls(item, reading)
@@ -1123,11 +1124,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
       context: covered_names(item),
       trait: trait,
       tag: if(ambiguous?, do: "Used in more than one sense", else: "New term"),
-      question:
-        if(ambiguous?,
-          do: "What #{tn} value does “#{term}” mean, Gall by Gall?",
-          else: "What #{tn} value is “#{term}”?"
-        ),
+      question: "What does “#{term}” mean for #{these_galls(length(galls))}?",
       scope:
         if(ambiguous?,
           do: "“#{term}” is used in more than one sense, so it is never placed for every Source.",
@@ -1170,14 +1167,14 @@ defmodule GallformersWeb.Admin.Review.Questions do
     picker = if item.subject["slot"] == "place", do: :place, else: :statement
 
     state = %Choice{
-      label: "State it…",
-      hint: "Use this when you judge the Source states it outright. You choose what it says.",
+      label: "Add it…",
+      hint: "Add it if you think the Source says it outright. You choose what it states.",
       picker: picker
     }
 
     leave = %Choice{
       label: "Leave it out",
-      hint: "It stays out; the words remain in the Source's text.",
+      hint: "It stays out. The words stay in the Source's text.",
       decision: %{"keep" => true}
     }
 
@@ -1192,7 +1189,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
     %{
       written: term,
       context: context,
-      question: "Should this hedged statement go in as a Fact?",
+      question: "Should this hedged statement go in?",
       proposal:
         proposal("Leave it out", "A hedge stays out unless you state it", %{"keep" => true}),
       choices: [leave | if(covered_galls(item) == [], do: [], else: [state])]
@@ -1299,7 +1296,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
     %{
       written: written,
       context: if(item.subject["title"], do: item.subject["citation"]),
-      question: "Is “#{written}” a Source Gallformers already holds?",
+      question: "Is “#{written}” a Source we already have?",
       proposal: nil,
       undecided: undecided(item, ctx, :sources),
       candidates: candidates(item, ctx, :sources),
@@ -1901,24 +1898,22 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp candidate(ctx, kind, id), do: %{id: id, name: name(ctx, kind, id)}
 
-  # Each Gall offered: compared with what the Source says, tagged, and,
-  # when the Source disagrees with it, its statements to settle first.
+  # Each Gall offered, taken in one click: compared with what the Source
+  # says, and tagged. Where the Source disagrees with the Gall, its
+  # statements still go in, credited to it (Jeff, 2026-11-08: a Source is
+  # authoritative for what it says; the comparison is evidence for whether
+  # it is the same Gall, not questions to settle).
   defp gall_choices(item, ctx) do
     for id <- Enum.take(proposed_first(item), @shown) do
       name = name(ctx, :galls, id)
       fields = gall_fields(item, id)
       base = %{"gall_id" => id}
-      disagree = disagreeing(fields, ctx)
 
       %Choice{
         label: "It's #{name}",
-        hint: "#{cap(poss(ctx.who))} statements go on #{name}.",
-        decision: if(disagree == [], do: base),
+        hint: "What #{ctx.who} says about it goes on #{name}.",
+        decision: base,
         base: base,
-        picker: if(disagree != [], do: :statements),
-        statements: disagree,
-        sections:
-          if(Enum.any?(disagree, &(&1.as == "host_taxon_id")), do: ctx.host_sections, else: []),
         comparison: gall_table(ctx, id, name, fields),
         tags: gall_tags(item, id)
       }
@@ -2055,8 +2050,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp create_gall(ctx),
     do: %Choice{
-      label: "It's a Gall Gallformers doesn't hold: create it",
-      hint: "Adds a new Gall for #{poss(ctx.who)} description.",
+      label: "It's a Gall we don't have: add it",
+      hint: "Adds a new Gall from what #{ctx.who} says about it.",
       decision: %{"new" => true}
     }
 
@@ -2068,9 +2063,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
     choose? = Enum.any?(generations, &(not &1.held))
 
     %Choice{
-      label: "It's another generation's Gall: create it",
-      hint:
-        "A new Gall of this species, of a generation Gallformers doesn't hold a Gall for yet.",
+      label: "It's another generation: add a new Gall",
+      hint: "A new Gall of this species, for a generation we don't have a Gall for yet.",
       decision: if(choose?, do: nil, else: %{"new" => true}),
       picker: if(choose?, do: :generation),
       generations: if(choose?, do: generations, else: [])
@@ -2089,10 +2083,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
     case length(candidate_ids(item)) - @shown do
       more when more > 0 ->
         %Choice{
-          label: "Choose from #{more} more possible #{plural(more, "Gall", "Galls")}…",
-          hint:
-            "They agree on fewer fields with what #{ctx.who} says. Or search Galls by name, " <>
-              "Inducer or Host.",
+          label: "#{more} more #{plural(more, "Gall", "Galls")} that could be it…",
+          hint: "They match less of what #{ctx.who} says. Or search by name, Inducer or Host.",
           picker: :gall
         }
 
@@ -2108,12 +2100,14 @@ defmodule GallformersWeb.Admin.Review.Questions do
   defp leave_gall(item, ctx) do
     n = length(about_gall(ctx, item.statement_ref))
 
+    statements = if n == 1, do: "the one statement", else: "all #{n} statements"
+
     hint =
       if n > 0,
         do:
-          "Its #{n} #{plural(n, "statement is", "statements are")} dropped: its Host, where it " <>
-            "is, its description and its traits.",
-        else: "Its statements are dropped."
+          "Leaves out #{statements} #{ctx.who} makes about it: its Host, where it's found, " <>
+            "its description and its traits.",
+        else: "Leaves out what #{ctx.who} says about it."
 
     %Choice{label: "Leave this Gall out", hint: hint, decision: %{"skip" => true}}
   end
@@ -2192,7 +2186,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
       n ->
         parts = [facts_part(facts, ref, ctx), acts_part(acts)] |> Enum.filter(& &1)
-        "Drops #{n} #{plural(n, "statement", "statements")}: #{and_list(parts)}."
+        "Leaves out #{n} #{plural(n, "statement", "statements")}: #{and_list(parts)}."
     end
   end
 
@@ -2313,6 +2307,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
     stated = Enum.count(rows, &(&1.mark != :none))
     agrees = Enum.count(rows, &(&1.mark == :agree))
+    marks = for {key, _label} <- @gall_fields, do: {key, Map.get(@marks, fields[key], :none)}
 
     meta =
       [
@@ -2329,12 +2324,41 @@ defmodule GallformersWeb.Admin.Review.Questions do
       rows: rows,
       description: {source[:text], gall[:description]},
       meta: meta,
+      brief: brief(marks),
       quoted_in: gall[:quoted_in] && "✓ Gallformers' description comes from #{gall.quoted_in}",
       path: "/gall/#{id}?edit"
     }
   end
 
   defp gall_table(_ctx, _id, _name, _fields), do: nil
+
+  @field_words %{
+    "host" => "Host",
+    "where" => "where on the plant",
+    "detachable" => "detachable",
+    "generation" => "generation and season",
+    "form" => "form"
+  }
+
+  # A candidate's comparison in a sentence or two: "Agrees on 2 of 3: Host
+  # and where on the plant. Conflicts on generation and season." Nil when
+  # the Source states none of the fields.
+  defp brief(marks) do
+    words = fn mark -> for {key, ^mark} <- marks, do: @field_words[key] end
+    {agree, differ, conflict} = {words.(:agree), words.(:differ), words.(:conflict)}
+    stated = length(agree) + length(differ) + length(conflict)
+
+    [
+      agree != [] && "Agrees on #{length(agree)} of #{stated}: #{and_list(agree)}.",
+      differ != [] && "Differs on #{and_list(differ)}.",
+      conflict != [] && "Conflicts on #{and_list(conflict)}."
+    ]
+    |> Enum.filter(& &1)
+    |> case do
+      [] -> nil
+      parts -> Enum.join(parts, " ")
+    end
+  end
 
   defp source_value("host", source) do
     case List.wrap(source[:hosts]) do
@@ -2399,92 +2423,6 @@ defmodule GallformersWeb.Admin.Review.Questions do
         and_list(values)
     end
   end
-
-  # The Source's statements a candidate disagrees with (a field that differs
-  # or conflicts) that a curator can leave out: each field's Facts, and for
-  # the Host its name, to read as another plant.
-  defp disagreeing(fields, %{gall_view: %{source: source}} = ctx) do
-    for {key, _label} <- @gall_fields,
-        Map.get(fields, key) in ["differ", "conflict"],
-        entry = settle(key, source, ctx),
-        do: entry
-  end
-
-  defp disagreeing(_fields, _ctx), do: []
-
-  # A Host above species rank (a genus: the Source's name for many Galls)
-  # goes on the plant picked for this Gall only (`"host_taxon_id"`); one at
-  # species rank is read as the plant throughout the Source.
-  defp settle("host", source, ctx) do
-    hosts = List.wrap(source[:hosts])
-    refs = Enum.flat_map(hosts, &List.wrap(&1[:refs]))
-    written = hosts |> Enum.map(&(&1.written || &1.name)) |> Enum.uniq()
-    what = "“#{Enum.join(written, ", ")}”"
-    who = cap(poss(ctx.who))
-
-    if refs != [] do
-      %{
-        key: "host",
-        label: "Host: #{what}",
-        refs: refs,
-        keep: "Keep it as #{hosts |> Enum.map(& &1.name) |> Enum.uniq() |> and_list()}",
-        reading: if(match?([_], written), do: hd(written)),
-        left: "#{who} #{what} is left out."
-      }
-      |> Map.merge(
-        if above_species?(hosts),
-          do: %{
-            as: "host_taxon_id",
-            other: "On another plant",
-            note:
-              "Puts this Gall's #{what} on the plant you pick, for this Gall only: " <>
-                "#{who} other #{what} statements stay as they are.",
-            read:
-              "#{who} #{what} goes in on %{taxon}, for this Gall only. " <>
-                "#{who} other #{what} statements stay as they are."
-          },
-          else: %{
-            as: nil,
-            other: "He means another plant",
-            note: "Records what #{ctx.who} means by #{what}, for every use of it in #{ctx.who}.",
-            read: "#{who} #{what} is read as %{taxon} throughout #{ctx.who}."
-          }
-      )
-    end
-  end
-
-  defp settle(key, source, ctx) do
-    entries = List.wrap(source[settle_key(key)])
-    refs = Enum.flat_map(entries, &List.wrap(&1[:refs]))
-    what = "“#{Enum.map_join(entries, ", ", &(&1.term || &1.value))}”"
-
-    if refs != [] do
-      %{
-        key: key,
-        label: "#{settle_label(key)}: #{what}",
-        refs: refs,
-        keep: "Keep it",
-        reading: nil,
-        as: nil,
-        other: nil,
-        note: nil,
-        left: "#{cap(poss(ctx.who))} #{what} is left out.",
-        read: nil
-      }
-    end
-  end
-
-  defp above_species?(hosts),
-    do: Enum.any?(hosts, &(Map.get(&1, :rank) not in [nil | @species_level]))
-
-  # The season is the part of "generation and season" a Source states as Facts.
-  defp settle_key("generation"), do: :season
-  defp settle_key(key), do: source_key(key)
-
-  defp settle_label("where"), do: "Where on the plant"
-  defp settle_label("detachable"), do: "Detachable"
-  defp settle_label("generation"), do: "Season"
-  defp settle_label("form"), do: "Form"
 
   # A Gall question's line beside the Source's words: its Host and where.
   defp gall_context(item, %{gall_view: %{source: source}}) do
@@ -2613,18 +2551,72 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   # Each covered Gall: its name, its quotes, what the readers said, and
   # what most of them chose (a category, `:text` for none, or nil).
+  # Each Gall a term covers: what its readers said and chose (`suggested`,
+  # every value one chose, marked on the card), what most chose
+  # (`default`), and what the pipeline made of it in a sentence (`line`).
   defp term_galls(item, reading) do
     v3? = item.subject["format_version"] == 3
+    term = item.subject["term"]
+    tn = trait_name(item.subject["trait"])
 
-    for %{cover: cover, most: most} <- reading.covers, is_binary(cover["gall"]) do
+    for %{cover: cover, most: most, readings: readings} <- reading.covers,
+        is_binary(cover["gall"]) do
+      default = gall_default(most)
+
       %{
         ref: cover["gall"],
         name: cover["name_as_written"] || "a Gall",
         quotes: cover_quotes(cover),
         said: producer_said(cover) ++ checkers_said(cover, reading.names, v3?),
-        default: gall_default(most)
+        default: default,
+        suggested:
+          readings |> Enum.flat_map(fn {_who, set} -> List.wrap(set) end) |> chosen_values(),
+        line: pipeline_line(default, term, tn)
       }
     end
+  end
+
+  defp chosen_values(values), do: values |> Enum.filter(&is_binary/1) |> Enum.uniq()
+
+  defp pipeline_line(nil, term, tn),
+    do: "The import pipeline couldn't agree how to map “#{term}” to a #{tn} value."
+
+  defp pipeline_line(:text, _term, _tn),
+    do: "The import pipeline suggests keeping the words as text."
+
+  defp pipeline_line(values, _term, _tn),
+    do: "The import pipeline suggests #{and_list(List.wrap(values))}."
+
+  # A dispute about a Trait term as the one Gall's answer to give: nothing
+  # chosen to start with, the producer's values and the checkers' marked.
+  defp dispute_gall(item, gall, term, sides) do
+    producer = chosen_values(List.wrap(item.subject["suggestions"]))
+
+    checkers =
+      item.subject["placements"] |> List.wrap() |> Enum.flat_map(&List.wrap(&1["category"]))
+
+    mapped =
+      if producer == [],
+        do: "The producer kept “#{term}” as text.",
+        else: "The producer mapped “#{term}” to #{and_list(producer)}."
+
+    objection =
+      case sides.checker do
+        [first | _] -> " A checker disagreed: #{first}"
+        [] -> ""
+      end
+
+    %{
+      ref: item.statement_ref,
+      name: gall || "this Gall",
+      quotes: [],
+      said:
+        Enum.map(sides.producer, &"The producer: #{&1}") ++
+          Enum.map(sides.checker, &"A checker: #{&1}"),
+      default: nil,
+      suggested: chosen_values(producer ++ checkers),
+      line: mapped <> objection
+    }
   end
 
   defp gall_default([]), do: :text
@@ -2743,6 +2735,9 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp here_get(1, value), do: "The Gall here gets #{value}."
   defp here_get(n, value), do: "The #{n} Galls here get #{value}."
+
+  defp these_galls(n) when n <= 1, do: "this Gall"
+  defp these_galls(n), do: "these #{n} Galls"
 
   defp galls_word(1), do: "This Gall"
   defp galls_word(2), do: "Both Galls"

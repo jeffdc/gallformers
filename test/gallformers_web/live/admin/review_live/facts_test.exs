@@ -143,7 +143,7 @@ defmodule GallformersWeb.Admin.ReviewLive.FactsTest do
   # -- the page --------------------------------------------------------------------
 
   describe "the page" do
-    test "is a step of the Source's review, in the bar and on the overview", %{conn: conn} do
+    test "is a step of the Source's review, in the bar", %{conn: conn} do
       %{package: package} = ready!()
       base = "/admin/review/packages/#{package.id}"
 
@@ -162,14 +162,6 @@ defmodule GallformersWeb.Admin.ReviewLive.FactsTest do
 
       {:ok, step, _html} = live(conn, "#{base}/names")
       assert has_element?(step, "#step-bar-facts[href='#{base}/facts']")
-
-      {:ok, overview, _html} = live(conn, base)
-
-      assert has_element?(
-               overview,
-               "#overview a[href='#{base}/facts']",
-               "See every Fact this Source would add"
-             )
     end
 
     test "a Source's page has its Facts at its own path", %{conn: conn} do

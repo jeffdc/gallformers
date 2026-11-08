@@ -73,44 +73,11 @@ defmodule GallformersWeb.Admin.ReviewLive.StepTest do
 
   defp open_items(package), do: Import.list_queue_items(package)
 
-  defp overview(conn, package), do: live(conn, ~p"/admin/review/packages/#{package.id}")
-
   defp step(conn, package, step),
     do: live(conn, ~p"/admin/review/packages/#{package.id}/#{step}")
 
-  describe "the overview" do
-    test "names the Source by its short name, with a row per step", %{conn: conn} do
-      package = awaiting!()
-      open = open_items(package)
-      names = Enum.count(open, &(&1.kind in [:unresolved_host, :unresolved_name]))
-
-      {:ok, view, html} = overview(conn, package)
-
-      assert has_element?(view, "h1", "Ashmead 1897")
-      assert html =~ "Galls of the oaks"
-
-      assert has_element?(view, "#overview-names", "Names")
-      assert has_element?(view, "#overview-names", "Which organisms does the Source mean?")
-      assert has_element?(view, "#overview-names", "#{names} of #{names} left")
-      assert has_element?(view, "#overview-names", "with a recommended answer")
-      assert has_element?(view, "#overview-names", "Holds approval")
-
-      assert has_element?(view, "#overview-hedges", "1 of 1 left")
-      assert has_element?(view, "#overview-hedges", "Doesn't hold approval")
-      assert has_element?(view, "#overview-disputes", "All settled")
-
-      # Continue goes to the first step with work left.
-      assert has_element?(
-               view,
-               "#continue[href='/admin/review/packages/#{package.id}/names']",
-               "Continue: Names"
-             )
-
-      # The questions themselves are on the step pages.
-      refute has_element?(view, "#section-hosts")
-    end
-
-    test "a Source Gallformers holds has its overview and steps at its own path", %{conn: conn} do
+  describe "paths" do
+    test "a Source Gallformers holds has its review and steps at its own path", %{conn: conn} do
       source = source_fixture("Ashmead, W. H. 1897. Galls of the oaks", "1897")
 
       gall =
@@ -125,7 +92,6 @@ defmodule GallformersWeb.Admin.ReviewLive.StepTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/review/sources/#{source.id}")
       assert has_element?(view, "h1", "Weld 1897")
-      assert has_element?(view, "#continue[href='/admin/review/sources/#{source.id}/names']")
 
       {:ok, view, _html} = live(conn, ~p"/admin/review/sources/#{source.id}/names")
       assert has_element?(view, "#section-hosts #item-#{host.id}", "Q. lobata")
@@ -214,7 +180,7 @@ defmodule GallformersWeb.Admin.ReviewLive.StepTest do
     test "Approve appears once nothing holds approval, and asks before applying",
          %{conn: conn} do
       package = settled!()
-      {:ok, view, _html} = overview(conn, package)
+      {:ok, view, _html} = step(conn, package, "hedges")
 
       refute has_element?(view, "#approve-wait")
       refute has_element?(view, "#approve-confirm")

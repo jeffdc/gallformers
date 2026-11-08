@@ -29,10 +29,11 @@ defmodule GallformersWeb.ReviewComponents do
   import GallformersWeb.CoreComponents, only: [icon: 1]
   import GallformersWeb.ActionComponents, only: [button: 1]
   import GallformersWeb.DataComponents, only: [chip: 1]
-  import GallformersWeb.DomainComponents, only: [source_quote: 1]
+  import GallformersWeb.DomainComponents, only: [gall_name: 1, source_quote: 1]
   import GallformersWeb.FeedbackComponents, only: [notice: 1, progress_bar: 1]
   import GallformersWeb.FormComponents, only: [radio_card: 1, search_field: 1]
   import GallformersWeb.PageComponents, only: [panel: 1]
+  import GallformersWeb.UIComponents, only: [loading_spinner: 1, tooltip: 1]
 
   # The rows' columns, as flex items so the column heads line up with the
   # rows: a question row (`review_question_row/1`: the chevron, the Source's
@@ -575,6 +576,45 @@ defmodule GallformersWeb.ReviewComponents do
     default: nil,
     doc: "the plant to create when WCVP has nothing (`review_new_plant/1`'s `prefill`)"
 
+  attr :line, :boolean,
+    default: false,
+    doc: "one plain line under a question (the one-at-a-time review), not a notice"
+
+  def review_wcvp_panel(%{line: true} = assigns) do
+    ~H"""
+    <p id={@id} data-role="wcvp" class="text-meta text-ink-2">
+      <%= cond do %>
+        <% @host == nil -> %>
+          <span class="italic text-muted">Looking “{@written}” up in WCVP…</span>
+        <% @host.wcvp == nil -> %>
+          WCVP doesn't have “{@written}” or a near spelling. Search
+          <a
+            href={"https://powo.science.kew.org/results?q=#{URI.encode_www_form(@written)}"}
+            target="_blank"
+            rel="noopener"
+          >
+            POWO ↗
+          </a>
+          or <a
+            href={"https://www.ipni.org/?q=#{URI.encode_www_form(@written)}"}
+            target="_blank"
+            rel="noopener"
+          >IPNI ↗</a>.
+        <% true -> %>
+          {wcvp_line(@host, @written)}
+          <a
+            :if={@host.held && @host.held[:taxon_id]}
+            href={~p"/admin/taxonomy/#{@host.held.taxon_id}"}
+            target="_blank"
+            rel="noopener"
+          >
+            Open ↗
+          </a>
+      <% end %>
+    </p>
+    """
+  end
+
   def review_wcvp_panel(assigns) do
     ~H"""
     <.notice id={@id} data-role="wcvp" kind={:info}>
@@ -636,7 +676,8 @@ defmodule GallformersWeb.ReviewComponents do
     """
   end
 
-  defp new_plant_href(prefill) do
+  @doc "The New Taxon page started with the plant `prefill` (`review_new_plant/1`)."
+  def new_plant_href(prefill) do
     query =
       for {key, value} <- [
             name: prefill[:name],
@@ -677,6 +718,37 @@ defmodule GallformersWeb.ReviewComponents do
       end
 
     "#{holds}#{status}#{held}"
+  end
+
+  # "WCVP: Nabalus crepidineus DC. (Accepted). We don't have it yet."
+  defp wcvp_line(host, written) do
+    record = full_name(host.wcvp.name, host.wcvp.authors)
+
+    found =
+      if host.match == :exact,
+        do: "WCVP: #{record}",
+        else: "WCVP doesn't have “#{written}” as written. Nearest spelling: #{record}"
+
+    status =
+      case host do
+        %{accepted: %{name: name, authors: authors}} ->
+          ", a synonym of #{full_name(name, authors)}"
+
+        %{wcvp: %{status: status}} when is_binary(status) ->
+          " (#{status})"
+
+        _ ->
+          ""
+      end
+
+    held =
+      case host.held do
+        %{name: name} -> " We have it as #{name}."
+        nil -> " We don't have it yet."
+      end
+
+    sentence = found <> status
+    if String.ends_with?(sentence, "."), do: sentence <> held, else: "#{sentence}.#{held}"
   end
 
   defp full_name(name, nil), do: name
@@ -1338,11 +1410,382 @@ defmodule GallformersWeb.ReviewComponents do
   end
 
   @doc """
+  The side of a Source's review (matter `6611`): the Source (linked to it
+  in Gallformers, `source_id`, once it is there), how far along it is, the
+  stages to move between, the hedged statements, what comes next, and
+  Approve with why it waits. Every count comes from `tally`
+  (`GallformersWeb.Admin.Review.Units.tally/1`); `stages` from
+  `Units.stages/2`; `approval` is `ReviewLive.SourcePage.approval/3`'s.
+  """
+  attr :title, :string, required: true
+  attr :source_id, :integer, default: nil, doc: "the Source in Gallformers, once it is there"
+  attr :tally, :map, required: true
+  attr :stages, :list, required: true
+  attr :next, :list, default: [], doc: "the next units, one line each"
+  attr :approval, :any, required: true
+  attr :on_stage, :any, required: true
+  attr :on_hedges, :any, required: true
+  attr :on_approve, :any, required: true
+  attr :on_deny, :any, required: true
+  attr :class, :any, default: nil, doc: "layout only"
+
+  def review_rail(assigns) do
+    ~H"""
+    <aside
+      aria-label="Review status"
+      class={["flex flex-col gap-4 rounded-panel border border-line bg-surface p-panel", @class]}
+    >
+      <div class="flex flex-col gap-1">
+        <p class="text-ui text-ink-2">{@title}</p>
+        <.review_source_link :if={@source_id} source_id={@source_id} />
+        <p data-role="answered" class="text-body text-ink">
+          <span class="font-semibold tabular-nums">{@tally.done}</span> of {@tally.total} answered
+        </p>
+        <.progress_bar value={@tally.done} max={max(@tally.total, 1)} />
+        <p :if={@tally.left > 0} data-role="to-go" class="text-meta text-ink-2">
+          {@tally.left} to go.
+          <span :if={@tally.holding > 0}>
+            <span class="text-autumn-ink">{@tally.holding} of them</span>
+            must be answered before you can approve.
+          </span>
+        </p>
+      </div>
+
+      <nav aria-label="Stages" class="flex flex-col">
+        <button
+          :for={stage <- @stages}
+          type="button"
+          phx-click={@on_stage}
+          phx-value-id={stage.id}
+          disabled={stage.left == 0}
+          aria-current={stage.state == :current && "step"}
+          class={[
+            "flex items-center gap-2 rounded-ctl px-2 py-1.5 text-left text-ui",
+            stage.state == :current && "bg-sky-soft font-semibold text-ink",
+            stage.state == :todo && "text-ink-2 hover:bg-surface-2",
+            stage.state == :done && "text-ok"
+          ]}
+        >
+          <.icon :if={stage.state == :done} name="ph-check" class="size-4" />
+          <span :if={stage.state == :current} class="inline-block size-2 rounded-full bg-autumn">
+          </span>
+          <span
+            :if={stage.state == :todo}
+            class="inline-block size-2 rounded-full border border-line-strong"
+          >
+          </span>
+          <span class="flex-1">{stage.title}</span>
+          <span class="text-meta tabular-nums text-muted">
+            {if stage.left == 0, do: "done", else: "#{stage.left} left"}
+          </span>
+        </button>
+      </nav>
+
+      <button
+        :if={@tally.hedged > 0}
+        type="button"
+        phx-click={@on_hedges}
+        class="text-left text-meta text-link hover:underline"
+      >
+        {@tally.hedged} hedged {if @tally.hedged == 1, do: "statement was", else: "statements were"} left out. Review them
+      </button>
+
+      <div :if={@next != []} data-role="next" class="flex flex-col gap-1 border-t border-line pt-3">
+        <p class="text-meta text-muted">Up next</p>
+        <p :for={line <- @next} class="text-meta text-ink-2">{line}</p>
+      </div>
+
+      <div class="flex flex-col gap-1 border-t border-line pt-3">
+        <div :if={@approval != :approved} class="flex flex-wrap items-center gap-3">
+          <.button
+            variant="primary"
+            phx-click={@on_approve}
+            disabled={!match?({:ready, _}, @approval)}
+          >
+            Approve
+          </.button>
+          <.button variant="ghost" phx-click={@on_deny}>Deny…</.button>
+        </div>
+        <p :if={approve_why(@approval, @tally)} data-role="approve-why" class="text-meta text-muted">
+          {approve_why(@approval, @tally)}
+        </p>
+      </div>
+    </aside>
+    """
+  end
+
+  defp approve_why({:ready, _later}, _tally), do: nil
+  defp approve_why(:approved, _tally), do: "Approved."
+
+  defp approve_why(:resolving, _tally),
+    do: "The Source is still being read. You can approve once that's done."
+
+  defp approve_why({:waiting, _}, %{holding: n}) when n > 0,
+    do:
+      "You can approve once the #{n} marked #{if n == 1, do: "question is", else: "questions are"} answered."
+
+  defp approve_why({:waiting, _}, _tally),
+    do: "A question about the Source itself must be answered first."
+
+  defp approve_why(:none, _tally), do: "Nothing here is awaiting review."
+
+  @doc """
+  One unit of a Source's review, the one thing on the page (matter `6611`).
+  `kind`:
+
+    * `:question` and `:trait`: the kind of question (`section`, with
+      "needed before you can approve" when it `holds`), **Affects** (`affects`:
+      `%{name, undescribed, what}`), the question (`heading`, `scope`), the
+      Source's words (`quotes`: `%{text, where}`, two at most), earlier
+      `notes`, the answers (the inner block) and a footer: Add a note…
+      (`on_note`, `phx-value-id` `item_id`, to `note_target`), Read the
+      Source (`on_read`, `phx-value-item` `item_id`), and Skip for now (`on_skip` with `phx-value-key` `skip_key`).
+    * `:batch`: a section's suggested answers as a checklist (`rows`:
+      `%{id, trait, term, answer, covers}`), ticked but for `unticked`;
+      `stage` and `of` (the stage's questions left) say how many these are.
+      A box sends `on_tick` with its id; the button `on_accept` with the
+      ticked ids, comma-separated.
+    * `:hedges`: the hedged statements (`groups`: `{title, [%{id, text}]}`),
+      each with Add it… (`on_add`), and Back to the questions (`on_back`).
+    * `:facts`: what approving will add (the inner block, a `facts_view`),
+      a spinner while `loading`.
+  """
+  attr :id, :string, required: true
+  attr :kind, :atom, default: :question, values: [:question, :trait, :batch, :hedges, :facts]
+  attr :section, :string, default: nil, doc: "the kind of question, e.g. Host plants"
+  attr :holds, :boolean, default: false, doc: "must be answered before approving"
+  attr :affects, :list, default: []
+  attr :heading, :string, default: nil
+  attr :scope, :string, default: nil
+  attr :quotes, :list, default: []
+  attr :notes, :list, default: []
+  attr :item_id, :any, default: nil
+  attr :skip_key, :string, default: nil
+  attr :on_note, :any, default: nil
+  attr :note_target, :any, default: nil, doc: "where Add a note… goes (the card's component)"
+  attr :on_read, :any, default: nil
+  attr :on_skip, :any, default: nil
+  attr :stage, :string, default: nil, doc: "(`:batch`) the stage's title"
+  attr :of, :integer, default: 0, doc: "(`:batch`) the stage's questions left"
+  attr :rows, :list, default: []
+  attr :unticked, :any, default: MapSet.new()
+  attr :on_tick, :any, default: nil
+  attr :on_accept, :any, default: nil
+  attr :groups, :list, default: []
+  attr :on_add, :any, default: nil
+  attr :on_back, :any, default: nil
+  attr :loading, :boolean, default: false
+  attr :class, :any, default: nil, doc: "layout only"
+  slot :inner_block
+  slot :note, doc: "the open note box, under the footer"
+
+  def review_card(%{kind: :batch} = assigns) do
+    ticked = Enum.reject(assigns.rows, &(&1.id in assigns.unticked))
+    n = length(assigns.rows)
+
+    assigns =
+      assign(assigns,
+        ticked: ticked,
+        n: n,
+        others: assigns.of - n,
+        all?: length(ticked) == n
+      )
+
+    ~H"""
+    <section id={@id} class={[card_class(), @class]}>
+      <p data-role="kind" class="text-meta font-semibold text-muted">{@section}</p>
+      <h2 class="font-brand text-section text-ink text-wrap">
+        {if @others > 0,
+          do: "#{@n} of the #{@of} #{@stage} questions have suggested answers",
+          else: "All #{@n} #{@stage} questions have suggested answers"}
+      </h2>
+      <p data-role="intro" class="text-body text-ink-2">
+        They look right to us. Untick any you want to check yourself.
+        <span :if={@others > 0}>
+          After these, the other {@others} come up one at a time, along with any you untick.
+        </span>
+      </p>
+      <ul class="flex flex-col">
+        <li :for={row <- @rows} data-id={row.id} class="border-b border-line">
+          <label class="flex cursor-pointer items-baseline gap-3 py-2 text-body">
+            <input
+              type="checkbox"
+              class="gf-checkbox shrink-0 translate-y-0.5"
+              checked={row.id not in @unticked}
+              phx-click={@on_tick}
+              phx-value-id={row.id}
+            />
+            <span class={["min-w-0", row.id in @unticked && "text-muted"]}>
+              <span :if={row.trait} class="text-muted">{row.trait}: </span>
+              <span class={if row.id in @unticked, do: "text-muted", else: "text-ink"}>
+                {row.term}
+              </span>
+              <span class="text-muted">→</span>
+              <span class="text-ink-2">{row.answer}</span>
+              <span :if={row.covers > 1} class="text-meta text-muted">
+                ({row.covers} Galls)
+              </span>
+            </span>
+          </label>
+        </li>
+      </ul>
+      <div class="flex flex-wrap items-center gap-3">
+        <.button
+          variant="primary"
+          phx-click={@on_accept}
+          phx-value-ids={Enum.map_join(@ticked, ",", & &1.id)}
+          disabled={@ticked == []}
+        >
+          {if @all?, do: "Accept all #{@n}", else: "Accept the #{length(@ticked)} ticked"}
+        </.button>
+        <.skip_link on_skip={@on_skip} skip_key={@skip_key} />
+      </div>
+    </section>
+    """
+  end
+
+  def review_card(%{kind: :hedges} = assigns) do
+    ~H"""
+    <section id={@id} class={[card_class(), @class]}>
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 class="font-brand text-section text-ink text-wrap">Hedged statements</h2>
+        <button type="button" class="text-ui text-link hover:underline" phx-click={@on_back}>
+          Back to the questions
+        </button>
+      </div>
+      <p class="text-body text-ink-2">
+        The Source hedges these (“may”, “possibly”, “presumed”), so we left them out. Add any you think should go in.
+      </p>
+      <div :for={{title, statements} <- @groups} class="flex flex-col">
+        <h3 class="border-b border-line pb-1 text-meta font-semibold text-muted">
+          {title} <span class="font-normal tabular-nums">{length(statements)}</span>
+        </h3>
+        <ul class="flex flex-col">
+          <li
+            :for={statement <- statements}
+            data-id={statement.id}
+            class="flex items-baseline justify-between gap-3 border-b border-line py-2"
+          >
+            <span class="min-w-0 text-body text-ink">{statement.text}</span>
+            <button
+              type="button"
+              class="shrink-0 text-meta text-link hover:underline"
+              phx-click={@on_add}
+              phx-value-id={statement.id}
+            >
+              Add it…
+            </button>
+          </li>
+        </ul>
+      </div>
+    </section>
+    """
+  end
+
+  def review_card(%{kind: :facts} = assigns) do
+    ~H"""
+    <section id={@id} class={[card_class(), @class]}>
+      <h2 class="font-brand text-section text-ink text-wrap">What approving will add</h2>
+      <div :if={@loading} class="flex items-center gap-2 text-body text-ink-2">
+        <.loading_spinner size="sm" label="Working out what approving will add" />
+        Working out what approving will add…
+      </div>
+      <div :if={!@loading} data-role="answers" class="flex flex-col gap-3">
+        {render_slot(@inner_block)}
+      </div>
+    </section>
+    """
+  end
+
+  def review_card(assigns) do
+    ~H"""
+    <section id={@id} class={[card_class(), @class]}>
+      <p data-role="kind" class="text-meta font-semibold text-muted">
+        {@section}<span :if={@holds} class="font-normal text-autumn-ink"> · needed before you can approve</span>
+      </p>
+
+      <div
+        :if={@affects != []}
+        data-role="affects"
+        class="flex flex-col gap-0.5 rounded-ctl bg-surface-2 px-3 py-2"
+      >
+        <p class="text-meta text-muted">Affects</p>
+        <p :for={gall <- @affects} class="text-ui">
+          <span class="text-ink"><.gall_name name={gall.name} undescribed={gall.undescribed} /></span>
+          <span class="text-muted">· {gall.what}</span>
+        </p>
+      </div>
+
+      <h2 class="font-brand text-section text-ink text-wrap">{@heading}</h2>
+      <p :if={@scope} class="text-body text-ink-2">{@scope}</p>
+      <.source_quote :for={quote <- Enum.take(@quotes, 2)} page={quote.where}>
+        <p>“{quote.text}”</p>
+      </.source_quote>
+      <.review_note_list :if={@notes != []} id={"#{@id}-notes"} notes={@notes} />
+
+      <div data-role="answers" class="flex flex-col gap-2">{render_slot(@inner_block)}</div>
+
+      <div class="flex flex-wrap items-center gap-4 text-ui">
+        <button
+          :if={@on_note}
+          type="button"
+          class="text-link hover:underline"
+          phx-click={@on_note}
+          phx-value-id={@item_id}
+          phx-target={@note_target}
+        >
+          Add a note…
+        </button>
+        <button
+          :if={@on_read}
+          type="button"
+          class="text-link hover:underline"
+          phx-click={@on_read}
+          phx-value-item={@item_id}
+        >
+          Read the Source
+        </button>
+        <.skip_link on_skip={@on_skip} skip_key={@skip_key} />
+      </div>
+      {render_slot(@note)}
+    </section>
+    """
+  end
+
+  defp card_class, do: "flex flex-col gap-4 rounded-panel border border-line bg-surface p-6"
+
+  attr :on_skip, :any, required: true
+  attr :skip_key, :string, required: true, doc: "nil: nothing to skip to (no Skip)"
+
+  defp skip_link(assigns) do
+    ~H"""
+    <button
+      :if={@on_skip && @skip_key}
+      type="button"
+      class="ml-auto text-ui text-link hover:underline"
+      phx-click={@on_skip}
+      phx-value-key={@skip_key}
+    >
+      Skip for now
+    </button>
+    """
+  end
+
+  @doc """
   One option of a question, as a radio card: what it is (`label`), what it
   does (`summary`), "Recommended" with who recommends it (`by`) when it is
   the recommended answer, who chose it (`tally`, recommended or not), and
   its follow-up input (the `follow` slot), shown only once it is chosen. The radio sends `on_pick` with
   `phx-value-choice` set to `value`.
+
+  With `use` (the one-at-a-time review, matter `6611`) the option is taken
+  in one click: no radio, a button at its right. An option without a
+  `follow` shows "Use this", sending `on_pick` with `phx-value-use="1"`
+  (decide now); one with a `follow` shows `open_label` ("Search…"),
+  sending `on_pick` without it, which picks the option and opens its
+  `follow`; one with an `href` is a link to it, opened in a new tab ("Add
+  a new plant": `open_label` "Add… ↗"). The recommended option is marked
+  "Suggested" and its button is the primary one.
   """
   attr :id, :string, required: true
   attr :name, :string, required: true, doc: "the radio group's name"
@@ -1360,8 +1803,73 @@ defmodule GallformersWeb.ReviewComponents do
     default: nil,
     doc: "who chose it, shown whether recommended or not; in place of `by`"
 
+  attr :use, :boolean, default: false, doc: "taken in one click, with a button (see above)"
+
+  attr :open_label, :string,
+    default: "Search…",
+    doc: "with `use`, the button of an option that needs input first"
+
+  attr :href, :string,
+    default: nil,
+    doc: "with `use`, a page that answers it elsewhere, opened in a new tab by `open_label`"
+
   slot :extra, doc: "what it shows besides, under it whether chosen or not (a comparison)"
   slot :follow, doc: "the input the option needs, shown once chosen"
+
+  def review_option(%{use: true} = assigns) do
+    ~H"""
+    <div
+      id={@id}
+      data-recommended={@recommended}
+      data-chosen={@checked}
+      class={[
+        "flex flex-col gap-2 rounded-ctl border p-3",
+        if(@recommended or @checked, do: "border-brand", else: "border-line")
+      ]}
+    >
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span data-role="label" class="text-body text-ink">
+            {@label}
+            <.chip :if={@recommended} data-role="recommended" variant={:ok} size="sm" class="ml-1">
+              Suggested
+            </.chip>
+            <.chip
+              :for={tag <- @tags}
+              data-role={"tag-#{tag.kind}"}
+              variant={if tag.kind == :conflict, do: :danger, else: :info}
+              size="sm"
+              class="ml-1"
+            >
+              {tag.text}
+            </.chip>
+          </span>
+          <span :if={@summary} data-role="summary" class="text-meta text-muted">{@summary}</span>
+          <span :if={@tally} data-role="tally" class="text-meta text-muted">{@tally}</span>
+          <span :if={!@tally and @recommended and @by} class="text-meta text-muted">{@by}</span>
+        </div>
+        <.button :if={@href} class="shrink-0" href={@href} target="_blank" rel="noopener">
+          {@open_label}
+        </.button>
+        <.button
+          :if={!@href}
+          variant={if @recommended, do: "primary", else: "default"}
+          class="shrink-0"
+          phx-click={@on_pick}
+          phx-value-choice={@value}
+          phx-value-use={@follow == [] && "1"}
+          phx-target={@target}
+        >
+          {if @follow == [], do: "Use this", else: @open_label}
+        </.button>
+      </div>
+      <div :if={@extra != []}>{render_slot(@extra)}</div>
+      <div :if={@checked and @follow != []} data-role="follow" class="grid gap-2">
+        {render_slot(@follow)}
+      </div>
+    </div>
+    """
+  end
 
   def review_option(assigns) do
     ~H"""
@@ -1401,9 +1909,10 @@ defmodule GallformersWeb.ReviewComponents do
   @doc """
   A Trait's values to choose from, each with its definition: radios for
   one (`type="radio"`), checkboxes for several. Each input sends `on_pick`
-  with `phx-value-value`; `selected` are the values chosen, `noted` those
+  with `phx-value-value` (and `params`, each as `phx-value-<key>`); `selected` are the values chosen, `noted` those
   marked with `note` ("a reader chose it"). Input ids are
-  `<id>-<value>`.
+  `<id>-<value>`. `compact` lays them out as the Trait card's columns of
+  plain inputs, each definition in a `tooltip` on its value.
   """
   attr :id, :string, required: true
   attr :type, :string, default: "radio", values: ["radio", "checkbox"]
@@ -1413,8 +1922,57 @@ defmodule GallformersWeb.ReviewComponents do
   attr :note, :string, default: nil
   attr :on_pick, :any, required: true
   attr :target, :any, default: nil
+  attr :params, :map, default: %{}, doc: "sent with each value too, as `phx-value-<key>`"
+
+  attr :compact, :boolean,
+    default: false,
+    doc:
+      "plain inputs in columns, each definition in a `tooltip` on its value (no underline: " <>
+        "a dotted one is `fact_ref`'s), a line above saying so"
+
+  def review_value_list(%{compact: true} = assigns) do
+    assigns =
+      assign(assigns, extra: for({key, value} <- assigns.params, do: {"phx-value-#{key}", value}))
+
+    assigns = assign(assigns, defined?: Enum.any?(assigns.values, fn {_v, d} -> d end))
+
+    ~H"""
+    <p :if={@defined?} data-role="values-hint" class="text-meta text-muted">
+      Hover a value to see its definition.
+    </p>
+    <div id={@id} class="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3" data-role="values">
+      <p :if={@values == []} class="text-ui italic text-muted">No value matches.</p>
+      <label
+        :for={{value, definition} <- @values}
+        for={"#{@id}-#{value}"}
+        class="flex cursor-pointer items-center gap-2 text-ui text-ink"
+      >
+        <input
+          type={@type}
+          id={"#{@id}-#{value}"}
+          name={if @type == "radio", do: @id, else: "#{@id}[]"}
+          value={value}
+          class={if @type == "radio", do: "gf-radio", else: "gf-checkbox"}
+          checked={value in @selected}
+          phx-click={@on_pick}
+          phx-value-value={value}
+          phx-target={@target}
+          {@extra}
+        />
+        <.tooltip :if={definition} id={"#{@id}-#{value}-def"} text={definition}>
+          <span class="cursor-help">{value}</span>
+        </.tooltip>
+        <span :if={!definition}>{value}</span>
+        <span :if={@note && value in @noted} class="text-caption text-muted">{@note}</span>
+      </label>
+    </div>
+    """
+  end
 
   def review_value_list(assigns) do
+    assigns =
+      assign(assigns, extra: for({key, value} <- assigns.params, do: {"phx-value-#{key}", value}))
+
     ~H"""
     <div id={@id} class="grid gap-1 max-h-80 overflow-y-auto" data-role="values">
       <p :if={@values == []} class="text-ui italic text-muted">No value matches.</p>
@@ -1430,6 +1988,7 @@ defmodule GallformersWeb.ReviewComponents do
         phx-click={@on_pick}
         phx-value-value={value}
         phx-target={@target}
+        {@extra}
       >
         <:label>
           {value}
