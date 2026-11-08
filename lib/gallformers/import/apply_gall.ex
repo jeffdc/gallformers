@@ -67,6 +67,7 @@ defmodule Gallformers.Import.ApplyGall do
   alias Gallformers.Import.ApplyTaxonomy
   alias Gallformers.Import.Attributions
   alias Gallformers.Import.Diff
+  alias Gallformers.Import.MissedNames
   alias Gallformers.Import.SetAside
   alias Gallformers.Import.TraitTerms
   alias Gallformers.Places
@@ -93,17 +94,18 @@ defmodule Gallformers.Import.ApplyGall do
       facts = Enum.reject(List.wrap(content["facts"]), &(&1["kind"] == "trait"))
       {qualifiers, others} = Enum.split_with(facts, &(&1["kind"] == "qualifier"))
       set_aside = SetAside.facts(Map.get(ctx, :set_aside, []))
+      missed = MissedNames.facts(Map.get(ctx, :missed, []))
 
       refs = %{
-        taxa: Map.merge(taxa, set_aside.taxa),
-        galls: galls,
-        declared: Map.merge(declared, set_aside.declared),
+        taxa: taxa |> Map.merge(set_aside.taxa) |> Map.merge(missed.taxa),
+        galls: Map.merge(galls, missed.galls),
+        declared: declared |> Map.merge(set_aside.declared) |> Map.merge(missed.declared),
         hosts: Map.get(ctx, :hosts, %{}),
         facts: %{}
       }
 
       with {:ok, outcomes, refs} <-
-             write_all(ctx, diff, others ++ terms.facts ++ set_aside.facts, refs),
+             write_all(ctx, diff, others ++ terms.facts ++ set_aside.facts ++ missed.facts, refs),
            {:ok, q_outcomes, _refs} <- write_all(ctx, diff, qualifiers, refs),
            :ok <- TraitTerms.store_waiting(ctx, terms.waiting, galls),
            :ok <- TraitTerms.store_disputed(ctx, Map.get(ctx, :trait_disputes, []), galls),
@@ -152,6 +154,17 @@ defmodule Gallformers.Import.ApplyGall do
   end
 
   @doc """
+  Writes what the decided missed-name items `decided` state
+  (`Gallformers.Import.MissedNames`), for a gall batch applied already, as
+  `run_set_aside/2` does.
+  """
+  @spec run_missed(map(), [map()]) :: {:ok, map()} | {:error, term()}
+  def run_missed(ctx, decided) do
+    missed = MissedNames.facts(decided)
+    run_facts(ctx, missed.facts, Map.take(missed, [:taxa, :declared, :galls]))
+  end
+
+  @doc """
   Writes `facts` (the contract's shape: a decided question's Trait Facts,
   `Gallformers.Import.TraitTerms.facts_for/3`, or what set-aside items
   state) for a gall batch applied already, as `run_set_aside/2` does;
@@ -164,7 +177,7 @@ defmodule Gallformers.Import.ApplyGall do
 
     refs = %{
       taxa: Map.get(refs, :taxa, %{}),
-      galls: ctx.gall_ids,
+      galls: Map.merge(ctx.gall_ids, Map.get(refs, :galls, %{})),
       declared: Map.get(refs, :declared, %{}),
       hosts: Map.get(ctx, :hosts, %{}),
       facts: %{}

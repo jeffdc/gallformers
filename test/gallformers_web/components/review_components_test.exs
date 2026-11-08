@@ -16,6 +16,8 @@ defmodule GallformersWeb.ReviewComponentsTest do
   defp text(html, selector),
     do: html |> LazyHTML.from_fragment() |> LazyHTML.query(selector) |> LazyHTML.text()
 
+  defp squish(text), do: text |> String.split() |> Enum.join(" ")
+
   defp summaries(left_by_step) do
     for step <- Steps.all() do
       {left, holding} = Map.get(left_by_step, step.id, {0, 0})
@@ -140,6 +142,141 @@ defmodule GallformersWeb.ReviewComponentsTest do
       refute has?(html, "[data-role=recommended]")
     end
 
+    test "with use, an option is taken in one click: Use this sends the pick with use" do
+      html =
+        render_component(&ReviewComponents.review_option/1,
+          id: "o",
+          name: "q",
+          value: 2,
+          label: "Leave this Host out",
+          summary: "Drops 1 statement.",
+          use: true,
+          on_pick: "pick"
+        )
+
+      refute has?(html, "input[type=radio]")
+      assert text(html, "[data-role=label]") =~ "Leave this Host out"
+      assert text(html, "[data-role=summary]") =~ "Drops 1 statement."
+
+      assert text(html, "button[phx-click=pick][phx-value-choice='2'][phx-value-use='1']") =~
+               "Use this"
+    end
+
+    test "with use, the recommended option is marked Suggested and its button is the primary one" do
+      html =
+        render_component(&ReviewComponents.review_option/1,
+          id: "o",
+          name: "q",
+          value: 0,
+          label: "Use Potentilla norvegica L.",
+          recommended: true,
+          use: true,
+          on_pick: "pick"
+        )
+
+      assert has?(html, "[data-recommended]")
+      assert text(html, "[data-role=recommended]") =~ "Suggested"
+      assert has?(html, "button.gf-btn-primary[phx-value-use='1']")
+    end
+
+    test "with use, an option that needs input opens it first: Search… picks it without use" do
+      closed = render_use_search(false)
+
+      assert text(closed, "button[phx-click=pick][phx-value-choice='1']:not([phx-value-use])") =~
+               "Search…"
+
+      refute closed =~ "The search"
+
+      open = render_use_search(true)
+      assert text(open, "[data-role=follow]") =~ "The search"
+    end
+
+    test "with use and href, the option is a link that opens in a new tab" do
+      html =
+        render_component(&ReviewComponents.review_option/1,
+          id: "o",
+          name: "q",
+          value: "add",
+          label: "Add a new plant",
+          summary: "Not in Gallformers or WCVP? Add it, then search for it here.",
+          use: true,
+          href: "/admin/taxonomy/new?name=R.+ursinus",
+          open_label: "Add… ↗",
+          on_pick: "pick"
+        )
+
+      assert has?(html, "a[href='/admin/taxonomy/new?name=R.+ursinus'][target=_blank]")
+      assert text(html, "a[target=_blank]") =~ "Add… ↗"
+      refute has?(html, "button")
+    end
+
+    test "with use and tags, a weak suggestion is a Best guess, not the primary answer" do
+      html =
+        render_component(&ReviewComponents.review_option/1,
+          id: "o",
+          name: "q",
+          value: 0,
+          label: "It's Antistrophus s-gracile-flower-gall",
+          tags: [%{text: "Best guess", kind: :best}],
+          use: true,
+          on_pick: "pick"
+        )
+
+      assert text(html, "[data-role=tag-best]") =~ "Best guess"
+      refute has?(html, "button.gf-btn-primary")
+    end
+
+    test "a compact value list: checkboxes in columns, each definition in a tooltip" do
+      html =
+        render_component(&ReviewComponents.review_value_list/1,
+          id: "v",
+          type: "checkbox",
+          compact: true,
+          values: [{"tan", "Tan to light brown."}, {"white", nil}],
+          selected: ["tan"],
+          noted: ["white"],
+          note: "suggested",
+          on_pick: "pick"
+        )
+
+      assert has?(html, "#v.grid input#v-tan[type=checkbox][checked][phx-value-value=tan]")
+      assert text(html, "#v [role=tooltip]") =~ "Tan to light brown."
+      # The dotted underline is `fact_ref`'s ("who says so"): a definition is
+      # marked by a line above the values instead.
+      assert squish(text(html, "[data-role=values-hint]")) ==
+               "Hover a value to see its definition."
+
+      refute html =~ "border-dotted"
+      assert text(html, "label[for=v-white]") =~ "suggested"
+      refute has?(html, "[data-chosen]")
+    end
+
+    test "a compact value list with no definitions has no hover hint" do
+      html =
+        render_component(&ReviewComponents.review_value_list/1,
+          id: "v",
+          type: "checkbox",
+          compact: true,
+          values: [{"green", nil}],
+          on_pick: "pick"
+        )
+
+      refute has?(html, "[data-role=values-hint]")
+    end
+
+    test "a value list sends its params with each value, to say whose value it is" do
+      html =
+        render_component(&ReviewComponents.review_value_list/1,
+          id: "v",
+          type: "checkbox",
+          values: [{"green", nil}],
+          params: %{ref: "g2"},
+          on_pick: "pick"
+        )
+
+      assert has?(html, "input[phx-click=pick][phx-value-value=green][phx-value-ref=g2]")
+    end
+
     test "a value list: each value with its definition, the chosen and the readers' marked" do
       html =
         render_component(&ReviewComponents.review_value_list/1,
@@ -206,5 +343,325 @@ defmodule GallformersWeb.ReviewComponentsTest do
       <:follow>The search</:follow>
     </ReviewComponents.review_option>
     """)
+  end
+
+  defp render_use_search(checked) do
+    assigns = %{checked: checked}
+
+    rendered_to_string(~H"""
+    <ReviewComponents.review_option
+      id="o"
+      name="q"
+      value={1}
+      checked={@checked}
+      label="Another plant…"
+      summary="Search Gallformers and WCVP by name."
+      use
+      on_pick="pick"
+    >
+      <:follow>The search</:follow>
+    </ReviewComponents.review_option>
+    """)
+  end
+
+  describe "review_wcvp_panel, as a line" do
+    defp wcvp_line(host),
+      do:
+        render_component(&ReviewComponents.review_wcvp_panel/1,
+          id: "w",
+          written: "N. crepideneus",
+          host: host,
+          line: true
+        )
+
+    @record %{id: "1", name: "Nabalus crepidineus", authors: "DC.", status: "Accepted"}
+
+    test "says in one plain line what WCVP has and whether we have it" do
+      html = wcvp_line(%{match: :near, wcvp: @record, accepted: nil, held: nil})
+
+      assert squish(text(html, "[data-role=wcvp]")) ==
+               "WCVP doesn't have “N. crepideneus” as written. Nearest spelling: " <>
+                 "Nabalus crepidineus DC. (Accepted). We don't have it yet."
+
+      refute has?(html, "[role=status], [role=alert]")
+      refute has?(html, "a[href*='powo']")
+    end
+
+    test "a synonym names its accepted plant, and the plant we have links to it" do
+      html =
+        wcvp_line(%{
+          match: :exact,
+          wcvp: %{@record | status: "Synonym"},
+          accepted: %{name: "Prenanthes crepidinea", authors: "Michx."},
+          held: %{name: "Prenanthes crepidinea", taxon_id: 9}
+        })
+
+      assert squish(text(html, "[data-role=wcvp]")) =~
+               "WCVP: Nabalus crepidineus DC., a synonym of Prenanthes crepidinea Michx. " <>
+                 "We have it as Prenanthes crepidinea."
+
+      assert has?(html, "a[href='/admin/taxonomy/9'][target=_blank]")
+    end
+
+    test "with nothing in WCVP, it offers POWO and IPNI" do
+      html = wcvp_line(%{match: nil, wcvp: nil, accepted: nil, held: nil})
+
+      assert text(html, "[data-role=wcvp]") =~ "WCVP doesn't have “N. crepideneus”"
+      assert has?(html, "a[href*='powo.science.kew.org'][target=_blank]")
+      assert has?(html, "a[href*='ipni.org'][target=_blank]")
+    end
+  end
+
+  describe "review_rail" do
+    @tally %{done: 12, left: 23, total: 35, holding: 22, hedged: 81, missed: 4}
+    @stages [
+      %{id: :names, title: "Names", state: :current, left: 3},
+      %{id: :galls, title: "Galls", state: :todo, left: 19},
+      %{id: :disputes, title: "Disputes", state: :done, left: 0}
+    ]
+
+    defp rail(opts) do
+      render_component(
+        &ReviewComponents.review_rail/1,
+        Keyword.merge(
+          [
+            title: "Field Guide to the Herb & Bramble Gall Wasps",
+            tally: @tally,
+            stages: @stages,
+            next: ["Host plants: N. crepideneus"],
+            approval: {:waiting, ["Names"]},
+            on_stage: "stage",
+            on_hedges: "hedges",
+            on_missed: "missed",
+            on_approve: "approve",
+            on_deny: "deny"
+          ],
+          opts
+        )
+      )
+    end
+
+    test "how far along, in words, from the one tally" do
+      html = rail([])
+
+      assert text(html, "[data-role=answered]") =~ "12 of 35 answered"
+      assert text(html, "[data-role=to-go]") =~ "23 to go."
+
+      assert squish(text(html, "[data-role=to-go]")) =~
+               "22 of them must be answered before you can approve."
+    end
+
+    test "the stages are buttons with what's left, the current one marked, a finished one done" do
+      html = rail([])
+
+      assert text(html, "button[phx-click=stage][phx-value-id=names][aria-current=step]") =~
+               "3 left"
+
+      assert text(html, "button[phx-click=stage][phx-value-id=galls]") =~ "19 left"
+      assert text(html, "button[phx-click=stage][phx-value-id=disputes]") =~ "done"
+    end
+
+    test "the names we didn't read are a link, when there are any" do
+      assert text(rail([]), "button[phx-click=missed]") =~
+               "4 names we didn't read. Look them over"
+
+      refute has?(rail(tally: %{@tally | missed: 0}), "button[phx-click=missed]")
+    end
+
+    test "links to the Source in Gallformers when there is one" do
+      refute has?(rail([]), "a[href^='/admin/sources/']")
+      assert has?(rail(source_id: 42), "a[href='/admin/sources/42']")
+    end
+
+    test "the hedged statements are a link, and Up next lists what comes" do
+      html = rail([])
+
+      assert text(html, "button[phx-click=hedges]") =~
+               "81 hedged statements were left out. Review them"
+
+      assert text(html, "[data-role=next]") =~ "Host plants: N. crepideneus"
+    end
+
+    test "Approve waits, saying why, until nothing must be answered first" do
+      waiting = rail([])
+      assert has?(waiting, "button[phx-click=approve][disabled]")
+
+      assert text(waiting, "[data-role=approve-why]") =~
+               "You can approve once the 22 marked questions are answered."
+
+      ready = rail(approval: {:ready, []}, tally: %{@tally | holding: 0})
+      refute has?(ready, "button[phx-click=approve][disabled]")
+      refute has?(ready, "[data-role=approve-why]")
+      assert has?(ready, "button[phx-click=deny]")
+    end
+
+    test "a Source still being read, or already approved, says so" do
+      assert text(rail(approval: :resolving), "[data-role=approve-why]") =~ "still being read"
+      approved = rail(approval: :approved)
+      refute has?(approved, "button[phx-click=approve]")
+      assert text(approved, "[data-role=approve-why]") =~ "Approved"
+    end
+  end
+
+  describe "review_card" do
+    defp card(kind, opts, inner \\ "") do
+      assigns = %{kind: kind, opts: opts, inner: inner}
+
+      rendered_to_string(~H"""
+      <ReviewComponents.review_card id="card" kind={@kind} {@opts}>
+        {@inner}
+      </ReviewComponents.review_card>
+      """)
+    end
+
+    @question [
+      section: "Host plants",
+      holds: true,
+      heading: "Which plant is “N. crepideneus”?",
+      affects: [
+        %{name: "Diastrophus nebulosus", undescribed: false, what: "its Host"},
+        %{name: "Rubus stem gall", undescribed: true, what: "the Gall itself"}
+      ],
+      quotes: [
+        %{text: "On N. crepideneus.", where: "p. 12"},
+        %{text: "Also on N. crepideneus.", where: nil},
+        %{text: "A third.", where: nil}
+      ],
+      notes: [%{text: "Checked POWO.", author_name: "Jeff", inserted_at: nil}],
+      skip_key: "q-7",
+      item_id: 7,
+      on_note: "note",
+      note_target: "#q-7",
+      on_read: "read",
+      on_skip: "skip"
+    ]
+
+    test "a question: its kind, what it affects, the question, two quotes, earlier notes, the footer" do
+      html = card(:question, @question, "the answers")
+
+      assert squish(text(html, "[data-role=kind]")) =~
+               "Host plants · needed before you can approve"
+
+      assert text(html, "[data-role=affects]") =~ "Diastrophus nebulosus"
+      assert squish(text(html, "[data-role=affects]")) =~ "its Host"
+      assert has?(html, "h2.text-wrap")
+      assert text(html, "h2") =~ "Which plant is “N. crepideneus”?"
+      assert html |> LazyHTML.from_fragment() |> LazyHTML.query("blockquote") |> Enum.count() == 2
+      assert text(html, "blockquote") =~ "p. 12"
+      assert text(html, "[data-role=notes]") =~ "Checked POWO."
+      assert text(html, "[data-role=answers]") =~ "the answers"
+      assert has?(html, "button[phx-click=note][phx-value-id='7']")
+      assert has?(html, "button[phx-click=read][phx-value-item='7']")
+      assert has?(html, "button[phx-click=note][phx-target='#q-7']")
+      assert has?(html, "button[phx-click=skip][phx-value-key=q-7]")
+    end
+
+    test "nothing about approval, Affects or notes when there are none" do
+      html = card(:question, Keyword.merge(@question, holds: false, affects: [], notes: []))
+
+      refute text(html, "[data-role=kind]") =~ "needed before"
+      refute has?(html, "[data-role=affects]")
+      refute has?(html, "[data-role=notes]")
+    end
+
+    @rows [
+      %{id: 1, trait: "texture", term: "lumpy", answer: "Keep as text", covers: 1},
+      %{id: 2, trait: "texture", term: "smooth", answer: "smooth", covers: 3},
+      %{id: 3, trait: nil, term: "Q. alba", answer: "Quercus alba", covers: 1}
+    ]
+
+    defp batch(opts) do
+      card(
+        :batch,
+        Keyword.merge(
+          [
+            section: "Trait terms",
+            stage: "Traits",
+            of: 13,
+            rows: @rows,
+            unticked: MapSet.new(),
+            skip_key: "batch-trait_terms",
+            on_tick: "tick",
+            on_accept: "accept",
+            on_skip: "skip"
+          ],
+          opts
+        )
+      )
+    end
+
+    test "a batch: the suggested answers ticked, each with its term and answer" do
+      html = batch([])
+
+      assert text(html, "h2") =~ "3 of the 13 Traits questions have suggested answers"
+      assert squish(text(html, "[data-role=intro]")) =~ "Untick any you want to check yourself."
+      assert squish(text(html, "[data-role=intro]")) =~ "the other 10 come up one at a time"
+      assert has?(html, "input[type=checkbox][phx-click=tick][phx-value-id='2'][checked]")
+      assert squish(text(html, "li[data-id='2']")) =~ "texture: smooth → smooth (3 Galls)"
+      assert squish(text(html, "li[data-id='3']")) == "Q. alba → Quercus alba"
+      assert text(html, "button[phx-click=accept]") =~ "Accept all 3"
+      assert has?(html, "button[phx-click=accept][phx-value-ids='1,2,3']")
+      assert has?(html, "button[phx-click=skip][phx-value-key=batch-trait_terms]")
+    end
+
+    test "a batch with some unticked accepts the ticked ones; with all of a stage, says so" do
+      some = batch(unticked: MapSet.new([2]))
+      refute has?(some, "input[phx-value-id='2'][checked]")
+      assert text(some, "button[phx-click=accept]") =~ "Accept the 2 ticked"
+      assert has?(some, "button[phx-click=accept][phx-value-ids='1,3']")
+
+      none = batch(unticked: MapSet.new([1, 2, 3]))
+      assert has?(none, "button[phx-click=accept][disabled]")
+
+      all = batch(of: 3)
+      assert text(all, "h2") =~ "All 3 Traits questions have suggested answers"
+      refute text(all, "[data-role=intro]") =~ "the other"
+    end
+
+    test "the hedged statements, grouped, each to add, and a way back" do
+      html =
+        card(:hedges,
+          groups: [
+            {"Host plants", [%{id: 4, text: "possibly on Q. rubra"}]},
+            {"Places", [%{id: 5, text: "may occur in Texas"}, %{id: 6, text: "presumed in Ohio"}]}
+          ],
+          on_add: "add",
+          on_back: "back"
+        )
+
+      assert text(html, "h2") =~ "Hedged statements"
+      assert squish(text(html, "h3")) =~ "Places 2"
+      assert text(html, "li[data-id='5']") =~ "may occur in Texas"
+      assert has?(html, "li[data-id='5'] button[phx-click=add][phx-value-id='5']")
+      assert text(html, "button[phx-click=back]") =~ "Back to the questions"
+    end
+
+    test "the hedges card's words can be another list's: the names we didn't read" do
+      html =
+        card(:hedges,
+          heading: "Names we didn't read",
+          intro: "Weld prints these names.",
+          add_label: "Look at it…",
+          groups: [{nil, [%{id: 9, text: "Cynips quercus inanis · pp. 12, 40"}]}],
+          on_add: "open",
+          on_back: "back"
+        )
+
+      assert text(html, "h2") =~ "Names we didn't read"
+      assert text(html, "p") =~ "Weld prints these names."
+      refute has?(html, "h3")
+      assert text(html, "li[data-id='9'] button[phx-click=open]") =~ "Look at it…"
+    end
+
+    test "what approving will add: working it out, then the Facts" do
+      loading = card(:facts, loading: true)
+      assert text(loading, "h2") =~ "What approving will add"
+      assert has?(loading, "[role=status]")
+      refute has?(loading, "button[phx-click=skip]")
+
+      ready = card(:facts, [loading: false], "the Facts")
+      refute has?(ready, "[role=status]")
+      assert text(ready, "[data-role=answers]") =~ "the Facts"
+    end
   end
 end

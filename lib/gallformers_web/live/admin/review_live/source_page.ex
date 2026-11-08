@@ -39,7 +39,8 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcePage do
 
   @doc """
   Loads the page's packages and questions into `socket` (on a step's page,
-  with what that step's answers show besides: `Loader.entries/3`): `summary`,
+  with what that step's answers show besides, and with every step's given
+  `context: :all`: `Loader.entries/3`): `summary`,
   `name` (the Source's short name, else its title), `packages`, `entries`,
   `summaries` (per step), `approval`, `stats` and `definitions`. Raises
   `Ecto.NoResultsError` when there is no such Source or package.
@@ -55,7 +56,7 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcePage do
     if data == nil, do: raise(Ecto.NoResultsError, queryable: Gallformers.Import.Package)
 
     summary = data.summary
-    step = socket.assigns[:step] && socket.assigns.step.id
+    step = socket.assigns[:context] || (socket.assigns[:step] && socket.assigns.step.id)
     entries = Loader.entries(data.packages, summary.who, step: step)
     summaries = Steps.summarize(entries)
 

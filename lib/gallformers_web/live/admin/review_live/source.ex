@@ -1,28 +1,8 @@
 defmodule GallformersWeb.Admin.ReviewLive.Source do
   @moduledoc """
-  A Source's review overview (`6611` Task 6; steps after matter `d213`,
-  Task 15): `/admin/review/sources/:id` is the Source's packages under
-  review together; `/admin/review/packages/:id` one package (one not
-  matched to a Source yet, or one of the Gallformers notes). Its steps are
-  pages of their own (`GallformersWeb.Admin.ReviewLive.Step`).
-
-  The overview shows the Source by its short name ("Ashmead 1897"), with
-  its title, kind, status, what it states, and Deny with a reason; the step
-  bar, where Approve appears once nothing holds approval
-  (`GallformersWeb.Admin.ReviewLive.SourcePage.approval/3`) and asks to
-  confirm; "Which Source this is" as a banner (with any question no step
-  shows); where it stands in each step, with "Continue" to the first
-  step with work left; and the names the Source prints that Gallformers
-  holds but no batch declares (`Gallformers.Import.UnusedNames.for_package/1`,
-  read after the page loads), for a curator to scan for a taxon the
-  producer left out. The head links to the Source in Gallformers
-  (`/admin/sources/:id`) once there is one. While any of the Source's
-  taxonomic statements awaits a curator in the taxonomy queue (matter
-  `f923` Task 6; they come after approval and hold none), it says how many
-  and links to them (`/admin/review/taxonomy?source=<id>`).
-
-  The Gallformers Source's page (`6611` Task 7, screen 4 of the design)
-  shows its notes instead, built for scanning
+  The Gallformers notes, `/admin/review/notes` (`6611` Task 7, screen 4
+  of the design): the Gallformers Source's notes under review, built for
+  scanning
   (`GallformersWeb.Admin.ReviewLive.Loader.notes_page/1`), in three tabs
   kept in the URL (`tab`: `ready` — the default; `needs`; `approved`):
 
@@ -37,73 +17,30 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
     * **Approved:** the approved notes.
 
   Each tab groups its notes by what the note holds
-  (`GallformersWeb.Admin.ReviewLive.Notes`).
+  (`GallformersWeb.Admin.ReviewLive.Notes`). One note's own page is its
+  package's review (`GallformersWeb.Admin.ReviewLive.Review`).
   """
   use GallformersWeb, :live_view
 
   import GallformersWeb.ReviewComponents
 
   alias Gallformers.Import
-  alias Gallformers.Import.UnusedNames
-  alias GallformersWeb.Admin.Review.Steps
   alias GallformersWeb.Admin.ReviewLive.ItemRow
   alias GallformersWeb.Admin.ReviewLive.Loader
   alias GallformersWeb.Admin.ReviewLive.Notes
-  alias GallformersWeb.Admin.ReviewLive.SourcePage
-
-  @deniable [:received, :invalid, :validated, :resolving, :awaiting_review]
 
   @tabs ~w(ready needs approved)
 
-  @status_labels %{
-    received: "Received",
-    invalid: "Invalid",
-    validated: "Validated",
-    resolving: "Resolving",
-    awaiting_review: "Awaiting review",
-    approved: "Approved",
-    denied: "Denied"
-  }
-
   @impl true
-  def mount(params, _session, socket) do
-    mode = SourcePage.mode(params)
+  def mount(_params, _session, socket) do
+    source =
+      Gallformers.Sources.get_gallformers_source() ||
+        raise Ecto.NoResultsError, queryable: Gallformers.Sources.Source
 
     {:ok,
      socket
-     |> assign(
-       mode: mode,
-       base: SourcePage.base_path(mode),
-       keep: [],
-       closed: MapSet.new(),
-       confirm_approve: false,
-       deny_form: nil,
-       tab: "ready",
-       unticked: MapSet.new()
-     )
-     |> load()
-     |> unused_names()}
-  end
-
-  # The names its text prints that no batch declares, from every package
-  # (read once, after the page loads: it reads each package's document).
-  defp unused_names(%{assigns: %{notes?: true}} = socket), do: socket
-
-  defp unused_names(socket) do
-    packages = Enum.map(socket.assigns.packages, & &1.package)
-
-    assign_async(socket, :unused_names, fn ->
-      names = packages |> Enum.flat_map(&package_unused_names/1) |> Enum.uniq_by(& &1.normalized)
-      {:ok, %{unused_names: names}}
-    end)
-  end
-
-  # A package with no text to read has none.
-  defp package_unused_names(package) do
-    case UnusedNames.for_package(package) do
-      {:ok, names} -> names
-      {:error, _reason} -> []
-    end
+     |> assign(source_id: source.id, closed: MapSet.new(), tab: "ready", unticked: MapSet.new())
+     |> load()}
   end
 
   @impl true
@@ -126,64 +63,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
     {:noreply, assign(socket, closed: closed)}
   end
 
-  def handle_event("approve_ask", _params, socket),
-    do: {:noreply, assign(socket, confirm_approve: true)}
-
-  def handle_event("approve_cancel", _params, socket),
-    do: {:noreply, assign(socket, confirm_approve: false)}
-
-  def handle_event("approve", _params, socket),
-    do: {:noreply, socket |> SourcePage.approve() |> assign(confirm_approve: false) |> load()}
-
-  def handle_event("open_deny", _params, socket),
-    do: {:noreply, assign(socket, deny_form: deny_form())}
-
-  def handle_event("cancel_deny", _params, socket),
-    do: {:noreply, assign(socket, deny_form: nil)}
-
-  def handle_event("deny", %{"deny" => %{"reason" => reason}}, socket) do
-    %{actor: actor, packages: packages} = socket.assigns
-
-    result =
-      packages
-      |> Enum.filter(&deniable?/1)
-      |> Enum.reduce_while(:ok, fn p, :ok ->
-        case Import.deny_package(actor, p.package, reason) do
-          {:ok, _denied} -> {:cont, :ok}
-          error -> {:halt, error}
-        end
-      end)
-
-    case result do
-      :ok ->
-        {:noreply,
-         socket
-         |> assign(deny_form: nil)
-         |> put_flash(:info, "The Source was denied; nothing of it is applied.")
-         |> load()}
-
-      {:error, %Ecto.Changeset{errors: errors}} ->
-        reason_errors = for {:denied_reason, error} <- errors, do: {:reason, error}
-        {:noreply, assign(socket, deny_form: deny_form(reason, reason_errors))}
-
-      {:error, :not_deniable} ->
-        {:noreply,
-         socket
-         |> assign(deny_form: nil)
-         |> put_flash(:error, "This can no longer be denied.")
-         |> load()}
-    end
-  end
-
-  # -- the Gallformers notes ----------------------------------------------------
-
   def handle_event("tab", %{"tab" => tab}, socket) when tab in @tabs do
-    {:source, id} = socket.assigns.mode
-
     path =
       if tab == "ready",
-        do: ~p"/admin/review/sources/#{id}",
-        else: ~p"/admin/review/sources/#{id}?#{[tab: tab]}"
+        do: ~p"/admin/review/notes",
+        else: ~p"/admin/review/notes?#{[tab: tab]}"
 
     {:noreply, push_patch(socket, to: path)}
   end
@@ -262,77 +146,17 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
   defp notes_word(1), do: "note"
   defp notes_word(_n), do: "notes"
 
-  defp deny_form(reason \\ "", errors \\ []),
-    do: to_form(%{"reason" => reason}, as: :deny, errors: errors)
+  defp load(socket) do
+    data = Loader.notes_page(socket.assigns.source_id)
 
-  defp deniable?(%{package: package, batches: batches}),
-    do: package.status in @deniable and not Enum.any?(batches, &(&1.status == :applied))
-
-  # -- loading -----------------------------------------------------------------
-
-  # The Gallformers Source's page shows its notes; any other, its questions.
-  defp load(%{assigns: %{mode: {:source, id}}} = socket) do
-    case Loader.notes_page(id) do
-      nil -> load_questions(socket)
-      data -> load_notes(socket, data)
-    end
-  end
-
-  defp load(socket), do: load_questions(socket)
-
-  defp load_notes(socket, data) do
     assign(socket,
       page_title: data.summary.title,
       source: data.source,
       summary: data.summary,
-      notes?: true,
       notes: data.notes,
       note_stats: data.stats,
       definitions: Loader.definitions()
     )
-  end
-
-  defp load_questions(socket) do
-    socket = socket |> SourcePage.load() |> assign(notes?: false)
-    id = source_id(socket.assigns.mode, socket.assigns.packages)
-
-    assign(socket,
-      taxonomy_source_id: id,
-      taxonomy_open: if(id, do: Import.count_taxonomy_questions(id), else: 0)
-    )
-  end
-
-  # -- what the page shows -------------------------------------------------------
-
-  defp status(packages, approval) do
-    statuses = packages |> Enum.map(& &1.package.status) |> Enum.uniq()
-
-    cond do
-      statuses == [:awaiting_review] and match?({:ready, _}, approval) ->
-        {"Ready to approve", "success"}
-
-      statuses == [:approved] ->
-        {"Approved", "success"}
-
-      statuses == [:awaiting_review] ->
-        {"Awaiting review", "warning"}
-
-      statuses == [] ->
-        {"Nothing under review", "info"}
-
-      true ->
-        {Enum.map_join(statuses, ", ", &status_label/1), "info"}
-    end
-  end
-
-  defp status_label(status), do: Map.fetch!(@status_labels, status)
-
-  # The overview's own questions ("Which Source this is", and any no step
-  # shows), in sections.
-  defp banner(entries, who) do
-    unplaced = Steps.unplaced(entries)
-    ids = unplaced |> Enum.map(& &1.question.section.id) |> Enum.uniq()
-    SourcePage.sections(unplaced, ids, who)
   end
 
   # -- rendering -------------------------------------------------------------------
@@ -340,7 +164,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
   @tab_states %{"ready" => :ready, "needs" => :needs, "approved" => :approved}
 
   @impl true
-  def render(%{notes?: true} = assigns) do
+  def render(assigns) do
     state = Map.fetch!(@tab_states, assigns.tab)
     shown = Enum.filter(assigns.notes, &(&1.state == state))
     ticked = assigns |> ticked() |> MapSet.new(& &1.id)
@@ -368,11 +192,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
             <div class="mt-1.5 flex flex-wrap gap-1.5">
               <.review_tag>Gallformers' own notes</.review_tag>
             </div>
-            <.review_source_link
-              :if={source_id(@mode, [])}
-              source_id={source_id(@mode, [])}
-              class="mt-1.5"
-            />
+            <.review_source_link source_id={@source_id} class="mt-1.5" />
           </div>
           <div class="flex flex-col items-start md:items-end gap-1">
             <.button
@@ -457,154 +277,6 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
     </Layouts.admin>
     """
   end
-
-  def render(assigns) do
-    {status, status_variant} = status(assigns.packages, assigns.approval)
-
-    assigns =
-      assign(assigns,
-        status: status,
-        status_variant: status_variant,
-        banner: banner(assigns.entries, assigns.summary.who),
-        next: Steps.first_open(assigns.summaries)
-      )
-
-    ~H"""
-    <Layouts.admin flash={@flash} current_user={@current_user}>
-      <.page_header>
-        <:crumb navigate={~p"/admin/review"}>Sources to review</:crumb>
-        <:title>{@name}</:title>
-      </.page_header>
-
-      <.review_source_head
-        name={@name}
-        title={@summary.title}
-        citation={@summary.citation}
-        kind={@summary.kind}
-        status={@status}
-        status_variant={@status_variant}
-        source_id={source_id(@mode, @packages)}
-      >
-        <:actions :if={Enum.any?(@packages, &deniable?/1)}>
-          <.button id="deny" phx-click="open_deny" size="sm" variant="secondary">Deny…</.button>
-        </:actions>
-        <div id="source-stats" class="flex flex-wrap gap-2">
-          <.review_stat value={@stats.galls} label="Galls" />
-          <.review_stat value={@stats.facts} label="statements about Galls" />
-          <.review_stat value={@stats.acts} label="taxonomic acts" />
-          <.review_stat value={@stats.set_aside} label="terms and statements set aside" />
-        </div>
-      </.review_source_head>
-
-      <.review_step_bar
-        base={@base}
-        current={:overview}
-        summaries={@summaries}
-        approval={@approval}
-        confirm={@confirm_approve}
-      />
-
-      <div id="banner">
-        <.review_section
-          :for={s <- @banner}
-          id={"section-#{s.section.id}"}
-          section={Atom.to_string(s.section.id)}
-          title={s.section.title}
-          count={if s.open == [], do: "· all decided", else: "· #{length(s.open)} to decide"}
-          explanation={s.section.explanation}
-          holds={s.section.holds}
-          holds_approval={s.section.holds_approval}
-          done={s.open == []}
-          closed={MapSet.member?(@closed, Atom.to_string(s.section.id))}
-          on_toggle="toggle_section"
-          layout={:question}
-        >
-          <.live_component
-            :for={entry <- s.rows}
-            module={ItemRow}
-            id={"item-row-#{entry.item.id}"}
-            entry={entry}
-            actor={@actor}
-            definitions={@definitions}
-            source_name={@name}
-          />
-        </.review_section>
-      </div>
-
-      <.review_step_overview
-        base={@base}
-        summaries={@summaries}
-        next={@next}
-        status={SourcePage.approval_text(@approval)}
-      />
-
-      <.notice :if={@taxonomy_open > 0} id="taxonomy-questions-open" kind={:info} class="mt-4">
-        {@taxonomy_open} taxonomy {if @taxonomy_open == 1, do: "question", else: "questions"} open: this Source's taxonomic statements, newer than what the tree follows, to accept or decline. They don't hold approval.
-        <:action>
-          <.link navigate={~p"/admin/review/taxonomy?#{[source: @taxonomy_source_id]}"}>
-            Open them
-          </.link>
-        </:action>
-      </.notice>
-
-      <.section
-        id="unused-names"
-        title="Names no batch declares"
-        count={@unused_names.ok? && length(@unused_names.result)}
-        class="mt-section"
-      >
-        <p class="mb-2 text-meta text-ink-2">
-          The Source prints these names, which Gallformers holds, but none of its batches declares them. Scan them for a taxon the producer left out.
-        </p>
-        <.async_result :let={names} assign={@unused_names}>
-          <:loading>
-            <p class="text-ui text-muted">Reading the Source's text…</p>
-          </:loading>
-          <:failed>
-            <p class="text-ui text-muted">The Source's text couldn't be read.</p>
-          </:failed>
-          <p :if={names == []} class="text-ui text-muted">
-            Every name the Source prints that Gallformers holds is declared by a batch.
-          </p>
-          <.name_list :if={names != []} items={names} columns={3}>
-            <:item :let={n}>
-              <span data-part="name">
-                <.taxon_name name={n.name} />
-                <span :if={n.pages != []} class="text-meta text-muted">
-                  p. {Enum.join(n.pages, ", ")}
-                </span>
-              </span>
-            </:item>
-          </.name_list>
-        </.async_result>
-      </.section>
-
-      <.dialog
-        :if={@deny_form}
-        id="deny-modal"
-        title={"Deny #{@summary.title}"}
-        show
-        on_cancel={JS.push("cancel_deny")}
-      >
-        <.form for={@deny_form} id="deny-form" phx-submit="deny" class="flex flex-col gap-block">
-          <p class="text-meta text-ink-2">
-            Nothing of a denied Source is applied. The reason is kept with it and in the replay
-            log.
-          </p>
-          <.input field={@deny_form[:reason]} type="textarea" label="Reason" required />
-        </.form>
-        <:actions>
-          <.button type="button" phx-click="cancel_deny">Cancel</.button>
-          <.button type="submit" form="deny-form" variant="danger">Deny</.button>
-        </:actions>
-      </.dialog>
-    </Layouts.admin>
-    """
-  end
-
-  # The Source in Gallformers the page reviews: a package's once matched.
-  defp source_id({:source, id}, _packages), do: id
-  defp source_id({:package, _id}, packages), do: Enum.find_value(packages, & &1.package.source_id)
 
   defp ticked_text(0, _where), do: "Nothing ticked"
   defp ticked_text(n, "here"), do: "Approve #{n} ticked here"

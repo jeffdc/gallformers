@@ -209,8 +209,8 @@ defmodule GallformersWeb.Admin.ReviewLive.NotesPageTest do
     }
   end
 
-  defp page(conn, source, query \\ ""),
-    do: live(conn, ~p"/admin/review/sources/#{source.id}" <> query)
+  defp page(conn, _source, query \\ ""),
+    do: live(conn, ~p"/admin/review/notes" <> query)
 
   describe "Ready" do
     test "groups the notes by what they hold, one line each with chips, ticked", ctx do
@@ -311,7 +311,7 @@ defmodule GallformersWeb.Admin.ReviewLive.NotesPageTest do
       assert has_element?(view, "#tab-needs", "Needs you (1)")
 
       view |> element("#tab-needs") |> render_click()
-      assert_patch(view, ~p"/admin/review/sources/#{ctx.gallformers.id}?tab=needs")
+      assert_patch(view, ~p"/admin/review/notes?tab=needs")
 
       assert has_element?(view, "#note-#{disputed.id}", "1 to decide")
       assert has_element?(view, "#note-#{disputed.id} #item-#{dispute.id}")
@@ -346,7 +346,7 @@ defmodule GallformersWeb.Admin.ReviewLive.NotesPageTest do
       refute has_element?(view, "#tick-#{seen.id}")
 
       view |> element("#tab-ready") |> render_click()
-      assert_patch(view, ~p"/admin/review/sources/#{ctx.gallformers.id}")
+      assert_patch(view, ~p"/admin/review/notes")
       assert has_element?(view, "#tab-ready[aria-pressed=true]")
       refute has_element?(view, "#note-#{seen.id}")
       assert has_element?(view, "#notes", "No note is ready to approve.")

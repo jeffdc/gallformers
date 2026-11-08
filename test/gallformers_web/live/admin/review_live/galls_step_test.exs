@@ -2,9 +2,8 @@ defmodule GallformersWeb.Admin.ReviewLive.GallsStepTest do
   @moduledoc """
   The Galls step (matter `d213`, Task 19): Galls of named species and
   Undescribed Galls; each candidate Gall compared side by side with what
-  the Source says; a candidate the Source disagrees with settled statement
-  by statement (kept, left out, or a Host read as another plant) before
-  Decide; another generation's Gall created with its generation chosen.
+  the Source says; another generation's Gall created with its generation
+  chosen.
 
   Not async: packages create Sources (unique titles) and the Catalog
   vocabularies are loaded.
@@ -22,7 +21,6 @@ defmodule GallformersWeb.Admin.ReviewLive.GallsStepTest do
   alias Gallformers.Import
   alias Gallformers.Import.QueueItem
   alias Gallformers.Repo
-  alias Gallformers.Taxa
 
   setup %{conn: conn} do
     {conn, _user} = log_in_admin(conn, "Rita Reviewer")
@@ -131,7 +129,7 @@ defmodule GallformersWeb.Admin.ReviewLive.GallsStepTest do
     assert has_element?(
              view,
              "#item-#{item.id}-detail [data-role=question]",
-             "Which Gall is Osten Sacken 1862's “the large stem galls”?"
+             "Which Gall does Osten Sacken 1862 mean by “the large stem galls”?"
            )
 
     choices = "#item-#{item.id}-choices"
@@ -155,119 +153,6 @@ defmodule GallformersWeb.Admin.ReviewLive.GallsStepTest do
              "#{choices} [data-role=gall-meta] a[href='/gall/#{elsewhere.id}?edit']",
              "Open ↗"
            )
-  end
-
-  test "a Gall the Source disagrees with: each statement settled before Decide",
-       %{conn: conn} = ctx do
-    {_on_nigra, elsewhere} = two_galls!(ctx)
-    package = deliver!()
-    item = gall_item(package)
-    {:ok, view, _html} = step(conn, package)
-    open_row(view, item)
-
-    choose(view, item, "It's #{elsewhere.name}")
-    settle = "#item-#{item.id}-picker-settle"
-    assert has_element?(view, settle, "Host: “Quercus nigra”")
-    assert has_element?(view, "#item-#{item.id}-decide[disabled]")
-
-    assert has_element?(
-             view,
-             "#item-#{item.id}-effect",
-             "Settle 1 more statement Osten Sacken 1862 disagrees on."
-           )
-
-    view |> element("#{settle}-host-choice-leave") |> render_click()
-
-    assert has_element?(
-             view,
-             "#item-#{item.id}-effect",
-             "Osten Sacken 1862's “Quercus nigra” is left out."
-           )
-
-    view |> element("#item-#{item.id}-decide") |> render_click()
-    assert render(view) =~ "Decision recorded."
-
-    assert %QueueItem{status: :decided, decision: decision} = Import.get_queue_item!(item.id)
-    assert decision == %{"gall_id" => elsewhere.id, "drop" => ["f2"]}
-  end
-
-  test "a Host read as another plant, picked, throughout the Source", %{conn: conn} = ctx do
-    {_on_nigra, elsewhere} = two_galls!(ctx)
-    package = deliver!()
-    item = gall_item(package)
-    {:ok, view, _html} = step(conn, package)
-    open_row(view, item)
-
-    choose(view, item, "It's #{elsewhere.name}")
-    view |> element("#item-#{item.id}-picker-settle-host-choice-other") |> render_click()
-    assert has_element?(view, "#item-#{item.id}-decide[disabled]")
-
-    view
-    |> with_target("#item-row-#{item.id}")
-    |> render_hook("search_plant", %{"value" => "Quercus mari"})
-
-    view
-    |> element("#item-#{item.id}-picker-results button", "Quercus marilandica")
-    |> render_click()
-
-    assert has_element?(
-             view,
-             "#item-#{item.id}-effect",
-             "Osten Sacken 1862's “Quercus nigra” is read as Quercus marilandica throughout " <>
-               "Osten Sacken 1862."
-           )
-
-    view |> element("#item-#{item.id}-decide") |> render_click()
-    assert render(view) =~ "Decision recorded."
-
-    decision = Import.get_queue_item!(item.id).decision
-    assert decision["gall_id"] == elsewhere.id
-    assert %{"name" => "Quercus nigra", "taxon_id" => id} = decision["host_reading"]
-    assert id == ctx.marilandica.id
-  end
-
-  test "a genus Host goes on another plant for this Gall only, its sections first",
-       %{conn: conn} = ctx do
-    castanea = plant_fixture(name: "Castanea", rank: :genus)
-    chestnut = plant_fixture(name: "Castanea dentata", parent: castanea)
-    lobatae = plant_fixture(name: "Lobatae", rank: :section, parent: ctx.quercus)
-    {:ok, _} = Taxa.add_common_name(test_actor(), lobatae, "Red Oaks")
-    wasp_gall!(ctx, "Andricus quercuscalifornicus stem gall", host: chestnut)
-    elsewhere = wasp_gall!(ctx, "Andricus quercuscalifornicus bud gall", host: chestnut)
-    package = deliver_on!({"Quercus", "genus"})
-    item = gall_item(package)
-    {:ok, view, _html} = step(conn, package)
-    open_row(view, item)
-
-    choose(view, item, "It's #{elsewhere.name}")
-    settle = "#item-#{item.id}-picker-settle"
-    assert has_element?(view, "#{settle}-host", "On another plant")
-    refute has_element?(view, "#{settle}-host", "He means another plant")
-
-    view |> element("#{settle}-host-choice-other") |> render_click()
-    assert has_element?(view, "#{settle}-host", "for this Gall only")
-
-    results = "#item-#{item.id}-picker-results"
-    assert has_element?(view, "#{results} button", "Lobatae")
-    assert has_element?(view, "#{results} button", "Red Oaks")
-    view |> element("#{results} button", "Lobatae") |> render_click()
-
-    assert has_element?(
-             view,
-             "#item-#{item.id}-effect",
-             "Osten Sacken 1862's “Quercus” goes in on Lobatae, for this Gall only. " <>
-               "Osten Sacken 1862's other “Quercus” statements stay as they are."
-           )
-
-    view |> element("#item-#{item.id}-decide") |> render_click()
-    assert render(view) =~ "Decision recorded."
-
-    assert Import.get_queue_item!(item.id).decision == %{
-             "gall_id" => elsewhere.id,
-             "host_taxon_id" => lobatae.id
-           }
-
-    assert Taxa.list_synonyms(lobatae.id) == []
   end
 
   test "a conflict is tagged, and the row says to check", %{conn: conn} = ctx do
@@ -320,7 +205,7 @@ defmodule GallformersWeb.Admin.ReviewLive.GallsStepTest do
     {:ok, view, _html} = step(conn, package)
     open_row(view, item)
 
-    choose(view, item, "It's another generation's Gall: create it")
+    choose(view, item, "It's another generation: add a new Gall")
     picker = "#item-#{item.id}-picker"
     assert has_element?(view, "#{picker} option[value=sexual][disabled]")
     assert has_element?(view, "#{picker} option[value=agamic]")

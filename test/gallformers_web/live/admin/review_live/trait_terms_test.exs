@@ -159,7 +159,7 @@ defmodule GallformersWeb.Admin.ReviewLive.TraitTermsTest do
     {:ok, view, _html} = page(conn, package)
 
     section = "#section-trait_terms"
-    assert has_element?(view, section, "Trait terms to settle")
+    assert has_element?(view, section, "Trait terms")
     # The section says once who the readers are, and what an open term means.
     assert has_element?(view, section, "the producer, the AI that read the Source")
     assert has_element?(view, section, "You can approve the Source with terms still open.")
@@ -187,7 +187,12 @@ defmodule GallformersWeb.Admin.ReviewLive.TraitTermsTest do
     open_row(view, item)
 
     detail = "#item-#{item.id}-detail"
-    assert has_element?(view, "#{detail} [data-role=question]", "What color value is “pale tan”?")
+
+    assert has_element?(
+             view,
+             "#{detail} [data-role=question]",
+             "What does “pale tan” mean for these 2 Galls?"
+           )
 
     assert has_element?(
              view,
@@ -371,7 +376,7 @@ defmodule GallformersWeb.Admin.ReviewLive.TraitTermsTest do
     assert has_element?(
              view,
              "#item-#{item.id}-detail [data-role=question]",
-             "What color value does “pale tan” mean, Gall by Gall?"
+             "What does “pale tan” mean for this Gall?"
            )
 
     assert has_element?(view, "#item-#{item.id}-choices [data-chosen] #item-#{item.id}-galls")

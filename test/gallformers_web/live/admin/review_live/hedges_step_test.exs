@@ -125,10 +125,10 @@ defmodule GallformersWeb.Admin.ReviewLive.HedgesStepTest do
     assert has_element?(
              view,
              "#item-#{item.id}-detail [data-role=question]",
-             "Should this hedged statement go in as a Fact?"
+             "Should this hedged statement go in?"
            )
 
-    assert has_element?(view, "#item-#{item.id}-choices", "State it…")
+    assert has_element?(view, "#item-#{item.id}-choices", "Add it…")
   end
 
   test "Leave the rest out decides a group's open hedges as left out", %{conn: conn} do

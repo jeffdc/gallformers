@@ -18,7 +18,10 @@ defmodule Gallformers.Import.GallComparison do
     * `:generation` — generation and season: the Source's generation
       against the Gall's, and the Source's seasons among the Gall's. Either
       differing differs.
-    * `:form` — the Gall's overall type: a different form is a conflict.
+    * `:form` — the Gall's overall type: a different form is a conflict,
+      unless the two are readings of one ambiguous form term (`form_near`:
+      "swelling" is abrupt swelling, tapered swelling or stem club, `c8c3`),
+      which differ.
 
   Each field is `:agree`, `:differ`, `:conflict`, or `:none` when either
   side does not state it. A conflict is a reason for a curator to look,
@@ -26,6 +29,7 @@ defmodule Gallformers.Import.GallComparison do
   (`Gallformers.Import.GallMatcher`).
   """
 
+  alias Gallformers.Catalog
   alias Gallformers.Catalog.ReadModels.GallSummary
   alias Gallformers.Taxa
 
@@ -39,7 +43,8 @@ defmodule Gallformers.Import.GallComparison do
           detachable: [String.t()],
           generation: String.t() | nil,
           season: [String.t()],
-          form: [String.t()]
+          form: [String.t()],
+          form_near: [String.t()]
         }
 
   @type t :: %{
@@ -76,7 +81,8 @@ defmodule Gallformers.Import.GallComparison do
       detachable: Map.get(traits, "detachable", []),
       generation: get_in(ident, ["generation", "value"]),
       season: Map.get(traits, "season", []),
-      form: Map.get(traits, "form", [])
+      form: Map.get(traits, "form", []),
+      form_near: Catalog.trait_readings_with("form", Map.get(traits, "form", []))
     }
   end
 
@@ -100,7 +106,7 @@ defmodule Gallformers.Import.GallComparison do
       where: where(source.where, trait(summary, "plant_part")),
       detachable: detachable(source.detachable, trait(summary, "detachable")),
       generation: generation(source, summary),
-      form: form(source.form, trait(summary, "form"))
+      form: form(source, trait(summary, "form"))
     }
 
     %{
@@ -197,7 +203,15 @@ defmodule Gallformers.Import.GallComparison do
   defp seasons(_source, []), do: :none
   defp seasons(source, gall), do: if(Enum.all?(source, &(&1 in gall)), do: :agree, else: :differ)
 
-  defp form(source, gall), do: compare_sets(source, gall, :conflict)
+  defp form(%{form: form} = source, gall) do
+    case compare_sets(form, gall, :conflict) do
+      :conflict ->
+        if overlap?(Map.get(source, :form_near, []), gall), do: :differ, else: :conflict
+
+      result ->
+        result
+    end
+  end
 
   defp compare_sets([], _gall, _otherwise), do: :none
   defp compare_sets(_source, [], _otherwise), do: :none

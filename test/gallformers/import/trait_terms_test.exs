@@ -54,7 +54,7 @@ defmodule Gallformers.Import.TraitTermsTest do
   @words "The galls are ovoid and globular, round, each with a single insect, pale tan, " <>
            "rough, lumpy and bumpy, " <>
            "a swelling on the leaf, woody, lignified, green-yellow, tan-white, " <>
-           "protruding from both sides, on the leaf or petiole."
+           "protruding from both sides, on the leaf or petiole, swellings, kernels."
 
   # The fixture document with one more text item holding the terms.
   defp doc do
@@ -408,6 +408,39 @@ defmodule Gallformers.Import.TraitTermsTest do
       assert q.proposal == %{"category" => "bumpy"}
       assert Import.proposed_decision(q) == {:ok, %{"category" => "bumpy"}}
       assert Catalog.get_term("texture", "lumpy") == nil
+    end
+
+    # `c8c3` item 10: Nastasi & Davis asked about "swelling" (3 Galls) and "swellings"
+    # (15 Galls) apart.
+    test "a term's singular and plural are one question" do
+      package =
+        deliver(
+          gall_batch([
+            trait("f6", "g1", "form", "swelling", "abrupt swelling", %{
+              "evidence" => [%{"item" => "#/texts/5", "quote" => "a swelling on the leaf"}]
+            }),
+            trait("f7", "g2", "form", "swellings", "abrupt swelling")
+          ]),
+          placements: [placement("f6", "tapered swelling"), placement("f7", "tapered swelling")]
+        )
+
+      assert [q] = questions(package)
+      assert q.statement_ref == "u:form:swelling"
+      assert ["g1", "g2"] = Enum.map(q.subject["covers"], & &1["gall"])
+      assert Enum.map(q.subject["covers"], & &1["term"]) == ["swelling", "swellings"]
+    end
+
+    test "a term placed in one form places a Source's other form" do
+      {:ok, _} = Catalog.place_term(test_actor(), "shape", "kernel", "globular", :curator)
+
+      package =
+        deliver(gall_batch([trait("f7", "g2", "shape", "kernels", "spindle")]),
+          placements: [placement("f7", "spindle")]
+        )
+
+      assert questions(package) == []
+      package = approve!(package)
+      assert traits(gall_id(package, "g2"), "shape") == ["globular"]
     end
 
     test "is one question per package when the readers disagree, covering each Gall", ctx do
@@ -1110,6 +1143,27 @@ defmodule Gallformers.Import.TraitTermsTest do
       # A placement the vocabulary doesn't hold is still a question missing.
       other = put_in(entry, [:payload, "decision"], %{"place" => "white"})
       assert {:error, %{reason: {:no_queue_item, _}}} = Replay.run([other], actor: test_actor())
+    end
+
+    test "a decision logged before plurals were folded finds its question" do
+      # `c8c3` item 10: a ref logged as "u:color:pale tans" names the question now asked as
+      # "u:color:pale tan".
+      package = disagreeing()
+      [batch | _] = Import.list_batches(package)
+
+      entry = %{
+        kind: :queue_decision,
+        key: %{
+          "package" => package.key,
+          "batch_id" => batch.producer_batch_id,
+          "kind" => "trait_term",
+          "statement_ref" => "u:color:pale tans"
+        },
+        payload: %{"decision" => %{"keep" => true}}
+      }
+
+      assert {:ok, 1} = Replay.run([entry], actor: test_actor())
+      assert %{status: :decided, decision: %{"keep" => true}} = question(package)
     end
 
     test "a placement by agreement replays before its batch" do

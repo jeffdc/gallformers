@@ -368,7 +368,8 @@ defmodule Gallformers.Import.UnusedNames do
       [first | _] = all = groups[key]
 
       %{
-        name: first.printed,
+        # A name ending a sentence or clause is printed without the punctuation after it.
+        name: Regex.replace(~r/[.,;:]+$/, first.printed, ""),
         normalized: first.normalized,
         taxon_ids: all |> Enum.flat_map(& &1.taxon_ids) |> Enum.uniq() |> Enum.sort(),
         items: all |> Enum.map(& &1.ref) |> Enum.uniq() |> Enum.take(@items_shown),

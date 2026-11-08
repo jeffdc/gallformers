@@ -83,7 +83,8 @@ defmodule Gallformers.Import.QueueItem do
     :set_aside_statement,
     :trait_term,
     :taxonomy_acceptance,
-    :split_inducer
+    :split_inducer,
+    :missed_name
   ]
 
   @type kind ::
@@ -101,6 +102,7 @@ defmodule Gallformers.Import.QueueItem do
           | :trait_term
           | :taxonomy_acceptance
           | :split_inducer
+          | :missed_name
 
   @type t :: %__MODULE__{
           id: integer() | nil,

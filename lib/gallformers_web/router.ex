@@ -135,8 +135,10 @@ defmodule GallformersWeb.Router do
       live "/review/taxonomy", Admin.ReviewLive.Taxonomy, :index
       live "/changes", Admin.ChangesLive, :index
       live "/observation", Admin.ObservationLive, :index
-      live "/review/sources/:id", Admin.ReviewLive.Source, :source
-      live "/review/packages/:package_id", Admin.ReviewLive.Source, :package
+      # One Source's review, one thing at a time (6611); the Gallformers notes apart
+      live "/review/notes", Admin.ReviewLive.Source, :index
+      live "/review/sources/:id", Admin.ReviewLive.Review, :source
+      live "/review/packages/:package_id", Admin.ReviewLive.Review, :package
       # A Source's Facts: what approving writes, with edits (f14c, item 4)
       live "/review/sources/:id/facts", Admin.ReviewLive.Facts, :source
       live "/review/packages/:package_id/facts", Admin.ReviewLive.Facts, :package

@@ -886,7 +886,9 @@ defmodule GallformersWeb.FormComponents do
   ## Keyboard behavior
   - Arrow Down/Up: Navigate through results
   - Enter: Select highlighted item
-  - Escape: Clear results or selection
+  - Escape in the search: close the results, keeping the text (typing or an
+    arrow key opens them again)
+  - Escape on a selection: clear it
   - Backspace/Delete on selection: Clear and focus input
   - Type on selection: Clear and start new search
 

@@ -22,4 +22,20 @@ defmodule GallformersWeb.UIComponentsTest do
                "https://www.inaturalist.org/search?q=Andricus%20weldi"
     end
   end
+
+  describe "tooltip" do
+    test "its text shows on hover or focus of what it explains, which it describes" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.tooltip id="tip" text="Tan to light brown.">tan</.tooltip>
+        """)
+
+      assert text(html, "#tip [role=tooltip]") == "Tan to light brown."
+      assert query(html, "#tip [aria-describedby=tip-text]") |> Enum.any?()
+      assert query(html, "#tip-text[role=tooltip]") |> Enum.any?()
+      assert html =~ "tan"
+    end
+  end
 end

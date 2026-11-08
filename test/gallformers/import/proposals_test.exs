@@ -296,8 +296,11 @@ defmodule Gallformers.Import.ProposalsTest do
       package = deliver()
       {:ok, _} = Import.reject_proposal(test_actor(), items(package)["t4"])
 
+      # The fixture's document prints Hosts this batch renames: missed names, not asked here.
+      listed = Enum.reject(Import.list_queue_items(package), &(&1.kind == :missed_name))
+
       assert {:ok, %{decided: decided, skipped: skipped}} =
-               Import.accept_proposals(test_actor(), Import.list_queue_items(package))
+               Import.accept_proposals(test_actor(), listed)
 
       assert decided |> Enum.map(& &1.statement_ref) |> Enum.sort() == ["t2", "u:other:pale tan"]
 

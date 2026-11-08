@@ -131,6 +131,22 @@ defmodule Gallformers.Import.TraitTerms do
           position: non_neg_integer()
         }
 
+  @doc """
+  A term question's ref (`"u:<trait>:<normalized term>"`, a Trait term's or
+  a set-aside's) as `statement_ref/2` makes it now, from one logged with an
+  older normalization (before plurals were folded, `c8c3`). A shortened
+  ref (its term hashed) and any other ref are returned as they are.
+  """
+  @spec current_ref(String.t() | nil) :: String.t() | nil
+  def current_ref("u:" <> rest = ref) do
+    case String.split(rest, ":", parts: 2) do
+      [trait, term] -> if String.contains?(term, "#"), do: ref, else: statement_ref(trait, term)
+      _ -> ref
+    end
+  end
+
+  def current_ref(ref), do: ref
+
   @doc "The kind of queue item for a question about a term."
   @spec kind() :: QueueItem.kind()
   def kind, do: @kind

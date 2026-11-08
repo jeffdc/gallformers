@@ -124,7 +124,8 @@ defmodule Gallformers.Import.SetAsideTest do
       Enum.filter(Import.list_queue_items(package, status: :all), &(&1.kind in SetAside.kinds()))
 
   @tan "u:other:pale tan"
-  @hills_ref "u:place:throughout the hills"
+  # The ref is the normalized term: plurals are folded (`TraitTermMapping.normalize/1`).
+  @hills_ref "u:place:throughout the hill"
 
   defp item(package, ref), do: Enum.find(set_aside(package), &(&1.statement_ref == ref))
 
@@ -178,7 +179,7 @@ defmodule Gallformers.Import.SetAsideTest do
              ] = term.subject["covers"]
 
       assert statement.kind == :set_aside_statement
-      assert statement.statement_ref == "u:place:throughout the hills"
+      assert statement.statement_ref == @hills_ref
       assert statement.proposal == %{"keep" => true}
       assert [%{"gall" => "g1", "note" => "no place is named"}] = statement.subject["covers"]
     end

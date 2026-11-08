@@ -17,11 +17,12 @@ defmodule Gallformers.Import.Queue do
   | a Gall (`g1`): ambiguous, undescribed candidates, unresolved | `%{"gall_id" => id}`, `%{"new" => true}` or `%{"skip" => true}`; each may add `"drop" => [fact refs]` and `"host_reading" => %{"name", "taxon_id"}`, and new `"generation" => value` (`Gallformers.Import.GallDecisions`) |
   | the package's Source (`"source"`) | `%{"source_id" => id}` or `%{"new" => true}` |
   | the Source a notice retracts (`"retracts"`) | `%{"source_id" => id}` or `%{"skip" => true}` |
-  | a phase 6 dispute (`f3`, `a2`, ...; `Gallformers.Import.Disputes`) | `%{"keep" => true}` (the statement stands) or `%{"skip" => true}` (it is dropped); a Host dispute also `%{"keep" => true, "host_reading" => %{"name", "taxon_id"}}` (it stands, the Host read as another plant throughout the Source; a species-level Host only) or `%{"keep" => true, "host_taxon_id" => id}` (it stands on the plant chosen, for its statements only) |
+  | a phase 6 dispute (`f3`, `a2`, ...; `Gallformers.Import.Disputes`) | `%{"keep" => true}` (the statement stands) or `%{"skip" => true}` (it is dropped); a Host dispute also `%{"keep" => true, "host_reading" => %{"name", "taxon_id"}}` (it stands, the Host read as another plant throughout the Source; a species-level Host only) or `%{"keep" => true, "host_taxon_id" => id}` (it stands on the plant chosen, for its statements only); a Trait dispute also `%{"values" => [v, …]}` (it stands on those values of its Trait) |
   | a same-date conflict, a generation outside its group, a plant's disagreeing act | `%{}` (acknowledged) |
   | a taxonomic statement to accept (`Gallformers.Import.TaxonomyQueue`) | `%{"accept" => true}` or `%{"decline" => true, "reason" => text}` (a reason required) |
   | a rename proposal (`Gallformers.Import.GallRenames`) | `%{"accept" => true}` or `%{"reject" => true}` |
   | a statement set aside (`u:<slot>:<term>`, `Gallformers.Import.SetAside`) | `%{"keep" => true}` or `%{"state" => spec}` |
+  | a name the producer missed (`n:<name>`, `Gallformers.Import.MissedNames`) | `%{"dismiss" => true}` or `%{"state" => spec}` |
   | a Trait term (`u:<trait>:<term>`, `Gallformers.Import.TraitTerms`) | `%{"place" => c}` or `%{"place" => [c1, c2]}` (for every Source: the values a term names), `%{"category" => c}` (these Galls), `%{"no_fit" => true}` or `%{"keep" => true}` |
 
   A decided item stays decided: resolving the package again keeps it and
@@ -85,6 +86,7 @@ defmodule Gallformers.Import.Queue do
   alias Gallformers.Import.Disputes
   alias Gallformers.Import.GallDecisions
   alias Gallformers.Import.HostDecisions
+  alias Gallformers.Import.MissedNames
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.SetAside
   alias Gallformers.Import.SplitQuestions
@@ -211,6 +213,7 @@ defmodule Gallformers.Import.Queue do
 
   defp choices(%QueueItem{kind: :set_aside_statement} = item), do: SetAside.choices(item)
   defp choices(%QueueItem{kind: :trait_term} = item), do: TraitTerms.choices(item)
+  defp choices(%QueueItem{kind: :missed_name} = item), do: MissedNames.choices(item)
 
   defp choices(%QueueItem{kind: kind})
        when kind in [:same_date_conflict, :generation_outside_group],

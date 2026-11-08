@@ -99,9 +99,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   questions, all but the terms and statements set aside (which never hold
   approval), identical disputes once. `holding` is `[{count, section
   title}]`; `ready` is true when nothing holds approval. `path` opens the
-  Source at its first step with work left
-  (`GallformersWeb.Admin.Review.Steps`), else at its overview; the
-  Gallformers notes at their own page.
+  Source's review; the Gallformers notes at their own page.
   """
   @spec sources() :: [map()]
   def sources do
@@ -188,11 +186,10 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   defp row_id({:source, id}, _packages), do: "source-#{id}"
   defp row_id({:package, id}, _packages), do: "package-#{id}"
 
-  # A Source opens at its first step with work left; the Gallformers notes
-  # at their own page.
-  defp row_path(:notes, [p | _], _first), do: "/admin/review/sources/#{p.source_id}"
-  defp row_path(key, packages, nil), do: base_path(key, packages)
-  defp row_path(key, packages, step), do: "#{base_path(key, packages)}/#{step.slug}"
+  # A Source opens at its review (`GallformersWeb.Admin.ReviewLive.Review`);
+  # the Gallformers notes at their own page.
+  defp row_path(:notes, _packages, _first), do: "/admin/review/notes"
+  defp row_path(key, packages, _first), do: base_path(key, packages)
 
   defp base_path({:package, id}, _packages), do: "/admin/review/packages/#{id}"
   defp base_path(_key, [p | _]), do: "/admin/review/sources/#{p.source_id}"
@@ -661,7 +658,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
 
   @doc """
   Every item of `packages` (from `package_data/1`) as an `t:entry/0`, with
-  `who` (the Source's short name) in the copy.
+  `who` (the Source's short name) in the copy. `step` (a step's id, or `:all` for
+  every step's) says what the answers show besides.
   """
   @spec entries([map()], String.t() | nil, keyword()) :: [entry()]
   def entries(packages, who, opts \\ []) do
@@ -696,6 +694,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
       |> Map.put(:decided, decided_text(item, question, names))
       |> Map.put(:comparison, comparison(item, question))
       |> host_context(question, content)
+      |> missed_context()
     end)
     |> group_disputes(who, names)
   end
@@ -790,6 +789,15 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   defp step_context(:galls, items, batches, who),
     do: %{taxa_info: %{}, held_genera: %{}, galls: gall_sides(items, batches, who)}
 
+  # The one-at-a-time review (`GallformersWeb.Admin.ReviewLive.Review`)
+  # shows any question, so it reads what every step's answers show.
+  defp step_context(:all, items, batches, who),
+    do: %{
+      taxa_info: taxa_info(items),
+      held_genera: held_genera(items),
+      galls: gall_sides(items, batches, who)
+    }
+
   defp step_context(_step, _items, _batches, _who),
     do: %{taxa_info: %{}, held_genera: %{}, galls: %{}}
 
@@ -800,7 +808,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
     host = host_taxon(fact, statements)
 
     gall_view =
-      if shared.step == :galls and gall_item?(item),
+      if shared.step in [:galls, :all] and gall_item?(item),
         do: gall_view(item, content, statements, shared.names, shared.galls)
 
     %{
@@ -1110,6 +1118,31 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   end
 
   defp host_context(entry, _question, _content), do: entry
+
+  # A name the Source prints that no batch declares (`c8c3` item 12): the
+  # taxa it names, each a plant or not (a Host or an Inducer, when stated),
+  # with its Galls (those on the plant, or those it induces) to offer first.
+  defp missed_context(%{item: %QueueItem{kind: :missed_name, subject: subject}} = entry) do
+    taxa =
+      for id <- List.wrap((subject || %{})["taxon_ids"]),
+          taxon = ReviewContext.taxon(id),
+          do: missed_taxon(taxon)
+
+    Map.put(entry, :missed, %{taxa: taxa})
+  end
+
+  defp missed_context(entry), do: entry
+
+  defp missed_taxon(taxon) do
+    plant? = match?(%{kingdom: "Plantae"}, Taxa.get_taxon(taxon.taxon_id))
+
+    galls =
+      if plant?,
+        do: Enum.map(Catalog.list_galls_for_hosts([taxon.taxon_id]), &Map.take(&1, [:id, :name])),
+        else: taxon.galls
+
+    %{id: taxon.taxon_id, name: taxon.name, plant?: plant?, galls: galls}
+  end
 
   # The plant a Host the tree doesn't hold starts as on the New Taxon page
   # (matter f14c): the Source's name for it (`name_reading`, else

@@ -52,6 +52,27 @@ defmodule Gallformers.Catalog.TraitTermsTest do
       assert Catalog.get_term("shape", "lens-shaped") == nil
     end
 
+    # `c8c3` item 10: Nastasi & Davis's "swelling" and "swellings" were two questions.
+    test "a word's plural is the same term: a Source writing either form takes it" do
+      assert %TraitTermMapping{term: "ovoid"} = Catalog.get_term("shape", "Ovoids")
+
+      for {plural, singular} <- [
+            {"swellings", "swelling"},
+            {"covered in short hairs", "covered in short hair"},
+            {"many chambers", "many chamber"},
+            {"berries", "berry"},
+            {"patches of hairs", "patch of hair"},
+            {"masses", "mass"}
+          ] do
+        assert TraitTermMapping.normalize(plural) == TraitTermMapping.normalize(singular)
+      end
+
+      # Words that only look plural stay as they are.
+      for word <- ["hairless", "glabrous", "various", "species", "this", "gas"] do
+        assert TraitTermMapping.normalize(word) == word
+      end
+    end
+
     test "normalizes as the import's questions about terms do" do
       for term <- ["Pale  Tan", " ovoid", "ÉCLAT"] do
         assert TraitTerms.statement_ref("color", term) ==

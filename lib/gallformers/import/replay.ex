@@ -146,6 +146,7 @@ defmodule Gallformers.Import.Replay do
   alias Gallformers.Import.TaxonomicDecisions
   alias Gallformers.Import.TaxonomyEdits
   alias Gallformers.Import.TaxonomyStatements
+  alias Gallformers.Import.TraitTerms
   alias Gallformers.Import.VocabEdits
   alias Gallformers.Taxa
 
@@ -674,9 +675,10 @@ defmodule Gallformers.Import.Replay do
     items = Import.list_queue_items(package, status: :all)
     kind = String.to_existing_atom(key["kind"])
 
+    ref = TraitTerms.current_ref(key["statement_ref"])
+
     Enum.find(items, fn item ->
-      item.kind == kind and item.batch_id == batch_id and
-        item.statement_ref == key["statement_ref"]
+      item.kind == kind and item.batch_id == batch_id and item.statement_ref == ref
     end) ||
       (batch &&
          Enum.find(items, fn item ->

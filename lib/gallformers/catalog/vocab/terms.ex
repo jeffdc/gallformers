@@ -62,6 +62,26 @@ defmodule Gallformers.Catalog.Vocab.Terms do
   def list, do: Repo.all(from(m in TraitTermMapping, order_by: m.id))
 
   @doc """
+  The other values of `trait` that are readings of one ambiguous term with
+  any of `values` (its candidates: "swelling" is abrupt swelling, tapered
+  swelling or stem club), each once.
+  """
+  @spec readings_with(String.t(), [String.t()]) :: [String.t()]
+  def readings_with(_trait, []), do: []
+
+  def readings_with(trait, values) do
+    from(m in TraitTermMapping,
+      where:
+        m.trait == ^trait and m.status == :ambiguous and fragment("? && ?", m.candidates, ^values),
+      select: m.candidates
+    )
+    |> Repo.all()
+    |> List.flatten()
+    |> Enum.uniq()
+    |> Kernel.--(values)
+  end
+
+  @doc """
   Places `term` for every Source under `categories`: one value, or each
   value its words name (a list), `placed_by` one of
   `TraitTermMapping.placed_by_values/0`. A new term, or one that fit no

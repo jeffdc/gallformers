@@ -3,7 +3,7 @@ status: raw
 created: 2026-11-07
 updated: 2026-11-08
 epic: taxogall
-relates: [6611, 294c, f14c, c90c]
+relates: [6611, 294c, f14c, c90c, ca45]
 ---
 
 # Review back end: pipeline and resolver fixes found in the review redesign
@@ -43,3 +43,30 @@ Found while redesigning the import review with Jeff (2026-11-07; design in `6611
 
 10. **Singular and plural are different terms** (Jeff, 2026-11-08, package 115). Nastasi & Davis's "swelling" (form, 3 Galls, `ambiguous`: already known to mean different values in different Galls) and "swellings" (form, 15 Galls, `new`) are two Trait-term questions, because terms are grouped and looked up in the term mappings by exact text. Treat singular and plural (and other inflections) as one term when grouping a Source's terms and when matching term mappings, so the curator decides "swelling" once for all 18 Galls and a later Source writing either form takes the decision.
 
+
+11. **A Trait dispute can only be kept or dropped** (found building `6611`, 2026-11-08). `Import.Disputes` takes `%{"keep" => true}` (the producer's values) or `%{"skip" => true}` (the Source's words as text). The approved review card treats a Trait dispute like a Trait term: "Keep as text", or "Map it to <trait> values" with every value of the Trait, each side's values pre-ticked (the producer's `suggestions`, the checkers' `placements`). When the curator ticks values other than the producer's (a checker's, or their own), there is no decision to send. The dispute needs a values decision, e.g. `%{"values" => [v, …]}` (or the term's `%{"categories" => %{gall_ref => [v…] | nil}}` for its one Gall), writing the Fact with those values as `keep` writes the producer's. Until then the review offers, on a Trait dispute, only "Keep as text" and the producer's values.
+
+
+12. **A name the producer missed can't be acted on** (Jeff, 2026-11-08). `Import.UnusedNames` lists the taxon names a Source prints that we hold but no batch declares (Osten Sacken's "Cynips quercus inanis"). The old overview showed the list; the new review doesn't, because Jeff: "if we show it we have to be able to action it". Needed: from a listed name, send its passages back through the producer (a partial run of one Source, adding to its package), so the missed Gall or taxon comes back as statements and questions like the rest. Each such run is a paid producer run and needs Jeff's go. Once it exists, the review shows the list just before Approve (a rail line like the hedged statements, opening a card of names with their pages and Read the Source), each with that action.
+
+
+13. **A named species with one Gall is asked about only because the Source names no generation** (Jeff, 2026-11-08, package 115: Nastasi & Davis's "silverpuff stem gall (Antistrophus microseris)", and we have one Gall for *A. microseris*). When the species has a single Gall and isn't known to alternate generations, the match should be firm (or not asked), not a "Which Gall?" question that holds approval. A species that does alternate could still be describing the missing generation's Gall, so only those should ask. Needs a way to tell whether a species alternates (its Galls' generations, the genus, a Trait), which is the back end's call.
+
+
+## Status (2026-11-08): items 10–13
+
+**10 built (uncommitted):** `TraitTermMapping.normalize/1` takes each word's plural as its singular ("swellings" → "swelling", "covered in short hairs" → "covered in short hair", "berries" → "berry", "patches" → "patch"). Words ending in ss/us/is ("hairless", "glabrous"), words of three letters or fewer, and a few that only look plural ("species", "this") are left alone. The folded form is only a key and is never shown. Every term comparison goes through this one function: grouping a Source's terms, looking up the term table, pending terms, set-aside items, and the ID tool's term search. Migration `20261109120000_fold_term_plurals` recomputes the stored keys (term table, pending terms, term candidates, and Trait-term and set-aside queue refs). It merges terms that fold together into the oldest row: if they agree it keeps them as they are, otherwise the term becomes ambiguous between all their values. Run on a copy of `gallformers_taxogall`, it merged "swelling" and "swellings" (both ambiguous) and folded the refs. Where one batch held both forms, the second keeps its old ref until the package is resolved again. The replay log finds a question logged under an old ref (`TraitTerms.current_ref/1`). Only plurals are folded, not other inflections ("swollen", "-ed", "-ing").
+
+**11 built (uncommitted):** a Trait dispute also takes `%{"values" => [v, …]}`: one or more values of its Trait, none twice. Decided before apply, its Facts go on them (`Disputes.chosen_values/1` joins the apply context's `trait_values`; a curator's Fact edits still win). Decided after apply, they are written and the waiting term is settled under them. The decision replays. The review session (6611) sends it from the Trait card.
+
+**13: the diagnosis was wrong.** Silverpuff stem gall (g11, *Antistrophus microseris*) wasn't asked because of the generation. The lone-candidate rule is already firm unless the species alternates generations (heterogony group) or the Source conflicts with the Gall. It was asked because of a **form conflict**: the Source's "swellings" read as `tapered swelling`, while Gall 1445 then held only `abrupt swelling`. Approving package 115 has since added tapered swelling to it. Proposed fix, waiting on Jeff: compare forms coarsely, as plant parts are compared. Values that are the candidates of one ambiguous form term ("swelling": abrupt swelling, tapered swelling, stem club) count as `differ`, not `conflict`. The rule comes from the term table, not a hard-coded list. Separately: should a single-Gall species that doesn't alternate be firm even with a real form or plant-part conflict?
+
+**12: waiting on Jeff (design and paid runs).** See the questions in the session; outcome to be recorded here.
+
+
+**Decisions (Jeff, 2026-11-08):**
+- **10 and 11 committed** (`14c67ffb`). The fold-plurals migration has run on `gallformers_taxogall` and `gallformers_dev`.
+- **13:** forms that are readings of one ambiguous form term differ, not conflict (built, uncommitted). `GallComparison.source_side/3` adds `form_near`, read from the term table by `Catalog.trait_readings_with/2`. Silverpuff stem gall's case (tapered vs abrupt swelling) would now be resolved firmly. A real form conflict still asks.
+- **12:** no producer re-run for a missed name. Jeff: it's far too powerful a tool for such a small scope. How a listed name is acted on is still to be discussed.
+
+- **12 back end built (uncommitted until the review handles the kind).** `Import.MissedNames`: resolving queues one `:missed_name` item per name `UnusedNames` lists, on the gall batch (`n:<normalized name>`). It never holds approval and has no proposal. Decisions: `%{"dismiss" => true}`, or `%{"state" => %{"kind" => "inducer_of" | "host_of", "taxon_id", "gall_id", "items"}}`, which writes one Relationship Fact on a Gall Gallformers holds. It is attributed to the package's Source, with the name as written and the chosen blocks as whole-item evidence. It's written when the gall batch is applied, or at once if it already is, and it replays. Migration `20261109130000_add_missed_name_queue_kind`. `UnusedNames` now prints a name without the punctuation after it ("Quercus douglasii", not "Quercus douglasii."). Review side: the 6611 session adds the card (Not needed / Add a statement… in the 87a1 editor).

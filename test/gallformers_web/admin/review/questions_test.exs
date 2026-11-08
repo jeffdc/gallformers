@@ -127,7 +127,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
       leave = choice(q, "Leave this Host out")
       assert leave.decision == %{"skip" => true}
-      assert leave.hint =~ "The Galls' other statements go in."
+      assert leave.hint =~ "says about the Galls still goes in."
       refute leave.pending
     end
 
@@ -556,7 +556,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.topic == :not_held
 
     assert q.question ==
-             "Which taxon does Ashmead mean by “Syrphidae”? Gallformers holds none by that name."
+             "Which taxon does Ashmead mean by “Syrphidae”? We have none by that name."
 
     assert q.proposal == nil
     assert choice(q, "It's new: create Syrphidae").picker == {:parent, :family}
@@ -706,7 +706,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
       assert q.section.title == "Galls of named species"
 
       assert q.question ==
-               "Which Gall is Ashmead's “the gall of ANDRICUS MORRISONI”?"
+               "Which Gall does Ashmead mean by “the gall of ANDRICUS MORRISONI”?"
 
       assert_plain(q)
     end
@@ -720,16 +720,16 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     test "offers the Gall, another generation's, a search and leaving it out", %{q: q} do
       assert labels(q) == [
                "It's Callirhytis morrisoni (sexgen)",
-               "It's another generation's Gall: create it",
+               "It's another generation: add a new Gall",
                "Another Gall…",
                "Leave this Gall out"
              ]
 
-      create = choice(q, "It's another generation's Gall: create it")
+      create = choice(q, "It's another generation: add a new Gall")
       assert create.decision == %{"new" => true}
 
       assert create.hint ==
-               "A new Gall of this species, of a generation Gallformers doesn't hold a Gall for yet."
+               "A new Gall of this species, for a generation we don't have a Gall for yet."
 
       another = choice(q, "Another Gall…")
       assert another.picker == :gall
@@ -809,7 +809,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.section.holds_approval == true
 
     assert q.question ==
-             "Is Ashmead's “a small spindle gall on the midrib” a Gall Gallformers holds?"
+             "Which Gall does Ashmead mean by “a small spindle gall on the midrib”?"
 
     # An undescribed match is never firm: a curator confirms it.
     assert q.proposal.label == "Quercus lobata spindle gall"
@@ -818,7 +818,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.proposal.decision == %{"gall_id" => 700}
     assert choice(q, "It's Quercus lobata midrib gall").decision == %{"gall_id" => 701}
 
-    assert choice(q, "It's a Gall Gallformers doesn't hold: create it").decision == %{
+    assert choice(q, "It's a Gall we don't have: add it").decision == %{
              "new" => true
            }
 
@@ -836,7 +836,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     q = present(item)
 
     assert q.topic == :new_galls
-    assert q.proposal.label == "Create it as a new Gall"
+    assert q.proposal.label == "Add it as a new Gall"
     assert q.proposal.decision == %{"new" => true}
     # Only a suggestion, never batched: it may be a Gall Gallformers holds (`c8c3` item 6).
     refute q.proposal.firm
@@ -933,7 +933,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert choice(q, "Drop it").decision == %{"skip" => true}
 
     assert choice(q, "Drop it").hint ==
-             "It is left out; Ashmead's words stay in the Source's text."
+             "It's left out. Ashmead's words stay in the Source's text."
 
     assert q.holds_approval == true
     assert_plain(q)
@@ -1135,16 +1135,44 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.context == "AULAX AMBROSIÆCOLA"
 
     assert q.question ==
-             "Should “attached by a small point” go in as AULAX AMBROSIÆCOLA's detachable?"
+             "What does “attached by a small point” mean for AULAX AMBROSIÆCOLA?"
 
     assert q.proposal == nil
     assert q.sides.checker == ["No gall was seen on Ambrosia."]
-    assert labels(q) == ["Keep it", "Drop it"]
+    assert labels(q) == ["Keep the producer's value", "Keep it as text"]
 
-    assert choice(q, "Drop it").hint ==
-             "The Gall keeps “attached by a small point” as text, with no detachable value."
+    assert choice(q, "Keep it as text").hint ==
+             "The Gall shows “attached by a small point” in the Source's words, with no " <>
+               "detachable value."
 
     assert_plain(q)
+  end
+
+  test "a dispute about a Trait term is one Gall's answer, each side's values marked" do
+    item = %QueueItem{
+      kind: :dispute,
+      statement_ref: "f7",
+      subject: %{
+        "findings" => @dispute_findings,
+        "trait" => "detachable",
+        "term" => "attached by a small point",
+        "facts" => ["f7"],
+        "suggestions" => ["integral"],
+        "placements" => [%{"reviewer" => "model-b", "category" => "detachable"}]
+      },
+      proposal: %{}
+    }
+
+    fact = %{"id" => "f7", "kind" => "trait", "gall" => "g2", "trait" => "detachable"}
+    q = present(item, %{fact: fact, written: @dispute_written})
+
+    assert [g] = q.galls
+    assert %{ref: "f7", name: "AULAX AMBROSIÆCOLA", default: nil} = g
+    assert g.suggested == ["integral", "detachable"]
+
+    assert g.line ==
+             "The producer mapped “attached by a small point” to integral. A checker " <>
+               "disagreed: No gall was seen on Ambrosia."
   end
 
   # -- Trait terms to settle (matter d213, Traits step) -----------------------------
@@ -1238,7 +1266,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
     test "is in the Trait terms section, which holds nothing", %{q: q} do
       assert q.section.id == :trait_terms
-      assert q.section.title == "Trait terms to settle"
+      assert q.section.title == "Trait terms"
       assert q.section.explanation =~ "Floate"
       assert q.section.explanation =~ "the producer, the AI that read the Source"
       assert q.section.explanation =~ "You can approve the Source with terms still open."
@@ -1252,7 +1280,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
       assert q.tag == "New term"
       assert q.covers == 2
       assert q.context == "the large stem galls and the small bud galls"
-      assert q.question == "What color value is “pale tan”?"
+      assert q.question == "What does “pale tan” mean for these 2 Galls?"
 
       assert q.scope ==
                "You're deciding what these words mean. The 2 Galls here that use them get " <>
@@ -1281,6 +1309,17 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
       assert g1.default == nil
       assert g2.said == ["The producer suggested tan.", "The checker placed it under tan."]
       assert g2.default == "tan"
+    end
+
+    test "says, Gall by Gall, what the pipeline made of the term", %{q: q} do
+      assert [g1, g2] = q.galls
+
+      assert g1.line ==
+               "The import pipeline couldn't agree how to map “pale tan” to a color value."
+
+      assert g1.suggested == ["tan", "white"]
+      assert g2.line == "The import pipeline suggests tan."
+      assert g2.suggested == ["tan"]
     end
 
     test "offers each value a reader chose, with who chose it", %{q: q} do
@@ -1400,6 +1439,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     q = present(term_item("form", "round", "new", covers), %{definitions: @form})
 
     assert Enum.map(q.galls, & &1.default) == ["globular", :text]
+    assert List.last(q.galls).line == "The import pipeline suggests keeping the words as text."
 
     assert q.proposal.label == "It depends on the Gall"
     assert q.proposal.why == "The readers chose differently for different Galls"
@@ -1472,7 +1512,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
     test "says so, and is decided Gall by Gall", %{q: q} do
       assert q.tag == "Used in more than one sense"
-      assert q.question == "What form value does “swelling” mean, Gall by Gall?"
+      assert q.question == "What does “swelling” mean for this Gall?"
 
       assert q.scope ==
                "“swelling” is used in more than one sense, so it is never placed for every Source."
@@ -1596,22 +1636,22 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     end
 
     test "recommends leaving it out, or stating it", %{q: q} do
-      assert q.question == "Should this hedged statement go in as a Fact?"
+      assert q.question == "Should this hedged statement go in?"
       assert q.proposal.label == "Leave it out"
       assert q.proposal.why == "A hedge stays out unless you state it"
       assert q.proposal.decision == %{"keep" => true}
 
-      assert labels(q) == ["Leave it out", "State it…"]
+      assert labels(q) == ["Leave it out", "Add it…"]
       assert choice(q, "Leave it out").proposed == true
 
       assert choice(q, "Leave it out").hint ==
-               "It stays out; the words remain in the Source's text."
+               "It stays out. The words stay in the Source's text."
 
-      state = choice(q, "State it…")
+      state = choice(q, "Add it…")
       assert state.picker == :statement
 
       assert state.hint ==
-               "Use this when you judge the Source states it outright. You choose what it says."
+               "Add it if you think the Source says it outright. You choose what it states."
 
       assert Questions.picked_decision(state, {:host, 5}) ==
                %{"state" => %{"kind" => "host_of", "taxon_id" => 5}}
@@ -1641,7 +1681,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
     q = present(item)
     assert q.section.id == :hedge_range
-    state = choice(q, "State it…")
+    state = choice(q, "Add it…")
     assert state.picker == :place
     assert q.context == "ANDRICUS MURTFELDTÆ"
 
@@ -1887,7 +1927,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.holds_approval == true
 
     assert q.question ==
-             "Is “Descriptions of new cynipidous galls” a Source Gallformers already holds?"
+             "Is “Descriptions of new cynipidous galls” a Source we already have?"
 
     assert choice(q, "It's Descriptions of new cynipidous galls").decision == %{"source_id" => 3}
     assert choice(q, "It's Cynipidous galls (abstract)").decision == %{"source_id" => 4}
@@ -1979,7 +2019,8 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
              :hedge_other,
              :taxonomy_acceptance,
              :split_inducer,
-             :source
+             :source,
+             :missed_names
            ]
   end
 
@@ -1989,6 +2030,61 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.question == "Which plant does the Source mean by “Q. obtusiloba”?"
 
     assert Questions.section(:synonyms, nil).title ==
-             "The Source's names that Gallformers now treats as synonyms"
+             "The Source's names we now treat as synonyms"
+  end
+
+  # `c8c3` item 12: a name the Source prints that we hold and no batch declares.
+  describe "a missed name" do
+    setup do
+      item = %QueueItem{
+        kind: :missed_name,
+        statement_ref: "n:cynips quercus inanis",
+        subject: %{
+          "name" => "Cynips quercus inanis",
+          "normalized" => "cynips quercus inanis",
+          "taxon_ids" => [7],
+          "items" => ["#/texts/3"],
+          "pages" => [12, 40]
+        },
+        proposal: %{}
+      }
+
+      %{q: present(item)}
+    end
+
+    test "is apart from the steps, holding nothing", %{q: q} do
+      assert q.section.id == :missed_names
+      assert q.section.title == "Names we didn't read"
+      assert q.holds_approval == false
+      assert q.proposal == nil
+    end
+
+    test "asks whether the Source says something with it, plainly", %{q: q} do
+      assert q.written == "Cynips quercus inanis"
+      assert q.context == "pp. 12, 40"
+
+      assert q.question ==
+               "Ashmead prints “Cynips quercus inanis”, which we have, but nothing it says " <>
+                 "with it was read. Does it say something we should add?"
+
+      assert choice(q, "Not needed").decision == %{"dismiss" => true}
+      assert_plain(q)
+    end
+
+    test "Add a statement… asks for the Gall, the name's passages its evidence", %{q: q} do
+      add = choice(q, "Add a statement…")
+      assert add.picker == :missed_statement
+      refute add.pending
+      assert add.values == ["#/texts/3"]
+
+      assert Questions.picked_decision(add, {:missed, "host_of", 7, 501}) == %{
+               "state" => %{
+                 "kind" => "host_of",
+                 "taxon_id" => 7,
+                 "gall_id" => 501,
+                 "items" => ["#/texts/3"]
+               }
+             }
+    end
   end
 end

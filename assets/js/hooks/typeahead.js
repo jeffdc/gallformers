@@ -3,6 +3,9 @@ const Typeahead = {
   mounted() {
     this.highlightedIndex = -1
     this.pendingFocus = false
+    // Escape closes the results without changing anything (`closeResults`);
+    // they stay closed through page updates until the user types or arrows.
+    this.closed = false
     this.inputHandler = (e) => this.handleInputKeydown(e)
     this.selectedHandler = (e) => this.handleSelectedKeydown(e)
 
@@ -12,6 +15,7 @@ const Typeahead = {
   updated() {
     // Re-query elements and re-attach listeners after DOM updates
     this.attachListeners()
+    if (this.closed && this.resultsContainer) this.resultsContainer.hidden = true
 
     // Focus input if we just cleared and are waiting for focus
     if (this.pendingFocus && this.input) {
@@ -49,6 +53,7 @@ const Typeahead = {
       this.input.addEventListener("keydown", this.inputHandler)
       // Listen for paste/autofill via the input event (phx-keyup misses these)
       this.input.addEventListener("input", () => {
+        this.openResults()
         const searchEvent = this.el.dataset.searchEvent
         if (searchEvent) {
           const payload = {value: this.input.value}
@@ -65,6 +70,17 @@ const Typeahead = {
       this.selectedContainer._typeaheadListener = true
       this.selectedContainer.addEventListener("keydown", this.selectedHandler)
     }
+  },
+
+  // Close the results list, keeping the text and telling the server nothing.
+  closeResults() {
+    this.closed = true
+    if (this.resultsContainer) this.resultsContainer.hidden = true
+  },
+
+  openResults() {
+    this.closed = false
+    if (this.resultsContainer) this.resultsContainer.hidden = false
   },
 
   // Push event to the correct target (LiveComponent or LiveView)
@@ -89,6 +105,7 @@ const Typeahead = {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault()
+        this.openResults()
         if (results.length > 0) {
           this.highlightedIndex = Math.min(this.highlightedIndex + 1, results.length - 1)
           this.updateHighlight()
@@ -98,6 +115,7 @@ const Typeahead = {
 
       case "ArrowUp":
         e.preventDefault()
+        this.openResults()
         if (results.length > 0) {
           this.highlightedIndex = Math.max(this.highlightedIndex - 1, 0)
           this.updateHighlight()
@@ -124,6 +142,7 @@ const Typeahead = {
         e.preventDefault()
         this.highlightedIndex = -1
         this.updateHighlight()
+        this.closeResults()
         break
     }
   },

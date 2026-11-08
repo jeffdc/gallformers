@@ -3,7 +3,8 @@ defmodule Gallformers.Import.Disputes do
   Phase 6 disputes as queue items (`9449` §5): findings in `review.json`
   that the producer disagreed with, one item per statement (several
   reviewers' findings together), holding approval until a curator decides
-  `%{"keep" => true}` or `%{"skip" => true}`.
+  `%{"keep" => true}` or `%{"skip" => true}`; a Trait dispute may also be
+  decided `%{"values" => [v, …]}` (below).
 
   ## Trait Facts
 
@@ -67,6 +68,11 @@ defmodule Gallformers.Import.Disputes do
   batch would have and settles the waiting term under its categories, and
   `skip` keeps its words as text (the waiting term settled as text).
 
+  `values` (`c8c3`) keeps the statement on other values of its Trait: a
+  checker's, or any the curator chooses, one or more (`chosen_values/1`).
+  Decided before its batch is applied, its Facts go on them; afterwards,
+  they are written on them and the waiting term settled under them.
+
   Such a dispute says what each side chose as data, not only in its
   findings' prose (`c8c3`; a producer's summary once dropped the value it
   chose): `subject["facts"]`, the term's Facts on the Gall (one per value
@@ -74,6 +80,7 @@ defmodule Gallformers.Import.Disputes do
   each (nil for none); and `subject["placements"]`, each checker's, as
   `Gallformers.Import.TraitTerms` gives a term's covers.
   """
+  alias Gallformers.Catalog
   alias Gallformers.Import.Batch
   alias Gallformers.Import.GallDecisions
   alias Gallformers.Import.QueueItem
@@ -368,9 +375,41 @@ defmodule Gallformers.Import.Disputes do
 
   defp content(_item), do: %{}
 
-  @doc "The choices a dispute allows, as `{key, check}` (`Gallformers.Import.Queue.validate_decision/3`)."
+  @doc """
+  The choices a dispute allows, as `{key, check}`
+  (`Gallformers.Import.Queue.validate_decision/3`): keep or skip; a Trait
+  dispute also `"values"`, one or more values of its Trait, none twice.
+  """
   @spec choices(QueueItem.t()) :: [{String.t(), (term() -> boolean())}]
-  def choices(_item), do: [{"keep", &(&1 == true)}, {"skip", &(&1 == true)}]
+  def choices(item) do
+    keep_skip = [{"keep", &(&1 == true)}, {"skip", &(&1 == true)}]
+
+    if trait?(item),
+      do: keep_skip ++ [{"values", &values?(item.subject["trait"], &1)}],
+      else: keep_skip
+  end
+
+  defp values?(trait, [_ | _] = values) do
+    Enum.uniq(values) == values and
+      Enum.all?(values, &(is_binary(&1) and Catalog.get_trait_value(trait, &1) != nil))
+  end
+
+  defp values?(_trait, _values), do: false
+
+  @doc """
+  The values chosen for the Trait Facts of `decided` (decided items): a
+  Trait dispute decided `%{"values" => values}`, for each of its Facts,
+  ref to the values. Those Facts go on them, as a curator's edit of a
+  Trait Fact's values does (`Gallformers.Import.FactEdits`).
+  """
+  @spec chosen_values([QueueItem.t()]) :: %{String.t() => [String.t()]}
+  def chosen_values(decided) do
+    for %QueueItem{decision: %{"values" => values}} = item <- decided,
+        trait?(item),
+        ref <- refs(item),
+        into: %{},
+        do: {ref, values}
+  end
 
   @doc """
   The `unmapped` entries (`Gallformers.Import.BatchUnmapped` fields, less

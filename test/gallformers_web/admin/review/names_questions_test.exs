@@ -318,7 +318,9 @@ defmodule GallformersWeb.Admin.Review.NamesQuestionsTest do
       leave = choice(q, "Leave this name out")
 
       assert leave.decision == %{"skip" => true}
-      assert leave.hint == "Drops 1 statement: the Inducer of the gall of Andricus dasydactyli."
+
+      assert leave.hint ==
+               "Leaves out 1 statement: the Inducer of the gall of Andricus dasydactyli."
 
       q = present(%{called_new() | statement_ref: "t99"}, %{statement: @new})
 
@@ -367,8 +369,8 @@ defmodule GallformersWeb.Admin.Review.NamesQuestionsTest do
       assert leave.decision == %{"skip" => true}
 
       assert leave.hint ==
-               "Drops 1 statement: the Host of the gall of Andricus dasydactyli. The Galls' " <>
-                 "other statements go in."
+               "Leaves out 1 statement: the Host of the gall of Andricus dasydactyli. " <>
+                 "Everything else Ashmead 1897 says about the Galls still goes in."
     end
   end
 
