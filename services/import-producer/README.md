@@ -103,7 +103,7 @@ The checked packages predate the 2026-10-17 and 2026-10-26 contract decisions. A
 
 ## Known limits
 
-- **Web pages:** the producer can't know a page's URL or access date; pass them in (not yet automated). Docling's HTML conversion fragments text at every italic name and may duplicate the page inside a layout table; quotes still verify.
+- **Web pages:** the producer can't know a page's URL or access date; pass them in (not yet automated). Docling's HTML conversion splits a paragraph at every italic name or link; phase 1 joins the pieces back into one item (`merge_inline`), so a quote can be the whole sentence. It may also duplicate the page inside a layout table; quotes still verify.
 - **Photos aren't read:** the batches say what the text says, even where a photo shows otherwise.
 - **Long Sources** (a 147-page catalogue, a 352-page key) are untested; a gall batch could exceed one response.
 - **Complex tables** convert poorly.

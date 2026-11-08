@@ -76,6 +76,55 @@ def drop_off_page(doc) -> int:
     return len(phantoms)
 
 
+def join_pieces(pieces: list[str]) -> str:
+    """The pieces of an inline group as the page reads them: a space between pieces, none
+    before closing punctuation or after an opening bracket."""
+    text = ""
+    for piece in (p.strip() for p in pieces):
+        if not piece:
+            continue
+        if text and not text.endswith(("(", "[")) and not piece.startswith(tuple(".,;:!?)]")):
+            text += " "
+        text += piece
+    return text
+
+
+def merge_inline(doc) -> int:
+    """Join each inline group of text items into one item in its place; return how many.
+
+    Docling's HTML reader splits a paragraph at every italic or bold run and every link
+    (an inline group of text items), so each species name was an item of its own and a
+    quote could be no more than a bare name. A group inside a list item becomes the list
+    item's text; any other becomes a text item where the group was.
+    """
+    from docling_core.types.doc import DocItemLabel, GroupLabel, ListItem, TextItem
+
+    merged = 0
+    for group in [g for g in doc.groups if g.label == GroupLabel.INLINE]:
+        pieces = [c.resolve(doc) for c in group.children]
+        if not pieces or not all(type(p) is TextItem for p in pieces):
+            continue
+        text = join_pieces([p.text for p in pieces])
+        parent = group.parent.resolve(doc)
+        if isinstance(parent, ListItem) and not parent.text:
+            parent.text = parent.orig = text
+        else:
+            # The first piece takes the group's place, keeping its number in reading order.
+            first, rest = pieces[0], pieces[1:]
+            if rest:
+                doc.delete_items(node_items=rest)
+            first.text = first.orig = text
+            first.label = DocItemLabel.TEXT
+            first.formatting = first.hyperlink = None
+            first.parent = group.parent
+            at = next(i for i, c in enumerate(parent.children) if c.cref == group.self_ref)
+            parent.children.insert(at, first.get_ref())
+            group.children = []
+        doc.delete_items(node_items=[group])
+        merged += 1
+    return merged
+
+
 def prepare_text(pdf: Path, out_dir: Path, plan: OcrPlan) -> tuple[Path, dict]:
     """The PDF whose text layer Docling should read, and the record of how it was chosen."""
     if plan == "none":
@@ -135,12 +184,19 @@ def convert_url(url: str, out_dir: Path) -> dict:
     started = time.monotonic()
     result = DocumentConverter().convert(url)
     seconds = round(time.monotonic() - started, 1)
+    merged = merge_inline(result.document)
 
     document = out_dir / "document.json"
     result.document.save_as_json(document, ensure_ascii=False)
     doc = load(document)
     (out_dir / "document.txt").write_text(render(doc), encoding="utf-8")
 
-    record = {"url": url, "status": str(result.status), "seconds": seconds, "quality": report(doc)}
+    record = {
+        "url": url,
+        "status": str(result.status),
+        "seconds": seconds,
+        "merged_inline_groups": merged,
+        "quality": report(doc),
+    }
     (out_dir / "convert.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
     return record

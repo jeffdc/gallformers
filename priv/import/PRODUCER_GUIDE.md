@@ -62,7 +62,7 @@ Each evidence entry quotes the document:
 
 - `item`: the reference of the document item the evidence is in (e.g. `#/texts/42`, `#/tables/3`).
 - `quote`: verbatim text from that item, long enough to be unambiguous within it — a sentence or a clause. Copy the document's text as it stands, OCR errors included. For a table row, the row's cells joined with " | ".
-- Cite the passage that states the Fact: the sentence that says it, in preference to a figure caption or a heading that names it.
+- Cite the passage that states the Fact: the sentence that says it, in preference to a figure caption or a heading that names it. A bare name is never a quote: "Rubus strigosus" names a Host, while "has been recorded from 11 different species of Rubus (… Rubus strigosus …)" states it.
 - A statement that spans two items (a name broken over two lines, a column break) takes one evidence entry per item.
 - `whole_item: true` in place of `quote` when the evidence is the item's entire text (typically a descriptive paragraph).
 - `page`: the page number as printed in the Source, when known.
@@ -196,7 +196,8 @@ A qualifier is its own Fact, pointing at a Relationship Fact in the same batch (
 - **Terms in `traits.json`.** Its term mappings (`mappings`) list terms Gallformers has already decided. A `placed` term takes its category. An `ambiguous` term, listed with its `candidates`, is never mapped as listed: choose among the candidates from this Gall's description (or `null` when nothing in it tells them apart) and mark it `depends_on_gall: true`.
 - **Words for something else are not a term of this Trait.** "Sometimes three or four together, pressing each other into irregular shapes" says how the Galls grow together, not the shape of one: no shape term. "Each with a single insect" says what is in each chamber, not how many chambers the Gall has: it is a `cells` term only where the Source's words say whether the Gall has one chamber or several. A comparison the Source makes for a Trait is the term, as written ("the color of a large dried pea" for color); suggest a category only when the comparison plainly means one value, else `null`.
 - **One Fact per value a term names.** Most terms name one value: one Fact. A term that names several values takes one Fact for each, all with the same term: "green-yellow" is color `green` and color `yellow`; "protruding from both sides" of a leaf is plant_part `upper leaf` and `lower leaf`. A Gall can also have several terms for a Trait ("pale tan, spotted with red": color `pale tan` and color `red`); `detachable` has one Fact.
-- **Never guess between values.** A term that offers a choice or leaves it open names none of them: "on either side of the leaf" and "on the upper or lower surface" are `leaf`; any other such term is one Fact with category `null`, and `depends_on_gall: true` when its value varies from Gall to Gall.
+- **A term naming alternatives names each of them.** In Gallformers, several values of a Trait mean the Gall can be any of them. So a term that names values the Gall varies between ("green or yellowish", "single-chambered or have many chambers", "greenish to reddish") takes one Fact for each value it names, all with the same term, as "green-yellow" does. A place on the leaf is the exception: "on either side of the leaf" and "on the upper or lower surface" are `leaf`.
+- **Never guess a value the Source doesn't name.** A term that leaves the value open ("of various colours", "variable in shape") or that the Source says is unknown is one Fact with category `null`, and `depends_on_gall: true` when its value varies from Gall to Gall.
 
 ```json
 { "id": "f6", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "shape",
@@ -268,7 +269,7 @@ The producer answers every finding once, in its `response`:
 
 - **Agree** when the finding is right by this guide and the document. Fix the statement (as suggested, or better), and say what changed in `reason`.
 - **Disagree** when the statement already follows this guide and the document. Leave it as it is, and say why in `reason`, citing the document or the rule. A disputed finding goes to a human reviewer at intake.
-- **`summary`:** with either answer, your position in one plain sentence, for the curator who weighs it against the reviewer's: no rule numbers and no `#/texts` references ("Ashmead gives the colour by comparison, so the comparison is the term, with no category"). The full argument stays in `reason`.
+- **`summary`:** with either answer, your position in one plain sentence, for the curator who weighs it against the reviewer's: no rule numbers and no `#/texts` references ("Ashmead gives the colour by comparison, so the comparison is the term, with no category"). Name the value the statement holds as you leave it: for a trait Fact, its term and category ("'Fleshy' stays as texture `succulent`: …"); for a Relationship or a range adjustment, its taxon or place. The full argument stays in `reason`.
 
 Placements are not findings: don't answer them, and don't read them. A trait Fact keeps the category you gave it unless a finding makes you change its term or Trait; a trait Fact you add or rewrite in phase 6 has no placement, so a curator places its term at intake.
 

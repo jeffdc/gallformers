@@ -4,7 +4,7 @@ Review the batches below against their document, following VERIFY_GUIDE.md exact
 
 Your `gall.json` is a copy with the producer's category removed from every trait Fact: place each trait term yourself, from its quote and the definitions in `vocab/traits.json`, and write the placements in `review.json` (VERIFY_GUIDE.md, "Placing trait terms"). Because the copy has no categories it won't validate against the schema; that is expected.
 
-Give every finding a `summary`: your position in one plain sentence, with no rule numbers and no `#/texts` references, for the curator who reads it beside the producer's answer. The full argument goes in `reason`.
+Give every finding a `summary`: your position in one plain sentence, with no rule numbers and no `#/texts` references, for the curator who reads it beside the producer's answer. Name the value you say is right, or say the statement should go. The full argument goes in `reason`.
 
 ## Values you must use exactly
 

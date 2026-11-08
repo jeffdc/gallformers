@@ -55,3 +55,60 @@ def test_drop_off_page_removes_items_wholly_outside_their_page():
     assert drop_off_page(doc) == 2
     assert [t.text for t in doc.texts] == ["Etymology. — The name", "edge"]
     assert doc.texts[1].self_ref == "#/texts/1"
+
+
+def test_merge_inline_joins_a_web_paragraph_into_one_item():
+    """Docling's HTML reader splits a paragraph at every italic name (Aphis rubifolii, a web
+    page): each piece became an item, so a quote could only be a bare name ("Aphis
+    rubifolii") or a fragment. Each inline group becomes one text item, its pieces joined
+    as the page reads, in place of the group."""
+    from docling_core.types.doc import DocItemLabel, DoclingDocument, GroupLabel
+
+    from producer.convert import merge_inline
+
+    doc = DoclingDocument(name="page")
+    doc.add_text(label=DocItemLabel.SECTION_HEADER, text="Identification")
+    para = doc.add_group(label=GroupLabel.INLINE)
+    for piece in [
+        "Aphis rubifolii",
+        "has been recorded from 11 species of",
+        "Rubus",
+        "(",
+        "Rubus allegheliensis, Rubus cuneifolius",
+        ").",
+    ]:
+        doc.add_text(label=DocItemLabel.TEXT, text=piece, parent=para)
+    doc.add_text(label=DocItemLabel.TEXT, text="After the paragraph.")
+    entries = doc.add_group(label=GroupLabel.LIST)
+    entry = doc.add_list_item(text="", parent=entries)
+    cite = doc.add_group(label=GroupLabel.INLINE, parent=entry)
+    for piece in [
+        "Davis, J.J. (1910)",
+        ". A list of the Aphididae.",
+        "J. Econ. Ent.",
+        "3",
+        ", 482.",
+    ]:
+        doc.add_text(label=DocItemLabel.TEXT, text=piece, parent=cite)
+
+    assert merge_inline(doc) == 2
+    assert [(t.label, t.text) for t in doc.texts] == [
+        (DocItemLabel.SECTION_HEADER, "Identification"),
+        (
+            DocItemLabel.TEXT,
+            "Aphis rubifolii has been recorded from 11 species of Rubus "
+            "(Rubus allegheliensis, Rubus cuneifolius).",
+        ),
+        (DocItemLabel.TEXT, "After the paragraph."),
+        (
+            DocItemLabel.LIST_ITEM,
+            "Davis, J.J. (1910). A list of the Aphididae. J. Econ. Ent. 3, 482.",
+        ),
+    ]
+    assert [g.label for g in doc.groups] == [GroupLabel.LIST]
+    assert [c.cref for c in doc.body.children] == [
+        "#/texts/0",
+        "#/texts/1",
+        "#/texts/2",
+        "#/groups/0",
+    ]

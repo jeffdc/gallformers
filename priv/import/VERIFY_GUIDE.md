@@ -10,7 +10,7 @@ You report; you change nothing. In phase 6 the producer answers each finding, fi
 
 Check every act in `taxonomy.json` and every Fact in `gall.json`, and the taxa and Galls they declare:
 
-- **Support:** its evidence, read in the cited document item, says what the statement says. The quote exists in the item and carries the meaning claimed, in context.
+- **Support:** its evidence, read in the cited document item, says what the statement says. The quote exists in the item and carries the meaning claimed, in context. A quote that is only a name, or a fragment that doesn't state the Fact, is an `unsupported` finding, even when the sentence around it would support the statement.
 - **Value:** each controlled value (a generation, a plant part in `identified_by`, a place, a qualifier) matches its definition (`vocab/traits.json` for generations and plant parts) and the Source's words in `as_written`.
 - **Term:** a trait Fact's `term` is the Source's own word or short phrase for one value of that Trait of that Gall, verbatim: the words that are the term, not the sentence and not a clause. A term for another Trait, words that describe something else ("sometimes three or four together, pressing each other into irregular shapes" as a shape; "each with a single insect" as cells, where nothing says how many chambers the Gall has), or words the Source doesn't use for it, is a `wrong_value` finding. A comparison the Source makes for the Trait ("the color of a large dried pea") is a term (`PRODUCER_GUIDE.md`, "Traits").
 - **Type:** the Relationship type, act kind or qualifier is the one the Source supports — the most specific the evidence allows, and no more.
@@ -34,7 +34,8 @@ Place every trait Fact's term, as the producer did but without knowing what it s
 A term `traits.json` lists as `placed` (`mappings`) takes its category. An `ambiguous` term, listed with its `candidates`, is placed from this Gall's description, with `depends_on_gall: true`.
 
 - **A term that names several values** is several trait Facts with the same Gall, Trait and term ("green-yellow": green and yellow; "protruding from both sides" of a leaf: upper leaf and lower leaf). Place them together, each in one of the values the term names. A term that names several values but has a Fact for only one of them is a `rule` finding on that Fact.
-- **Never guess between values.** A term that offers a choice or leaves it open ("on either side of the leaf", "on the upper or lower surface") names none of them: a leaf location is `leaf`; any other such term is `null`, with `depends_on_gall: true` when its value varies from Gall to Gall.
+- **A term naming alternatives names each of them** ("green or yellowish": green and yellow; "single-chambered or have many chambers": monothalamous and polythalamous): several values of a Trait mean the Gall can be any of them. Place its Facts as for any term that names several values. A place on the leaf is the exception: "on either side of the leaf" and "on the upper or lower surface" are `leaf`.
+- **Never guess a value the Source doesn't name.** A term that leaves the value open ("of various colours", "variable in shape") or that the Source says is unknown is `null`, with `depends_on_gall: true` when its value varies from Gall to Gall.
 - A `plant_part` is the most precise location the Source supports; `leaf` when it supports no more precise place on the leaf. Never `leaf` beside a leaf value from the same words: every leaf value is on the leaf.
 - Place a term in a value only when its definition fits clearly: where the producer suggested nothing, two reviewers agreeing place a new term for every Source.
 
@@ -64,5 +65,5 @@ A placement is not a finding: write one for every trait Fact, whether or not you
 
 - `reviewed`: the sha256 of each batch file you checked, as provided with the batches (or computed with a hashing tool).
 - `findings`: one entry per problem, with the statement's `id` (`a…`, `f…`, `t…`, `g…`), one `problem` from the schema, a `reason` that cites the document, a `summary`, and an optional `suggestion`. An empty list means every statement checks out.
-- `summary`: your position in one plain sentence, for the curator who weighs it against the producer's answer: no rule numbers and no `#/texts` references. The full argument stays in `reason`.
+- `summary`: your position in one plain sentence, for the curator who weighs it against the producer's answer: no rule numbers and no `#/texts` references. Name the value you say is right, or say the statement should go ("'Fleshy' describes the tissue inside, not the surface, so it isn't a texture term"). The full argument stays in `reason`.
 - `placements`: one entry per trait Fact, by its `id` ("Placing trait terms").
