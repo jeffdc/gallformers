@@ -148,7 +148,9 @@ defmodule Gallformers.Import.FactsView do
   words (as `entries/2`), each with its `sources`: every attribution's
   Source, `%{source_id, name, stance}` (`name` as
   `Gallformers.Sources.short_name/1`, else the title), oldest statement
-  first. For a page showing a Gall's Facts from all its Sources.
+  first; and its `lines`, each Source's whole statement (`statements/1`),
+  its words left out where they only repeat the Fact's value. For a page
+  showing a Gall's Facts from all its Sources.
   """
   @spec gall_entries([integer()]) :: [entry()]
   def gall_entries([]), do: []
@@ -156,6 +158,7 @@ defmodule Gallformers.Import.FactsView do
   def gall_entries(fact_ids) when is_list(fact_ids) do
     all = Facts.list_attributions_for_facts(fact_ids)
     names = all |> Map.values() |> List.flatten() |> source_names()
+    statements = statements(fact_ids, all)
 
     for e <- build(nil, fact_ids, all) do
       sources =
@@ -164,8 +167,146 @@ defmodule Gallformers.Import.FactsView do
         |> Enum.sort_by(&{&1.stated_on != nil, stated_days(&1.stated_on), &1.id})
         |> Enum.map(&%{source_id: &1.source_id, name: names[&1.source_id], stance: &1.stance})
 
-      Map.put(e, :sources, sources)
+      lines = statements |> Map.get(e.fact_id, []) |> without_value_words(value_words(e))
+
+      e |> Map.put(:sources, sources) |> Map.put(:lines, lines)
     end
+  end
+
+  @typedoc """
+  One Source's statement of a Fact, as the Fact inspector shows it: who
+  (`name` as `Gallformers.Sources.short_name/1`, else the title; `own?`
+  for Gallformers' own Sources, `gallformers?` for the Gallformers Source),
+  when (`stated_on` at its `precision`, `date` in words, nil when
+  undated), its `stance`, its `words` as written, its `statement` text,
+  its `quotes` and `observations`, and its `state`: whether it counts,
+  awaits a curator, or was declined (`reason`).
+  """
+  @type statement :: %{
+          source_id: integer(),
+          name: String.t(),
+          own?: boolean(),
+          gallformers?: boolean(),
+          stated_on: Date.t() | nil,
+          precision: :year | :month | :day | nil,
+          date: String.t() | nil,
+          stance: :confirm | :deny,
+          words: [String.t()],
+          statement: String.t() | nil,
+          quotes: [%{quote: String.t(), page: String.t() | nil}],
+          observations: [
+            %{
+              provider: atom(),
+              id: String.t(),
+              url: String.t() | nil,
+              quality_grade: String.t() | nil,
+              thumbnail_url: String.t() | nil
+            }
+          ],
+          state: :counts | :awaiting | :declined,
+          reason: String.t() | nil
+        }
+
+  @doc """
+  Every Source's statement of each of `fact_ids`, by Fact ID, oldest
+  first (undated first). Whether a statement counts follows the Fact's
+  kind (`Gallformers.Facts.counts?/3`): a taxonomic statement awaits a
+  curator until accepted.
+  """
+  @spec statements([integer()]) :: %{integer() => [statement()]}
+  def statements([]), do: %{}
+
+  def statements(fact_ids) when is_list(fact_ids),
+    do: statements(fact_ids, Facts.list_attributions_for_facts(fact_ids))
+
+  defp statements(fact_ids, attributions) do
+    sources =
+      attributions
+      |> Map.values()
+      |> List.flatten()
+      |> Enum.map(& &1.source_id)
+      |> Enum.uniq()
+      |> Sources.list_sources_by_id()
+      |> Map.new(&{&1.id, &1})
+
+    kinds =
+      Repo.all(from(f in Fact, where: f.id in ^fact_ids, select: {f.id, f.kind})) |> Map.new()
+
+    own = Sources.own_source_ids()
+
+    Map.new(attributions, fn {fact_id, list} ->
+      {fact_id,
+       list
+       |> Enum.sort_by(&{&1.stated_on != nil, stated_days(&1.stated_on), &1.id})
+       |> Enum.map(&statement(&1, sources[&1.source_id], own, kinds[fact_id]))}
+    end)
+  end
+
+  defp statement(a, source, own, kind) do
+    %{
+      source_id: a.source_id,
+      name: statement_source_name(source, a.source_id),
+      own?: a.source_id in own,
+      gallformers?: source != nil and source.kind == :gallformers,
+      stated_on: a.stated_on,
+      precision: a.stated_on && a.stated_precision,
+      date: stated_words(a.stated_on, a.stated_precision),
+      stance: a.stance,
+      words: as_written(a),
+      statement: a.statement_text,
+      quotes: for(e <- a.evidence, e.quote not in [nil, ""], do: %{quote: e.quote, page: e.page}),
+      observations:
+        for(
+          o <- a.observations,
+          do: %{
+            provider: o.provider,
+            id: o.external_id,
+            url: o.url,
+            quality_grade: o.quality_grade,
+            thumbnail_url: o.thumbnail_url
+          }
+        ),
+      state: statement_state(a, kind, own),
+      reason: a.decline_reason
+    }
+  end
+
+  defp statement_source_name(nil, source_id), do: "Source #{source_id}"
+  defp statement_source_name(source, _id), do: Sources.short_name(source) || source.title
+
+  # The Source's own words for the Fact, once each.
+  defp as_written(a) do
+    ([a.value_as_written, a.term, a.status_as_written, a.authorship_as_written] ++
+       Enum.map(a.names, & &1.name_as_written))
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.uniq_by(&String.downcase/1)
+  end
+
+  defp statement_state(%{declined_at: at}, _kind, _own) when at != nil, do: :declined
+
+  defp statement_state(a, kind, own),
+    do: if(Facts.counts?(kind, a, own), do: :counts, else: :awaiting)
+
+  # A statement's date in words at its precision: "1959", "Jun 1959",
+  # "Jun 14, 1959".
+  defp stated_words(nil, _precision), do: nil
+  defp stated_words(date, :year), do: to_string(date.year)
+  defp stated_words(date, :month), do: Calendar.strftime(date, "%b %Y")
+  defp stated_words(date, _precision), do: Calendar.strftime(date, "%b %-d, %Y")
+
+  # The words a Fact's value shows already, lowercased.
+  defp value_words(%{value: %{subject: %{name: name}}}) when is_binary(name), do: [name]
+  defp value_words(%{kind: :trait, value: %{value: value}}) when is_binary(value), do: [value]
+  defp value_words(%{value: %{place: %{} = place}}), do: [place.name, place.code]
+  defp value_words(%{kind: :alias, value: %{name: name}}), do: [name]
+  defp value_words(_entry), do: []
+
+  # A Source's words that read as the Fact shows say nothing more.
+  defp without_value_words(lines, shown) do
+    shown = for w <- shown, is_binary(w), into: MapSet.new(), do: String.downcase(w)
+
+    for line <- lines,
+        do: %{line | words: Enum.reject(line.words, &MapSet.member?(shown, String.downcase(&1)))}
   end
 
   # A statement's date as a number to sort by (undated ones sort first on

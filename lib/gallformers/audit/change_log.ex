@@ -103,6 +103,7 @@ defmodule Gallformers.Audit.ChangeLog do
           id: integer(),
           change: :added | :made_current | :superseded | :withdrawn | :unsupported,
           what: String.t() | nil,
+          key: tuple() | nil,
           gall: subject() | nil,
           taxon: map() | nil
         }
@@ -413,6 +414,7 @@ defmodule Gallformers.Audit.ChangeLog do
       coalesce(tf.gall_id, rf.object_gall_id, rf.subject_gall_id, raf.gall_id, oc.gall_id, df.gall_id, af.gall_id),
       coalesce(tg.name, rg.name, rag.name, og.name, dg.name, ag.name),
       cf.taxon_id, cn.name, ct.rank::text, ct.kingdom::text,
+      rf.subject_taxon_id, coalesce(raf.place_id, oc.place_id),
       f.kind::text, tv.trait, tv.value, rf.type::text,
       CASE rf.type::text
         WHEN 'host_of' THEN subj.name WHEN 'inducer_of' THEN subj.name
@@ -446,16 +448,48 @@ defmodule Gallformers.Audit.ChangeLog do
 
     %{rows: rows} = Repo.query!(sql, [fact_ids])
 
-    Map.new(rows, fn [id, gall_id, gall, taxon_id, taxon, rank, kingdom | words] ->
+    Map.new(rows, fn [
+                       id,
+                       gall_id,
+                       gall,
+                       taxon_id,
+                       taxon,
+                       rank,
+                       kingdom,
+                       subject_id,
+                       place_id | words
+                     ] ->
       {id,
        %{
          id: id,
          what: words |> fact_of() |> fact_words(),
+         key: gall_key(words, subject_id, place_id),
          gall: gall_id && %{id: gall_id, name: gall},
          taxon: taxon_id && %{id: taxon_id, name: taxon, rank: rank, kingdom: kingdom}
        }}
     end)
   end
+
+  # What the Gall page and the change set call a Fact about a Gall
+  # (`Gallformers.Curation.Key`), or nil for one they don't (a description,
+  # a taxon's Fact).
+  defp gall_key(["gall_trait", trait, value | _], _subject, _place), do: {:trait, trait, value}
+
+  defp gall_key(["gall_relationship", _, _, type, _ | _], subject, _place)
+       when type in ["host_of", "inducer_of"] and is_integer(subject),
+       do: {if(type == "host_of", do: :host, else: :inducer), subject}
+
+  defp gall_key(["gall_range", _, _, _, _, adjustment, _ | _], _subject, place)
+       when adjustment in ["exclude", "only"] and is_integer(place),
+       do: {:range, String.to_existing_atom(adjustment), place}
+
+  defp gall_key(["gall_occurrence" | _], _subject, place) when is_integer(place),
+    do: {:occurrence, place}
+
+  defp gall_key(["gall_alias", _, _, _, _, _, _, name, _], _subject, _place) when is_binary(name),
+    do: {:alias, name}
+
+  defp gall_key(_words, _subject, _place), do: nil
 
   defp fact_of(["gall_trait", trait, value | _]), do: {:trait, trait, value}
   defp fact_of(["gall_relationship", _, _, type, name | _]), do: {:relationship, type, name}

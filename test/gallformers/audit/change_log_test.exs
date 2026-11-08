@@ -57,6 +57,28 @@ defmodule Gallformers.Audit.ChangeLogTest do
     assert change.counts == %{added: 1}
   end
 
+  test "each Fact about a Gall carries its key (what the Gall page opens it by)", ctx do
+    {:ok, trait} =
+      Catalog.assert_trait(
+        test_actor(),
+        %{gall_id: ctx.gall.id, trait: "season", value: "Spring"},
+        confirm(ctx.source)
+      )
+
+    tx("Adam", "import.apply_batch", 5, [
+      {"import_batches", "update", %{id: 1, package_id: ctx.package.id}},
+      {"facts", "insert",
+       %{id: ctx.host_fact.id, kind: "gall_relationship", standing: "current"}},
+      {"facts", "insert", %{id: trait.fact.id, kind: "gall_trait", standing: "current"}}
+    ])
+
+    [change] = ChangeLog.groups(limit: 10)
+    oak_id = ctx.oak.id
+
+    assert [{:host, ^oak_id}, {:trait, "season", "Spring"}] =
+             change.facts |> Enum.sort_by(& &1.id) |> Enum.map(& &1.key)
+  end
+
   test "consecutive changes by one curator, of one kind, on one Source, are one group", ctx do
     q = fn ->
       {"queue_items", "update",

@@ -162,6 +162,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.FactEdits
   alias Gallformers.Import.FactsView
   alias Gallformers.Import.GallDecisions
+  alias Gallformers.Import.GallFacts
   alias Gallformers.Import.GallMatcher
   alias Gallformers.Import.GallRenames
   alias Gallformers.Import.HostDecisions
@@ -2589,6 +2590,14 @@ defmodule Gallformers.Import do
 
     FactsView.group([header], entries)
   end
+
+  @doc """
+  Gall `gall_id`'s current Facts as its page shows them with the Fact
+  inspector, each with its change-set key, its standing and who says so
+  (`Gallformers.Import.GallFacts`).
+  """
+  @spec gall_facts(integer()) :: GallFacts.t()
+  def gall_facts(gall_id) when is_integer(gall_id), do: GallFacts.for_gall(gall_id)
 
   # -- denial ------------------------------------------------------------------
 
