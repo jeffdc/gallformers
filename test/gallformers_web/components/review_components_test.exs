@@ -413,7 +413,7 @@ defmodule GallformersWeb.ReviewComponentsTest do
   end
 
   describe "review_rail" do
-    @tally %{done: 12, left: 23, total: 35, holding: 22, hedged: 81}
+    @tally %{done: 12, left: 23, total: 35, holding: 22, hedged: 81, missed: 4}
     @stages [
       %{id: :names, title: "Names", state: :current, left: 3},
       %{id: :galls, title: "Galls", state: :todo, left: 19},
@@ -432,6 +432,7 @@ defmodule GallformersWeb.ReviewComponentsTest do
             approval: {:waiting, ["Names"]},
             on_stage: "stage",
             on_hedges: "hedges",
+            on_missed: "missed",
             on_approve: "approve",
             on_deny: "deny"
           ],
@@ -458,6 +459,13 @@ defmodule GallformersWeb.ReviewComponentsTest do
 
       assert text(html, "button[phx-click=stage][phx-value-id=galls]") =~ "19 left"
       assert text(html, "button[phx-click=stage][phx-value-id=disputes]") =~ "done"
+    end
+
+    test "the names we didn't read are a link, when there are any" do
+      assert text(rail([]), "button[phx-click=missed]") =~
+               "4 names we didn't read. Look them over"
+
+      refute has?(rail(tally: %{@tally | missed: 0}), "button[phx-click=missed]")
     end
 
     test "links to the Source in Gallformers when there is one" do
@@ -626,6 +634,23 @@ defmodule GallformersWeb.ReviewComponentsTest do
       assert text(html, "li[data-id='5']") =~ "may occur in Texas"
       assert has?(html, "li[data-id='5'] button[phx-click=add][phx-value-id='5']")
       assert text(html, "button[phx-click=back]") =~ "Back to the questions"
+    end
+
+    test "the hedges card's words can be another list's: the names we didn't read" do
+      html =
+        card(:hedges,
+          heading: "Names we didn't read",
+          intro: "Weld prints these names.",
+          add_label: "Look at it…",
+          groups: [{nil, [%{id: 9, text: "Cynips quercus inanis · pp. 12, 40"}]}],
+          on_add: "open",
+          on_back: "back"
+        )
+
+      assert text(html, "h2") =~ "Names we didn't read"
+      assert text(html, "p") =~ "Weld prints these names."
+      refute has?(html, "h3")
+      assert text(html, "li[data-id='9'] button[phx-click=open]") =~ "Look at it…"
     end
 
     test "what approving will add: working it out, then the Facts" do

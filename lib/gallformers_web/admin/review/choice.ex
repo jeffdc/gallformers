@@ -108,6 +108,7 @@ defmodule GallformersWeb.Admin.Review.Choice do
           | :keep_galls
           | {:trait_value, String.t()}
           | {:trait_values, String.t()}
+          | :missed_statement
           | {:parent, Gallformers.Taxa.Rank.t()}
           | {:reading, String.t()}
           | :section

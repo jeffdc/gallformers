@@ -468,6 +468,122 @@ defmodule GallformersWeb.Admin.ReviewLive.ReviewTest do
     end
   end
 
+  describe "the names we didn't read" do
+    # A name the Source prints, a plant we hold with a Gall on it, that no
+    # batch declares (`c8c3` item 12).
+    defp missed!(package) do
+      [batch] = Import.list_batches(package)
+      alba = plant_fixture(name: "Quercus alba")
+      gall = gall_fixture(name: "Quercus alba bullet gall")
+      legacy = source_fixture("Legacy", "1990")
+
+      {:ok, _} =
+        Gallformers.Catalog.assert_relationship(
+          Gallformers.DataCase.test_actor(),
+          %{type: "host_of", subject_taxon_id: alba.id, object_gall_id: gall.id},
+          confirm(legacy)
+        )
+
+      item =
+        %QueueItem{}
+        |> QueueItem.create_changeset(%{
+          package_id: package.id,
+          batch_id: batch.id,
+          kind: :missed_name,
+          statement_ref: "n:quercus alba",
+          subject: %{
+            "name" => "Quercus alba",
+            "normalized" => "quercus alba",
+            "taxon_ids" => [alba.id],
+            "items" => ["#/texts/3"],
+            "pages" => [12]
+          }
+        })
+        |> Repo.insert!()
+
+      %{item: item, alba: alba, gall: gall}
+    end
+
+    test "are a line in the rail, and a list to look over", %{conn: conn} do
+      package = awaiting!()
+      %{item: item} = missed!(package)
+      {:ok, view, _html} = review(conn, package)
+
+      refute current_id(view) == "#{item.id}"
+      view |> element("button[phx-click=missed]", "1 name we didn't read") |> render_click()
+
+      assert has_element?(view, "#unit h2", "Names we didn't read")
+      assert has_element?(view, "#unit li[data-id='#{item.id}']", "Quercus alba · p. 12")
+
+      view |> element("#unit li[data-id='#{item.id}'] button", "Look at it…") |> render_click()
+      use_answer(view, "Not needed")
+
+      assert Import.get_queue_item!(item.id).decision == %{"dismiss" => true}
+    end
+
+    test "Add a statement… offers the plant's Galls first, and states it", %{conn: conn} do
+      package = awaiting!()
+      %{item: item, alba: alba, gall: gall} = missed!(package)
+      {:ok, view, _html} = review(conn, package, "?missed")
+
+      view |> element("#unit li[data-id='#{item.id}'] button", "Look at it…") |> render_click()
+      use_answer(view, "Add a statement…")
+
+      card = "#q-#{item.id}"
+      assert has_element?(view, "#{card} [data-role=follow]", gall.name)
+      view |> element("#{card} [data-role=follow] [phx-value-id='#{gall.id}']") |> render_click()
+      assert has_element?(view, "#{card} [data-role=effect]", "Quercus alba is a Host of")
+      view |> element("#{card} button[phx-click=decide]") |> render_click()
+
+      assert Import.get_queue_item!(item.id).decision == %{
+               "state" => %{
+                 "kind" => "host_of",
+                 "taxon_id" => alba.id,
+                 "gall_id" => gall.id,
+                 "items" => ["#/texts/3"]
+               }
+             }
+    end
+
+    test "the last step says how many are left to look over", %{conn: conn} do
+      package = settled!()
+      missed!(package)
+      {:ok, view, _html} = review(conn, package)
+
+      assert has_element?(view, "#unit h2", "What approving will add")
+      assert has_element?(view, "#unit button[phx-click=missed]", "1 name we didn't read")
+    end
+  end
+
+  describe "a name we don't have" do
+    test "adding it as new says Add it…, what it does said once", %{conn: conn} do
+      package = awaiting!()
+      item = Enum.find(open_items(package), &(&1.kind == :unresolved_name))
+      {:ok, view, _html} = review(conn, package, "?view=all")
+      view |> element("#row-#{item.id} button") |> render_click()
+
+      card = "#q-#{item.id}"
+
+      option =
+        view
+        |> render()
+        |> LazyHTML.from_fragment()
+        |> LazyHTML.query("#{card} [id^='q-#{item.id}-c']")
+        |> Enum.filter(&(&1 |> LazyHTML.attribute("id") |> hd() |> String.match?(~r/-c\d+$/)))
+        |> Enum.find(&(LazyHTML.text(&1) =~ "It's new"))
+
+      [choice] = option |> LazyHTML.query("button") |> LazyHTML.attribute("phx-value-choice")
+      button = "#{card} button[phx-value-choice='#{choice}']"
+      assert has_element?(view, button, "Add it…")
+
+      view |> element(button) |> render_click()
+      # What it does is said once, under Use this, not also above the search.
+      follow = view |> element("#{card} [data-role=follow]") |> render()
+      assert length(String.split(follow, "Adds a new species to the tree.")) == 2
+      refute follow =~ ~s(data-role="note")
+    end
+  end
+
   describe "everything" do
     test "lists every open question by section; a row opens its card", %{conn: conn} do
       package = awaiting!()

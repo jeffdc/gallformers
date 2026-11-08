@@ -542,6 +542,24 @@ defmodule GallformersWeb.Admin.Review.Questions do
     do: %{"taxon_id" => id, "add_synonym" => true}
 
   def picked_decision(%Choice{picker: :plant}, {:wcvp, id}), do: %{"wcvp_id" => id}
+
+  # A missed name stated: its taxon a Host or the Inducer of the Gall
+  # picked, every passage it appears in the evidence (`c8c3` item 12).
+  def picked_decision(%Choice{picker: :missed_statement, values: items}, {
+        :missed,
+        kind,
+        taxon_id,
+        gall_id
+      }),
+      do: %{
+        "state" => %{
+          "kind" => kind,
+          "taxon_id" => taxon_id,
+          "gall_id" => gall_id,
+          "items" => items
+        }
+      }
+
   def picked_decision(%Choice{picker: :taxon}, {:taxon, id}), do: %{"taxon_id" => id}
   def picked_decision(%Choice{picker: :gall}, {:gall, id}), do: %{"gall_id" => id}
 
@@ -828,8 +846,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
     held =
       if candidate_ids(item) == [],
-        do: " Gallformers holds none by that name.",
-        else: " Gallformers holds it only in another spelling or genus."
+        do: " We have none by that name.",
+        else: " We have it only in another spelling or genus."
 
     %{
       written: written,
@@ -1194,7 +1212,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
           label: "Add a statement…",
           hint: "What #{ctx.who} says with it: a Host of one of our Galls, or its Inducer.",
           picker: :missed_statement,
-          pending: true
+          values: List.wrap(item.subject["items"])
         }
       ]
     }

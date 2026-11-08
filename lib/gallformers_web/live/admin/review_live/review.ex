@@ -61,6 +61,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
          saved: nil,
          open_row: nil,
          open_hedge: nil,
+         open_missed: nil,
          deny_form: nil,
          preview: nil
        )
@@ -99,6 +100,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
        view: if(params["view"] == "all", do: "all", else: "one"),
        stage: stage && stage.id,
        hedges?: Map.has_key?(params, "hedges"),
+       missed?: Map.has_key?(params, "missed"),
        facts?: Map.has_key?(params, "facts")
      )
      |> preview()}
@@ -116,8 +118,19 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
 
   def handle_event("hedges", _params, socket) do
     hedges = if socket.assigns.hedges?, do: nil, else: true
-    {:noreply, push_patch(socket, to: review_path(socket, hedges: hedges))}
+    {:noreply, push_patch(socket, to: review_path(socket, hedges: hedges, missed: nil))}
   end
+
+  # The names we didn't read (`c8c3` item 12), and one of them opened.
+  def handle_event("missed", _params, socket) do
+    missed = if socket.assigns.missed?, do: nil, else: true
+
+    {:noreply,
+     push_patch(socket, to: review_path(socket, missed: missed, hedges: nil, facts: nil))}
+  end
+
+  def handle_event("open_missed", %{"id" => id}, socket),
+    do: {:noreply, assign(socket, open_missed: String.to_integer(id))}
 
   # A hedged statement's own question, to add it as a Fact.
   def handle_event("add_hedge", %{"id" => id}, socket),
@@ -225,7 +238,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
 
     {:noreply,
      socket
-     |> assign(saved: saved(entry, items), open_row: nil, open_hedge: nil)
+     |> assign(saved: saved(entry, items), open_row: nil, open_hedge: nil, open_missed: nil)
      |> SourcePage.load()
      |> preview()}
   end
@@ -318,7 +331,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
   defp facts_now?(%{facts?: true}), do: true
 
   defp facts_now?(assigns),
-    do: assigns[:view] == "one" and not assigns[:hedges?] and units(assigns) == [:facts]
+    do:
+      assigns[:view] == "one" and not assigns[:hedges?] and not assigns[:missed?] and
+        units(assigns) == [:facts]
 
   defp deny_form(reason \\ "", errors \\ []),
     do: to_form(%{"reason" => reason}, as: :deny, errors: errors)
@@ -335,6 +350,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
         view: if(a.view == "all", do: "all"),
         stage: a.stage && Atom.to_string(a.stage),
         hedges: if(a.hedges?, do: true),
+        missed: if(a.missed?, do: true),
         facts: if(a.facts?, do: true)
       ]
       |> Keyword.merge(changes)
@@ -361,6 +377,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
   defp current(assigns) do
     cond do
       assigns.hedges? -> :hedges
+      assigns.missed? -> :missed
       assigns.facts? -> :facts
       true -> assigns |> units() |> List.first()
     end
@@ -439,6 +456,15 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
 
   defp readable?(documents, entry), do: Document.for_item(documents, entry.item) != nil
 
+  # The first passage a missed name appears in, its block marked.
+  defp first_passage(documents, entry) do
+    case {Document.for_item(documents, entry.item), List.wrap(entry.item.subject["items"])} do
+      {nil, _items} -> []
+      {_doc, []} -> []
+      {doc, [first | _]} -> Document.passage(doc, %{item: first})
+    end
+  end
+
   defp suggestion(%{question: %{proposal: %{firm: true}}, rejected: false}), do: :suggested
   defp suggestion(%{question: %{proposal: %{}}, rejected: false}), do: :guess
   defp suggestion(_entry), do: nil
@@ -468,7 +494,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
         units: units,
         current: current,
         tally: Units.tally(assigns.entries),
-        stages: Units.stages(assigns.entries, if(current == :hedges, do: nil, else: current)),
+        stages:
+          Units.stages(assigns.entries, if(current in [:hedges, :missed], do: nil, else: current)),
         next: units |> Units.next() |> Enum.map(&Units.label/1)
       )
 
@@ -524,6 +551,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
               name={@name}
               documents={@documents}
               open_hedge={@open_hedge}
+              open_missed={@open_missed}
+              missed={@tally.missed}
             />
           <% else %>
             <.everything
@@ -547,6 +576,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
           approval={@approval}
           on_stage="stage"
           on_hedges="hedges"
+          on_missed="missed"
           on_approve="approve"
           on_deny="deny_open"
           class="lg:sticky lg:top-4 lg:col-span-4"
@@ -596,6 +626,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
   attr :name, :string, required: true
   attr :documents, :map, required: true
   attr :open_hedge, :any, default: nil
+  attr :open_missed, :any, default: nil
+  attr :missed, :integer, default: 0
 
   defp unit(%{current: :hedges} = assigns) do
     assigns =
@@ -627,9 +659,67 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
     """
   end
 
+  defp unit(%{current: :missed} = assigns) do
+    entries =
+      Enum.filter(
+        assigns.entries,
+        &(&1.item.status == :open and &1.question.section.id == :missed_names)
+      )
+
+    rows =
+      for e <- entries,
+          do: %{
+            id: e.item.id,
+            text: Enum.join(Enum.filter([e.question.written, e.question.context], & &1), " · ")
+          }
+
+    open = Enum.find(entries, &(&1.item.id == assigns.open_missed))
+
+    assigns =
+      assign(assigns,
+        rows: rows,
+        open: open,
+        passage: open && first_passage(assigns.documents, open)
+      )
+
+    ~H"""
+    <.live_component
+      :if={@open}
+      module={QuestionCard}
+      id={"q-#{@open.item.id}"}
+      entry={@open}
+      actor={@actor}
+      definitions={@definitions}
+      source_name={@name}
+      affects={[]}
+      skip_key={nil}
+      readable={readable?(@documents, @open)}
+      passage={@passage}
+    />
+    <ReviewComponents.review_card
+      id="unit"
+      kind={:hedges}
+      heading="Names we didn't read"
+      intro={"#{@name} prints these names, which we have, but nothing it says with them was read. Look at each: add what it says, or mark it not needed."}
+      add_label="Look at it…"
+      groups={if @rows == [], do: [], else: [{nil, @rows}]}
+      on_add="open_missed"
+      on_back="missed"
+    />
+    """
+  end
+
   defp unit(%{current: :facts} = assigns) do
     ~H"""
     <ReviewComponents.review_card id="unit" kind={:facts} loading={@preview == nil}>
+      <:note :if={@missed > 0}>
+        <p class="text-body text-ink-2">
+          Before you approve:
+          <button type="button" phx-click="missed" class="text-link hover:underline">
+            {@missed} {if @missed == 1, do: "name", else: "names"} we didn't read. Look them over
+          </button>
+        </p>
+      </:note>
       <p :if={@preview == :failed} class="text-body text-ink-2">
         What approving will add couldn't be worked out. Reload to try again.
       </p>

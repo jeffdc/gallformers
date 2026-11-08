@@ -1425,6 +1425,7 @@ defmodule GallformersWeb.ReviewComponents do
   attr :approval, :any, required: true
   attr :on_stage, :any, required: true
   attr :on_hedges, :any, required: true
+  attr :on_missed, :any, default: nil, doc: "opens the names we didn't read (`tally.missed`)"
   attr :on_approve, :any, required: true
   attr :on_deny, :any, required: true
   attr :class, :any, default: nil, doc: "layout only"
@@ -1490,6 +1491,15 @@ defmodule GallformersWeb.ReviewComponents do
         {@tally.hedged} hedged {if @tally.hedged == 1, do: "statement was", else: "statements were"} left out. Review them
       </button>
 
+      <button
+        :if={@on_missed && Map.get(@tally, :missed, 0) > 0}
+        type="button"
+        phx-click={@on_missed}
+        class="text-left text-meta text-link hover:underline"
+      >
+        {@tally.missed} {if @tally.missed == 1, do: "name", else: "names"} we didn't read. Look them over
+      </button>
+
       <div :if={@next != []} data-role="next" class="flex flex-col gap-1 border-t border-line pt-3">
         <p class="text-meta text-muted">Up next</p>
         <p :for={line <- @next} class="text-meta text-ink-2">{line}</p>
@@ -1545,8 +1555,10 @@ defmodule GallformersWeb.ReviewComponents do
       `stage` and `of` (the stage's questions left) say how many these are.
       A box sends `on_tick` with its id; the button `on_accept` with the
       ticked ids, comma-separated.
-    * `:hedges`: the hedged statements (`groups`: `{title, [%{id, text}]}`),
-      each with Add it… (`on_add`), and Back to the questions (`on_back`).
+    * `:hedges`: the hedged statements (`groups`: `{title | nil, [%{id,
+      text}]}`), each with Add it… (`on_add`), and Back to the questions
+      (`on_back`); `heading`, `intro` and `add_label` make it another such
+      list (the names we didn't read: "Look at it…").
     * `:facts`: what approving will add (the inner block, a `facts_view`),
       a spinner while `loading`.
   """
@@ -1574,10 +1586,12 @@ defmodule GallformersWeb.ReviewComponents do
   attr :groups, :list, default: []
   attr :on_add, :any, default: nil
   attr :on_back, :any, default: nil
+  attr :add_label, :string, default: "Add it…", doc: "(`:hedges`) each row's action"
+  attr :intro, :string, default: nil, doc: "(`:hedges`) the line under the heading"
   attr :loading, :boolean, default: false
   attr :class, :any, default: nil, doc: "layout only"
   slot :inner_block
-  slot :note, doc: "the open note box, under the footer"
+  slot :note, doc: "the open note box, under the footer; (`:facts`) a line under the heading"
 
   def review_card(%{kind: :batch} = assigns) do
     ticked = Enum.reject(assigns.rows, &(&1.id in assigns.unticked))
@@ -1645,19 +1659,27 @@ defmodule GallformersWeb.ReviewComponents do
   end
 
   def review_card(%{kind: :hedges} = assigns) do
+    assigns =
+      assigns
+      |> assign(heading: assigns.heading || "Hedged statements")
+      |> assign(
+        intro:
+          assigns.intro ||
+            "The Source hedges these (“may”, “possibly”, “presumed”), so we left them out. " <>
+              "Add any you think should go in."
+      )
+
     ~H"""
     <section id={@id} class={[card_class(), @class]}>
       <div class="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 class="font-brand text-section text-ink text-wrap">Hedged statements</h2>
+        <h2 class="font-brand text-section text-ink text-wrap">{@heading}</h2>
         <button type="button" class="text-ui text-link hover:underline" phx-click={@on_back}>
           Back to the questions
         </button>
       </div>
-      <p class="text-body text-ink-2">
-        The Source hedges these (“may”, “possibly”, “presumed”), so we left them out. Add any you think should go in.
-      </p>
+      <p class="text-body text-ink-2">{@intro}</p>
       <div :for={{title, statements} <- @groups} class="flex flex-col">
-        <h3 class="border-b border-line pb-1 text-meta font-semibold text-muted">
+        <h3 :if={title} class="border-b border-line pb-1 text-meta font-semibold text-muted">
           {title} <span class="font-normal tabular-nums">{length(statements)}</span>
         </h3>
         <ul class="flex flex-col">
@@ -1673,7 +1695,7 @@ defmodule GallformersWeb.ReviewComponents do
               phx-click={@on_add}
               phx-value-id={statement.id}
             >
-              Add it…
+              {@add_label}
             </button>
           </li>
         </ul>
@@ -1686,6 +1708,7 @@ defmodule GallformersWeb.ReviewComponents do
     ~H"""
     <section id={@id} class={[card_class(), @class]}>
       <h2 class="font-brand text-section text-ink text-wrap">What approving will add</h2>
+      {render_slot(@note)}
       <div :if={@loading} class="flex items-center gap-2 text-body text-ink-2">
         <.loading_spinner size="sm" label="Working out what approving will add" />
         Working out what approving will add…

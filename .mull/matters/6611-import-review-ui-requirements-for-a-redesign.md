@@ -3,7 +3,7 @@ status: planned
 created: 2026-10-30
 updated: 2026-11-08
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28]
+relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28, ca45]
 ---
 
 # Import review UI: requirements for a redesign
@@ -401,3 +401,6 @@ Every write is a public `Gallformers.Import` function taking an `Actor`, so the 
 
 
 **c8c3 item 11 landed in the back end (Backend Worker, 2026-11-08, uncommitted at the time):** a Trait dispute takes `%{"values" => [...]}`. The card now sends it when the ticked values aren't exactly the producer's (exactly the producer's still sends `keep`; Keep as text sends `skip`). Tests in `question_card_test.exs`. To commit after the back end's commit, since the tests need it.
+
+
+**Names we didn't read (c8c3 item 12), built 2026-11-08, as Jeff agreed:** a rail line ("N names we didn't read. Look them over", `review_rail` `on_missed`, `?missed`), also on the last step ("Before you approve: …"); a list card (the hedges card with its own heading, line and "Look at it…"); a name opened is a question card with the first passage it appears in, "Not needed" (`dismiss`) and "Add a statement…": which taxon (only when it names several), then which Gall, the plant's Galls (or those the taxon induces) listed first; Host or Inducer set by whether the taxon is a plant; every passage the name appears in as evidence. Loader gives each missed name its taxa and their Galls (`entry.missed`). Only Hosts and Inducers for now; other statements wait for the Fact editor (87a1).

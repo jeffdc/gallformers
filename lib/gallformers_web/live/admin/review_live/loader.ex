@@ -694,6 +694,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
       |> Map.put(:decided, decided_text(item, question, names))
       |> Map.put(:comparison, comparison(item, question))
       |> host_context(question, content)
+      |> missed_context()
     end)
     |> group_disputes(who, names)
   end
@@ -1117,6 +1118,31 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   end
 
   defp host_context(entry, _question, _content), do: entry
+
+  # A name the Source prints that no batch declares (`c8c3` item 12): the
+  # taxa it names, each a plant or not (a Host or an Inducer, when stated),
+  # with its Galls (those on the plant, or those it induces) to offer first.
+  defp missed_context(%{item: %QueueItem{kind: :missed_name, subject: subject}} = entry) do
+    taxa =
+      for id <- List.wrap((subject || %{})["taxon_ids"]),
+          taxon = ReviewContext.taxon(id),
+          do: missed_taxon(taxon)
+
+    Map.put(entry, :missed, %{taxa: taxa})
+  end
+
+  defp missed_context(entry), do: entry
+
+  defp missed_taxon(taxon) do
+    plant? = match?(%{kingdom: "Plantae"}, Taxa.get_taxon(taxon.taxon_id))
+
+    galls =
+      if plant?,
+        do: Enum.map(Catalog.list_galls_for_hosts([taxon.taxon_id]), &Map.take(&1, [:id, :name])),
+        else: taxon.galls
+
+    %{id: taxon.taxon_id, name: taxon.name, plant?: plant?, galls: galls}
+  end
 
   # The plant a Host the tree doesn't hold starts as on the New Taxon page
   # (matter f14c): the Source's name for it (`name_reading`, else

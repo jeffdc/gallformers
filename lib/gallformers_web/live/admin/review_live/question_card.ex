@@ -50,7 +50,8 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
   alias GallformersWeb.ReviewComponents
 
   @impl true
-  def mount(socket), do: {:ok, assign(socket, Answer.state() ++ [noting: false, trait: %{}])}
+  def mount(socket),
+    do: {:ok, assign(socket, Answer.state() ++ [noting: false, trait: %{}, passage: []])}
 
   @impl true
   def update(assigns, socket) do
@@ -253,6 +254,7 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
         on_read={@readable && "reader_open"}
         on_skip="skip"
       >
+        <ReviewComponents.review_passage :if={@passage != []} blocks={@passage} />
         <ReviewComponents.review_wcvp_panel
           :if={Answer.wcvp_panel?(@entry) and @host != :failed}
           id={"#{@id}-wcvp"}
@@ -406,6 +408,7 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
           choice={@c}
           settled={@ctx.settled}
           who={@ctx.source_name}
+          entry={@ctx.entry}
           target={@myself}
         />
         <div class="flex flex-wrap items-center gap-3">
@@ -429,7 +432,9 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
   # What an answer's button says when it needs input first: a search, or a
   # choice among values (a generation, a section, a reason…).
   defp open_label(picker) when picker in [:plant, :taxon, :gall, :place], do: "Search…"
-  defp open_label({kind, _}) when kind in [:reading, :parent], do: "Search…"
+  defp open_label({:reading, _}), do: "Search…"
+  # A new taxon: its place in the tree is searched for, or left for later.
+  defp open_label({:parent, _}), do: "Add it…"
   defp open_label(_picker), do: "Choose…"
 
   defp gall_choice?(%{base: %{"gall_id" => _}}), do: true

@@ -36,7 +36,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   @text "__text__"
 
   @events ~w(pick pick_tree settle note_draft save_note select_pick clear_pick pick_value
-             pick_galls pick_gall fill_galls filter_values toggle_value toggle_member)
+             pick_galls pick_gall fill_galls filter_values toggle_value toggle_member
+             pick_missed_taxon)
 
   @doc ~S|The events `handle_event/3` takes, besides every "search_" one.|
   def events, do: @events
@@ -219,6 +220,9 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   end
 
   # A Gall ticked or unticked, on a question for identical disputes.
+  def handle_event("pick_missed_taxon", %{"value" => id}, socket),
+    do: {:noreply, assign(socket, pick: missed_pick(socket.assigns.entry, id), error: nil)}
+
   def handle_event("toggle_member", %{"id" => id}, socket) do
     id = String.to_integer(id)
     unticked = socket.assigns.unticked
@@ -285,7 +289,14 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   defp first_results(assigns, i) do
     choice = is_integer(i) && Enum.at(assigns.choices, i)
 
-    case plant_sections(choice) do
+    case {choice, plant_sections(choice)} do
+      {%Choice{picker: :missed_statement}, _} -> missed_pick(assigns.entry, nil)
+      {_, sections} -> sections_or_first(choice, sections, assigns)
+    end
+  end
+
+  defp sections_or_first(choice, sections, assigns) do
+    case sections do
       [_ | _] = sections -> %{empty_pick() | results: Enum.map(sections, &section_result/1)}
       [] -> first_pick(choice, assigns.entry.question.others)
     end
@@ -322,6 +333,25 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
 
   defp blank_nil(""), do: nil
   defp blank_nil(value), do: value
+
+  # A missed name's taxon (`id`, a string from the select, or nil for its
+  # first) and the pick it starts: its Galls listed first.
+  defp missed_taxon(entry, id) do
+    taxa = Map.get(entry, :missed, %{taxa: []}).taxa
+    Enum.find(taxa, List.first(taxa), &(to_string(&1.id) == to_string(id)))
+  end
+
+  defp missed_pick(entry, id) do
+    case missed_taxon(entry, id) do
+      nil ->
+        empty_pick()
+
+      taxon ->
+        meta = if taxon.plant?, do: "on #{taxon.name}", else: "induced by #{taxon.name}"
+        results = for g <- taxon.galls, do: %{id: g.id, name: g.name, meta: meta, group: nil}
+        %{empty_pick() | value: to_string(taxon.id), results: results}
+    end
+  end
 
   # -- searching -----------------------------------------------------------------
 
@@ -516,6 +546,19 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   end
 
   # A section of the genus, picked from the list by name.
+  # A missed name stated on the Gall picked: a Host when its taxon is a
+  # plant, else the Gall's Inducer.
+  defp choice_decision(%Choice{picker: :missed_statement} = choice, assigns) do
+    case {missed_taxon(assigns.entry, assigns.pick.value), assigns.pick.selected} do
+      {%{} = taxon, %{id: gall_id}} when is_integer(gall_id) ->
+        kind = if taxon.plant?, do: "host_of", else: "inducer_of"
+        {:ok, Questions.picked_decision(choice, {:missed, kind, taxon.id, gall_id})}
+
+      _ ->
+        {:error, "Pick the Gall from the search."}
+    end
+  end
+
   defp choice_decision(%Choice{picker: :section} = choice, %{pick: pick}) do
     case Enum.find(choice.sections, &(&1.name == pick.value)) do
       nil -> {:error, missing(:section, pick)}
@@ -685,6 +728,16 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
        do: String.replace(effect, "%{taxon}", pick.selected.name)
 
   # A section of the genus picked.
+  defp effect_for(%Choice{picker: :missed_statement}, assigns) do
+    taxon = missed_taxon(assigns.entry, assigns.pick.value)
+    gall = assigns.pick.selected.name
+    who = assigns.source_name || "the Source"
+
+    if taxon.plant?,
+      do: "Adds that #{taxon.name} is a Host of #{gall}, in #{who}'s words.",
+      else: "Adds that #{taxon.name} induces #{gall}, in #{who}'s words."
+  end
+
   defp effect_for(%Choice{picker: :section, effect: effect}, %{pick: %{value: name}})
        when is_binary(effect),
        do: String.replace(effect, "%{taxon}", "sect. #{name}")
@@ -817,6 +870,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   attr :choice, :any, default: nil, doc: "the chosen `GallformersWeb.Admin.Review.Choice`"
   attr :settled, :map, default: %{}, doc: "the statements settled so far, by key"
   attr :who, :string, default: nil, doc: "what the page calls the Source"
+  attr :entry, :map, default: nil, doc: "the question's entry (a missed name's taxa)"
 
   # What a synonym becomes when the Source is right.
   def picker(%{picker: :tree} = assigns) do
@@ -888,6 +942,33 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   end
 
   # Why a taxonomic statement is declined: a reason, required.
+  # A missed name stated: which of its taxa (when it names several), then
+  # which Gall, those on the plant or that it induces first.
+  def picker(%{picker: :missed_statement} = assigns) do
+    taxa = Map.get(assigns.entry || %{}, :missed, %{taxa: []}).taxa
+    assigns = assign(assigns, taxa: taxa)
+
+    ~H"""
+    <div class="grid gap-2">
+      <.form
+        :if={length(@taxa) > 1}
+        for={%{}}
+        id={"#{@id}-taxon"}
+        phx-change="pick_missed_taxon"
+        phx-target={@target}
+      >
+        <label for={"#{@id}-taxon-select"} class="gf-label">Which taxon</label>
+        <select id={"#{@id}-taxon-select"} name="value" class="gf-select">
+          <option :for={t <- @taxa} value={t.id} selected={@pick.value == to_string(t.id)}>
+            {t.name}
+          </option>
+        </select>
+      </.form>
+      <.name_search id={@id} what="gall" label="Which Gall?" pick={@pick} target={@target} />
+    </div>
+    """
+  end
+
   def picker(%{picker: :reason} = assigns) do
     ~H"""
     <.form for={%{}} id={@id} phx-change="pick_value" phx-target={@target} class="grid gap-1">
@@ -931,9 +1012,6 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
         pick={@pick}
         target={@target}
       />
-      <p :if={is_nil(@pick.selected)} class="text-meta text-ink-2" data-role="note">
-        {@choice.note}
-      </p>
     </div>
     """
   end

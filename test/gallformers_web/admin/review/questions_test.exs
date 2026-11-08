@@ -556,7 +556,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.topic == :not_held
 
     assert q.question ==
-             "Which taxon does Ashmead mean by “Syrphidae”? Gallformers holds none by that name."
+             "Which taxon does Ashmead mean by “Syrphidae”? We have none by that name."
 
     assert q.proposal == nil
     assert choice(q, "It's new: create Syrphidae").picker == {:parent, :family}
@@ -2069,6 +2069,22 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
       assert choice(q, "Not needed").decision == %{"dismiss" => true}
       assert_plain(q)
+    end
+
+    test "Add a statement… asks for the Gall, the name's passages its evidence", %{q: q} do
+      add = choice(q, "Add a statement…")
+      assert add.picker == :missed_statement
+      refute add.pending
+      assert add.values == ["#/texts/3"]
+
+      assert Questions.picked_decision(add, {:missed, "host_of", 7, 501}) == %{
+               "state" => %{
+                 "kind" => "host_of",
+                 "taxon_id" => 7,
+                 "gall_id" => 501,
+                 "items" => ["#/texts/3"]
+               }
+             }
     end
   end
 end
