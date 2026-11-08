@@ -954,6 +954,24 @@ defmodule Gallformers.Import.GallMatcherTest do
       assert s.detail["conflicts"] == ["form"]
     end
 
+    # `c8c3` item 13: Nastasi & Davis's silverpuff stem gall ("swellings": tapered swelling)
+    # was asked about because its one Gall, Antistrophus microseris's, held abrupt swelling.
+    test "forms that are readings of one ambiguous term differ, not conflict: resolved",
+         %{source: source} do
+      wasp = taxon_fixture(name: "Antistrophus microseris", kingdom: "Animalia")
+      entry = gall_fixture(name: "Antistrophus microseris")
+      inducer!(wasp, entry, source)
+      trait!(entry, "form", "abrupt swelling", source)
+
+      %{"g11" => s} =
+        match([gall("g11", %{"inducer" => "t1"})], [resolved("t1", wasp)], [
+          trait_fact("g11", "form", "tapered swelling")
+        ])
+
+      assert s.resolution == :resolved
+      assert s.gall_id == entry.id
+    end
+
     test "lower leaf vs leaf midrib agrees: resolved, and proposed stays firm",
          %{source: source} do
       tribe = taxon_fixture(name: "Cynipini", rank: :tribe, kingdom: "Animalia")

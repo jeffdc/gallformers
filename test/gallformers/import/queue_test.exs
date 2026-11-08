@@ -260,7 +260,7 @@ defmodule Gallformers.Import.QueueTest do
       assert taxon_items(package) == []
 
       assert [%QueueItem{kind: :ambiguous_match, statement_ref: "g1"}] =
-               Import.list_queue_items(package)
+               Enum.reject(Import.list_queue_items(package), &(&1.kind == :missed_name))
     end
 
     test "a name can be decided new; a Host name can't" do
@@ -445,7 +445,15 @@ defmodule Gallformers.Import.QueueTest do
         |> put_in(["galls", Access.at(0), "new"], true)
 
       package = package(gall: gall) |> with_review() |> deliver!()
-      assert Import.list_queue_items(package) == []
+      # The fixture's document still prints the Inducer this batch renames: a missed name.
+      assert [
+               %QueueItem{
+                 kind: :missed_name,
+                 subject: %{"name" => "Andricus quercuscalifornicus"}
+               }
+             ] =
+               Import.list_queue_items(package)
+
       {:ok, _} = Import.approve_package(test_actor(), package)
 
       assert [%QueueItem{statement_ref: "g1", subject: %{"generation" => "agamic"}}] =

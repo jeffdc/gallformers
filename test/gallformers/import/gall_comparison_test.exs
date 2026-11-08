@@ -127,6 +127,19 @@ defmodule Gallformers.Import.GallComparisonTest do
                :agree
     end
 
+    test "forms read from one ambiguous term differ (`form_near`), others conflict" do
+      s = %{
+        source(%{}, [trait("g1", "form", "tapered swelling")])
+        | form_near: ["abrupt swelling"]
+      }
+
+      assert GallComparison.compare(s, summary(traits: %{"form" => ["abrupt swelling"]})).fields.form ==
+               :differ
+
+      assert GallComparison.compare(s, summary(traits: %{"form" => ["bullet"]})).fields.form ==
+               :conflict
+    end
+
     test "detachable agrees or differs; unknown is not stated" do
       s = source(%{}, [trait("g1", "detachable", "integral")])
 

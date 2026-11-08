@@ -166,6 +166,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.GallRenames
   alias Gallformers.Import.HostDecisions
   alias Gallformers.Import.Merge
+  alias Gallformers.Import.MissedNames
   alias Gallformers.Import.Package
   alias Gallformers.Import.Preview
   alias Gallformers.Import.Proposals
@@ -518,6 +519,13 @@ defmodule Gallformers.Import do
     texts = document_texts(files["document.json"])
     review = decode(files["review.json"])
 
+    # The names the Source prints that no batch declares, asked on the gall batch.
+    missed =
+      MissedNames.queue_items(
+        decode(files["document.json"]),
+        for(b <- all, b.status != :denied, do: b.content)
+      )
+
     %{source_id: source_id, queue: source_items} =
       all |> Enum.map(& &1.content) |> SourceStep.source_block() |> SourceStep.resolve()
 
@@ -544,7 +552,8 @@ defmodule Gallformers.Import do
       texts: texts,
       review: review,
       names: names,
-      readings: readings
+      readings: readings,
+      missed: missed
     }
 
     resolutions =
@@ -666,10 +675,11 @@ defmodule Gallformers.Import do
 
   # The items about the batch's statements rather than its names and Galls,
   # less those decided: disputes, what was set aside, Trait terms.
-  defp statement_items(%Batch{content: content, file: file}, ctx) do
+  defp statement_items(%Batch{content: content, file: file} = batch, ctx) do
     decided_disputes = for(%{kind: :dispute} = q <- ctx.decided, ref <- Disputes.refs(q), do: ref)
     decided_set_aside = for(q <- ctx.decided, SetAside.set_aside?(q), do: q.statement_ref)
     decided_terms = for(%{kind: :trait_term} = q <- ctx.decided, do: q.statement_ref)
+    decided_missed = for(%{kind: :missed_name} = q <- ctx.decided, do: q.statement_ref)
 
     dropped = Map.keys(Queue.drops(ctx.decided))
     terms = TraitTerms.queue_items(content, ctx.review, file: file, drop: dropped)
@@ -689,8 +699,14 @@ defmodule Gallformers.Import do
 
     disputes ++
       Enum.reject(SetAside.queue_items(content), &(&1.statement_ref in decided_set_aside)) ++
-      terms
+      terms ++ missed_items(batch, ctx, decided_missed)
   end
+
+  # The package's missed names, on its gall batch (`Gallformers.Import.MissedNames`).
+  defp missed_items(%Batch{batch_type: :gall}, ctx, decided),
+    do: ctx |> Map.get(:missed, []) |> Enum.reject(&(&1.statement_ref in decided))
+
+  defp missed_items(_batch, _ctx, _decided), do: []
 
   # The taxon refs a batch's acts or Galls and Facts need resolved. A
   # synonymy act's `name` is a name, not a taxon: it need not resolve. Nor
@@ -1544,6 +1560,24 @@ defmodule Gallformers.Import do
     if batch.status == :applied and batch.batch_type == :gall do
       files = files || package |> read_package_files() |> unwrap_or_rollback()
       write_set_aside(actor, package, batch, [item], files)
+    end
+
+    :ok
+  end
+
+  # A missed name stated: its Fact is written when the gall batch is
+  # applied, or now if it is (`Gallformers.Import.MissedNames`).
+  defp honour(
+         actor,
+         %QueueItem{kind: :missed_name, decision: %{"state" => _}} = item,
+         package,
+         files
+       ) do
+    batch = get_batch!(item.batch_id)
+
+    if batch.status == :applied do
+      files = files || package |> read_package_files() |> unwrap_or_rollback()
+      write_later(actor, package, batch, files, &ApplyGall.run_missed(&1, [item]))
     end
 
     :ok
@@ -2959,6 +2993,7 @@ defmodule Gallformers.Import do
       trait_values: decided |> Disputes.chosen_values() |> Map.merge(edits.trait_values),
       trait_disputes: trait_disputes,
       set_aside: Enum.filter(decided, &SetAside.set_aside?/1),
+      missed: Enum.filter(decided, &MissedNames.missed?/1),
       review: decode(files["review.json"]),
       term_items:
         package

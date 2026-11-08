@@ -22,6 +22,7 @@ defmodule Gallformers.Import.Queue do
   | a taxonomic statement to accept (`Gallformers.Import.TaxonomyQueue`) | `%{"accept" => true}` or `%{"decline" => true, "reason" => text}` (a reason required) |
   | a rename proposal (`Gallformers.Import.GallRenames`) | `%{"accept" => true}` or `%{"reject" => true}` |
   | a statement set aside (`u:<slot>:<term>`, `Gallformers.Import.SetAside`) | `%{"keep" => true}` or `%{"state" => spec}` |
+  | a name the producer missed (`n:<name>`, `Gallformers.Import.MissedNames`) | `%{"dismiss" => true}` or `%{"state" => spec}` |
   | a Trait term (`u:<trait>:<term>`, `Gallformers.Import.TraitTerms`) | `%{"place" => c}` or `%{"place" => [c1, c2]}` (for every Source: the values a term names), `%{"category" => c}` (these Galls), `%{"no_fit" => true}` or `%{"keep" => true}` |
 
   A decided item stays decided: resolving the package again keeps it and
@@ -85,6 +86,7 @@ defmodule Gallformers.Import.Queue do
   alias Gallformers.Import.Disputes
   alias Gallformers.Import.GallDecisions
   alias Gallformers.Import.HostDecisions
+  alias Gallformers.Import.MissedNames
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.SetAside
   alias Gallformers.Import.SplitQuestions
@@ -211,6 +213,7 @@ defmodule Gallformers.Import.Queue do
 
   defp choices(%QueueItem{kind: :set_aside_statement} = item), do: SetAside.choices(item)
   defp choices(%QueueItem{kind: :trait_term} = item), do: TraitTerms.choices(item)
+  defp choices(%QueueItem{kind: :missed_name} = item), do: MissedNames.choices(item)
 
   defp choices(%QueueItem{kind: kind})
        when kind in [:same_date_conflict, :generation_outside_group],

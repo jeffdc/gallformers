@@ -424,6 +424,7 @@ defmodule Gallformers.Import.GallDecisionsTest do
         })
 
       for item <- Import.list_queue_items(package),
+          item.kind != :missed_name,
           do: {:ok, _} = Import.decide_queue_item(test_actor(), item, %{"new" => true})
 
       {:ok, _} = Import.approve_package(test_actor(), package)

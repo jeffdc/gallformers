@@ -168,6 +168,16 @@ defmodule Gallformers.Import.UnusedNamesTest do
       refute "quercopsis rubida" in names
     end
 
+    test "a name that ends a sentence is printed without its full stop" do
+      doc = %{
+        "schema_name" => "DoclingDocument",
+        "body" => %{"self_ref" => "#/body", "children" => [%{"$ref" => "#/texts/0"}]},
+        "texts" => [text(0, "Bred on Quercopsis albida.", "text", 1)]
+      }
+
+      assert [%{name: "Quercopsis albida"}] = UnusedNames.list(doc, [])
+    end
+
     test "words the tree doesn't hold are not reported" do
       names = document() |> UnusedNames.list([]) |> Enum.map(& &1.normalized)
 

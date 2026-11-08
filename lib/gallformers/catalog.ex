@@ -170,6 +170,14 @@ defmodule Gallformers.Catalog do
   defdelegate list_trait_term_mappings(), to: Terms, as: :list
 
   @doc """
+  The other values of `trait` that are readings of one ambiguous term with
+  any of `values`: "swelling" is abrupt swelling, tapered swelling or stem
+  club (`Gallformers.Import.GallComparison` takes them as close).
+  """
+  @spec trait_readings_with(String.t(), [String.t()]) :: [String.t()]
+  defdelegate trait_readings_with(trait, values), to: Terms, as: :readings_with
+
+  @doc """
   Adds a Trait value (`6611`: the database owns the vocabulary). `attrs`
   (atom keys): `:trait` (one of `Gallformers.Catalog.Vocab.TraitValue.traits/0`),
   `:value` and `:definition`, all required; the value must be new to its
