@@ -2019,7 +2019,8 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
              :hedge_other,
              :taxonomy_acceptance,
              :split_inducer,
-             :source
+             :source,
+             :missed_names
            ]
   end
 
@@ -2030,5 +2031,44 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
     assert Questions.section(:synonyms, nil).title ==
              "The Source's names we now treat as synonyms"
+  end
+
+  # `c8c3` item 12: a name the Source prints that we hold and no batch declares.
+  describe "a missed name" do
+    setup do
+      item = %QueueItem{
+        kind: :missed_name,
+        statement_ref: "n:cynips quercus inanis",
+        subject: %{
+          "name" => "Cynips quercus inanis",
+          "normalized" => "cynips quercus inanis",
+          "taxon_ids" => [7],
+          "items" => ["#/texts/3"],
+          "pages" => [12, 40]
+        },
+        proposal: %{}
+      }
+
+      %{q: present(item)}
+    end
+
+    test "is apart from the steps, holding nothing", %{q: q} do
+      assert q.section.id == :missed_names
+      assert q.section.title == "Names we didn't read"
+      assert q.holds_approval == false
+      assert q.proposal == nil
+    end
+
+    test "asks whether the Source says something with it, plainly", %{q: q} do
+      assert q.written == "Cynips quercus inanis"
+      assert q.context == "pp. 12, 40"
+
+      assert q.question ==
+               "Ashmead prints “Cynips quercus inanis”, which we have, but nothing it says " <>
+                 "with it was read. Does it say something we should add?"
+
+      assert choice(q, "Not needed").decision == %{"dismiss" => true}
+      assert_plain(q)
+    end
   end
 end

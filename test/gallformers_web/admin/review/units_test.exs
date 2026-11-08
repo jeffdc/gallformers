@@ -37,10 +37,13 @@ defmodule GallformersWeb.Admin.Review.UnitsTest do
         entry(3, :trait_terms),
         entry(4, :hedge_names),
         entry(5, :hedge_host),
-        entry(6, :hedge_host, status: :decided)
+        entry(6, :hedge_host, status: :decided),
+        entry(7, :missed_names),
+        entry(8, :missed_names, status: :decided)
       ]
 
-      assert Units.tally(entries) == %{done: 1, left: 2, total: 3, holding: 1, hedged: 2}
+      assert Units.tally(entries) ==
+               %{done: 1, left: 2, total: 3, holding: 1, hedged: 2, missed: 1}
     end
   end
 
@@ -56,6 +59,12 @@ defmodule GallformersWeb.Admin.Review.UnitsTest do
       ]
 
       assert keys(Units.units(entries)) == ["q-4", "q-5", "q-3", "q-1", "facts"]
+    end
+
+    test "the names we didn't read are apart, like the hedged statements" do
+      entries = [entry(1, :hosts), entry(2, :missed_names)]
+
+      assert keys(Units.units(entries)) == ["q-1", "facts"]
     end
 
     test "a question about the Source itself comes before every step's" do

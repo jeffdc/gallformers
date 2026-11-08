@@ -36,7 +36,8 @@ defmodule GallformersWeb.Admin.Review.Units do
           left: non_neg_integer(),
           total: non_neg_integer(),
           holding: non_neg_integer(),
-          hedged: non_neg_integer()
+          hedged: non_neg_integer(),
+          missed: non_neg_integer()
         }
 
   @typedoc "A stage (a step) of the review, with what is left in it."
@@ -49,6 +50,9 @@ defmodule GallformersWeb.Admin.Review.Units do
 
   @hedges Enum.find(Steps.all(), &(&1.id == :hedges)).sections
 
+  # The names we didn't read (`c8c3` item 12): apart, as the hedges are.
+  @missed [:missed_names]
+
   @doc "The questions answered and to go (hedged statements apart)."
   @spec tally([map()]) :: tally()
   def tally(entries) do
@@ -60,7 +64,8 @@ defmodule GallformersWeb.Admin.Review.Units do
       left: length(open),
       total: length(questions),
       holding: Enum.count(open, & &1.holds),
-      hedged: Enum.count(hedged, &open?/1)
+      hedged: hedged |> Enum.reject(&missed?/1) |> Enum.count(&open?/1),
+      missed: Enum.count(entries, &(missed?(&1) and open?(&1)))
     }
   end
 
@@ -183,5 +188,8 @@ defmodule GallformersWeb.Admin.Review.Units do
   end
 
   defp open?(entry), do: entry.item.status == :open
-  defp hedged?(entry), do: entry.question.section.id in @hedges
+  # Apart from the units and the questions' counts: the hedged statements,
+  # and the names we didn't read.
+  defp hedged?(entry), do: entry.question.section.id in @hedges or missed?(entry)
+  defp missed?(entry), do: entry.question.section.id in @missed
 end

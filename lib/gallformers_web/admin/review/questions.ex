@@ -175,7 +175,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
     :hedge_other,
     :taxonomy_acceptance,
     :split_inducer,
-    :source
+    :source,
+    :missed_names
   ]
 
   # A hedge's section, by what it is about (`subject["topic"]`, d213 Task
@@ -463,6 +464,13 @@ defmodule GallformersWeb.Admin.Review.Questions do
        "Doesn't hold approval: the tree waits until you decide",
        "If you leave it: the tree keeps following the paper it follows now."}
 
+  defp copy(:missed_names, who),
+    do:
+      {"Names we didn't read",
+       "#{cap(who)} prints these names, which we have, but nothing it says with them was " <>
+         "read. Add what it says with one, or mark it not needed.", false,
+       "Doesn't hold approval", "If you leave it: nothing is added; approval doesn't wait on it."}
+
   defp copy(:split_inducer, who),
     do:
       {"Galls whose Inducer was split",
@@ -672,6 +680,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   # -- which section -------------------------------------------------------------
 
+  defp section_id(%QueueItem{kind: :missed_name}, _ctx), do: :missed_names
   defp section_id(%QueueItem{kind: :gall_rename}, _ctx), do: :gall_rename
   defp section_id(%QueueItem{kind: :taxonomy_acceptance}, _ctx), do: :taxonomy_acceptance
   defp section_id(%QueueItem{kind: :split_inducer}, _ctx), do: :split_inducer
@@ -1158,6 +1167,36 @@ defmodule GallformersWeb.Admin.Review.Questions do
       proposal: nil,
       undecided: acknowledged(),
       choices: [acknowledge("It stays as text on the Gall.")]
+    }
+  end
+
+  # A name the Source prints that we hold and no batch declares (`c8c3` item
+  # 12, `Gallformers.Import.MissedNames`): not needed, or a statement added
+  # by hand.
+  defp build(:missed_names, item, ctx) do
+    name = item.subject["name"]
+
+    %{
+      written: name,
+      context: pages_text(item.subject["pages"]),
+      question:
+        "#{cap(ctx.who)} prints “#{name}”, which we have, but nothing it says with it was " <>
+          "read. Does it say something we should add?",
+      proposal: nil,
+      undecided: %{label: "To look over", why: nil},
+      choices: [
+        %Choice{
+          label: "Not needed",
+          hint: "It says nothing to add.",
+          decision: %{"dismiss" => true}
+        },
+        %Choice{
+          label: "Add a statement…",
+          hint: "What #{ctx.who} says with it: a Host of one of our Galls, or its Inducer.",
+          picker: :missed_statement,
+          pending: true
+        }
+      ]
     }
   end
 
@@ -2738,6 +2777,10 @@ defmodule GallformersWeb.Admin.Review.Questions do
 
   defp these_galls(n) when n <= 1, do: "this Gall"
   defp these_galls(n), do: "these #{n} Galls"
+
+  defp pages_text([page]), do: "p. #{page}"
+  defp pages_text([_ | _] = pages), do: "pp. #{Enum.join(pages, ", ")}"
+  defp pages_text(_pages), do: nil
 
   defp galls_word(1), do: "This Gall"
   defp galls_word(2), do: "Both Galls"
