@@ -93,4 +93,85 @@ defmodule Gallformers.Import.DisputesTest do
       assert Disputes.trait?(%{subject: subject}) == true
     end
   end
+
+  describe "what each side chose (c8c3 item 3)" do
+    # Nastasi & Davis 2022: the producer's summary dropped the value it chose for "fleshy"
+    # (succulent, from the term table); the review must say it from data, not prose.
+    defp texture(id, gall, term, value),
+      do: %{
+        "id" => id,
+        "kind" => "trait",
+        "gall" => gall,
+        "trait" => "texture",
+        "term" => term,
+        "category" => value && %{"value" => value}
+      }
+
+    defp placement(id, reviewer, value, extra \\ %{}),
+      do:
+        Map.merge(
+          %{"id" => id, "reviewer" => reviewer, "category" => value && %{"value" => value}},
+          extra
+        )
+
+    test "a Trait dispute carries the producer's categories and each checker's" do
+      content = %{
+        "format_version" => 4,
+        "facts" => [
+          texture("f422", "g35", "fleshy", "succulent"),
+          texture("f423", "g36", "fleshy", "succulent")
+        ]
+      }
+
+      review = %{
+        "findings" => [finding("f422")],
+        "placements" => [
+          placement("f422", "claude-opus-5-5", "succulent"),
+          placement("f422", "claude-sonnet-5-5", nil, %{"reason" => "the inside, not the surface"}),
+          placement("f423", "claude-opus-5-5", "succulent")
+        ]
+      }
+
+      assert [%{statement_ref: "f422", subject: subject}] =
+               Disputes.items(review, "gall.json", content)
+
+      assert subject["facts"] == ["f422"]
+      assert subject["suggestions"] == ["succulent"]
+
+      assert subject["placements"] == [
+               %{"reviewer" => "claude-opus-5-5", "category" => "succulent"},
+               %{"reviewer" => "claude-sonnet-5-5", "reason" => "the inside, not the surface"}
+             ]
+    end
+
+    test "a term naming several values gives every value its Facts hold" do
+      content = %{
+        "format_version" => 4,
+        "facts" => [
+          %{texture("f1", "g1", "green or yellowish", "green") | "trait" => "color"},
+          %{texture("f2", "g1", "Green or yellowish", "yellow") | "trait" => "color"}
+        ]
+      }
+
+      review = %{
+        "findings" => [finding("f1")],
+        "placements" => [placement("f1", "a", "green"), placement("f2", "a", "yellow")]
+      }
+
+      assert [%{subject: subject}] = Disputes.items(review, "gall.json", content)
+      assert subject["facts"] == ["f1", "f2"]
+      assert subject["suggestions"] == ["green", "yellow"]
+      assert Enum.map(subject["placements"], & &1["category"]) == ["green", "yellow"]
+    end
+
+    test "a dispute about anything else carries none" do
+      content = %{"facts" => [%{"id" => "f2", "kind" => "relationship", "type" => "host_of"}]}
+
+      assert [%{subject: subject}] =
+               Disputes.items(%{"findings" => [finding("f2")]}, "gall.json", content)
+
+      refute Map.has_key?(subject, "suggestions")
+      refute Map.has_key?(subject, "placements")
+    end
+  end
 end

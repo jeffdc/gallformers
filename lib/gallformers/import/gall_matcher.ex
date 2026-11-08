@@ -73,11 +73,28 @@ defmodule Gallformers.Import.GallMatcher do
   instead, and a candidate picked for one is dropped from the others'
   candidates.
 
+  With no candidate while one of its Hosts is not settled (unresolved or
+  ambiguous, not left out), the Gall waits on that Host: it is
+  `:unresolved`, flagged `"waits_on_host"` with the Host's ref as
+  `detail["waits_on"]`, and has no queue item of its own; it is matched
+  again once the Host is decided (Nastasi & Davis's "Horkelia stem gall",
+  on a Host Gallformers had no name for, had been proposed as new).
+
   With no candidate, the Galls whose current Inducer is a taxon the batch
   says `emerged_from` the Gall are offered (method `"emerged_from"`; one is
-  only the best match); with
-  none of those either the Gall is `:new` when the Source presents it as
-  new, else `:unresolved` with new proposed (`detail["proposed"]` `"new"`).
+  only the best match). With none of those, the undescribed entries of
+  the Inducer's genus on other plants of its Hosts' genera are looked at
+  (`c8c3`): a Source names an undescribed Gall by its Host's common name
+  ("Toothed rosinweed cryptic stem gall"), while Gallformers codes it by
+  the Host's epithet and may hold it on another taxon of that name
+  (*Antistrophus s-dentatum-cryptic-stem-gall*, on Silphium asteriscus var.
+  dentatum, for the Source's S. dentatum). Those whose code has an epithet
+  of the Source's Host names are offered, else those sharing the most
+  descriptive words, if any do (method `"undescribed"`, one only the best
+  match). When the genera hold such entries but none matches, nothing is
+  proposed. Otherwise the Gall is `:new` when the Source presents it as
+  new, else `:unresolved` with new proposed (`detail["proposed"]` `"new"`,
+  only a suggestion: `Gallformers.Import.Proposals`).
 
   A supplied `gallformers_gall_id` that is not the match or among the
   candidates is flagged `"supplied_id_disagrees"` — except in a batch
@@ -108,8 +125,9 @@ defmodule Gallformers.Import.GallMatcher do
   @species_or_below ["species", "subspecies", "variety", "form"]
   @species_ranks [:species, :subspecies, :variety, :form]
   @stop_words ~w(gall galls the and of on in a an sp spp wasp unknown from with its this)
+  @rank_words ~w(var subsp ssp forma)
   @open [:unresolved, :ambiguous]
-  @not_queued ["waits_on_inducer", "paired_with_gall"]
+  @not_queued ["waits_on_inducer", "waits_on_host", "paired_with_gall"]
   @supplied "gallformers_gall_id"
 
   @doc """
@@ -198,6 +216,7 @@ defmodule Gallformers.Import.GallMatcher do
       ident: ident,
       inducer: inducer,
       hosts: hosts,
+      host_statements: host_statements(g, ident, taxa, facts),
       facts: facts,
       emerged: emerged_from(g, taxa, facts),
       source: GallComparison.source_side(g, facts, hosts)
@@ -365,8 +384,31 @@ defmodule Gallformers.Import.GallMatcher do
           |> by_organ(organs(g, facts))
           |> by_description(gall_words(g, facts))
 
-        undescribed_outcome(base, m, candidates)
+        case {candidates, open_host(m)} do
+          {{[], _agree?}, ref} when is_binary(ref) -> waits_on_host(base, ref)
+          _ -> undescribed_outcome(base, Map.put(m, :scope, scope), candidates)
+        end
     end
+  end
+
+  # A Host of the Gall's not settled yet (unresolved or ambiguous, and not
+  # left out): nothing can match on it until it is.
+  defp open_host(m) do
+    Enum.find_value(m.host_statements, fn {ref, s} ->
+      if open?(s) and "skipped" not in s.flags, do: ref
+    end)
+  end
+
+  defp waits_on_host(base, ref) do
+    %{
+      base
+      | flags: ["waits_on_host"],
+        detail:
+          Map.merge(base.detail, %{
+            "waits_on" => ref,
+            "reason" => "waits on its Host (#{ref})"
+          })
+    }
   end
 
   defp undescribed_outcome(base, m, {[], _agree?}) do
@@ -374,10 +416,7 @@ defmodule Gallformers.Import.GallMatcher do
       [] ->
         if m.g["new"] == true,
           do: %{base | resolution: :new},
-          else:
-            base
-            |> unresolved("no undescribed Gall on its Host matches: new proposed")
-            |> put_in([:detail, "proposed"], "new")
+          else: on_host_genus(base, m, near_entries(m))
 
       candidates ->
         refs = Enum.map_join(m.emerged, ", ", &elem(&1, 0))
@@ -416,6 +455,142 @@ defmodule Gallformers.Import.GallMatcher do
         m.source,
         "several undescribed candidates (admin picks)"
       )
+
+  # Nothing on the Gall's own Hosts: the undescribed entries on other
+  # plants of their genera that match (a Host's epithet the Source uses in
+  # the entry's code, else its descriptive words) are offered, never firm.
+  # While the genera hold undescribed Galls of the Inducer's genus but none
+  # matches, nothing is proposed; with none, new is.
+  defp on_host_genus(base, m, %{offered: [], count: count, genera: genera})
+       when count > 0 and m.scope != nil do
+    unresolved(
+      base,
+      "no undescribed Gall on its Host matches; Gallformers holds #{count} undescribed " <>
+        "#{plural(count, "Gall", "Galls")} of its Inducer's genus on other " <>
+        "#{genera} plants: one of them, or a new Gall"
+    )
+  end
+
+  defp on_host_genus(base, _m, %{offered: []}) do
+    base
+    |> unresolved("no undescribed Gall on its Host matches: new proposed")
+    |> put_in([:detail, "proposed"], "new")
+  end
+
+  defp on_host_genus(base, m, %{offered: offered, genera: genera}) do
+    summaries = Enum.map(offered, &Catalog.gall_summary(&1.id))
+
+    case summaries do
+      [one] ->
+        base
+        |> ranked(
+          "undescribed",
+          [one],
+          m.source,
+          "no undescribed Gall on its Host; one on other #{genera} plants matches (admin confirms)"
+        )
+        |> pick("best", one.gall_id)
+
+      several ->
+        ranked(
+          base,
+          "undescribed",
+          several,
+          m.source,
+          "no undescribed Gall on its Host; #{length(several)} on other #{genera} plants match " <>
+            "(admin picks)"
+        )
+    end
+  end
+
+  defp plural(1, one, _many), do: one
+  defp plural(_n, _one, many), do: many
+
+  # The undescribed entries of the Inducer's genus (any, with no Inducer)
+  # on plants of the Gall's Hosts' genera, on one of its organs (the ID
+  # tool's index, `Gallformers.Catalog.identify/1`): how many, the genera's
+  # names, and those offered.
+  defp near_entries(m) do
+    genera = host_genera(m.hosts)
+    organs = organs(m.g, m.facts)
+
+    rows =
+      for genus <- genera,
+          row <-
+            Catalog.identify(%{
+              host_group_id: genus.id,
+              undescribed: true,
+              inducer_family_id: m.scope && m.scope.id
+            }),
+          uniq: true,
+          do: row
+
+    rows = by_organ(rows, organs)
+
+    %{
+      count: length(rows),
+      genera: Enum.map_join(genera, " and ", &Taxa.accepted_name/1),
+      offered: offered(rows, host_epithets(m.host_statements), gall_words(m.g, m.facts))
+    }
+  end
+
+  # The entries whose code has an epithet of the Source's Host names
+  # ("Antistrophus s-dentatum-cryptic-stem-gall" for "S. dentatum"), the
+  # best by descriptive words among them; else those sharing the most
+  # descriptive words with the Gall, if any do.
+  defp offered(rows, epithets, words) do
+    case Enum.filter(rows, &(code_epithet(&1.name) in epithets)) do
+      [] ->
+        case by_description_with(rows, words, &code_words/1) do
+          {best, true} -> best
+          {_best, false} -> []
+        end
+
+      hits ->
+        hits |> by_description_with(words, &code_words/1) |> elem(0)
+    end
+  end
+
+  # The genera of the Hosts (a genus Host itself).
+  defp host_genera(host_ids) do
+    host_ids
+    |> Enum.map(fn id ->
+      taxon = Taxa.get_taxon!(id)
+
+      if taxon.rank == :genus,
+        do: taxon,
+        else: id |> Taxa.ancestors() |> Enum.find(&(&1.rank == :genus))
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.id)
+  end
+
+  # The epithets of the names the Source and the tree give the Gall's
+  # Hosts ("S. dentatum", "Silphium dentatum": dentatum).
+  defp host_epithets(host_statements) do
+    for {_ref, s} <- host_statements,
+        name <- [s.detail["name_as_written"], s.detail["name_reading"], s.detail["matched"]],
+        is_binary(name),
+        [_genus | rest] = String.split(name),
+        word <- words(Enum.join(rest, " ")),
+        word not in @rank_words,
+        into: MapSet.new(),
+        do: word
+  end
+
+  # An undescribed entry's code is its Host's genus initial and epithet,
+  # then what it is ("s-dentatum-cryptic-stem-gall").
+  defp code(name), do: name |> String.split() |> List.last("") |> String.downcase()
+
+  defp code_epithet(name) do
+    case Regex.run(~r/^[a-z]-([a-z]+)-/, code(name)) do
+      [_, epithet] -> epithet
+      nil -> nil
+    end
+  end
+
+  defp code_words(row),
+    do: row.name |> code() |> words() |> MapSet.delete(code_epithet(row.name))
 
   defp best_undescribed(base, gall_id, reason) do
     base
@@ -512,10 +687,13 @@ defmodule Gallformers.Import.GallMatcher do
 
   # Keeps the candidates sharing the most descriptive words with the Gall;
   # says whether the best shares any.
-  defp by_description([], _words), do: {[], false}
+  defp by_description(candidates, words),
+    do: by_description_with(candidates, words, &descriptor/1)
 
-  defp by_description(candidates, words) do
-    scored = Enum.map(candidates, &{MapSet.size(MapSet.intersection(descriptor(&1), words)), &1})
+  defp by_description_with([], _words, _descriptor), do: {[], false}
+
+  defp by_description_with(candidates, words, descriptor) do
+    scored = Enum.map(candidates, &{MapSet.size(MapSet.intersection(descriptor.(&1), words)), &1})
     best = scored |> Enum.map(&elem(&1, 0)) |> Enum.max()
     {for({score, c} <- scored, score == best, do: c), best > 0}
   end
@@ -597,6 +775,18 @@ defmodule Gallformers.Import.GallMatcher do
     for ref <- Enum.uniq([ident["host"] | from_facts]),
         %{resolution: :resolved, taxon_id: id} <- [taxa[ref]],
         do: id
+  end
+
+  # The Gall's Host statements by ref, resolved or not.
+  defp host_statements(g, ident, taxa, facts) do
+    from_facts =
+      for %{"kind" => "relationship", "type" => "host_of", "stance" => "confirm"} = f <- facts,
+          f["object"] == g["ref"],
+          do: f["subject"]
+
+    for ref <- Enum.uniq([ident["host"] | from_facts]),
+        %{} = s <- [taxa[ref]],
+        do: {ref, s}
   end
 
   # The Hosts and their ancestors (an entry may hold the genus as its Host).
@@ -860,8 +1050,8 @@ defmodule Gallformers.Import.GallMatcher do
   candidates are `:undescribed_gall` (with the best one, if any), other
   ambiguous matches `:ambiguous_match` (a pair's with the other Gall as
   `"pair"`), unresolved Galls `:unresolved_name` (`"proposed"` `"new"` when
-  new is proposed). A Gall waiting on its Inducer, and the second of a
-  pair, have none.
+  new is proposed). A Gall waiting on its Inducer or its Host, and the
+  second of a pair, have none.
   """
   @spec queue_items([statement()]) :: [map()]
   def queue_items(statements) do

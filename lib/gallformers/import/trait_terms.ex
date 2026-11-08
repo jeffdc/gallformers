@@ -64,7 +64,8 @@ defmodule Gallformers.Import.TraitTerms do
                        "suggestions" => [the producer's category | nil, per Fact],
                        "depends_on_gall" => the producer says so,
                        "placements" => [%{"reviewer", "category", "depends_on_gall", "reason"}],
-                       "findings" => [format 3 checker findings the producer disputed],
+                       "findings" => [checker findings the producer disputed: format 3's,
+                                      and format 4 disputes taken in, `absorb_disputes/2`],
                        "note" => a set-aside entry's note, "position"}]}
 
   and its proposal `%{"category" => c}` when the producer and the checkers
@@ -77,7 +78,7 @@ defmodule Gallformers.Import.TraitTerms do
   |---|---|
   | `%{"place" => c}` or `%{"place" => [c1, c2]}` | places the term under `c` for every Source, or under each value its words name (a new term, or one fitting none); every waiting use of it, in every Source, gets its Fact for each |
   | `%{"category" => c}` | `c` for these Galls only; the term becomes ambiguous, `c` among its candidates |
-  | `%{"categories" => %{gall_ref => c \\| nil}}` | per Gall: each covered Gall (every one, by its ref in the batch) under its own category, or kept as text (nil); the term becomes ambiguous, the categories chosen among its candidates |
+  | `%{"categories" => %{gall_ref => c \\| [c1, c2] \\| nil}}` | per Gall: each covered Gall (every one, by its ref in the batch) under its own category or categories, or kept as text (nil); the term becomes ambiguous, the categories chosen among its candidates. The same values for every Gall of a new term (or one fitting none) are recorded as `place` (`remembered/2`) |
   | `%{"no_fit" => true}` | marks a new term as fitting no category (counted for superadmins); every waiting use stays text |
   | `%{"keep" => true}` | these uses stay text; the term is left as it is |
 
@@ -355,11 +356,11 @@ defmodule Gallformers.Import.TraitTerms do
 
   defp outcome(uses, outcome), do: Enum.map(uses, &Map.put(&1, :outcome, outcome))
 
-  # A use under a per-Gall decision: its Gall's category, else text.
+  # A use under a per-Gall decision: its Gall's categories, else text.
   defp per_gall(use, by_gall) do
-    case Map.get(by_gall, use.gall) do
-      c when is_binary(c) -> Map.put(use, :outcome, {:facts, [c]})
-      _ -> Map.put(use, :outcome, {:text, :kept})
+    case TraitTermMapping.categories(Map.get(by_gall, use.gall)) do
+      [] -> Map.put(use, :outcome, {:text, :kept})
+      categories -> Map.put(use, :outcome, {:facts, categories})
     end
   end
 
@@ -739,6 +740,50 @@ defmodule Gallformers.Import.TraitTerms do
     end)
   end
 
+  @doc """
+  One question per statement (`c8c3`): a Trait dispute
+  (`Gallformers.Import.Disputes.trait?/1`) about a Fact one of `terms`
+  (`queue_items/3`) covers, and about no other batch's statement, is asked
+  as that term's question: its findings join the use's `"findings"`, and
+  it has no item of its own. A question with a disputed use proposes
+  nothing, however its readers placed it. Returns `{terms, disputes}`, the
+  disputes less those taken in.
+  """
+  @spec absorb_disputes([map()], [map()]) :: {[map()], [map()]}
+  def absorb_disputes(terms, disputes) do
+    covered =
+      for t <- terms, cover <- t.subject["covers"], ref <- List.wrap(cover["facts"]), into: %{} do
+        {ref, t.statement_ref}
+      end
+
+    {absorbed, kept} =
+      Enum.split_with(disputes, fn d ->
+        Disputes.trait?(d) and Map.has_key?(covered, d.statement_ref) and
+          List.wrap(d.subject["also"]) == []
+      end)
+
+    findings = Map.new(absorbed, &{&1.statement_ref, List.wrap(&1.subject["findings"])})
+    {Enum.map(terms, &take_findings(&1, findings)), kept}
+  end
+
+  defp take_findings(term, findings) do
+    covers =
+      for cover <- term.subject["covers"] do
+        case Enum.flat_map(List.wrap(cover["facts"]), &Map.get(findings, &1, [])) do
+          [] -> cover
+          more -> Map.update(cover, "findings", more, &(List.wrap(&1) ++ more))
+        end
+      end
+
+    disputed? = covers != term.subject["covers"]
+
+    %{
+      term
+      | subject: Map.put(term.subject, "covers", covers),
+        proposal: if(disputed?, do: %{}, else: term.proposal)
+    }
+  end
+
   # -- deciding ------------------------------------------------------------------
 
   @doc """
@@ -777,10 +822,11 @@ defmodule Gallformers.Import.TraitTerms do
 
   defp placement?(category, value?), do: value?.(category)
 
-  # A category (or nil, text) for every Gall the question covers, and no other.
+  # A category, or several, (or nil, text) for every Gall the question
+  # covers, and no other.
   defp per_gall?(item, by_gall, value?) when is_map(by_gall) and map_size(by_gall) > 0 do
     Enum.sort(Map.keys(by_gall)) == Enum.sort(covered_galls(item)) and
-      Enum.all?(Map.values(by_gall), &(is_nil(&1) or value?.(&1)))
+      Enum.all?(Map.values(by_gall), &(is_nil(&1) or placement?(&1, value?)))
   end
 
   defp per_gall?(_item, _by_gall, _value?), do: false
@@ -790,6 +836,42 @@ defmodule Gallformers.Import.TraitTerms do
   def covered_galls(%QueueItem{subject: subject}) do
     for %{"gall" => gall} <- List.wrap(subject["covers"]), is_binary(gall), uniq: true, do: gall
   end
+
+  @doc """
+  The decision a curator's answer `decision` to question `item` is
+  recorded as (`c8c3`): per-Gall values (`"categories"`) that are the same
+  for every Gall it covers, of a new term or one fitting none, place the
+  term under them for every Source (`"place"`), so no later Source asks
+  again. Answers that differ by Gall ("it depends on the Gall") place
+  nothing, nor does any answer for an ambiguous term. Anything else is
+  `decision` itself.
+  """
+  @spec remembered(QueueItem.t(), map()) :: map()
+  def remembered(
+        %QueueItem{kind: @kind, subject: %{"trait" => trait, "term" => term}} = item,
+        %{"categories" => by_gall} = decision
+      )
+      when is_map(by_gall) do
+    sets =
+      for gall <- covered_galls(item),
+          do: by_gall |> Map.get(gall) |> TraitTermMapping.categories() |> Enum.sort()
+
+    standing = Catalog.get_term(trait, term)
+
+    case Enum.uniq(sets) do
+      [[_ | _]] when standing == nil or standing.status == :no_fit ->
+        ordered = by_gall |> Map.get(hd(covered_galls(item))) |> TraitTermMapping.categories()
+
+        decision
+        |> Map.delete("categories")
+        |> Map.put("place", placement(ordered))
+
+      _ ->
+        decision
+    end
+  end
+
+  def remembered(_item, decision), do: decision
 
   @doc """
   Changes the term as the question's decision says (`decision`): places it
@@ -816,7 +898,10 @@ defmodule Gallformers.Import.TraitTerms do
         ambiguous(actor, item, Catalog.get_term(trait, term), [c])
 
       %{"categories" => by_gall} ->
-        case by_gall |> Map.values() |> Enum.filter(&is_binary/1) |> Enum.uniq() do
+        case by_gall
+             |> Map.values()
+             |> Enum.flat_map(&TraitTermMapping.categories/1)
+             |> Enum.uniq() do
           [] -> {:ok, Catalog.get_term(trait, term)}
           chosen -> ambiguous(actor, item, Catalog.get_term(trait, term), chosen)
         end

@@ -7,7 +7,7 @@ defmodule Gallformers.Import.Proposals do
   |---|---|
   | a name (`t1`): ambiguous, unresolved, held-valid synonym | `%{"taxon_id" => proposed}` |
   | an unresolved Host (`t2`) | `%{"taxon_id" => proposed, "add_synonym" => true}`: the plant, with the Source's spelling as its synonym (`Gallformers.Import.HostDecisions`) |
-  | a Gall (`g1`) | `%{"gall_id" => proposed}`, or `%{"new" => true}` when new is proposed; never an undescribed match or one with `"conflicts"` (only a `"best"` match, weak) |
+  | a Gall (`g1`) | `%{"gall_id" => proposed}`; never an undescribed match or one with `"conflicts"` (only a `"best"` match, weak), and never new (weak: Gallformers may hold it under another name, `c8c3`) |
   | a statement set aside | `%{"keep" => true}` |
   | a Trait term (`Gallformers.Import.TraitTerms`) | `%{"category" => c}`, when the producer and the checkers agree on `c` for every Gall it covers |
   | a rename proposal | `%{"accept" => true}` |
@@ -89,8 +89,12 @@ defmodule Gallformers.Import.Proposals do
       else: {:ok, %{"gall_id" => id}}
   end
 
+  # A new Gall may be one Gallformers holds under another name (an
+  # undescribed Gall coded by its Host's epithet, the Source naming it by
+  # the Host's common name): only a suggestion, so bulk accept never
+  # creates duplicates.
   defp answer(%QueueItem{statement_ref: "g" <> _, proposal: %{"proposed" => "new"}}),
-    do: {:ok, %{"new" => true}}
+    do: {:none, :weak}
 
   defp answer(%QueueItem{statement_ref: "t" <> _, proposal: proposal}), do: candidates(proposal)
   defp answer(%QueueItem{statement_ref: "g" <> _, proposal: proposal}), do: candidates(proposal)

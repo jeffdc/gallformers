@@ -54,7 +54,7 @@ defmodule Gallformers.Import.TraitTermsTest do
   @words "The galls are ovoid and globular, round, each with a single insect, pale tan, " <>
            "rough, lumpy and bumpy, " <>
            "a swelling on the leaf, woody, lignified, green-yellow, tan-white, " <>
-           "protruding from both sides."
+           "protruding from both sides, on the leaf or petiole."
 
   # The fixture document with one more text item holding the terms.
   defp doc do
@@ -654,6 +654,56 @@ defmodule Gallformers.Import.TraitTermsTest do
     end
   end
 
+  describe "a disputed Trait Fact" do
+    # `c8c3` item 7: Nastasi & Davis's "on the leaf or petiole" was asked twice, as a term
+    # ("what does it mean?") and as a dispute about the same statement.
+    defp leaf_or_petiole_finding(id),
+      do: %{
+        "batch" => "gall.json",
+        "id" => id,
+        "problem" => "rule",
+        "reason" => "It names two plant parts.",
+        "reviewer" => "checker",
+        "response" => %{"decision" => "disagree", "reason" => "An 'or' names neither."}
+      }
+
+    test "a format 4 Trait Fact both a term question and disputed is asked once, as the term" do
+      package =
+        deliver(
+          gall_batch([
+            trait("f6", "g1", "plant_part", "on the leaf or petiole", "leaf", %{
+              "depends_on_gall" => true
+            })
+          ]),
+          placements: [placement("f6", "leaf", %{"depends_on_gall" => true})],
+          findings: [leaf_or_petiole_finding("f6")]
+        )
+
+      assert Import.list_queue_items(package, kind: :dispute, status: :all) == []
+      assert [q] = questions(package)
+      assert [%{"facts" => ["f6"], "findings" => [finding]}] = q.subject["covers"]
+      assert finding["reason"] == "It names two plant parts."
+      assert finding["response"]["reason"] == "An 'or' names neither."
+
+      # The readers agreed, but a checker disputes the statement: nothing to accept in bulk.
+      assert q.proposal == %{}
+      assert Import.proposed_decision(q) == {:none, :no_proposal}
+    end
+
+    test "a disputed Trait Fact whose term is placed stays a dispute" do
+      {:ok, _} = Catalog.place_term(test_actor(), "plant_part", "on the leaf", "leaf", :curator)
+
+      package =
+        deliver(gall_batch([trait("f6", "g1", "plant_part", "on the leaf", "leaf")]),
+          placements: [placement("f6", "leaf")],
+          findings: [leaf_or_petiole_finding("f6")]
+        )
+
+      assert questions(package) == []
+      assert [%{statement_ref: "f6"}] = Import.list_queue_items(package, kind: :dispute)
+    end
+  end
+
   describe "decisions" do
     # g1 and g2 with the color term `term`, the readers disagreeing.
     defp disagreeing(opts \\ []) do
@@ -844,6 +894,56 @@ defmodule Gallformers.Import.TraitTermsTest do
       assert [%{settled_categories: ["tan"]}] = pending(gall_id(package, "g2"))
 
       assert Enum.sort(Catalog.get_term("color", "pale tan").candidates) == ["tan", "white"]
+    end
+
+    # `c8c3` item 8: a curator's answer is remembered when one answer covers every Gall, so
+    # no later Source asks again; "it depends on the Gall" remembers nothing.
+    test "categories: the same values for every Gall place a new term for every Source", ctx do
+      package = disagreeing()
+      item = decide!(question(package), %{"categories" => %{"g1" => "white", "g2" => "white"}})
+
+      assert item.decision == %{"place" => "white"}
+      assert %{status: :placed, categories: ["white"]} = Catalog.get_term("color", "pale tan")
+
+      approve!(package)
+      assert traits(ctx.gall.id, "color") == ["white"]
+    end
+
+    test "categories: a Gall may take several values; the same set for every Gall is placed" do
+      q = question(disagreeing(term: "pale tan"))
+      assert valid?(q, %{"categories" => %{"g1" => ["tan", "white"], "g2" => "tan"}})
+      refute valid?(q, %{"categories" => %{"g1" => [], "g2" => "tan"}})
+      refute valid?(q, %{"categories" => %{"g1" => ["tan", "tan"], "g2" => "tan"}})
+
+      item = decide!(q, %{"categories" => %{"g1" => ["tan", "white"], "g2" => ["white", "tan"]}})
+      assert item.decision == %{"place" => ["tan", "white"]}
+      assert %{status: :placed} = term = Catalog.get_term("color", "pale tan")
+      assert Enum.sort(term.categories) == ["tan", "white"]
+    end
+
+    test "categories: different values per Gall write each Gall's set, remembering none", ctx do
+      package = disagreeing()
+
+      item =
+        decide!(question(package), %{"categories" => %{"g1" => ["tan", "white"], "g2" => "tan"}})
+
+      assert item.decision == %{"categories" => %{"g1" => ["tan", "white"], "g2" => "tan"}}
+      assert %{status: :ambiguous} = Catalog.get_term("color", "pale tan")
+
+      package = approve!(package)
+      assert Enum.sort(traits(ctx.gall.id, "color")) == ["tan", "white"]
+      assert traits(gall_id(package, "g2"), "color") == ["tan"]
+    end
+
+    test "categories: an ambiguous term is never placed, the same values or not" do
+      q = question(disagreeing())
+
+      {:ok, _} =
+        Catalog.mark_term_ambiguous(test_actor(), "color", "pale tan", ["tan", "white"], :curator)
+
+      item = decide!(q, %{"categories" => %{"g1" => "white", "g2" => "white"}})
+      assert item.decision == %{"categories" => %{"g1" => "white", "g2" => "white"}}
+      assert %{status: :ambiguous} = Catalog.get_term("color", "pale tan")
     end
 
     test "no_fit: the term fits no category; its uses stay as text", ctx do

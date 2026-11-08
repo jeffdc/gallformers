@@ -400,7 +400,10 @@ defmodule GallformersWeb.Admin.ReviewLive.TraitTermsTest do
     assert has_element?(view, "#item-#{item.id}-row", "Fits no color")
   end
 
-  test "a disputed term is on Traits: keep or drop, both positions shown", %{conn: conn} do
+  # `c8c3` item 7: a dispute about a Fact of a term in question is asked once, in the term's
+  # question.
+  test "a disputed term is asked in its term's question, the checker's case shown",
+       %{conn: conn} do
     finding = %{
       "batch" => "gall.json",
       "id" => "f6",
@@ -415,29 +418,16 @@ defmodule GallformersWeb.Admin.ReviewLive.TraitTermsTest do
       }
     }
 
-    %{package: package} = delivered!(nil, [finding])
-    [dispute] = Import.list_queue_items(package, kind: :dispute)
+    %{package: package, item: item} = delivered!(nil, [finding])
+    assert Import.list_queue_items(package, kind: :dispute, status: :all) == []
     {:ok, view, _html} = page(conn, package)
 
-    row = "#section-trait_terms #item-#{dispute.id}"
-    assert has_element?(view, row, "pale tan")
-    assert has_element?(view, row, "Disputed")
-    assert has_element?(view, "#item-#{dispute.id}-row [data-role=answer]", "Keep or drop?")
+    open_row(view, item)
+    said = "#item-#{item.id}-said-g1"
+    assert has_element?(view, said, "The fresh gall is green.")
+    assert has_element?(view, said, "Ashmead describes the gall as he saw it.")
     # It holds nothing.
     refute has_element?(view, "#approve-wait", "Traits")
-
-    open_row(view, dispute)
-    sides = "#item-#{dispute.id}-sides"
-    assert has_element?(view, sides, "The producer kept it")
-    assert has_element?(view, sides, "Ashmead describes the gall as he saw it.")
-    assert has_element?(view, sides, "A checker questioned it")
-    assert has_element?(view, sides, "Only the dried gall is pale tan.")
-    assert has_element?(view, "#item-#{dispute.id}-arguments", "The fresh gall is green.")
-    refute has_element?(view, "#item-#{dispute.id}-choices [data-role=recommended]")
-
-    choose(view, dispute, "Drop it")
-    view |> element("#item-#{dispute.id}-decide") |> render_click()
-    assert Import.get_queue_item!(dispute.id).decision == %{"skip" => true}
   end
 
   # The Source in context (d213, Task 22).

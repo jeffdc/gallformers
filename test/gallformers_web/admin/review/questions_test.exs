@@ -838,6 +838,8 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.topic == :new_galls
     assert q.proposal.label == "Create it as a new Gall"
     assert q.proposal.decision == %{"new" => true}
+    # Only a suggestion, never batched: it may be a Gall Gallformers holds (`c8c3` item 6).
+    refute q.proposal.firm
     assert choice(q, "Another Gall…").picker == :gall
     assert_plain(q)
   end
@@ -1329,7 +1331,7 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
 
       assert per_gall.effect ==
                "“pale tan” stays undecided for every Source: each new Gall that uses it is " <>
-                 "asked again."
+                 "asked again, unless every Gall here gets the same values."
 
       assert Questions.picked_decision(per_gall, {:galls, %{"g1" => "white", "g2" => nil}}) ==
                %{"categories" => %{"g1" => "white", "g2" => nil}}
@@ -1403,6 +1405,8 @@ defmodule GallformersWeb.Admin.Review.QuestionsTest do
     assert q.proposal.why == "The readers chose differently for different Galls"
     assert q.proposal.decision == %{"categories" => %{"g1" => "globular", "g2" => nil}}
     assert choice(q, "It depends on the Gall").proposed == true
+    # Not an answer for a batch: each Gall's value still needs the curator (`c8c3` item 6).
+    refute q.proposal.firm
 
     assert choice(q, "It depends on the Gall").tally ==
              "The readers chose differently for different Galls"

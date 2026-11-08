@@ -31,7 +31,8 @@ defmodule Gallformers.Import do
        term, never holding approval (`Gallformers.Import.SetAside`). The
        Source's Trait terms are placed (`Gallformers.Import.TraitTerms`):
        a term the import can't place on its own is a question, one per term,
-       never holding approval.
+       never holding approval; a dispute about one of its Facts is asked in
+       that question, not on its own (`TraitTerms.absorb_disputes/2`).
     4. **Decide** (`decide_queue_item/3`): an admin answers each open item,
        recorded with who and when; or accepts the proposals of many at once
        (`accept_proposals/2`, `Gallformers.Import.Proposals`), having
@@ -674,12 +675,21 @@ defmodule Gallformers.Import do
     terms = TraitTerms.queue_items(content, ctx.review, file: file, drop: dropped)
 
     # A statement a Gall decision left out is disputed no longer.
-    Enum.reject(
-      Disputes.items(ctx.review, file, content),
-      &(&1.statement_ref in decided_disputes or &1.statement_ref in dropped)
-    ) ++
+    disputes =
+      Enum.reject(
+        Disputes.items(ctx.review, file, content),
+        &(&1.statement_ref in decided_disputes or &1.statement_ref in dropped)
+      )
+
+    # A Trait Fact both disputed and a term question is asked once, as the term.
+    {terms, disputes} =
+      terms
+      |> Enum.reject(&(&1.statement_ref in decided_terms))
+      |> TraitTerms.absorb_disputes(disputes)
+
+    disputes ++
       Enum.reject(SetAside.queue_items(content), &(&1.statement_ref in decided_set_aside)) ++
-      Enum.reject(terms, &(&1.statement_ref in decided_terms))
+      terms
   end
 
   # The taxon refs a batch's acts or Galls and Facts need resolved. A
@@ -1444,6 +1454,8 @@ defmodule Gallformers.Import do
   # package is not resolved again (`settle/3`). {:ok, item}, or {:error,
   # changeset} for a decision that does not fit.
   defp decide(actor, item, package, decision, files) do
+    decision = TraitTerms.remembered(item, decision)
+
     changeset =
       item
       |> QueueItem.decide_changeset(decision, actor)

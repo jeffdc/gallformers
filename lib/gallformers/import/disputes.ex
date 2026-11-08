@@ -66,10 +66,18 @@ defmodule Gallformers.Import.Disputes do
   shows the Source's words; decided afterwards, `keep` writes it as the
   batch would have and settles the waiting term under its categories, and
   `skip` keeps its words as text (the waiting term settled as text).
+
+  Such a dispute says what each side chose as data, not only in its
+  findings' prose (`c8c3`; a producer's summary once dropped the value it
+  chose): `subject["facts"]`, the term's Facts on the Gall (one per value
+  its words name); `subject["suggestions"]`, the producer's category for
+  each (nil for none); and `subject["placements"]`, each checker's, as
+  `Gallformers.Import.TraitTerms` gives a term's covers.
   """
   alias Gallformers.Import.Batch
   alias Gallformers.Import.GallDecisions
   alias Gallformers.Import.QueueItem
+  alias Gallformers.Import.TraitTerms
   alias Gallformers.Repo
   alias Gallformers.Taxa
   alias Gallformers.Taxa.NameNormalizer
@@ -84,13 +92,19 @@ defmodule Gallformers.Import.Disputes do
   def items(review, file, content) do
     facts = Map.new(List.wrap(content["facts"]), &{&1["id"], &1})
 
+    uses =
+      for use <- TraitTerms.uses(content, review, file: file),
+          f <- use.facts,
+          into: %{},
+          do: {f.ref, use}
+
     review
     |> Map.get("findings", [])
     |> List.wrap()
     |> Enum.filter(&(&1["batch"] == file and get_in(&1, ["response", "decision"]) == "disagree"))
     |> Enum.reject(&valued_trait?(facts[&1["id"]]))
     |> Enum.group_by(& &1["id"])
-    |> Enum.map(fn {id, findings} -> item(id, findings, facts[id], content) end)
+    |> Enum.map(fn {id, findings} -> item(id, findings, facts[id], content, uses[id]) end)
     |> Enum.sort_by(&ref_order(&1.statement_ref))
   end
 
@@ -98,7 +112,7 @@ defmodule Gallformers.Import.Disputes do
   defp valued_trait?(%{"kind" => "trait"} = fact), do: not Map.has_key?(fact, "term")
   defp valued_trait?(_fact), do: false
 
-  defp item(id, findings, fact, content) do
+  defp item(id, findings, fact, content, use) do
     %{
       kind: :dispute,
       statement_ref: id,
@@ -112,6 +126,7 @@ defmodule Gallformers.Import.Disputes do
           "group" => group(fact, content)
         }
         |> Map.merge(trait_term(fact))
+        |> Map.merge(chosen(fact, use))
         |> Map.reject(fn {_k, v} -> is_nil(v) end),
       proposal: %{},
       reason:
@@ -126,6 +141,20 @@ defmodule Gallformers.Import.Disputes do
        do: %{"trait" => trait, "term" => term}
 
   defp trait_term(_fact), do: %{}
+
+  # What each side chose for a format 4 Trait Fact, as data (`c8c3`): its
+  # use's Facts (the term's every Fact on the Gall, one per value), the
+  # producer's category for each (nil for none), and the checkers'
+  # placements, as `Gallformers.Import.TraitTerms` gives a term's covers.
+  defp chosen(%{"kind" => "trait", "term" => term}, %{facts: facts}) when is_binary(term) do
+    %{
+      "facts" => Enum.map(facts, & &1.ref),
+      "suggestions" => Enum.map(facts, & &1.suggestion),
+      "placements" => Enum.flat_map(facts, & &1.placements)
+    }
+  end
+
+  defp chosen(_fact, _use), do: %{}
 
   @doc """
   The group of a dispute about `fact` (a Fact of the decoded batch

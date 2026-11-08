@@ -161,9 +161,13 @@ defmodule Gallformers.Import.ProposalsTest do
 
         assert proposed(kind, "g1", %{"candidate_ids" => [7, 8]}) == {:none, :weak}
       end
+    end
 
+    test "a Gall proposed new is only a suggestion: bulk accept could create duplicates" do
+      # `c8c3` item 6: Gallformers may hold it under another name (an undescribed Gall named
+      # by its Host's epithet), so the curator decides each one.
       assert proposed(:unresolved_name, "g1", %{"candidate_ids" => [], "proposed" => "new"}) ==
-               {:ok, %{"new" => true}}
+               {:none, :weak}
     end
 
     test "a Gall: a best match, an undescribed match or one with a conflict is never firm" do

@@ -1009,7 +1009,8 @@ defmodule GallformersWeb.Admin.Review.Questions do
           proposal(
             "Create it as a new Gall",
             "no Gall Gallformers holds matches it",
-            %{"new" => true}
+            %{"new" => true},
+            firm: false
           ),
         else: gall_proposal(item, ctx, nil)
 
@@ -2672,7 +2673,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
       if Enum.all?(galls, &(&1.default != nil)),
         do: %{"categories" => Map.new(galls, &{&1.ref, text_nil(&1.default)})}
 
-    proposal("It depends on the Gall", why, decision)
+    proposal("It depends on the Gall", why, decision, firm: false)
   end
 
   defp text_nil(:text), do: nil
@@ -2758,10 +2759,12 @@ defmodule GallformersWeb.Admin.Review.Questions do
       label: "It depends on the Gall",
       hint:
         "The words mean different things for different Galls. You choose for each Gall here; " <>
-          "nothing is set for other Sources, so the next Source that uses them is asked again.",
+          "nothing is set for other Sources, so the next Source that uses them is asked again. " <>
+          "If you give every Gall the same values, they're set for every Source.",
       picker: :galls,
       effect:
-        "“#{term}” stays undecided for every Source: each new Gall that uses it is asked again.",
+        "“#{term}” stays undecided for every Source: each new Gall that uses it is asked again, " <>
+          "unless every Gall here gets the same values.",
       tally: if(rec == :per_gall, do: "The readers chose differently for different Galls"),
       proposed: rec == :per_gall
     }

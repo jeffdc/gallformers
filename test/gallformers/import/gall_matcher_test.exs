@@ -700,6 +700,150 @@ defmodule Gallformers.Import.GallMatcherTest do
     end
   end
 
+  describe "undescribed Galls on other plants of the Host's genus (c8c3 item 5)" do
+    # Nastasi & Davis 2022: the Source's "S. dentatum" is the species, while Gallformers
+    # holds its toothed rosinweed gall on Silphium asteriscus var. dentatum (whose synonym
+    # Silphium dentatum is). The Source names the Gall by its Host's common name, the entry
+    # is coded by the Host's epithet.
+    setup %{source: source} do
+      wasp = taxon_fixture(name: "Antistrophus", rank: :genus, kingdom: "Animalia")
+      silphium = plant_fixture(name: "Silphium", rank: :genus)
+      dentatum = plant_fixture(name: "Silphium dentatum", parent: silphium)
+
+      variety =
+        plant_fixture(name: "Silphium asteriscus var. dentatum", rank: :variety, parent: silphium)
+
+      laciniatum = plant_fixture(name: "Silphium laciniatum", parent: silphium)
+
+      entry = fn name, plant, part ->
+        gall = gall_fixture(name: name)
+        inducer!(wasp, gall, source)
+        host!(plant, gall, source)
+        plant_part!(gall, part, source)
+        gall
+      end
+
+      toothed = entry.("Antistrophus s-dentatum-cryptic-stem-gall", variety, "stem")
+      leafy = entry.("Antistrophus s-laciniatum-cryptic-leaf-gall", laciniatum, "leaf")
+      stem = entry.("Antistrophus s-laciniatum-stem-swelling", laciniatum, "stem")
+      :ok = Catalog.refresh_gall_index([toothed.id, leafy.id, stem.id])
+
+      %{
+        wasp: wasp,
+        silphium: silphium,
+        dentatum: dentatum,
+        toothed: toothed,
+        leafy: leafy,
+        stem: stem
+      }
+    end
+
+    defp host_as_written(ref, taxon, written),
+      do: put_in(resolved(ref, taxon, "species", true), [:detail, "name_as_written"], written)
+
+    defp toothed_gall(name, part \\ "stem") do
+      gall(
+        "g20",
+        %{
+          "inducer" => "t14",
+          "host" => "t35",
+          "plant_part" => %{"value" => part, "as_written" => part}
+        },
+        %{"name_as_written" => name}
+      )
+    end
+
+    defp genus_taxa(ctx),
+      do: [
+        resolved("t14", ctx.wasp, "genus"),
+        host_as_written("t35", ctx.dentatum, "S. dentatum")
+      ]
+
+    test "the one whose Host has the Source's epithet is the best match, never new", ctx do
+      statements =
+        [toothed_gall("Toothed rosinweed cryptic stem gall (Antistrophus sp.)")]
+        |> match(genus_taxa(ctx))
+        |> Map.values()
+
+      [s] = statements
+      assert s.resolution == :ambiguous
+      assert s.method == "undescribed"
+      assert s.candidate_ids == [ctx.toothed.id]
+      assert s.detail["best"] == ctx.toothed.id
+      refute Map.has_key?(s.detail, "proposed")
+      assert s.detail["reason"] =~ "other Silphium plants"
+
+      assert [%{kind: :undescribed_gall, proposal: %{"best" => best}}] =
+               GallMatcher.queue_items(statements)
+
+      assert best == ctx.toothed.id
+    end
+
+    test "with no epithet in common, the entries sharing descriptive words are offered", ctx do
+      other = plant_fixture(name: "Silphium terebinthinaceum", parent: ctx.silphium)
+
+      taxa = [
+        resolved("t14", ctx.wasp, "genus"),
+        host_as_written("t35", other, "S. terebinthinaceum")
+      ]
+
+      %{"g20" => s} = match([toothed_gall("Prairie dock stem swelling")], taxa)
+
+      assert s.resolution == :ambiguous
+      assert s.candidate_ids == [ctx.stem.id]
+      assert s.detail["best"] == ctx.stem.id
+    end
+
+    test "nothing alike on the genus's plants: no proposal while it holds such Galls", ctx do
+      %{"g20" => s} = match([toothed_gall("Prairie dock gall")], genus_taxa(ctx) |> no_epithet())
+
+      assert s.resolution == :unresolved
+      assert s.candidate_ids == []
+      refute Map.has_key?(s.detail, "proposed")
+
+      assert s.detail["reason"] =~
+               "2 undescribed Galls of its Inducer's genus on other Silphium plants"
+    end
+
+    test "an entry on another plant part is no candidate, and new is proposed", ctx do
+      %{"g20" => s} =
+        match([toothed_gall("Toothed rosinweed flower gall", "flower")], genus_taxa(ctx))
+
+      assert s.resolution == :unresolved
+      assert s.detail["proposed"] == "new"
+    end
+
+    defp no_epithet([inducer, host]),
+      do: [inducer, put_in(host, [:detail, "name_as_written"], "toothed rosinweed")]
+  end
+
+  describe "undescribed Galls waiting on their Host (c8c3 item 5)" do
+    # Nastasi & Davis 2022's "Horkelia stem gall": its Host "Horkelia congesta congesta"
+    # resolved to nothing, so no entry on it could match, and new was proposed.
+    defp horkelia(host) do
+      g = gall("g46", %{"host" => "t79"}, %{"name_as_written" => "Horkelia stem gall"})
+      match([g], [host])
+    end
+
+    test "with its Host not resolved, it waits on the Host's question, with none of its own" do
+      %{"g46" => s} = horkelia(statement("t79", :unresolved, "Horkelia congesta congesta"))
+
+      assert s.resolution == :unresolved
+      assert "waits_on_host" in s.flags
+      assert s.detail["waits_on"] == "t79"
+      refute Map.has_key?(s.detail, "proposed")
+      assert GallMatcher.queue_items([s]) == []
+    end
+
+    test "once its Host is left out, it is matched on its own" do
+      host = %{statement("t79", :unresolved, "Horkelia congesta congesta") | flags: ["skipped"]}
+      %{"g46" => s} = horkelia(host)
+
+      refute "waits_on_host" in s.flags
+      assert s.detail["proposed"] == "new"
+    end
+  end
+
   describe "comparison with the Source: conflicts and firmness" do
     # `d213` Task 4: a different coarse plant part or form cancels firm; an
     # undescribed match is never firm; candidates rank by agreeing fields.
