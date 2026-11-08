@@ -1,7 +1,7 @@
 ---
-status: active
+status: planned
 created: 2026-10-30
-updated: 2026-11-07
+updated: 2026-11-08
 epic: admin
 relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c]
 ---
@@ -274,3 +274,64 @@ Mockup: `dev/gallformers_web/dev/mockups/source_reading_live.ex`, `/dev/mockups/
 
 
 **Next (Jeff, 2026-11-07):** work through `c8c3` first (its Gallformers-side fixes, then the guide change once worded), then return to this design with re-resolved data (Nastasi & Davis, package 97) and keep pushing the UI.
+
+
+**Data (2026-11-08):** after the `c8c3` back-end fixes the four Sources were re-run; Nastasi & Davis 2022 is now **package 115** (97 is denied). The mockup takes the package from its URL: `/dev/mockups/source-reading/115`. On 115: 35 questions (was 46), 22 must be answered before approving (was 25); Names 3, Galls 19, Disputes none, Traits 13 (was 21); 81 hedged statements set aside.
+
+- **"Use this for the other N Galls"** (Jeff, 2026-11-08): on a Trait card that covers several Galls, once a Gall has an answer (its values ticked, or kept as text), a link under it copies that answer to every other Gall on the card; any exception is then changed on its own. In the mockup. (Why "swelling" and "swellings" are two cards: they are two terms to the back end; see `c8c3` item 10.)
+
+
+## Build decisions (Jeff, 2026-11-08)
+
+The redesign goes to a real build:
+- **Scope:** one Source's review: the one-at-a-time view, the Everything view and the status rail, replacing today's overview, the five step pages and the Facts page. The Sources list and the Gallformers notes page keep their current look for now.
+- **The Facts ("what approving will add") are the last step before Approve,** by Gall, and reachable any time from the rail.
+- **The question copy gets the plain-English pass in this build:** the strings in `GallformersWeb.Admin.Review.Questions` are rewritten as the mockup reads (its tests change with it), including the broken "Keep it" sentence.
+- **Keyboard, a small set:** Enter takes the suggested answer, S skips, up/down move between answers.
+- **Depends on** `c8c3`'s back-end items 3, 5, 6, 7, 8 (dispute values as data, several values per Gall, no firm "create new" or "it depends", one question per statement, remembered term mappings) being committed first. Item 10 (singular and plural as one term) doesn't block it.
+- **Next:** catalog entries for the new pieces (status rail, question card, batch card, trait card, `gf-density-reading`) for Jeff's approval, then a build plan here, tests first.
+
+
+## Build plan (2026-11-08; components approved by Jeff the same day)
+
+**Goal:** replace one Source's review (today's overview, the five step pages and the Facts page) with the one-at-a-time review and the Everything view, on the approved `review_rail`, `review_card`, `review_option` `use` and `gf-density-reading` (`docs/design-system/components.md`, `foundations.md`). The mockup (`dev/gallformers_web/dev/mockups/source_reading_live.ex`, `/dev/mockups/source-reading/115`) is the visual reference. The Sources list and the Gallformers notes page keep their look.
+
+**Principles:**
+- **The mockup and this matter's decisions are the design authority** (Jeff, 2026-11-08). Today's review pages never shipped: they were a test bed for seeing and working with the data. None of their interface behaviour is a contract (the Decide button, Reject, rows that expand, how options are laid out, their copy); the design-system README's "keep every behaviour" rule for replacing shipped components does not apply. Where the mockup and the test bed differ, the mockup wins; where the mockup is silent, ask Jeff rather than carry over what the test bed does.
+- **Reuse the back end, not the test bed's UI:** `Import.decide_queue_item/3`, `decide_group/3`, `accept_proposals/2`, undo, notes and the decision shapes are the capabilities the new UI calls. `ReviewLive.ItemRow` and the step pages' code may be mined for how to call them, rewritten freely, or replaced.
+- Tests first for every task (failing test, watch it fail, implement). URLs stay: `/admin/review/sources/:id` and `/admin/review/packages/:package_id` become the new review; old step and Facts URLs redirect into it. `mix precommit` clean before each commit.
+
+### Task 1: Map what the back end can do
+A capability map, not a contract: for each kind of question, the decisions the back end accepts (`Import.decide_queue_item/3` shapes, `decide_group/3` for identical disputes with per-Gall ticks, `accept_proposals/2`, undo and its refusals, notes, Host disputes read as another plant, taxonomy refusals), what each needs before it can be decided, and what the review reads (the WCVP panel, candidates, the dry run). Where the test bed offers something the mockup doesn't show (Reject, "Leave the rest out", undo, the Facts page's edits, refusals shown in place), list it as a question for Jeff, not as a behaviour to keep. Kept in this matter, not in `docs/design-system/inventory/` (that is for shipped components).
+
+### Task 2: The question copy, plainly
+Rewrite the strings of `GallformersWeb.Admin.Review.Questions` and `Choice` labels the way the mockup reads (the plain-writing rule): "Suggested" / "Best guess" for firm / weak proposals; Hosts "Another plant… / Add a new plant… / Leave this Host out"; undescribed Galls "Is it one of these Galls we already have?"; the Trait card's pipeline line ("The import pipeline couldn't agree how to map “lumpy” to a texture value." / "The producer mapped “fleshy” to succulent. A checker disagreed: …", from the dispute's `suggestions` and `placements`); no "Keep it: the Gall gets the … value “…” is placed under". The presenter's tests change first (the copy is part of the contract).
+
+### Task 3: The work, as units (a pure module)
+`GallformersWeb.Admin.Review.Units` from the page's entries: the **tally** (answered, to go, must be answered before approving, hedged apart: one source for every count on the page); the **stages** with what's left in each; the **units** in order: each section's firm suggestions as one batch (two or more; never "Create a new Gall" or "It depends on the Gall"), unticked ones next on their own, the rest one by one, a chosen stage first, skipped units last; the **next** three; the last unit **facts** once nothing is left. Unit tests on fixtures of entries (port the mockup's `units/1`, `tally/1`, `stages/2`).
+
+### Task 4: `review_option` `use`
+One-click mode: a "Use this" button sending `on_pick`; "Search…" for an option that needs input, opening its `follow`; the recommended one primary. Component test; style-guide entry.
+
+### Task 5: `review_rail`
+Title, "N of M answered", progress, "K to go. H of them must be answered before you can approve.", the stages as buttons (left / done, current marked; `stage` event), "N hedged statements were left out. Review them" (`hedges`), Up next, Approve (disabled with its reason) and Deny. Component tests; style-guide entry.
+
+### Task 6: `review_card`
+The frame (kind line with "needed before you can approve", Affects, the question heading with `text-wrap`, up to two `source_quote`s, footer: Add a note…, Read the Source, Skip for now) and its variants: `:batch` (the ticked checklist, trait name on each row, "Accept all N" / "Accept the N ticked", via `Import.accept_proposals/2`), `:hedges` (grouped, Add it…, Back to the questions), `:facts` (what approving will add, by Gall, `facts_view`, computed in the background as the Facts page does). `:question` and `:trait` are drawn by `ItemRow` in Task 7. Component tests; style-guide entries.
+
+### Task 7: The question and Trait cards
+Built to the mockup, calling the back end directly; `ItemRow` is rewritten or replaced, not wrapped. Options as `review_option use` (one click decides; options needing input open it first). Trait terms and Trait disputes as the `:trait` variant: one block per Gall, "Keep “…” as text" or "Map it to <trait> values" (`radio_card`s) opening every value of the Trait (`review_value_list`, checkboxes), each side's values pre-ticked from the data (`covers`, the dispute's `suggestions` and `placements`), "Use this for the other N Galls" (a new event copying one Gall's answer to the rest), Save once every Gall has an answer, deciding `%{"categories" => %{gall_ref => [values] | nil}}` as today. Host questions with no match: Search…, Add a new plant ↗, Leave out. Undescribed Galls: the genus's undescribed Galls first (the matcher's candidates, `c8c3` item 5), then "If not:" and the rest. LiveView tests for each.
+
+### Task 8: The review page
+New `ReviewLive.Review` on the review URLs (the Source-overview branch of `ReviewLive.Source` goes; its notes Source stays): the admin shell, the `gf-density-reading` main column with one `review_card`, `review_rail` beside it (below on phones), "One at a time | Everything" (`segmented_switch`). Everything lists every question by section (as the mockup's list, Suggested / Best guess chips and Accept on rows with a suggestion); choosing a row shows its card. Approve and Deny as today (`SourcePage.approve/1`, the deny form). Params: `?view=all`, `?stage=traits`, `?hedges`, `?facts`. After each decision the page reloads (`SourcePage.load/1`) and moves to the next unit. LiveView tests: first unit, stage jump, skip, batch accept, decide and move on, hedges, the facts step, approve gating.
+
+### Task 9: Keyboard
+A `ReviewKeys` hook on the card: Enter takes the suggested answer, S skips, up and down move between answers; inert while typing in a field. Server events tested in LiveView; the hook checked by hand (and in an e2e test if cheap).
+
+### Task 10: Retire and redirect
+Delete `ReviewLive.Step`, the Facts page's LiveView (its preview loading moves into the `:facts` unit), and the components only they used; redirect `/review/(sources|packages)/:id/:step` to the review with `?stage=` and `/facts` to `?facts`; update `docs/design-system/patterns.md` (the review step pattern), the style guide, the conformance baseline (`mix gallformers.design_system.baseline` for gains only), `a856` and this matter. Delete the mockup and its route (`mockups.md`: a built mockup goes).
+
+### Task 11: Check it on real data
+Package 115 at desktop and phone, light and dark: every kind of question, a batch, a Trait card with several Galls, a dispute, the hedges, the facts step, approve. Jeff walks a Source through.
+
+**Order:** 1 → 2 → 3 → (4, 5, 6 in any order) → 7 → 8 → 9 → 10 → 11. **Not in this build:** the Sources list, the Gallformers notes page, `c8c3` item 10 (singular and plural as one term, back end), the dry run's cost at scale (`c90c`).

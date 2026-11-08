@@ -126,6 +126,8 @@ The base stylesheet sizes `h1`–`h3` from this scale, so a bare `<h2>` is alrea
 
 The density context sets sizes for everything inside it. Public pages use Reading (the default). The admin shell adds `gf-density-working`, which switches to Working.
 
+**Approved:** `gf-density-reading` switches back to Reading inside the admin shell, for admin pages that are reading work rather than scanning lists: the one-at-a-time review (`review_card`). It sets the Reading values of the same tokens (`assets/css/system/tokens.css`, where it is already defined for the mockup).
+
 | Token | Utility | Reading | Working | Use for |
 |---|---|---|---|---|
 | `--gf-row-h` | `h-row`, `min-h-row` | 36px | 32px | Table and list rows |

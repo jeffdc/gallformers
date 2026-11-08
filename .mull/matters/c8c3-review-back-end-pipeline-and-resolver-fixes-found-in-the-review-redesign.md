@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-11-07
-updated: 2026-11-07
+updated: 2026-11-08
 epic: taxogall
 relates: [6611, 294c, f14c, c90c]
 ---
@@ -39,4 +39,7 @@ Found while redesigning the import review with Jeff (2026-11-07; design in `6611
 - **9:** moved to `c90c`.
 
 **Found while checking package 97 (data for Jeff):** two names are each held by two taxa. "Silphium dentatum" is accepted species 4878 and also a synonym of Silphium asteriscus var. dentatum (4863, which is placed directly under the genus). "Horkelia congesta" is accepted 5190 and also a synonym of Potentilla congesta (4870). The resolver takes the accepted one with no question, which is why toothed rosinweed's Gall (on 4863) didn't match.
+
+
+10. **Singular and plural are different terms** (Jeff, 2026-11-08, package 115). Nastasi & Davis's "swelling" (form, 3 Galls, `ambiguous`: already known to mean different values in different Galls) and "swellings" (form, 15 Galls, `new`) are two Trait-term questions, because terms are grouped and looked up in the term mappings by exact text. Treat singular and plural (and other inflections) as one term when grouping a Source's terms and when matching term mappings, so the curator decides "swelling" once for all 18 Galls and a later Source writing either form takes the decision.
 
