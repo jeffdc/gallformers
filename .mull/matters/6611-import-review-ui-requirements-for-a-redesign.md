@@ -3,7 +3,7 @@ status: active
 created: 2026-10-30
 updated: 2026-11-07
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d, c8c3]
+relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c]
 ---
 
 # Import review UI: requirements for a redesign
@@ -274,4 +274,3 @@ Mockup: `dev/gallformers_web/dev/mockups/source_reading_live.ex`, `/dev/mockups/
 
 
 **Next (Jeff, 2026-11-07):** work through `c8c3` first (its Gallformers-side fixes, then the guide change once worded), then return to this design with re-resolved data (Nastasi & Davis, package 97) and keep pushing the UI.
-

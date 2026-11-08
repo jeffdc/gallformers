@@ -3,7 +3,7 @@ status: raw
 created: 2026-11-07
 updated: 2026-11-07
 epic: taxogall
-relates: [6611, 294c, f14c]
+relates: [6611, 294c, f14c, c90c]
 ---
 
 # Review back end: pipeline and resolver fixes found in the review redesign
@@ -24,3 +24,19 @@ Found while redesigning the import review with Jeff (2026-11-07; design in `6611
 7. **One statement asked twice:** as a Trait term ("what does “on the leaf or petiole” mean?") and as a dispute about the same statement ("Should “on the leaf or petiole” go in as Ground-ivy gall's plant part?"). Ask once.
 8. **A curator's mapping of a term isn't remembered** (already open in `6611`): mapping "Green or yellowish" to green and yellow should add a term mapping, so no later Source asks.
 9. **The dry run at scale.** `Import.preview_package/2` takes 0.25–1 s for 49 Galls; a Source of ~570 Galls (Gagné 1989) may take 10 s or more, recomputed after every decision. Recompute only the Galls a decision touches.
+
+
+## Status (2026-11-07, evening)
+
+**Pipeline (items 1, 2, 4): committed `171c326e`.** The guides name each value of an "X or Y" Trait term (one Fact per value; an unstated side of the leaf stays `leaf`; `null` only for wording that leaves the value open). Producer and checker summaries name the value they hold or argue for. Phase 1 joins the pieces Docling's HTML reader splits a web paragraph into (`merge_inline`, `convert.py`), so a quote can be the sentence. A v6 run of the five trial Sources started overnight (`services/import-producer/output/v6-2026-11-07/`, log `output/run-v6.log`), each scored against the golden set.
+
+**Back end (items 3, 5, 6, 7, 8): built, `mix precommit` clean, not committed.**
+- **3:** a format 4 Trait dispute carries `subject["facts"]`, `["suggestions"]` (the producer's categories) and `["placements"]` (each checker's), as a term's covers do (`Import.Disputes`). The producer and the checkers already gave their values as data (`category` in `gall.json`, `placements` in `review.json`), so no contract change was needed.
+- **5:** `GallMatcher`: an undescribed Gall that has no candidate on its Hosts while a Host is still unresolved waits on that Host (`"waits_on_host"`, no queue item of its own; matched again once the Host is decided). Otherwise it looks at the undescribed entries of the Inducer's genus on other plants of its Hosts' genera (the ID tool's index). Those whose code holds an epithet of the Source's Host names are offered first, then those sharing descriptive words. None is firm. When such entries exist but none matches, nothing is proposed. On package 97: toothed rosinweed (g20) now gets *Antistrophus s-dentatum-cryptic-stem-gall* as its best match; Horkelia (g46) waits on its Host; sunflower (g45) gets 5 candidates on Helianthus; mossy bramble (g48) gets one candidate on Rubus.
+- **6:** "Create a new Gall" is never firm (`Import.Proposals`: weak), and neither "Create it as a new Gall" nor "It depends on the Gall" is a firm proposal in `Questions`.
+- **7:** a dispute about a Fact that a Trait term question covers is asked in that question: its findings join the use's `"findings"`, it has no item of its own, and the question proposes nothing (`TraitTerms.absorb_disputes/2`). A disputed Fact whose term is already placed stays a dispute.
+- **8:** a per-Gall answer (`"categories"`) that gives every covered Gall the same values, for a new term or one fitting none, is recorded as `"place"` (`TraitTerms.remembered/2`), so no later Source asks again. A Gall may now take several values (`%{"g1" => ["green", "yellow"]}`). The vocabulary page already places terms (the old backlog's "map" is gone), so nothing is needed there.
+- **9:** moved to `c90c`.
+
+**Found while checking package 97 (data for Jeff):** two names are each held by two taxa. "Silphium dentatum" is accepted species 4878 and also a synonym of Silphium asteriscus var. dentatum (4863, which is placed directly under the genus). "Horkelia congesta" is accepted 5190 and also a synonym of Potentilla congesta (4870). The resolver takes the accepted one with no question, which is why toothed rosinweed's Gall (on 4863) didn't match.
+
