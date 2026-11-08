@@ -179,6 +179,23 @@ defmodule GallformersWeb.Dev.Mockups.SourceReadingLive do
     {:noreply, update(socket, :picks, &Map.put(&1, {String.to_integer(id), ref}, next))}
   end
 
+  # One Gall's answer copied to every other Gall the question covers.
+  def handle_event("apply_to_all", %{"id" => id, "ref" => ref}, socket) do
+    e = find(socket, String.to_integer(id))
+    from = Enum.find(e.question.galls, &(&1.ref == ref))
+    answer = picked(socket.assigns.picks, e, from)
+
+    picks =
+      Enum.reduce(e.question.galls, socket.assigns.picks, fn g, acc ->
+        Map.put(acc, {e.item.id, g.ref}, answer)
+      end)
+
+    {:noreply,
+     socket
+     |> assign(picks: picks)
+     |> put_flash(:info, "Used the same answer for all #{length(e.question.galls)} Galls")}
+  end
+
   # `v`, not `value`: a checkbox's click sends its own value ("on") as `value`.
   def handle_event("pick_value", %{"id" => id, "ref" => ref, "v" => value} = params, socket) do
     key = {String.to_integer(id), ref}
@@ -1277,6 +1294,16 @@ defmodule GallformersWeb.Dev.Mockups.SourceReadingLive do
             </div>
           </div>
         </div>
+        <button
+          :if={@n > 1 and pick != :none}
+          type="button"
+          phx-click="apply_to_all"
+          phx-value-id={@e.item.id}
+          phx-value-ref={g.ref}
+          class="w-fit text-meta text-link hover:underline"
+        >
+          Use this for the other {@n - 1} {if @n == 2, do: "Gall", else: "Galls"}
+        </button>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 border-t border-line pt-4">

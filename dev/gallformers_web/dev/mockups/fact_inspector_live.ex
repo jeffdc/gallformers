@@ -802,7 +802,7 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
           class="border-l-2 border-line-strong pl-3 font-serif text-meta text-ink-2"
         >
           <span class="line-clamp-4">{q.quote}</span>
-          <span :if={q.page} class="font-sans text-caption text-muted"> p.       {q.page}</span>
+          <span :if={q.page} class="ml-1 font-sans text-caption text-muted">{"p. #{q.page}"}</span>
         </blockquote>
         <p :if={line && length(line.quotes) > 2} class="text-caption text-muted">
           {length(line.quotes) - 2} more quotes
