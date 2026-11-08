@@ -516,6 +516,63 @@ defmodule Gallformers.Import.DisputeGroupsTest do
                Catalog.list_pending_terms(ctx.gall.id, include_settled: true)
     end
 
+    # `c8c3` item 11: the review's Trait card lets the curator tick a checker's values, or
+    # any of the Trait's, as well as keep the producer's or keep the words as text.
+    test "values: one or more of the Trait's values, each once", ctx do
+      valid = fn decision ->
+        Queue.validate_decision(Ecto.Changeset.change(ctx.dispute), ctx.dispute, decision).valid?
+      end
+
+      assert valid.(%{"values" => ["spindle"]}) == true
+      assert valid.(%{"values" => ["globular", "spindle"], "note" => "both"}) == true
+      assert valid.(%{"values" => []}) == false
+      assert valid.(%{"values" => ["spindle", "spindle"]}) == false
+      assert valid.(%{"values" => ["no such shape"]}) == false
+      assert valid.(%{"values" => "spindle"}) == false
+      assert valid.(%{"values" => ["spindle"], "keep" => true}) == false
+    end
+
+    test "values before the batch is applied: its Fact goes on them", ctx do
+      {:ok, _} = Import.decide_queue_item(test_actor(), ctx.dispute, %{"values" => ["spindle"]})
+      {:ok, _} = Import.approve_package(test_actor(), ctx.package)
+
+      assert Catalog.gall_summary(ctx.gall.id).traits["shape"] == ["spindle"]
+      assert Catalog.list_pending_terms(ctx.gall.id) == []
+    end
+
+    test "values after the batch is applied: written on them, the term settled", ctx do
+      {:ok, _} = Import.approve_package(test_actor(), ctx.package)
+
+      {:ok, _} =
+        Import.decide_queue_item(test_actor(), ctx.dispute, %{"values" => ["globular", "spindle"]})
+
+      assert Enum.sort(Catalog.gall_summary(ctx.gall.id).traits["shape"]) == [
+               "globular",
+               "spindle"
+             ]
+
+      assert Catalog.list_pending_terms(ctx.gall.id) == []
+
+      assert [%{settled_as: "category", settled_categories: categories}] =
+               Catalog.list_pending_terms(ctx.gall.id, include_settled: true)
+
+      assert Enum.sort(categories) == ["globular", "spindle"]
+    end
+
+    test "a values decision replays", ctx do
+      {entries, _} =
+        logged_and_undone(fn ->
+          {:ok, item} =
+            Import.decide_queue_item(test_actor(), ctx.dispute, %{"values" => ["spindle"]})
+
+          item.decision
+        end)
+
+      assert {:ok, _} = Replay.run(entries, actor: test_actor())
+      assert_replays_again(entries, test_actor())
+      assert Import.get_queue_item!(ctx.dispute.id).decision == %{"values" => ["spindle"]}
+    end
+
     test "dropped after the batch is applied, its words stay as text", ctx do
       {:ok, _} = Import.approve_package(test_actor(), ctx.package)
       {:ok, _} = Import.decide_queue_item(test_actor(), ctx.dispute, %{"skip" => true})

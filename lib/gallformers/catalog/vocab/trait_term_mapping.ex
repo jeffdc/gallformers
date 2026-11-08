@@ -92,8 +92,15 @@ defmodule Gallformers.Catalog.Vocab.TraitTermMapping do
   def traits, do: ["generation" | TraitValue.traits()]
 
   @doc """
-  A term as compared: NFC, lowercased, whitespace collapsed (as
-  `Gallformers.Import.SetAside` compares set-aside terms).
+  A term as compared: NFC, lowercased, whitespace collapsed, and each
+  word's plural taken as its singular (`c8c3`: "swellings" is the term
+  "swelling", "covered in short hairs" is "covered in short hair"), as
+  `Gallformers.Import.SetAside` compares set-aside terms. The result is a
+  key, never shown: a word is folded by its ending alone ("berries" →
+  "berry", "patches" → "patch", "masses" → "mass", "chambers" →
+  "chamber"), except words of three letters or fewer, those ending in
+  "ss", "us" or "is" ("hairless", "glabrous") and a few that only look
+  plural ("species", "this").
   """
   @spec normalize(String.t()) :: String.t()
   def normalize(term) when is_binary(term) do
@@ -101,7 +108,38 @@ defmodule Gallformers.Catalog.Vocab.TraitTermMapping do
     |> :unicode.characters_to_nfc_binary()
     |> String.downcase()
     |> String.split()
-    |> Enum.join(" ")
+    |> Enum.map_join(" ", &singular_word/1)
+  end
+
+  @not_plural ~w(this its has was always sometimes perhaps whereas series species thus plus yes
+                 lens gas bias chaos canvas atlas)
+
+  # The word's trailing letters as their singular (a hyphenated word's
+  # last part: "green-yellows" is "green-yellow").
+  defp singular_word(word), do: Regex.replace(~r/[[:alpha:]]+$/u, word, &singular/1)
+
+  defp singular(word) when word in @not_plural, do: word
+
+  defp singular(word) do
+    cond do
+      String.length(word) <= 3 ->
+        word
+
+      String.ends_with?(word, ["ss", "us", "is"]) ->
+        word
+
+      String.length(word) > 4 and String.ends_with?(word, "ies") ->
+        String.slice(word, 0..-4//1) <> "y"
+
+      String.ends_with?(word, ["sses", "shes", "ches", "xes", "zes"]) ->
+        String.slice(word, 0..-3//1)
+
+      String.ends_with?(word, "s") ->
+        String.slice(word, 0..-2//1)
+
+      true ->
+        word
+    end
   end
 
   @doc """

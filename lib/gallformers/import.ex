@@ -1592,14 +1592,16 @@ defmodule Gallformers.Import do
     honour_statement(item)
   end
 
-  # A Trait dispute kept after its batch was applied: its Facts, which
-  # waited, are written now (`Gallformers.Import.Disputes`).
+  # A Trait dispute kept after its batch was applied, as it stands or on
+  # other values: its Facts, which waited, are written now
+  # (`Gallformers.Import.Disputes`).
   defp honour(
          actor,
-         %QueueItem{kind: :dispute, decision: %{"keep" => true}} = item,
+         %QueueItem{kind: :dispute, decision: decision} = item,
          package,
          files
-       ) do
+       )
+       when is_map_key(decision, "keep") or is_map_key(decision, "values") do
     batch = get_batch!(item.batch_id)
 
     if batch.status == :applied and Disputes.trait?(item) do
@@ -1631,7 +1633,8 @@ defmodule Gallformers.Import do
       TraitTerms.apply_plan(batch.content, decode(files["review.json"]),
         file: batch.file,
         drop: others,
-        items: term_items
+        items: term_items,
+        values: Disputes.chosen_values([item])
       )
 
     facts = Enum.filter(plan.facts, &ours?.(&1["id"]))
@@ -2953,7 +2956,7 @@ defmodule Gallformers.Import do
         GallDecisions.chosen_hosts(decided, batch.content || %{})
         |> Map.merge(Disputes.chosen_hosts(decided))
         |> Map.merge(edits.hosts),
-      trait_values: edits.trait_values,
+      trait_values: decided |> Disputes.chosen_values() |> Map.merge(edits.trait_values),
       trait_disputes: trait_disputes,
       set_aside: Enum.filter(decided, &SetAside.set_aside?/1),
       review: decode(files["review.json"]),
