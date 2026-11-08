@@ -94,13 +94,20 @@ defmodule Gallformers.Curation.Statements do
     }
     |> put_if(
       "observations",
-      observations != [] &&
-        Enum.map(observations, &%{"provider" => &1.provider, "id" => to_string(&1.id)})
+      observations != [] && Enum.map(observations, &observation/1)
     )
     |> put_if(
       "cites",
       source && %{"as_written" => Wording.source_name(source), "source_id" => source.id}
     )
+  end
+
+  # An Observation as a statement cites it, with its quality grade and
+  # thumbnail when it has them.
+  defp observation(o) do
+    %{"provider" => o.provider, "id" => to_string(o.id)}
+    |> put_if("quality_grade", o[:quality_grade])
+    |> put_if("thumbnail_url", o[:thumbnail_url])
   end
 
   defp text(_spec, text, _observations, _source) when is_binary(text) and text != "", do: text

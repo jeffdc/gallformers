@@ -35,8 +35,10 @@ defmodule Gallformers.Curation.Applying do
   alias Gallformers.Curation.Review
   alias Gallformers.Curation.Spec
   alias Gallformers.Curation.Statements
+  alias Gallformers.Images
   alias Gallformers.Import
   alias Gallformers.Import.GallformersFragment
+  alias Gallformers.INaturalist
   alias Gallformers.Repo
   alias Gallformers.Taxa
 
@@ -53,6 +55,21 @@ defmodule Gallformers.Curation.Applying do
     actor
     |> Import.record_fact_note(spec.gall_id, spec.key, spec.text)
     |> result()
+  end
+
+  # An observation's photo: fetched from iNaturalist and stored as the
+  # Gall's image (`Gallformers.Images.import_inat_photo/4`), at the pace
+  # iNaturalist allows; never in a transaction.
+  def run(actor, %Item{kind: :photo, spec: spec}) do
+    with {:ok, observation} <- fetch_observation(spec.observation_id),
+         {:ok, photo} <- find_photo(observation, spec.photo_id),
+         {:ok, _image} <-
+           Images.import_inat_photo(photo, observation, {:gall, spec.gall_id}, actor.name) do
+      :ok
+    else
+      {:error, reason} when is_binary(reason) -> {:error, reason}
+      {:error, reason} -> {:error, "the photo couldn't be stored (#{inspect(reason)})"}
+    end
   end
 
   def run(actor, %Item{kind: :editorial, spec: %{subject: {:gall, id}} = spec}) do
@@ -75,6 +92,21 @@ defmodule Gallformers.Curation.Applying do
       :ok
     end)
     |> result()
+  end
+
+  defp fetch_observation(id) do
+    case INaturalist.fetch_observation(to_string(id)) do
+      {:ok, observation} -> {:ok, observation}
+      {:error, :not_found} -> {:error, "iNaturalist has no observation #{id}"}
+      {:error, _reason} -> {:error, "iNaturalist couldn't be reached"}
+    end
+  end
+
+  defp find_photo(observation, photo_id) do
+    case Enum.find(observation.photos, &(&1.id == photo_id)) do
+      nil -> {:error, "iNaturalist observation #{observation.id} has no photo #{photo_id}"}
+      photo -> {:ok, photo}
+    end
   end
 
   @doc "Applies `item` in a transaction that is rolled back: `:ok` or `{:error, reason}`."

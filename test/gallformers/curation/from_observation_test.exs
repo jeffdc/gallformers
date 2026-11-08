@@ -67,6 +67,7 @@ defmodule Gallformers.Curation.FromObservationTest do
         "taxon" => %{"id" => 1, "name" => "Andricus obsus", "rank" => "species"},
         "user" => %{"login" => "jdoe", "name" => "J. Doe"},
         "observed_on" => "2025-07-14",
+        "quality_grade" => "needs_id",
         "place_guess" => "Berkeley, CA, USA",
         "place_ids" => [1, 14, 2001],
         "description" => nil,
@@ -117,6 +118,61 @@ defmodule Gallformers.Curation.FromObservationTest do
 
   defp keys(proposal, role), do: for(%{role: ^role} = i <- proposal.items, do: i.spec.key)
 
+  describe "already held, and the observation's taxon (87a1)" do
+    test "an occurrence the Gall holds already is held, matched by its place", ctx do
+      {:ok, _} =
+        Catalog.assert_occurrence(
+          ctx.ada,
+          %{gall_id: ctx.gall.id, place_id: ctx.california},
+          confirm(ctx.weld)
+        )
+
+      stub_inat!(observation())
+      assert {:ok, proposal} = Curation.from_observation(ctx.ada, url(), ctx.gall.id)
+
+      assert [%{held: true}] = for(%{role: :occurrence} = i <- proposal.items, do: i)
+    end
+
+    test "a Host the Gall doesn't hold yet is new", ctx do
+      stub_inat!(observation(%{"ofvs" => [host_field("Obsquercus alba")]}))
+      assert {:ok, proposal} = Curation.from_observation(ctx.ada, url(), ctx.gall.id)
+
+      assert [%{held: false} | _] = for(%{role: :host} = i <- proposal.items, do: i)
+      assert [%{held: false}] = for(%{role: :occurrence} = i <- proposal.items, do: i)
+    end
+
+    test "an observation of the Gall's Inducer matches it", ctx do
+      stub_inat!(observation())
+      assert {:ok, proposal} = Curation.from_observation(ctx.ada, url(), ctx.gall.id)
+
+      assert %{name: "Andricus obsus", matches?: true} = proposal.taxon
+    end
+
+    test "an observation of another taxon says so, naming that taxon's Gall", ctx do
+      aphid = taxon_fixture(name: "Aphis obsrubifolii", kingdom: "Animalia")
+      aphid_gall = gall_fixture(name: "Aphis obsrubifolii gall")
+      inducer!(ctx.ada, ctx.weld, aphid, aphid_gall)
+
+      stub_inat!(
+        observation(%{
+          "taxon" => %{"id" => 9, "name" => "Aphis obsrubifolii", "rank" => "species"}
+        })
+      )
+
+      assert {:ok, proposal} = Curation.from_observation(ctx.ada, url(), ctx.gall.id)
+
+      assert %{name: "Aphis obsrubifolii", matches?: false, galls: [%{id: id}]} = proposal.taxon
+      assert id == aphid_gall.id
+    end
+
+    test "an observation with no taxon warns of nothing", ctx do
+      stub_inat!(observation(%{"taxon" => nil}))
+      assert {:ok, proposal} = Curation.from_observation(ctx.ada, url(), ctx.gall.id)
+
+      assert %{name: nil, matches?: true, galls: []} = proposal.taxon
+    end
+  end
+
   describe "the recorded occurrence" do
     test "for the observation's state, dated as seen, on the given Gall", ctx do
       stub_inat!(observation())
@@ -138,9 +194,18 @@ defmodule Gallformers.Curation.FromObservationTest do
       assert occurrence.why =~ "California"
       assert occurrence.why =~ "2025-07-14"
 
+      # Its quality grade and a thumbnail, for the statement (87a1).
       assert proposal.evidence == %{
                text: nil,
-               observations: [%{provider: "inaturalist", id: "#{@obs_id}"}],
+               observations: [
+                 %{
+                   provider: "inaturalist",
+                   id: "#{@obs_id}",
+                   quality_grade: "needs_id",
+                   thumbnail_url:
+                     "https://inaturalist-open-data.s3.amazonaws.com/photos/111/medium.jpg"
+                 }
+               ],
                source_id: nil
              }
 

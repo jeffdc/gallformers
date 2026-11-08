@@ -47,6 +47,7 @@ defmodule Gallformers.Curation do
       Gallformers.Audit,
       Gallformers.Catalog,
       Gallformers.Facts,
+      Gallformers.Images,
       Gallformers.Import,
       Gallformers.INaturalist,
       Gallformers.Places,
@@ -281,7 +282,8 @@ defmodule Gallformers.Curation do
           spec: map(),
           text: String.t(),
           why: String.t(),
-          selected: boolean()
+          selected: boolean(),
+          held: boolean()
         }
 
   @typedoc "What `from_observation/3` proposes from one iNaturalist observation."
@@ -300,6 +302,11 @@ defmodule Gallformers.Curation do
             gall_id: integer() | nil,
             candidates: [%{id: integer(), name: String.t(), datacomplete: boolean()}],
             why: String.t() | nil
+          },
+          taxon: %{
+            name: String.t() | nil,
+            matches?: boolean(),
+            galls: [%{id: integer(), name: String.t(), datacomplete: boolean()}]
           },
           items: [proposed_item()],
           needs: [%{kind: :gall | :place | :host, text: String.t()}],
@@ -325,6 +332,12 @@ defmodule Gallformers.Curation do
       is only one or the "Gallformers Code" field names one, else nil.
     * `needs`: what the curator must give (`:gall`, `:place`, `:host`),
       in words.
+    * `held` on each item: the Gall holds that Fact already (matched by
+      its key: the place, the plant), so the observation adds evidence.
+    * `taxon`: the observation's taxon, whether it is the Gall's Inducer
+      (`matches?`; the Gall is one it, or a taxon under it, induces), and
+      its other Galls: an observation of another taxon is warned about,
+      not refused (matter `87a1`).
     * `photos` and `inat_observation`: for the iNaturalist image import
       (`GallformersWeb.Admin.InatImportComponent`, whose `fetch_result`
       takes `{:ok, inat_observation}`).
@@ -338,6 +351,63 @@ defmodule Gallformers.Curation do
           | {:error, :invalid_input | :not_found | :unavailable | :no_such_gall}
   def from_observation(%Actor{type: :user}, url_or_id, gall_id),
     do: FromObservation.propose(url_or_id, gall_id)
+
+  @doc """
+  What the Fact `key` (`Gallformers.Curation.Key`) names, in words: a
+  plant's or a place's name, a Trait value, a name ("Quercus alba",
+  "California", "Spring").
+  """
+  @spec value_words(Key.t()) :: String.t()
+  def value_words(key), do: Wording.value(key)
+
+  @doc """
+  The Observations a curator's words link (matter `87a1`): iNaturalist
+  (`…/observations/123`) and BugGuide (`…/node/view/123`) links, each once,
+  in order, separated any way. Anything else is ignored. The one parser of
+  observation links in a curator's words.
+  """
+  @spec observation_links(String.t() | nil) :: [%{provider: String.t(), id: String.t()}]
+  def observation_links(nil), do: []
+
+  def observation_links(text) when is_binary(text) do
+    text
+    |> String.split(~r/[\s,;()]+/, trim: true)
+    |> Enum.flat_map(&observation_link/1)
+    |> Enum.uniq()
+  end
+
+  defp observation_link(word) do
+    cond do
+      id = capture(~r{inaturalist\.org/observations/(\d+)}, word) ->
+        [%{provider: "inaturalist", id: id}]
+
+      id = capture(~r{bugguide\.net/node/view/(\d+)}, word) ->
+        [%{provider: "bugguide", id: id}]
+
+      true ->
+        []
+    end
+  end
+
+  defp capture(regex, text) do
+    case Regex.run(regex, text) do
+      [_, id] -> id
+      nil -> nil
+    end
+  end
+
+  @doc """
+  An item's evidence from the curator's "Why" (matter `87a1`): the words
+  as its text, the Observations they link as its `observations`; nil when
+  nothing is written.
+  """
+  @spec evidence_from_why(String.t() | nil) :: evidence() | nil
+  def evidence_from_why(why) do
+    case why && String.trim(why) do
+      text when text in [nil, ""] -> nil
+      text -> %{text: text, observations: observation_links(text), source_id: nil}
+    end
+  end
 
   # -- reading -------------------------------------------------------------------
 
@@ -367,6 +437,7 @@ defmodule Gallformers.Curation do
       subject_name: item.subject_name,
       key: item.key,
       state: item.state,
+      authority: authority(item),
       flags: flags,
       item: item
     }
@@ -433,16 +504,42 @@ defmodule Gallformers.Curation do
   def summary(%Actor{type: :user} = actor) do
     case open_set(actor) do
       nil ->
-        %{count: 0, lines: [], oldest_at: nil}
+        %{count: 0, lines: [], oldest_at: nil, groups: []}
 
       %ChangeSet{items: items} ->
         %{
           count: length(items),
           lines: Enum.map(items, &"#{&1.subject_name}: #{&1.text}"),
-          oldest_at: items |> Enum.map(& &1.inserted_at) |> Enum.min(DateTime, fn -> nil end)
+          oldest_at: items |> Enum.map(& &1.inserted_at) |> Enum.min(DateTime, fn -> nil end),
+          groups: groups(items)
         }
     end
   end
+
+  @typedoc """
+  The authority a change is made under (matter `d3b0`, "One tray, items
+  grouped by authority"): a Gallformers change (a Fact item), or editorial
+  (a note, an editorial field: applied to the record, not as a package).
+  """
+  @type authority :: :gallformers | :editorial
+
+  @doc "The authority `item` is made under (`t:authority/0`)."
+  @spec authority(Item.t()) :: authority()
+  def authority(%Item{kind: :fact}), do: :gallformers
+  def authority(%Item{}), do: :editorial
+
+  # Each authority's items counted, Gallformers' first, with its words.
+  defp groups(items) do
+    items
+    |> Enum.frequencies_by(&authority/1)
+    |> Enum.sort_by(fn {authority, _n} -> authority_order(authority) end)
+    |> Enum.map(fn {authority, n} ->
+      Map.merge(%{authority: authority, count: n}, Wording.authority_words(authority))
+    end)
+  end
+
+  defp authority_order(:gallformers), do: 0
+  defp authority_order(:editorial), do: 2
 
   # -- applying ------------------------------------------------------------------
 
@@ -757,6 +854,7 @@ defmodule Gallformers.Curation do
   end
 
   defp seen(%{kind: :editorial, subject: {:plant, id}}), do: %{"name" => Taxa.accepted_name(id)}
+  defp seen(%{kind: :photo}), do: %{}
 
   defp decorate_set(%ChangeSet{} = set) do
     set = Repo.preload(set, :items, force: true)

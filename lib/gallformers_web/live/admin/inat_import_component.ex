@@ -19,8 +19,6 @@ defmodule GallformersWeb.Admin.InatImportComponent do
 
   alias Gallformers.Images
   alias Gallformers.INaturalist
-  alias Gallformers.Licenses
-  alias Gallformers.Storage.Images, as: ImageStorage
 
   # -------------------------------------------------------------------
   # Lifecycle
@@ -366,56 +364,7 @@ defmodule GallformersWeb.Admin.InatImportComponent do
     do: {imported, errors ++ ["Photo #{photo_id}: #{inspect(reason)}"]}
 
   defp import_single_photo(photo, owner, uploader, observation) do
-    with {:ok, binary} <- INaturalist.download_photo(photo.original_url),
-         {:ok, _image} <- store_photo(binary, photo, observation, owner, uploader) do
-      :ok
-    end
-  end
-
-  @doc """
-  Stores a downloaded iNat `photo` (its bytes, `binary`) as `owner`'s image:
-  uploads it under the owner's path and creates the image with the
-  observation's creator ("login - name"), the mapped license and its link,
-  and the observation link as the source link.
-  """
-  @spec store_photo(
-          binary(),
-          Gallformers.INaturalist.Photo.t(),
-          Gallformers.INaturalist.Observation.t(),
-          Gallformers.Images.Image.owner(),
-          String.t()
-        ) :: {:ok, Gallformers.Images.Image.t()} | {:error, term()}
-  def store_photo(binary, photo, observation, owner, uploader) do
-    path = ImageStorage.generate_path(owner, extension_from_url(photo.original_url))
-
-    with {:ok, _} <- ImageStorage.upload(path, binary, content_type_from_url(photo.original_url)) do
-      Images.finalize_upload(path, owner, uploader, %{
-        creator:
-          INaturalist.format_creator(observation.observer_login, observation.observer_name),
-        license: photo.mapped_license,
-        licenselink: Licenses.url(photo.mapped_license),
-        sourcelink: observation.url
-      })
-    end
-  end
-
-  defp extension_from_url(url) do
-    url
-    |> URI.parse()
-    |> Map.get(:path, "")
-    |> Path.extname()
-    |> String.trim_leading(".")
-    |> case do
-      "" -> "jpg"
-      ext -> ext
-    end
-  end
-
-  defp content_type_from_url(url) do
-    case extension_from_url(url) do
-      "png" -> "image/png"
-      _ -> "image/jpeg"
-    end
+    with {:ok, _image} <- Images.import_inat_photo(photo, observation, owner, uploader), do: :ok
   end
 
   defp reset_state(socket) do

@@ -36,7 +36,7 @@ defmodule Gallformers.Curation.Spec do
 
   @typedoc "A checked item: what `change_set_items` stores of it."
   @type checked :: %{
-          kind: :fact | :note | :editorial,
+          kind: :fact | :note | :editorial | :photo,
           subject: {:gall | :plant, integer()},
           key: Key.t(),
           stored: map()
@@ -102,6 +102,20 @@ defmodule Gallformers.Curation.Spec do
            "value" => stored_value,
            "based_on" => based_on
          }
+       }}
+    end
+  end
+
+  # An iNaturalist observation's photo for a Gall (matter `87a1`).
+  def check(%{kind: :photo, gall_id: gall_id, observation_id: obs_id, photo_id: photo_id})
+      when is_integer(gall_id) and is_integer(obs_id) and is_integer(photo_id) do
+    with :ok <- subject(:gall, gall_id) do
+      {:ok,
+       %{
+         kind: :photo,
+         subject: {:gall, gall_id},
+         key: {:photo, obs_id, photo_id},
+         stored: %{"observation_id" => obs_id, "photo_id" => photo_id}
        }}
     end
   end
@@ -240,7 +254,8 @@ defmodule Gallformers.Curation.Spec do
   end
 
   @doc "The spec an item stored (`subject`, `key` and `stored` spec), as `add_item/2` takes it."
-  @spec decode(:fact | :note | :editorial, {atom(), integer()}, Key.t(), map()) :: map()
+  @spec decode(:fact | :note | :editorial | :photo, {atom(), integer()}, Key.t(), map()) ::
+          map()
   def decode(:fact, {:gall, gall_id}, key, stored) do
     to =
       with text when is_binary(text) <- stored["to"],
@@ -259,6 +274,14 @@ defmodule Gallformers.Curation.Spec do
     }
     |> put_present(:when, stored["when"])
   end
+
+  def decode(:photo, {:gall, gall_id}, _key, stored),
+    do: %{
+      kind: :photo,
+      gall_id: gall_id,
+      observation_id: stored["observation_id"],
+      photo_id: stored["photo_id"]
+    }
 
   def decode(:note, {:gall, gall_id}, key, stored),
     do: %{kind: :note, gall_id: gall_id, key: key, text: stored["text"]}
@@ -318,11 +341,21 @@ defmodule Gallformers.Curation.Spec do
         id = o[:id] || o["id"]
 
         if provider in @providers and (is_binary(id) or is_integer(id)) and to_string(id) != "",
-          do: %{"provider" => provider, "id" => to_string(id)},
+          do: observation_extras(%{"provider" => provider, "id" => to_string(id)}, o),
           else: :error
       end
 
     if :error in checked, do: :error, else: {:ok, Enum.uniq(checked)}
+  end
+
+  # An iNaturalist observation's quality grade and thumbnail, when given
+  # (matter `87a1`): kept with it, as text.
+  defp observation_extras(stored, o) do
+    for key <- [:quality_grade, :thumbnail_url],
+        value = o[key] || o[Atom.to_string(key)],
+        is_binary(value) and value != "",
+        reduce: stored,
+        do: (acc -> Map.put(acc, Atom.to_string(key), value))
   end
 
   @doc "Stored evidence as `t:Gallformers.Curation.evidence/0`, or nil."
@@ -332,9 +365,17 @@ defmodule Gallformers.Curation.Spec do
   def decode_evidence(stored) do
     %{
       text: stored["text"],
-      observations:
-        for(o <- stored["observations"] || [], do: %{provider: o["provider"], id: o["id"]}),
+      observations: for(o <- stored["observations"] || [], do: decode_observation(o)),
       source_id: stored["source_id"]
     }
+  end
+
+  defp decode_observation(o) do
+    base = %{provider: o["provider"], id: o["id"]}
+
+    for {key, field} <- [quality_grade: "quality_grade", thumbnail_url: "thumbnail_url"],
+        o[field],
+        reduce: base,
+        do: (acc -> Map.put(acc, key, o[field]))
   end
 end

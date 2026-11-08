@@ -25,6 +25,7 @@ defmodule Gallformers.Curation.FromObservation do
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Gall
   alias Gallformers.Curation.Wording
+  alias Gallformers.Facts
   alias Gallformers.Import
   alias Gallformers.INaturalist
   alias Gallformers.INaturalist.Observation
@@ -54,6 +55,9 @@ defmodule Gallformers.Curation.FromObservation do
       {occurrences, place_needs} = occurrences(obs, places, gall.gall_id)
       {hosts, host_needs} = hosts(obs, gall.gall_id)
 
+      items =
+        Enum.map(occurrences ++ hosts, &Map.put(&1, :held, held?(gall.gall_id, &1.spec.key)))
+
       {:ok,
        %{
          observation: %{
@@ -65,18 +69,26 @@ defmodule Gallformers.Curation.FromObservation do
            observer: INaturalist.format_creator(obs.observer_login, obs.observer_name)
          },
          inat_observation: obs,
-         evidence: %{
-           text: nil,
-           observations: [%{provider: "inaturalist", id: to_string(obs.id)}],
-           source_id: nil
-         },
+         evidence: %{text: nil, observations: [evidence_observation(obs)], source_id: nil},
          gall: Map.take(gall, [:gall_id, :candidates, :why]),
-         items: occurrences ++ hosts,
+         taxon: taxon(obs, gall.gall_id),
+         items: items,
          needs: gall_needs(gall) ++ place_needs ++ host_needs,
          photos: obs.photos
        }}
     end
   end
+
+  # The observation as the statements' evidence: with its quality grade
+  # and its first photo's thumbnail, when it has them (87a1).
+  defp evidence_observation(%Observation{} = obs) do
+    %{provider: "inaturalist", id: to_string(obs.id)}
+    |> put_present(:quality_grade, obs.quality_grade)
+    |> put_present(:thumbnail_url, Enum.find_value(obs.photos, & &1.thumbnail_url))
+  end
+
+  defp put_present(map, _key, value) when value in [nil, ""], do: map
+  defp put_present(map, key, value), do: Map.put(map, key, value)
 
   defp gall_exists(nil), do: :ok
 
@@ -120,14 +132,7 @@ defmodule Gallformers.Curation.FromObservation do
 
   defp gall(obs, nil) do
     inducers = inducers(obs.taxon_name)
-
-    candidates =
-      case inducers do
-        [] -> []
-        taxa -> taxa |> Enum.map(& &1.id) |> Taxa.subtree_ids() |> Map.values() |> List.flatten()
-      end
-      |> Enum.uniq()
-      |> Catalog.list_galls_for_inducers()
+    candidates = taxon_galls(inducers)
 
     coded = coded_gall(obs)
 
@@ -155,6 +160,45 @@ defmodule Gallformers.Curation.FromObservation do
       inducer: obs.taxon_name,
       inducer_found: inducers != []
     }
+  end
+
+  # The Galls the taxa (or a taxon under them) induce.
+  defp taxon_galls([]), do: []
+
+  defp taxon_galls(taxa) do
+    taxa
+    |> Enum.map(& &1.id)
+    |> Taxa.subtree_ids()
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.uniq()
+    |> Catalog.list_galls_for_inducers()
+  end
+
+  # Whether the observation's taxon is the Gall's Inducer (the Gall is one
+  # its taxon, or a taxon under it, induces), and that taxon's other Galls:
+  # an observation of another taxon is warned about, not refused (87a1). No
+  # taxon, or no Gall yet, warns of nothing.
+  defp taxon(%Observation{taxon_name: nil}, _gall_id), do: %{name: nil, matches?: true, galls: []}
+
+  defp taxon(obs, gall_id) do
+    galls = obs.taxon_name |> inducers() |> taxon_galls()
+
+    %{
+      name: obs.taxon_name,
+      matches?: gall_id == nil or Enum.any?(galls, &(&1.id == gall_id)),
+      galls: Enum.reject(galls, &(&1.id == gall_id))
+    }
+  end
+
+  # Whether Gall `gall_id` holds the Fact `key` names already, current.
+  defp held?(nil, _key), do: false
+
+  defp held?(gall_id, key) do
+    case Catalog.find_gall_fact(gall_id, key) do
+      {:ok, fact_id} when is_integer(fact_id) -> Facts.get_fact!(fact_id).standing == :current
+      _ -> false
+    end
   end
 
   defp inducers(nil), do: []

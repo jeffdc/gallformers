@@ -35,7 +35,7 @@ defmodule Gallformers.Curation.Item do
   @type t :: %__MODULE__{
           id: integer() | nil,
           change_set_id: integer() | nil,
-          kind: :fact | :note | :editorial | nil,
+          kind: :fact | :note | :editorial | :photo | nil,
           subject_type: :gall | :plant | nil,
           subject_id: integer() | nil,
           key: Key.t() | nil,
@@ -58,7 +58,7 @@ defmodule Gallformers.Curation.Item do
         }
 
   schema "change_set_items" do
-    field :kind, Ecto.Enum, values: [:fact, :note, :editorial]
+    field :kind, Ecto.Enum, values: [:fact, :note, :editorial, :photo]
     field :subject_type, Ecto.Enum, values: [:gall, :plant]
     field :subject_id, :integer
     field :key, Key

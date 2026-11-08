@@ -5,7 +5,7 @@ defmodule Gallformers.Curation.Wording do
   is worded by the change log itself (`Gallformers.Audit.ChangeLog.fact_words/1`):
   "host: Quercus alba", "inducer: …", "season: Spring", "range exclude:
   Europe", "recorded in Virginia", "also known as …"; the item says what
-  it does to it ("Add host: Quercus alba", "Withdraw …", "Correct season:
+  it does to it ("Add host: Quercus alba", "Deny …" (Gallformers says it isn't so), "Correct season:
   Spring → Summer", "Note on …"). The flags, the editorial fields and a
   correction's "old → new" are the tray's own: the change log has no
   words for them.
@@ -41,12 +41,15 @@ defmodule Gallformers.Curation.Wording do
     do: "Add #{what(key)} (#{seen})"
 
   def item_text(%{kind: :fact, action: :add, key: key}), do: "Add " <> what(key)
-  def item_text(%{kind: :fact, action: :withdraw, key: key}), do: "Withdraw " <> what(key)
+  def item_text(%{kind: :fact, action: :withdraw, key: key}), do: "Deny " <> what(key)
 
   def item_text(%{kind: :fact, action: :correct, key: key, to: to}),
     do: "Correct #{label(key)}: #{value(key)} → #{value(to)}"
 
   def item_text(%{kind: :note, key: key}), do: "Note on " <> what(key)
+
+  def item_text(%{kind: :photo, observation_id: observation_id, photo_id: photo_id}),
+    do: "Add photo #{photo_id} of iNaturalist observation #{observation_id}"
 
   def item_text(%{kind: :editorial, field: field, value: value}),
     do: "#{field_label(field)}: #{field_value(field, value)}"
@@ -57,11 +60,37 @@ defmodule Gallformers.Curation.Wording do
   defp label({:occurrence, _place}), do: "recorded in"
   defp label({role, _id}), do: Atom.to_string(role)
 
-  defp value({:trait, _trait, value}), do: value
-  defp value({:range, _adjustment, place_id}), do: place_name(place_id)
-  defp value({:alias, name}), do: name
-  defp value({:occurrence, place_id}), do: place_name(place_id)
-  defp value({_role, taxon_id}), do: taxon_name(taxon_id)
+  @doc """
+  An authority's group in the tray, in words: its `title` (Review's
+  section), `short` (the tray's chip) and what applying it does (`applies`).
+  """
+  @spec authority_words(Gallformers.Curation.authority()) :: %{
+          title: String.t(),
+          short: String.t(),
+          applies: String.t()
+        }
+  def authority_words(:gallformers),
+    do: %{
+      title: "Gallformers",
+      short: "Gallformers",
+      applies:
+        "Applies as one Gallformers change: one package of the Gallformers Source, dated when you apply, audited as yours."
+    }
+
+  def authority_words(:editorial),
+    do: %{
+      title: "Editorial",
+      short: "Editorial",
+      applies: "Not Facts: applied to the record itself, not as a package of any Source."
+    }
+
+  @doc "What a key's Fact is, in words: a plant's or a place's name, a Trait value, a name."
+  @spec value(Gallformers.Curation.Key.t()) :: String.t()
+  def value({:trait, _trait, value}), do: value
+  def value({:range, _adjustment, place_id}), do: place_name(place_id)
+  def value({:alias, name}), do: name
+  def value({:occurrence, place_id}), do: place_name(place_id)
+  def value({_role, taxon_id}), do: taxon_name(taxon_id)
 
   defp field_label(:completeness), do: "Completeness"
   defp field_label(:abundance), do: "Abundance"

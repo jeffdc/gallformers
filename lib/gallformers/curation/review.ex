@@ -90,6 +90,9 @@ defmodule Gallformers.Curation.Review do
     end
   end
 
+  # A photo is fetched only when applied: nothing to check before.
+  def flags(_actor, %Item{kind: :photo}, _set_evidence), do: [:editorial]
+
   def flags(actor, %Item{kind: :editorial, spec: spec} = item, _set_evidence) do
     confirm = if spec.field in [:code, :name_parts], do: [:needs_confirmation], else: []
 

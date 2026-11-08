@@ -7,7 +7,9 @@ defmodule Gallformers.Curation.Key do
       (`Gallformers.Catalog.gall_fact_key/0`): `{:inducer, taxon_id}`,
       `{:host, taxon_id}`, `{:trait, trait, value}`, `{:alias, name}`,
       `{:range, :exclude | :only, place_id}`, `{:occurrence, place_id}`;
-    * an editorial field: `{:editorial, field}`.
+    * an editorial field: `{:editorial, field}`;
+    * an iNaturalist observation's photo for the Gall:
+      `{:photo, observation_id, photo_id}` (matter `87a1`).
 
   Stored as a JSON list (`["host", 7]`, `["trait", "season", "Spring"]`).
   """
@@ -20,6 +22,7 @@ defmodule Gallformers.Curation.Key do
           | {:range, :exclude | :only, integer()}
           | {:occurrence, integer()}
           | {:editorial, atom()}
+          | {:photo, integer(), integer()}
 
   @impl true
   def type, do: :string
@@ -49,11 +52,16 @@ defmodule Gallformers.Curation.Key do
   def valid?({:alias, name}), do: is_binary(name)
   def valid?({:range, adjustment, id}), do: adjustment in [:exclude, :only] and is_integer(id)
   def valid?({:editorial, field}), do: is_atom(field)
+
+  def valid?({:photo, observation_id, photo_id}),
+    do: is_integer(observation_id) and is_integer(photo_id)
+
   def valid?(_key), do: false
 
   @doc "Whether `key` names a Fact (not an editorial field)."
   @spec fact?(t()) :: boolean()
   def fact?({:editorial, _field}), do: false
+  def fact?({:photo, _observation_id, _photo_id}), do: false
   def fact?(key), do: valid?(key)
 
   @doc "`key` as stored."
@@ -76,5 +84,10 @@ defmodule Gallformers.Curation.Key do
     do: {:ok, {:range, @adjustments[adjustment], id}}
 
   defp decode(["editorial", field]), do: {:ok, {:editorial, String.to_existing_atom(field)}}
+
+  defp decode(["photo", observation_id, photo_id])
+       when is_integer(observation_id) and is_integer(photo_id),
+       do: {:ok, {:photo, observation_id, photo_id}}
+
   defp decode(_list), do: :error
 end

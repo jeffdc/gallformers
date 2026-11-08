@@ -13,6 +13,7 @@ defmodule Gallformers.Images do
       Gallformers.ChangesetHelpers,
       Gallformers.SchemaFields,
       Gallformers.Async,
+      Gallformers.INaturalist,
       Gallformers.Licenses,
       Gallformers.Storage
     ],
@@ -22,6 +23,10 @@ defmodule Gallformers.Images do
 
   import Ecto.Query
   alias Gallformers.Images.Image, as: ImageSchema
+  alias Gallformers.INaturalist
+  alias Gallformers.INaturalist.Observation
+  alias Gallformers.INaturalist.Photo
+  alias Gallformers.Licenses
   alias Gallformers.Repo
   alias Gallformers.Storage.Images, as: ImageStorage
 
@@ -111,6 +116,61 @@ defmodule Gallformers.Images do
   @spec get_image!(integer()) :: ImageSchema.t()
   def get_image!(id) do
     Repo.get!(ImageSchema, id) |> Repo.preload(:source)
+  end
+
+  @doc """
+  Downloads an iNaturalist observation's `photo` and stores it as
+  `owner`'s image (`store_inat_photo/5`), as `uploader`. The image
+  manager's iNaturalist import and the change tray's photo items
+  (`Gallformers.Curation`, matter `87a1`) both use it.
+  """
+  @spec import_inat_photo(Photo.t(), Observation.t(), ImageSchema.owner(), String.t()) ::
+          {:ok, ImageSchema.t()} | {:error, term()}
+  def import_inat_photo(%Photo{} = photo, %Observation{} = observation, owner, uploader) do
+    with {:ok, binary} <- INaturalist.download_photo(photo.original_url) do
+      store_inat_photo(binary, photo, observation, owner, uploader)
+    end
+  end
+
+  @doc """
+  Stores a downloaded iNaturalist `photo` (its bytes, `binary`) as
+  `owner`'s image: uploads it under the owner's path and creates the image
+  with the observation's creator ("login - name"), the mapped license and
+  its link, and the observation link as the source link.
+  """
+  @spec store_inat_photo(binary(), Photo.t(), Observation.t(), ImageSchema.owner(), String.t()) ::
+          {:ok, ImageSchema.t()} | {:error, term()}
+  def store_inat_photo(binary, %Photo{} = photo, %Observation{} = observation, owner, uploader) do
+    path = ImageStorage.generate_path(owner, photo_extension(photo.original_url))
+
+    with {:ok, _} <- ImageStorage.upload(path, binary, photo_content_type(photo.original_url)) do
+      finalize_upload(path, owner, uploader, %{
+        creator:
+          INaturalist.format_creator(observation.observer_login, observation.observer_name),
+        license: photo.mapped_license,
+        licenselink: Licenses.url(photo.mapped_license),
+        sourcelink: observation.url
+      })
+    end
+  end
+
+  defp photo_extension(url) do
+    url
+    |> URI.parse()
+    |> Map.get(:path, "")
+    |> Path.extname()
+    |> String.trim_leading(".")
+    |> case do
+      "" -> "jpg"
+      ext -> ext
+    end
+  end
+
+  defp photo_content_type(url) do
+    case photo_extension(url) do
+      "png" -> "image/png"
+      _ -> "image/jpeg"
+    end
   end
 
   @doc """

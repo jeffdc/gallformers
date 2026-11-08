@@ -85,6 +85,7 @@ defmodule GallformersWeb.TrayLive do
         text: "#{entry.subject_name}: #{entry.text}",
         flags: entry.flags,
         state: entry.state,
+        authority: entry.authority,
         evidence: entry |> own_evidence() |> with_source(sources)
       }
     end)
@@ -163,7 +164,7 @@ defmodule GallformersWeb.TrayLive do
   def handle_event("set_evidence", %{"evidence" => params}, socket) do
     evidence = %{
       text: params["text"],
-      observations: observations(params["observations"] || ""),
+      observations: Curation.observation_links(params["observations"]),
       source_id: socket.assigns.evidence.source_id
     }
 
@@ -226,34 +227,6 @@ defmodule GallformersWeb.TrayLive do
       else: socket
   end
 
-  # Observation links, separated by commas, spaces or new lines: iNaturalist
-  # (…/observations/123) and BugGuide (…/node/view/123). Anything else is
-  # ignored.
-  defp observations(text) do
-    text
-    |> String.split(~r/[\s,]+/, trim: true)
-    |> Enum.flat_map(fn link ->
-      cond do
-        id = capture(~r{inaturalist\.org/observations/(\d+)}, link) ->
-          [%{provider: "inaturalist", id: id}]
-
-        id = capture(~r{bugguide\.net/node/view/(\d+)}, link) ->
-          [%{provider: "bugguide", id: id}]
-
-        true ->
-          []
-      end
-    end)
-    |> Enum.uniq()
-  end
-
-  defp capture(regex, text) do
-    case Regex.run(regex, text) do
-      [_, id] -> id
-      nil -> nil
-    end
-  end
-
   defp int(id) when is_integer(id), do: id
   defp int(id) when is_binary(id), do: String.to_integer(id)
 
@@ -279,6 +252,7 @@ defmodule GallformersWeb.TrayLive do
         <.review_apply
           id="review"
           items={@items}
+          groups={@summary && @summary.groups}
           evidence={@evidence}
           confirmed={@confirmed}
           source={@source}

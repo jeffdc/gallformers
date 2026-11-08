@@ -148,6 +148,16 @@ defmodule Gallformers.CurationTest do
     at
   end
 
+  describe "value_words/1" do
+    test "what a key's Fact is, in words: a plant's or a place's name, a value, a name", ctx do
+      assert Curation.value_words({:host, ctx.oak.id}) == "Quercus curata"
+      assert Curation.value_words({:trait, "season", "Spring"}) == "Spring"
+      assert Curation.value_words({:alias, "oak apple"}) == "oak apple"
+      assert Curation.value_words({:occurrence, place_id("US-CA")}) == "California"
+      assert Curation.value_words({:range, :exclude, place_id("CA-AB")}) == "Alberta"
+    end
+  end
+
   describe "the set and its items" do
     test "a curator has no set until they add an item", ctx do
       assert Curation.open_set(ctx.ada) == nil
@@ -181,7 +191,7 @@ defmodule Gallformers.CurationTest do
 
       assert again.id == item.id
       assert again.spec.action == :withdraw
-      assert again.text == "Withdraw host: Quercus rubricurata"
+      assert again.text == "Deny host: Quercus rubricurata"
       assert [_one] = Curation.open_set(ctx.ada).items
 
       # A note on the same Fact is an item of its own.
@@ -329,7 +339,13 @@ defmodule Gallformers.CurationTest do
 
       assert %{count: 1, lines: [line], oldest_at: %DateTime{}} = Curation.summary(ctx.ada)
       assert line == "Andricus curatus gall: Add host: Quercus rubricurata"
-      assert Curation.summary(user!("Cy")) == %{count: 0, lines: [], oldest_at: nil}
+
+      assert Curation.summary(user!("Cy")) == %{
+               count: 0,
+               lines: [],
+               oldest_at: nil,
+               groups: []
+             }
     end
 
     test "changes are broadcast to the curator and to the subject's page", ctx do
@@ -345,6 +361,67 @@ defmodule Gallformers.CurationTest do
       assert_received {:change_set, :changed}
       assert_received {:change_set, :others_changed}
       assert is_integer(ada_id)
+    end
+  end
+
+  describe "authorities (87a1, d3b0: one tray, grouped by authority)" do
+    test "a Fact change is Gallformers'; a note and an editorial change are editorial", ctx do
+      {_rubra, fact} = new_host!(ctx)
+
+      note =
+        add!(ctx.ada, %{
+          kind: :note,
+          gall_id: ctx.gall.id,
+          key: {:host, ctx.oak.id},
+          text: "Young leaves."
+        })
+
+      editorial =
+        add!(ctx.ada, %{
+          kind: :editorial,
+          subject: {:gall, ctx.gall.id},
+          field: :abundance,
+          value: 2
+        })
+
+      by_id = Map.new(Curation.preview(ctx.ada), &{&1.id, &1.authority})
+
+      assert by_id[fact.id] == :gallformers
+      assert by_id[note.id] == :editorial
+      assert by_id[editorial.id] == :editorial
+    end
+
+    test "the summary counts each authority's changes, Gallformers' first, each in words", ctx do
+      new_host!(ctx)
+
+      add!(ctx.ada, %{
+        kind: :editorial,
+        subject: {:gall, ctx.gall.id},
+        field: :abundance,
+        value: 2
+      })
+
+      assert [
+               %{
+                 authority: :gallformers,
+                 short: "Gallformers",
+                 title: "Gallformers",
+                 count: 1,
+                 applies: g
+               },
+               %{
+                 authority: :editorial,
+                 short: "Editorial",
+                 title: "Editorial",
+                 count: 1,
+                 applies: e
+               }
+             ] = Curation.summary(ctx.ada).groups
+
+      assert g ==
+               "Applies as one Gallformers change: one package of the Gallformers Source, dated when you apply, audited as yours."
+
+      assert e == "Not Facts: applied to the record itself, not as a package of any Source."
     end
   end
 
@@ -539,6 +616,73 @@ defmodule Gallformers.CurationTest do
     end
   end
 
+  describe "an observation's photos (87a1: through the tray, as editorial changes)" do
+    defp photo!(ctx, photo_id),
+      do:
+        add!(ctx.ada, %{
+          kind: :photo,
+          gall_id: ctx.gall.id,
+          observation_id: 4242,
+          photo_id: photo_id
+        })
+
+    test "each photo is an editorial change of its own, nothing fetched until applied", ctx do
+      first = photo!(ctx, 111)
+      second = photo!(ctx, 112)
+
+      assert first.key == {:photo, 4242, 111}
+      assert first.text == "Add photo 111 of iNaturalist observation 4242"
+      assert second.id != first.id
+
+      by_id = Map.new(Curation.preview(ctx.ada), &{&1.id, &1})
+      assert by_id[first.id].authority == :editorial
+      assert [%{kind: :editorial}] = by_id[first.id].flags
+    end
+
+    test "applying it stores the photo as the Gall's image", ctx do
+      Req.Test.stub(Gallformers.INaturalist, fn
+        %{request_path: "/v1/observations/" <> _} = conn ->
+          Req.Test.json(conn, %{
+            "results" => [
+              %{
+                "id" => 4242,
+                "user" => %{"login" => "jdoe", "name" => "J. Doe"},
+                "photos" => [
+                  %{
+                    "id" => 111,
+                    "url" =>
+                      "https://inaturalist-open-data.s3.amazonaws.com/photos/111/square.jpg",
+                    "license_code" => "cc-by-nc"
+                  }
+                ]
+              }
+            ]
+          })
+
+        conn ->
+          Plug.Conn.send_resp(conn, 200, "jpeg bytes")
+      end)
+
+      photo!(ctx, 111)
+      assert {:ok, %{applied: [_]}} = Curation.apply(ctx.ada)
+
+      assert [image] = Gallformers.Images.list_images_for_gall(ctx.gall.id)
+      assert image.sourcelink =~ "/observations/4242"
+      assert image.creator == "jdoe - J. Doe"
+    end
+
+    test "a photo the observation doesn't have is held, with the reason", ctx do
+      Req.Test.stub(Gallformers.INaturalist, fn conn ->
+        Req.Test.json(conn, %{"results" => [%{"id" => 4242, "photos" => []}]})
+      end)
+
+      item = photo!(ctx, 999)
+      assert {:ok, %{held: [{id, reason}]}} = Curation.apply(ctx.ada)
+      assert id == item.id
+      assert reason =~ "no photo 999"
+    end
+  end
+
   describe "apply/2" do
     test "an editorial item applies at once and leaves the tray", ctx do
       item =
@@ -624,6 +768,42 @@ defmodule Gallformers.CurationTest do
       assert {:ok, fact_id} = Catalog.find_gall_fact(ctx.gall.id, {:occurrence, california})
       assert [attribution] = Facts.list_attributions(fact_id)
       assert attribution.when_as_written == "2025-07-14"
+    end
+
+    test "an observation's quality grade and thumbnail reach the statement (87a1)", ctx do
+      california = place_id("US-CA")
+
+      item =
+        add!(ctx.ada, %{
+          kind: :fact,
+          gall_id: ctx.gall.id,
+          action: :add,
+          key: {:occurrence, california}
+        })
+
+      thumb = "https://inaturalist-open-data.s3.amazonaws.com/photos/1/square.jpg"
+
+      {:ok, _} =
+        Curation.set_item_evidence(ctx.ada, item.id, %{
+          observations: [
+            %{
+              provider: "inaturalist",
+              id: "318135694",
+              quality_grade: "needs_id",
+              thumbnail_url: thumb
+            }
+          ]
+        })
+
+      assert %{evidence: %{observations: [%{quality_grade: "needs_id", thumbnail_url: ^thumb}]}} =
+               Curation.open_set(ctx.ada).items |> hd()
+
+      assert {:ok, %{submitted: [_]}} = Curation.apply(ctx.ada)
+      {:ok, fact_id} = Catalog.find_gall_fact(ctx.gall.id, {:occurrence, california})
+      assert [attribution] = Facts.list_attributions(fact_id)
+
+      assert [%{external_id: "318135694", quality_grade: "needs_id", thumbnail_url: ^thumb}] =
+               attribution.observations
     end
 
     test "only a recorded occurrence added takes a when", ctx do
