@@ -80,7 +80,7 @@ Paste an iNaturalist taxon link or ID; Gallformers reads the taxon (`/v1/taxa/:i
 
 ## Where it lives (Jeff, 2026-11-08)
 
-A reusable tool whose main caller is the ingestion review, not a taxonomy-admin page. Jeff: about 90% of curatorial work will happen in the ingestion review; only direct Gallformers-authority edits and editorial work happen elsewhere. So:
+A reusable tool whose main caller is the ingestion review, not a taxonomy-admin page. Jeff: about 90% of the edits to the system will come in through ingestion; on-the-fly edits (the Fact viewer and editor, `87a1`) are a separate, less common tool. So:
 
 - **Back end:** one module that reads an iNat taxon (by ID, link or name search) and plans the import against our tree (ancestors, children, names), and one write that carries out the curator's chosen plan in one transaction, through the replay log, credited to the iNaturalist Source. Callable from anywhere.
 - **UI:** one component (the find, look and choose steps) that any page can open. In the review it is an answer on the name questions, Host and Inducer alike ("Find it on iNaturalist…"): once the import is done, the question is answered with the taxon it added or matched, in the same flow. The taxonomy admin and other pages call the same component.
