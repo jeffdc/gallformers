@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-09-13
-updated: 2026-10-24
+updated: 2026-11-08
 epic: taxonomy
-relates: [8ba0]
+relates: [8ba0, cb28]
 ---
 
 # Map Gallformers taxa to iNaturalist taxon IDs

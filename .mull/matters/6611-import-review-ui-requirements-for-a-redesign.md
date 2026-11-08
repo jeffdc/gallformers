@@ -3,7 +3,7 @@ status: planned
 created: 2026-10-30
 updated: 2026-11-08
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c]
+relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28]
 ---
 
 # Import review UI: requirements for a redesign
@@ -401,4 +401,3 @@ Every write is a public `Gallformers.Import` function taking an `Actor`, so the 
 
 
 **c8c3 item 11 landed in the back end (Backend Worker, 2026-11-08, uncommitted at the time):** a Trait dispute takes `%{"values" => [...]}`. The card now sends it when the ticked values aren't exactly the producer's (exactly the producer's still sends `keep`; Keep as text sends `skip`). Tests in `question_card_test.exs`. To commit after the back end's commit, since the tests need it.
-

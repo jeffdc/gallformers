@@ -1,8 +1,9 @@
 ---
 status: planned
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-08
 epic: taxogall
+relates: [cb28]
 ---
 
 # Phase 2: taxonomy as Facts driving the tree
@@ -126,4 +127,3 @@ All ten tasks built and merged into taxogall (Task 8 `6b88eda2`, Tasks 9–10 `8
 - **Task 9, carry-over** (`Import.TaxonomyCarryOver`, run by `Release.replay_log/1` after the replay): phase 1 tree-changing decisions and acts a curator followed (among `:taxonomy_disagreement` items, or the `:taxonomy_acceptance` items the replay now raises) become acceptances, dated at cutover with no curator recorded (the log doesn't keep who); unmatched ones are reported. Splits are never auto-accepted.
 - **Task 10, showing statements**: a Source's taxonomic statements on its public page and the review Facts page with accepted / declined (who, when, why) / awaiting; `Import.taxonomic_position/1` and the `taxonomic_position` component (used by the species page).
 - **Revalidated-name rule**: name and synonymy Facts of one name share a `contest` on the Fact; `Standing.settle_contests/2` supersedes an older synonymy once a dated, accepted name statement claims the name for another taxon; declined or retracted, the synonymy counts again. A later rename of the taxon keeps the outranking (the agent read "once accepted" as "from then on"; a one-line change if Jeff meant "only while it is the current name"). The migration adds contests to existing Facts without recomputing standings: production synonymies that should be superseded change at their next write (or run `Facts.recompute_for_source/2` for the relevant Sources) — before release.
-
