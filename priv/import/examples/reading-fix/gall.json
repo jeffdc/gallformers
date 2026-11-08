@@ -1,0 +1,39 @@
+{
+  "format": "gallformers-import",
+  "format_version": 4,
+  "vocabulary_version": "2026-10-11",
+  "batch_type": "gall",
+  "mode": "add",
+  "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d06",
+  "produced_at": "2026-11-08T14:00:00Z",
+  "producer": { "name": "gallformers-curation", "version": "1" },
+
+  "source": { "reading_of": { "gallformers_source_id": 59 } },
+
+  "taxa": [
+    { "ref": "t1", "name_as_written": "Andricus quercuscalifornicus", "rank": "species" },
+    { "ref": "t2", "name_as_written": "Quercus alba", "rank": "species" },
+    { "ref": "t3", "name_as_written": "Q. bicolor", "rank": "species" }
+  ],
+
+  "galls": [
+    {
+      "ref": "g1",
+      "name_as_written": "Andricus quercuscalifornicus agamic gall",
+      "identified_by": { "inducer": "t1", "generation": { "value": "agamic", "as_written": "agamic" } }
+    }
+  ],
+
+  "facts": [
+    {
+      "id": "f1", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g1",
+      "unstated": true,
+      "evidence": [{ "quote": "On Q. bicolor, rarely", "gallformers_document_item_id": 1234, "page": "41" }]
+    },
+    {
+      "id": "f2", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t3", "object": "g1",
+      "replaces": "f1",
+      "evidence": [{ "quote": "On Q. bicolor, rarely", "gallformers_document_item_id": 1234, "page": "41" }]
+    }
+  ]
+}

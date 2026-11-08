@@ -39,11 +39,32 @@
     },
 
     "source": {
-      "description": "Exactly one Source per batch: Gallformers itself (when it has the gallformers key), otherwise a document Source.",
+      "description": "Exactly one Source per batch: Gallformers itself (when it has the gallformers key); a Source Gallformers holds, read again (when it has the reading_of key); otherwise a document Source.",
       "type": "object",
       "if": { "required": ["gallformers"] },
       "then": { "$ref": "#/$defs/gallformers_source" },
-      "else": { "$ref": "#/$defs/document_source" }
+      "else": {
+        "if": { "required": ["reading_of"] },
+        "then": { "$ref": "#/$defs/reading_source" },
+        "else": { "$ref": "#/$defs/document_source" }
+      }
+    },
+
+    "reading_source": {
+      "description": "A reading fix (Gallformers only, matter 87a1): a Source Gallformers holds, whose statements Gallformers read wrongly, read again. Its Facts are that Source's statements, at its date and in its words; a Fact marked unstated takes the Source's statement of it away (the Source doesn't say it), and one that replaces an unstated Fact of the batch is what the Source does say. The quotes are the stored Source's (gallformers_document_item_id), so there is no document. Batches with this Source use mode add.",
+      "type": "object",
+      "required": ["reading_of"],
+      "properties": {
+        "reading_of": {
+          "type": "object",
+          "required": ["gallformers_source_id"],
+          "properties": {
+            "gallformers_source_id": { "type": "integer", "minimum": 1, "description": "Gallformers' ID for the Source read again." }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
 
     "gallformers_source": {
@@ -195,6 +216,7 @@
       "else": { "required": ["quote"] },
       "properties": {
         "item": { "type": "string", "pattern": "^#/", "description": "Reference of the document item the evidence comes from (a DoclingDocument self_ref, e.g. '#/texts/42'). Required whenever the batch has a document." },
+        "gallformers_document_item_id": { "type": "integer", "minimum": 1, "description": "A reading fix only: the stored document item of the Source read again that the quote comes from." },
         "quote": { "type": "string", "minLength": 1, "description": "Verbatim text from the item, long enough to be unambiguous within it." },
         "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph). Use it with item, in place of quote, in a batch with a document." },
         "page": { "type": "string", "description": "The page number as printed in the Source, if known." },

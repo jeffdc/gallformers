@@ -64,6 +64,8 @@ defmodule Gallformers.Import.ValidatorTest do
                "gallformers-note/gall.json: Gall g1 is identified by Inducer t1 but has " <>
                  "no confirmed inducer_of Fact from t1",
                "gallformers-statement/gall.json: Gall g1 is identified by Inducer t1 but has " <>
+                 "no confirmed inducer_of Fact from t1",
+               "reading-fix/gall.json: Gall g1 is identified by Inducer t1 but has " <>
                  "no confirmed inducer_of Fact from t1"
              ]
     end
@@ -1242,5 +1244,45 @@ defmodule Gallformers.Import.ValidatorTest do
       end
 
     %{batch | "format_version" => 3, "facts" => facts}
+  end
+
+  # As test_document_checks.py's reading-fix tests (matter 87a1).
+  describe "a reading fix: a held Source's statements, read again" do
+    defp reading, do: example("reading-fix")
+    defp reading_package(gall), do: %{"gall.json" => Jason.encode!(gall)}
+
+    test "unstated and replaces only in a reading fix" do
+      b = batch() |> put(["facts", 0, "unstated"], true) |> put(["facts", 1, "replaces"], "f1")
+      errors = problems(package(gall: b))
+
+      assert errors_mention?(errors, ["facts/0", "only in a reading fix"])
+      assert errors_mention?(errors, ["facts/1", "only in a reading fix"])
+    end
+
+    test "a Gallformers item ID only in a reading fix" do
+      b = put(batch(), ["facts", 0, "evidence", 0, "gallformers_document_item_id"], 7)
+
+      assert errors_mention?(problems(package(gall: b)), [
+               "gallformers_document_item_id",
+               "only in a reading fix"
+             ])
+    end
+
+    test "replaces names an unstated Fact of the batch" do
+      b = put(reading(), ["facts", 1, "replaces"], "f9")
+
+      assert errors_mention?(problems(reading_package(b)), [
+               "replaces f9, which is not an unstated Fact in this batch"
+             ])
+    end
+
+    test "an unstated Fact replaces nothing" do
+      b = put(reading(), ["facts", 0, "replaces"], "f2")
+
+      assert errors_mention?(problems(reading_package(b)), [
+               "facts/0",
+               "an unstated Fact replaces nothing"
+             ])
+    end
   end
 end

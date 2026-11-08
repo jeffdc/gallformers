@@ -3,7 +3,7 @@
 import copy
 import json
 
-from conftest import validate
+from conftest import example, validate
 
 
 def problems(package_dir, level="error"):
@@ -325,3 +325,45 @@ def test_a_common_name_takes_no_taxonomic_act(package, taxonomy):
     taxonomy["taxa"][0] = {"ref": "t1", "name_as_written": "the black oak", "common_name": True}
     errors = problems(package(gall=None, taxonomy=taxonomy))
     assert any("t1" in p and "common name" in p for p in errors), errors
+
+
+# -- a reading fix (matter 87a1): a held Source's statements, read again --------------
+
+
+def reading_package(tmp_path, gall):
+    """A reading fix's package: its gall batch alone (no document: its quotes are the stored Source's)."""
+    (tmp_path / "gall.json").write_text(json.dumps(gall), encoding="utf-8")
+    return tmp_path
+
+
+def test_a_reading_fix_passes(tmp_path):
+    assert problems(reading_package(tmp_path, example("reading-fix"))) == []
+
+
+def test_unstated_and_replaces_only_in_a_reading_fix(package, batch):
+    b = copy.deepcopy(batch)
+    b["facts"][0]["unstated"] = True
+    b["facts"][1]["replaces"] = "f1"
+    errors = problems(package(gall=b))
+    assert any("facts/0" in p and "only in a reading fix" in p for p in errors)
+    assert any("facts/1" in p and "only in a reading fix" in p for p in errors)
+
+
+def test_a_gallformers_item_id_only_in_a_reading_fix(package, batch):
+    b = copy.deepcopy(batch)
+    b["facts"][0]["evidence"][0]["gallformers_document_item_id"] = 7
+    assert any("gallformers_document_item_id" in p and "only in a reading fix" in p for p in problems(package(gall=b)))
+
+
+def test_replaces_names_an_unstated_fact_of_the_batch(tmp_path):
+    b = example("reading-fix")
+    b["facts"][1]["replaces"] = "f9"
+    errors = problems(reading_package(tmp_path, b))
+    assert any("replaces f9, which is not an unstated Fact in this batch" in p for p in errors)
+
+
+def test_an_unstated_fact_replaces_nothing(tmp_path):
+    b = example("reading-fix")
+    b["facts"][0]["replaces"] = "f2"
+    errors = problems(reading_package(tmp_path, b))
+    assert any("facts/0" in p and "an unstated Fact replaces nothing" in p for p in errors)

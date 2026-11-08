@@ -139,7 +139,9 @@
       "properties": {
         "id": { "$ref": "common.schema.json#/$defs/fact_id" },
         "stance": { "$ref": "common.schema.json#/$defs/stance" },
-        "evidence": { "$ref": "common.schema.json#/$defs/evidence" }
+        "evidence": { "$ref": "common.schema.json#/$defs/evidence" },
+        "unstated": { "const": true, "description": "A reading fix only: the Source doesn't say this; its statement of the Fact is taken away." },
+        "replaces": { "$ref": "common.schema.json#/$defs/fact_id", "description": "A reading fix only: the unstated Fact of this batch that this one is what the Source says in place of." }
       }
     },
 

@@ -270,13 +270,57 @@ defmodule Gallformers.Import.Validator.Checks do
       |> Enum.reduce({c, init}, fn {fact, i}, {acc, seen} ->
         where = "facts/#{i}"
         {acc, seen} = fact_checks(acc, seen, fact, by_id, where)
-        {evidence(acc, fact["evidence"], where), seen}
+        {acc |> evidence(fact["evidence"], where) |> reading(fact, by_id, where), seen}
       end)
 
     c
     |> more_than_one(seen.inducers, "inducer_of")
     |> more_than_one(seen.descriptions, "description")
     |> gall_statements(seen)
+  end
+
+  # A reading fix's marks (matter 87a1): only in a reading fix
+  # (`source.reading_of`); replaces names an unstated Fact of the batch.
+  defp reading(%{batch: %{"source" => %{"reading_of" => _}}} = c, fact, by_id, where) do
+    cond do
+      fact["unstated"] && Map.has_key?(fact, "replaces") ->
+        error(c, "#{where}: an unstated Fact replaces nothing")
+
+      Map.has_key?(fact, "replaces") and
+          not match?(%{"unstated" => true}, by_id[fact["replaces"]]) ->
+        error(
+          c,
+          "#{where}: replaces #{fact["replaces"]}, which is not an unstated Fact in this batch"
+        )
+
+      true ->
+        c
+    end
+  end
+
+  defp reading(c, fact, _by_id, where) do
+    c =
+      Enum.reduce(["unstated", "replaces"], c, fn key, c ->
+        if Map.has_key?(fact, key),
+          do: error(c, "#{where}: #{key} is only in a reading fix (source.reading_of)"),
+          else: c
+      end)
+
+    fact
+    |> Map.get("evidence")
+    |> List.wrap()
+    |> Enum.with_index()
+    |> Enum.reduce(c, fn
+      {%{"gallformers_document_item_id" => _}, i}, c ->
+        error(
+          c,
+          "#{where}/evidence/#{i}: gallformers_document_item_id is only in a reading fix " <>
+            "(source.reading_of)"
+        )
+
+      _, c ->
+        c
+    end)
   end
 
   defp identified_by(g) do

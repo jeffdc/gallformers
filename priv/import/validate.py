@@ -229,6 +229,26 @@ class PackageChecks:
                 hint = f"; found in {', '.join(elsewhere[:3])}" if elsewhere else "; not found anywhere in the document"
                 self.error(f"{path}: quote not found in {ref}{hint}: {quote[:80]!r}")
 
+    def reading(self, fact, by_id, where):
+        """A reading fix's marks (matter 87a1): only in a reading fix; replaces names an unstated Fact."""
+        reading = "reading_of" in self.batch.get("source", {})
+        if not reading:
+            for key in ("unstated", "replaces"):
+                if key in fact:
+                    self.error(f"{where}: {key} is only in a reading fix (source.reading_of)")
+            for i, ev in enumerate(fact.get("evidence", [])):
+                if "gallformers_document_item_id" in ev:
+                    self.error(
+                        f"{where}/evidence/{i}: gallformers_document_item_id is only in a reading fix (source.reading_of)"
+                    )
+            return
+        if fact.get("unstated") and "replaces" in fact:
+            self.error(f"{where}: an unstated Fact replaces nothing")
+        elif "replaces" in fact:
+            target = by_id.get(fact["replaces"])
+            if target is None or not target.get("unstated"):
+                self.error(f"{where}: replaces {fact['replaces']}, which is not an unstated Fact in this batch")
+
     def term(self, fact, where):
         """A format 4 trait Fact's term is the Source's own words: found, ignoring case, in one of
         its quotes or whole items. Statements (no document) aren't checked."""
@@ -318,6 +338,7 @@ class PackageChecks:
                 if kind == "trait" and isinstance(fact.get("term"), str):
                     self.term(fact, where)
             self.evidence(fact.get("evidence", []), where)
+            self.reading(fact, by_id, where)
 
         for gall, count in inducers.items():
             if count > 1:
