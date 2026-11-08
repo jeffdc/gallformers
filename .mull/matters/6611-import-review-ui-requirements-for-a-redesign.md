@@ -404,3 +404,7 @@ Every write is a public `Gallformers.Import` function taking an `Actor`, so the 
 
 
 **Names we didn't read (c8c3 item 12), built 2026-11-08, as Jeff agreed:** a rail line ("N names we didn't read. Look them over", `review_rail` `on_missed`, `?missed`), also on the last step ("Before you approve: …"); a list card (the hedges card with its own heading, line and "Look at it…"); a name opened is a question card with the first passage it appears in, "Not needed" (`dismiss`) and "Add a statement…": which taxon (only when it names several), then which Gall, the plant's Galls (or those the taxon induces) listed first; Host or Inducer set by whether the taxon is a plant; every passage the name appears in as evidence. Loader gives each missed name its taxa and their Galls (`entry.missed`). Only Hosts and Inducers for now; other statements wait for the Fact editor (87a1).
+
+
+**Direction (Jeff, 2026-11-08):** about 90% of curatorial work will happen in this ingestion review; outside it only direct Gallformers-authority edits and editorial work. Tools the review needs (the iNat taxon import, `cb28`; adding a plant; later the Fact editor, `87a1`) are built as reusable components the review calls in place, the review being their main caller, with other pages calling the same component.
+

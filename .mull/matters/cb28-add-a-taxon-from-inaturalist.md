@@ -77,3 +77,12 @@ Paste an iNaturalist taxon link or ID; Gallformers reads the taxon (`/v1/taxa/:i
 
 "Which taxon does Floate 2010 mean by “Syrphidae”?": a family we don't hold, with no higher taxon to attach it to (the Source names it only as "(Diptera: Syrphidae)"). Today the only answer is to add it unplaced and place it from the taxonomy admin later. With this feature: search iNat for "Syrphidae" from the question, and bring in its tree (Animalia › Arthropoda › Insecta › Diptera › … › Syrphidae), the ancestors we lack ticked down to the one we hold.
 
+
+## Where it lives (Jeff, 2026-11-08)
+
+A reusable tool whose main caller is the ingestion review, not a taxonomy-admin page. Jeff: about 90% of curatorial work will happen in the ingestion review; only direct Gallformers-authority edits and editorial work happen elsewhere. So:
+
+- **Back end:** one module that reads an iNat taxon (by ID, link or name search) and plans the import against our tree (ancestors, children, names), and one write that carries out the curator's chosen plan in one transaction, through the replay log, credited to the iNaturalist Source. Callable from anywhere.
+- **UI:** one component (the find, look and choose steps) that any page can open. In the review it is an answer on the name questions, Host and Inducer alike ("Find it on iNaturalist…"): once the import is done, the question is answered with the taxon it added or matched, in the same flow. The taxonomy admin and other pages call the same component.
+- Build order: the review first; the taxonomy admin's entry point after.
+
