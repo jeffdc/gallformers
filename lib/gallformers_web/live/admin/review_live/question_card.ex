@@ -24,9 +24,9 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
   and what most chose ticked to start with. "Use this for the other N
   Galls" copies one Gall's answer to the rest; Save waits until every Gall
   has one. A term decides `%{"categories" => %{gall_ref => [values] |
-  nil}}`; a dispute (one Gall) is kept with the producer's values or kept
-  as text, as the back end takes no other values for it yet (`c8c3` item
-  11).
+  nil}}`; a dispute (one Gall) is kept as text (`skip`), kept as the
+  producer placed it (`keep`, exactly the producer's values), or decided as
+  the values ticked (`values`, `c8c3` item 11).
 
   A Host named by its own name says in a line what WCVP has for it
   (`GallformersWeb.ReviewComponents.review_wcvp_panel/1`, `line`), read in
@@ -206,15 +206,14 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
 
   defp dispute_decision(_entry, :text), do: {:ok, %{"skip" => true}}
 
+  # Exactly the producer's values keep it as the producer placed it; any
+  # others (a checker's, or the curator's own) are decided as those values.
   defp dispute_decision(entry, set) do
     producer = producer_values(entry)
 
     if producer != [] and set == MapSet.new(producer),
       do: {:ok, %{"keep" => true}},
-      else:
-        {:error,
-         "For now a disputed term can take only the producer's values (" <>
-           Answer.and_list(producer) <> ") or be kept as text."}
+      else: {:ok, %{"values" => category(set)}}
   end
 
   defp producer_values(entry),

@@ -399,3 +399,6 @@ Every write is a public `Gallformers.Import` function taking an `Actor`, so the 
 
 **Jeff, 2026-11-08:** the dotted underline is `fact_ref`'s alone ("who says so"); a definition must not look like one. The Trait list's definitions have no underline: "Hover a value to see its definition." above the values, the definition in a `tooltip`. `glossary_tooltip`'s dotted underline clashes the same way on the public pages; the Fact inspector build (`87a1`, its own session and worktree) was sent the note to settle it there.
 
+
+**c8c3 item 11 landed in the back end (Backend Worker, 2026-11-08, uncommitted at the time):** a Trait dispute takes `%{"values" => [...]}`. The card now sends it when the ticked values aren't exactly the producer's (exactly the producer's still sends `keep`; Keep as text sends `skip`). Tests in `question_card_test.exs`. To commit after the back end's commit, since the tests need it.
+

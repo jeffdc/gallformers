@@ -147,4 +147,85 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCardTest do
     assert decided.status == :decided
     assert decided.decision["generation"] == "agamic"
   end
+
+  describe "a dispute about a Trait term" do
+    @words "The galls are ovoid and globular, attached by a small point."
+
+    defp shape_doc do
+      words = %{
+        "self_ref" => "#/texts/5",
+        "label" => "text",
+        "content_layer" => "body",
+        "text" => @words,
+        "prov" => [%{"page_no" => 2, "bbox" => %{}, "charspan" => [0, 0]}],
+        "children" => []
+      }
+
+      Gallformers.DoclingFixtures.document()
+      |> Map.update!("texts", &(&1 ++ [words]))
+      |> update_in(["body", "children"], &(&1 ++ [%{"$ref" => "#/texts/5"}]))
+    end
+
+    # The producer placed "globular" under globular; a checker disputes it.
+    defp shape_dispute! do
+      shape = %{
+        "id" => "f6",
+        "stance" => "confirm",
+        "kind" => "trait",
+        "gall" => "g1",
+        "trait" => "shape",
+        "term" => "globular",
+        "category" => %{"value" => "globular"},
+        "evidence" => [%{"item" => "#/texts/5", "quote" => "globular"}]
+      }
+
+      finding = %{
+        "batch" => "gall.json",
+        "id" => "f6",
+        "problem" => "unsupported",
+        "reason" => "the quote does not say so",
+        "response" => %{"decision" => "disagree", "reason" => "it does"}
+      }
+
+      gall =
+        batch()
+        |> unique_batch_id()
+        |> Map.put("format_version", 4)
+        |> put_in(["taxa", Access.at(1), "name_as_written"], "Quercus lobata")
+        |> Map.update!("facts", &(&1 ++ [shape]))
+
+      package =
+        package(gall: gall, doc: shape_doc())
+        |> with_review([finding], responded: true)
+        |> deliver!()
+
+      [dispute] = Import.list_queue_items(package, kind: :dispute)
+      {package, dispute}
+    end
+
+    defp map_to(view, card, values) do
+      view |> element("#{card}-f6-values") |> render_click()
+      for v <- values, do: view |> element("#{card}-f6-list-#{v}") |> render_click()
+      view |> element("#{card} button[phx-click=trait_save]") |> render_click()
+    end
+
+    test "values other than the producer's are decided as those values", %{conn: conn} do
+      {package, dispute} = shape_dispute!()
+      {:ok, view, _html} = review(conn, package, "?stage=traits")
+      card = "#q-#{dispute.id}"
+
+      assert has_element?(view, "#{card} [data-role=pipeline]", "The producer mapped")
+      map_to(view, card, ["globular", "spindle"])
+
+      assert Import.get_queue_item!(dispute.id).decision == %{"values" => ["globular", "spindle"]}
+    end
+
+    test "exactly the producer's values keep it as the producer placed it", %{conn: conn} do
+      {package, dispute} = shape_dispute!()
+      {:ok, view, _html} = review(conn, package, "?stage=traits")
+      map_to(view, "#q-#{dispute.id}", ["globular"])
+
+      assert Import.get_queue_item!(dispute.id).decision == %{"keep" => true}
+    end
+  end
 end
