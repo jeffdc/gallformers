@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-24
-updated: 2026-11-07
+updated: 2026-11-09
 epic: taxonomy
-relates: [8567, 9449, 3272, 803b, a856, 2c8c, d213, f14c, 20e5, bc0d]
+relates: [8567, 9449, 3272, 803b, a856, 2c8c, d213, f14c, 20e5, bc0d, 8861]
 ---
 
 # Taxogall: program overview and punchlist
@@ -68,4 +68,3 @@ Key references: domain language `docs/domain/domain-model.md`; design and rules 
 - Undo of split answers decided before `90a55ef0` is refused, and a pre-fix undo replays without moving the Inducer back: a compatibility path only matters if split undos ran on preview.
 - f14c ergonomics (fewer clicks, density): after the edit design (d3b0).
 - Superseded by the d3b0 model, to rework with the edit framework: `cited_source_id` / `cites_as_written` (remove), the taxonomy admin's and species page's "Based on which Source?" (`BasisPicker`), the two Gallformers Sources (legacy data and Source 58) becoming one Source with changes as packages, ID notes leaving Source 58.
-

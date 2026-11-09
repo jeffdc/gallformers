@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 epic: taxogall
-relates: [6611, c8c3, 294c]
+relates: [6611, 294c]
 ---
 
 # Every-scenario import package: a control for the review

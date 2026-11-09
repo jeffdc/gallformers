@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-11-04
-updated: 2026-11-07
+updated: 2026-11-09
 epic: taxogall
-relates: [bc0d, c8c3]
+relates: [bc0d]
 ---
 
 # Review flow after first live use: ergonomics, new Hosts, density, Facts preview

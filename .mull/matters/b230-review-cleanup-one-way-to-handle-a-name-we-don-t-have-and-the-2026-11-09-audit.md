@@ -3,7 +3,7 @@ status: planned
 created: 2026-11-09
 updated: 2026-11-09
 epic: taxogall
-relates: [6611, cb28, c800, 87a1, c8c3]
+relates: [6611, cb28, c800]
 ---
 
 # Review cleanup: one way to handle a name we don't have, and the 2026-11-09 audit

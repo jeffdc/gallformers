@@ -1,5 +1,5 @@
 ---
-status: planned
+status: active
 created: 2026-11-08
 updated: 2026-11-09
 epic: taxonomy
@@ -118,3 +118,13 @@ Where the plan was silent, the conservative choice was taken; each is easy to ch
 14. **Requests**: the review's "Another plant…"/"Another taxon…" search asks iNaturalist once per search (debounced, 3 characters or more), beside WCVP; the panel asks once for the taxon. The User-Agent is the existing "Gallformers/1.0 (gallformers.org)".
 
 - Final `mix precommit` (after the mockup's deletion): clean. 12 doctests, 4444 tests, 0 failures (35 excluded); the exclusions check is clean (705 tests, 0 excluded). `mix compile --warnings-as-errors` is clean in dev too. Nothing committed.
+
+
+## What's left (2026-11-09)
+
+Built and on `taxogall` (e69af545); the `taxon_inaturalist` migration is applied to `gallformers_taxogall`. Left:
+
+- **Jeff's check on real data:** the Rubus Host in package 119 (Arguti) and Syrphidae in Floate. The open questions above are the built defaults; answer them while trying it. Wait until `b230` Tasks 1-4 have landed, since they change how the review reaches the panel.
+- **Superseded by `b230`:** question 9 (the review's search becomes the one shared search, `b230` Task 3) and question 13 (the panel's Add hands its taxon back to the card and the import runs inside the decision, so Undo takes it back, `b230` decision 6 and Task 4). The iNat duplicates the audit found are `b230` Task 7.
+- Then `mull done cb28`.
+

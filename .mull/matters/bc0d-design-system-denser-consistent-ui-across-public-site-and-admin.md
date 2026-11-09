@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-11-04
-updated: 2026-11-07
+updated: 2026-11-09
 epic: design
-relates: [f14c, 6611, 9119, 87a1]
+relates: [f14c, 6611, 9119]
 ---
 
 # Design system: denser, consistent UI across public site and admin

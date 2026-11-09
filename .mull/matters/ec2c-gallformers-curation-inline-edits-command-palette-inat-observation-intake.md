@@ -1,9 +1,8 @@
 ---
 status: raw
 created: 2026-11-06
-updated: 2026-11-07
+updated: 2026-11-09
 epic: taxogall
-relates: [87a1]
 ---
 
 # Gallformers curation: inline edits, command palette, iNat observation intake
@@ -199,4 +198,3 @@ The observation is evidence, so it opens in the Fact inspector beside the page, 
 
 
 **Captured for the build in `87a1`** (with the Fact inspector).
-

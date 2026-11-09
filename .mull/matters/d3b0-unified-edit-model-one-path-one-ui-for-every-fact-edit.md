@@ -1,9 +1,8 @@
 ---
 status: raw
 created: 2026-11-07
-updated: 2026-11-08
+updated: 2026-11-09
 epic: taxogall
-relates: [87a1]
 ---
 
 # Unified edit model: one path, one UI for every Fact edit
@@ -109,4 +108,3 @@ The Fact viewer and the Fact editor are one thing. Every Fact-backed value on a 
 - The editorial fields edited in place.
 - The phone sheet scrolling the selected value into view above itself (87a1 built the plain version).
 - Remove the Facts-panel mockups (`gall_facts_live`, `genus_facts_live`, `species_facts_live`, `FactEditMock`) and the Fact-inspector mockup (`fact_inspector_live`, with its History and `?withdrawn` states) once Jeff OKs it: he wanted to see the real UI first.
-

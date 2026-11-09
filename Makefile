@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg db-start db-stop db-status hooks
+.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg db-start db-stop db-status hooks done-checks
 
 # Download production database for local dev
 # Downloads full pg_dump from private S3 bucket and restores into local Postgres
@@ -350,6 +350,13 @@ e2e-changed: load-prod-data-test
 		exit $$status
 
 # =============================================================================
+
+# The hard check `mull done` runs (`mull config checks "make done-checks"`).
+# Rebuilds this checkout's test database first: a worktree has its own, and
+# `mix test` only creates and migrates it (no seeds, no catalog migration).
+done-checks: test-db
+	mix precommit
+	mix dialyzer
 
 # Run CI checks (same as GitHub Actions)
 ci: assets/node_modules test-db

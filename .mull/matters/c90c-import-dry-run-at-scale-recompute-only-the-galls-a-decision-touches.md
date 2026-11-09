@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-11-07
-updated: 2026-11-08
+updated: 2026-11-09
 epic: admin
-relates: [c8c3, 6611]
+relates: [6611]
 ---
 
 # Import dry run at scale: recompute only the Galls a decision touches
@@ -24,3 +24,10 @@ Split out of `c8c3` item 9 (Jeff, 2026-11-07; to address 2026-11-08).
 - **Still linear:** the dry run costs ~3.5 ms per Fact written (~25 small queries per Fact: attributions, evidence, names, Carbonite transaction rows, locks). A decision costs ~16 ms per Gall to re-resolve the package (taxon name, common name and ancestry lookups per name). For ~570 Galls (Gagné 1989) that's roughly a 15–20 s dry run in the background and a ~9 s wait on every decision.
 - **Two routes:** (A) batch the per-Fact and per-name queries in the Fact writer and the resolver. This is general, also speeds up approval, maybe 3–5×. (B) Re-resolve and re-preview only the Galls a decision touches. This is riskier: a taxon or Trait-term decision touches many Galls, and a partial recompute must match a full one. Recommended: A first, measured on a large test package (the five v6 Sources combined), then decide whether B is needed. Waiting on Jeff.
 
+
+## Status (2026-11-09)
+
+- The slot fix is committed (`14c19024`).
+- Jeff chose route A (2026-11-08): batch the per-Fact and per-name queries in the Fact writer and the resolver.
+- Not started beyond profiling. The next step is to build a large test package from the five v6 Sources, then profile one dry run and one decision on it. Count queries per table with a telemetry handler on the Repo's query events, and use `:tprof` for time (it needs `Mix.ensure_application!(:tools)` first). After that, batch the largest classes. From the 2026-11-08 counts, those are Carbonite transaction inserts (~534 per dry run), locks, per-Fact attribution and evidence inserts, Source lookups (~163) and `trait_term_mappings` lookups.
+- `gallformers_c90c` on 127.0.0.1:54317 is a fully migrated copy of `gallformers_taxogall` to profile against. Drop it when this is done.

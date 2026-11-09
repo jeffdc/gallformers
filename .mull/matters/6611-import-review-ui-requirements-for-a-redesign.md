@@ -3,7 +3,7 @@ status: planned
 created: 2026-10-30
 updated: 2026-11-09
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28, ca45, c800, b230]
+relates: [a856, 20e5, e381, d213, bc0d, c90c, cb28, ca45, c800, b230]
 ---
 
 # Import review UI: requirements for a redesign
@@ -375,7 +375,7 @@ Every write is a public `Gallformers.Import` function taking an `Actor`, so the 
 - `ReviewLive.QuestionCard` (Task 7): one-click answers, "Search…" opening the input then "Use this", Suggested / Best guess, Add a new plant, undescribed Galls' candidates first then "If not:", notes, and the Trait card Gall by Gall (Keep as text / Map to values, values pre-ticked from what most readers chose, each reader's values marked, "Use this for the other N Galls", Save). Each Gall's pipeline sentence and marked values come from `Questions` (`line`, `suggested`; a Trait dispute is one Gall).
 - `ReviewLive.Review` (Task 8) on `/admin/review/sources/:id` and `/admin/review/packages/:package_id`: one at a time with the rail, Everything (rows with Suggested / Best guess and Accept, a row opens its card), batches, Skip, "Saved: … Undo", hedges, what approving will add (dry run in the background), Approve, Deny, the taxonomy-queue notice. The Gallformers notes moved to `/admin/review/notes` (the Source LiveView is now only that page); the Sources list opens a Source's review.
 
-**Still to do:** the hedges card's "Add it…" (opens the statement's "Add it…" input); the Facts edits on the last step (Jeff: keep them); Task 9 (keys); Task 10 (retire the step and Facts pages, porting their tests' decision flows to the card's tests; redirect their URLs; remove the overview-only components); Task 11.
+**Still to do:** Task 9 (keys) and Task 11 (check on real data). The hedges card's "Add it…", the Facts edits on the last step and Task 10 (retiring the step and Facts pages, and `ItemRow`) moved to `b230` on 2026-11-09, with the settle code noted below (b230 Task 1).
 
 **Process note:** Tasks 7 and 8 were written before their LiveView tests (the TDD rule slipped); the tests were added after and caught three bugs.
 

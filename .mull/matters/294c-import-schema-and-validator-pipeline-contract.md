@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-06
-updated: 2026-11-08
+updated: 2026-11-09
 epic: taxonomy
-relates: [8567, e381, 20e5, d213, c8c3, ca45]
+relates: [8567, e381, 20e5, d213, ca45]
 ---
 
 # Import schema and validator (pipeline contract)
