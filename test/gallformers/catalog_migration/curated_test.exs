@@ -27,6 +27,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Placements
+  alias Gallformers.CatalogMigration.PlantMerges
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.CatalogMigration.TaxonMerges
   alias Gallformers.Import
@@ -38,6 +39,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     aliases: {"aliases.csv", "owner,owner_id,alias_id,name,type,decision,target,note"},
     keys: {"keys.csv", "key,couplet,lead,species_id,decision,target_gall_id,note"},
     taxon_merges: {"taxon_merges.csv", "old_taxonomy_id,into_old_taxonomy_id,note"},
+    plant_merges: {"plant_merges.csv", "species_id,into_species_id,note"},
     kingdoms: {"kingdoms.csv", "old_taxonomy_id,kingdom,note"},
     added_taxa: {"added_taxa.csv", "name,rank,kingdom,children,note"},
     placements: {"placements.csv", "taxon,rank,parent,parent_rank,note"},
@@ -960,6 +962,62 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     end
   end
 
+  # -- plant merges ----------------------------------------------------------------------
+
+  describe "plant merges" do
+    defp hosts(gall_id), do: Enum.map(Catalog.gall_summary(gall_id).hosts, & &1.name)
+
+    defp names(id),
+      do: id |> Taxa.get_taxon!() |> Map.fetch!(:names) |> Enum.map(&{&1.name, &1.status})
+
+    test "a plant kept twice is merged into the one kept: its Galls, names and old ID go with it",
+         ctx do
+      %{alba: alba, rubra: rubra, agamic: agamic, sexgen: sexgen} = ctx.old
+      curated!(ctx, :plant_merges, ["#{alba},#{rubra},one plant"])
+
+      report = run!(ctx)
+
+      assert Taxa.get_taxon(alba) == nil
+      assert Taxa.taxon_redirect(alba) == rubra
+      assert {"Fixturquercus alba", :synonym} in names(rubra)
+      assert "Fixturquercus rubra" in hosts(agamic)
+      assert hosts(sexgen) == ["Fixturquercus rubra"]
+
+      # A decision file, not a curator's change: nothing is logged for replay.
+      assert Import.list_replay_entries() == []
+      assert {"Plants kept twice, merged (plant_merges.csv)", 1} in report.counts
+      assert problems(report, "plant_merges.csv") == []
+    end
+
+    test "a row naming no plant, or merging a plant into itself or a merged one, is an error naming the row; nothing is written",
+         ctx do
+      %{alba: alba, rubra: rubra, spp: spp, agamic: agamic} = ctx.old
+
+      for rows <- [
+            ["#{agamic},#{rubra},"],
+            ["#{alba},#{alba},"],
+            ["#{alba},#{rubra},", "#{rubra},#{spp},"]
+          ] do
+        curated!(ctx, :plant_merges, rows)
+        assert {:error, message} = run(ctx)
+        assert message =~ "plant_merges.csv row"
+        assert Catalog.get_gall(agamic) == nil
+      end
+    end
+
+    test "a row naming a species ID that is no row is reported, not used", ctx do
+      curated!(ctx, :plant_merges, ["999990,#{ctx.old.rubra},"])
+
+      report = run!(ctx)
+
+      assert problems(report, "plant_merges.csv") == [
+               "999990 into #{ctx.old.rubra}: 999990 is not a species row; the merge is not used"
+             ]
+
+      assert Taxa.get_taxon(ctx.old.rubra)
+    end
+  end
+
   # -- kingdoms ------------------------------------------------------------------------
 
   describe "kingdoms" do
@@ -1371,8 +1429,13 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   test "the shipped decisions load" do
     assert {:ok, merges} = TaxonMerges.load(Curated.default_path(:taxon_merges))
 
-    assert merges |> Map.values() |> Enum.map(&{&1.old_id, &1.into_id}) |> Enum.sort() ==
+    assert merges |> Map.values() |> Enum.map(&{&1.id, &1.into_id}) |> Enum.sort() ==
              [{984, 23}, {985, 202}]
+
+    assert {:ok, plant_merges} = PlantMerges.load(Curated.default_path(:plant_merges))
+
+    assert plant_merges |> Map.values() |> Enum.map(&{&1.id, &1.into_id}) |> Enum.sort() ==
+             [{4863, 4878}, {5190, 4870}]
 
     assert {:ok, %{1140 => %{kingdom: "Chromista"}}} =
              Kingdoms.load(Curated.default_path(:kingdoms))
@@ -1405,6 +1468,80 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   end
 
   # -- the replay log and duplicate taxon keys -----------------------------------------
+
+  test "a package's pending trait terms and statement edits don't stop the next run", ctx do
+    run!(ctx)
+    now = ~N[2026-01-01 00:00:00]
+    source = gallformers_source()
+
+    {:ok, _} =
+      Gallformers.Audit.transaction(test_actor(), "test.import_rows", fn ->
+        {1, [%{id: package_id}]} =
+          Repo.insert_all(
+            "import_packages",
+            [
+              %{
+                key: "k",
+                s3_prefix: "import/k/",
+                submitter_name: "t",
+                inserted_at: now,
+                updated_at: now
+              }
+            ],
+            returning: [:id]
+          )
+
+        {1, [%{id: batch_id}]} =
+          Repo.insert_all(
+            "import_batches",
+            [
+              %{
+                package_id: package_id,
+                file: "gall.json",
+                batch_type: "gall",
+                mode: "replace",
+                producer_batch_id: "b",
+                sha256: "x",
+                content: %{},
+                inserted_at: now,
+                updated_at: now
+              }
+            ],
+            returning: [:id]
+          )
+
+        Repo.insert_all("pending_trait_terms", [
+          %{
+            gall_id: ctx.old.agamic,
+            source_id: source.id,
+            package_id: package_id,
+            batch_id: batch_id,
+            trait: "color",
+            term: "reddish",
+            normalized_term: "reddish",
+            inserted_at: now,
+            updated_at: now
+          }
+        ])
+
+        Repo.insert_all("package_statement_edits", [
+          %{
+            package_id: package_id,
+            batch_id: batch_id,
+            statement_ref: "f1",
+            kind: "drop",
+            author_name: "t",
+            inserted_at: now,
+            updated_at: now
+          }
+        ])
+      end)
+
+    run!(ctx)
+
+    assert Old.count("SELECT count(*) FROM pending_trait_terms") == 0
+    assert Old.count("SELECT count(*) FROM package_statement_edits") == 0
+  end
 
   test "the migration never empties the replay log", ctx do
     entry = %{"taxon" => %{"name" => "X", "rank" => "species"}, "name" => "Y"}

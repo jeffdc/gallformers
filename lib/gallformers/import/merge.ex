@@ -84,7 +84,7 @@ defmodule Gallformers.Import.Merge do
   """
   @spec preview(spec(), Actor.t()) :: {:ok, result()} | {:error, error() | term()}
   def preview(spec, %Actor{} = actor \\ Actor.system("merge preview")) do
-    case run(actor, spec, true) do
+    case run(actor, spec, :preview) do
       {:error, {:preview, result}} -> {:ok, result}
       {:error, reason} -> {:error, reason}
     end
@@ -93,7 +93,7 @@ defmodule Gallformers.Import.Merge do
   @doc "Merges (see the module doc)."
   @spec record(Actor.t(), spec()) :: {:ok, result()} | {:error, error() | term()}
   def record(%Actor{} = actor, {type, absorbed_id, survivor_id} = spec) do
-    case run(actor, spec, false) do
+    case run(actor, spec, :record) do
       {:ok, result} ->
         Deletion.broadcast(
           {:records_merged,
@@ -107,7 +107,16 @@ defmodule Gallformers.Import.Merge do
     end
   end
 
-  defp run(actor, {type, absorbed_id, survivor_id} = spec, dry_run?) do
+  @doc """
+  Merges as `record/2` does, logging nothing for replay and telling no
+  page: for the catalog migration, whose decisions are files it applies on
+  every run (`Gallformers.CatalogMigration.PlantMerges`), not a curator's
+  change on preview.
+  """
+  @spec apply_unlogged(Actor.t(), spec()) :: {:ok, result()} | {:error, error() | term()}
+  def apply_unlogged(%Actor{} = actor, spec), do: run(actor, spec, :unlogged)
+
+  defp run(actor, {type, absorbed_id, survivor_id} = spec, mode) when is_atom(mode) do
     Audit.transaction(actor, "import.record_merge", fn ->
       check(spec) |> ok_or_rollback()
       Taxa.lock_tree()
@@ -115,14 +124,15 @@ defmodule Gallformers.Import.Merge do
       lock(type, survivor_id)
       key = replay_key(spec)
 
-      result = merge(actor, spec, dry_run?)
+      result = merge(actor, spec, mode == :preview)
 
-      if dry_run? do
-        Repo.rollback({:preview, result})
-      else
-        ReplayLog.append!(:merge, key, %{})
-        result
+      case mode do
+        :preview -> Repo.rollback({:preview, result})
+        :record -> ReplayLog.append!(:merge, key, %{})
+        :unlogged -> :ok
       end
+
+      result
     end)
   end
 

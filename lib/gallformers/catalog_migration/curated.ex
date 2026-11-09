@@ -3,8 +3,8 @@ defmodule Gallformers.CatalogMigration.Curated do
   The data migration's curated inputs (`9449` Task 17): CSV files in
   `priv/catalog_migration/` holding a curator's decisions —
   `non_galls.csv`, `range_decisions.csv`, `aliases.csv`, `keys.csv`,
-  `taxon_merges.csv`, `kingdoms.csv`, `added_taxa.csv`, `placements.csv`,
-  `generation_group_taxa.csv` — and the worksheets the migration writes for
+  `taxon_merges.csv`, `plant_merges.csv`, `kingdoms.csv`, `added_taxa.csv`,
+  `placements.csv`, `generation_group_taxa.csv` — and the worksheets the migration writes for
   filling the first four
   (`Gallformers.CatalogMigration.Report.write_curation/2`).
 
@@ -22,6 +22,7 @@ defmodule Gallformers.CatalogMigration.Curated do
     :aliases,
     :keys,
     :taxon_merges,
+    :plant_merges,
     :kingdoms,
     :added_taxa,
     :placements,
@@ -34,6 +35,7 @@ defmodule Gallformers.CatalogMigration.Curated do
           | :aliases
           | :keys
           | :taxon_merges
+          | :plant_merges
           | :kingdoms
           | :added_taxa
           | :placements

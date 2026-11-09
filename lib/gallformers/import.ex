@@ -3622,6 +3622,13 @@ defmodule Gallformers.Import do
   @spec record_merge(Actor.t(), Merge.spec()) :: {:ok, Merge.result()} | {:error, term()}
   defdelegate record_merge(actor, spec), to: Merge, as: :record
 
+  @doc """
+  Merges as `record_merge/2` does, logging nothing for replay: for the
+  catalog migration's curated plant merges (`Gallformers.Import.Merge.apply_unlogged/2`).
+  """
+  @spec apply_merge_unlogged(Actor.t(), Merge.spec()) :: {:ok, Merge.result()} | {:error, term()}
+  defdelegate apply_merge_unlogged(actor, spec), to: Merge, as: :apply_unlogged
+
   # -- taxonomic statements (matter `f923`) -----------------------------------
 
   @doc """

@@ -1,7 +1,7 @@
 ---
 status: done
 created: 2026-11-07
-updated: 2026-11-08
+updated: 2026-11-09
 epic: taxogall
 relates: [6611, 294c, f14c, c90c, ca45, b230]
 ---
@@ -79,3 +79,5 @@ All committed on `taxogall`: items 1, 2 and 4 in `171c326e`; 3, 5, 6, 7 and 8 in
 
 **Item 13 follow-up (Jeff, 2026-11-08):** a species with one Gall that doesn't alternate generations still goes to the curator when the Source really conflicts with that Gall (form or plant part). Only close forms count as `differ`. That is how it works already, so nothing changes.
 
+
+**Duplicate plants merged (Jeff, 2026-11-08), on `gallformers_taxogall`.** Both pairs came from the v1 data, not from the ingestion. Per WCVP: 4863 *Silphium asteriscus var. dentatum* went into 4878 *Silphium dentatum*, and 5190 *Horkelia congesta* went into 4870 *Potentilla congesta*. Replay entries 10785 and 10786 are keyed by accepted name, so the cutover's replay does them again.

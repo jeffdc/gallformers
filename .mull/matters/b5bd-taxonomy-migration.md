@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-02
-updated: 2026-11-07
+updated: 2026-11-09
 epic: taxonomy
-relates: [8567, 803b, a856, 9119]
+relates: [8567, 803b, a856, 9119, 8861]
 ---
 
 # Taxonomy migration
@@ -301,3 +301,28 @@ Ran the cutover on dev (`gallformers_taxogall`): export the replay log, `mix gal
 - Preview likely holds a bogus species "Stephanomeria" under the genus Stephanomeria (the WCVP rank bug, from the Nastasi & Davis review); fold it into the genus. Query to find such taxa: accepted plant names at species rank or below with no space, or equal to their parent's name, then check each linked `wcvp_id`'s `taxon_rank`.
 - In dev, private storage is per checkout (`tmp/private_storage` under each worktree): packages made while a server runs in a worktree lose their files when the worktree is removed. Dev only; production uses S3.
 
+
+## Plants kept twice (2026-11-08)
+
+Two plants were each in the v1 data twice, and the alias decisions (`aliases.csv`, rule 4) made one plant's name a synonym of the other: *Silphium dentatum* (4878) and *S. asteriscus var. dentatum* (4863), and *Horkelia congesta* (5190) and *Potentilla congesta* (4870). The resolver quietly took the accepted one, so Sources naming either plant missed the Galls on the other.
+
+**New curated input `plant_merges.csv`** (`species_id, into_species_id, note`; `Gallformers.CatalogMigration.PlantMerges`, step 11c). It runs the editorial plant merge (`Gallformers.Import.Merge`) at the end of the migration and logs nothing for replay. The shipped rows, per WCVP: 4863 into 4878, and 5190 into 4870. Rehearsed on a copy of `gallformers_taxogall`: both merged, nothing pending, no duplicate keys. The rehearsal also showed the rebuild never cleared `pending_trait_terms` or `package_statement_edits`, so it stopped on a database with review data. Fixed.
+
+**The same pattern elsewhere (open, for Jeff):** a plant name accepted on one taxon and a synonym with no sensu on another. Found after a rebuild by comparing names; checked against WCVP. Galls hosted on each in parentheses.
+- **WCVP says one plant (merge candidates):**
+  - *Cupressus nootkatensis* 2160 (0) into *Callitropsis nootkatensis* 1271 (1).
+  - *Cupressus pigmaea* 2236 (1) into *Hesperocyparis pygmaea* 1268 (2). WCVP doesn't hold the misspelling.
+  - *Fallopia japonica* 4728 (1) into *Reynoutria japonica* 1529 (1).
+  - *Grindelia robusta* 3384 (1) into *G. hirsutula* 3181 (5).
+  - *Alnus viridis* 36 (2) into *A. alnobetula* 5308 (1). WCVP: *A. viridis* = *A. alnobetula* subsp. *alnobetula*.
+  - *Populus trichocarpa* 4539 (12) and *P. tristis* 249 (12). WCVP sinks *P. trichocarpa* into *P. tristis*, which needs a check.
+- **WCVP says two plants (a misapplied name: the synonym needs a sensu, or should go):**
+  - *Quercus dumosa* 797 (64) and the synonym on *Q. cornelius-mulleri* 800 (18).
+  - *Q. texana* 1055 (3) and the synonym on *Q. buckleyi* 351 (40).
+  - *Berberis dictyota* 6985 (1) and the synonym on *B. aquifolium* 697 (1).
+  - *Solidago stricta* 3696 (0) and the synonym on *S. virgata* 4648 (0).
+  - *Ulmus pumila* 2733 (2) and the alias "Ulmus pumila Walter" on *U. alata* 495 (4): a homonym whose authorship is lost in normalizing.
+  - *Aristolochia durior* 1775 (0) and the synonym on *Bignonia capreolata* 5135 (0): WCVP's *A. durior* Hill is a *Bignonia* name, while the plant meant is probably Dutchman's pipe.
+  - *Quercus parvula* 338 (5) and the alias "Quercus parvula (shrevei)" on *Q. parvula* var. *shrevei* 2701 (4): the parenthesis is read away, so the alias names the species.
+
+**What reaches the cutover:** only the curated files and **preview's** replay log (M6 steps 3 and 7). Curation done on a local database, such as `gallformers_taxogall` (its review decisions, Host-name synonyms and plants, Trait-term placements, taxonomy edits), reaches production only if it is redone on preview, or, for fixes to v1 data, put in a curated file.

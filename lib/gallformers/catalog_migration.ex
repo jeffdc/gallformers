@@ -77,6 +77,10 @@ defmodule Gallformers.CatalogMigration do
         report counts those filled, ambiguous (listed as problems) and not
         in WCVP. With WCVP unreadable, a problem says so and nothing is
         filled (`Gallformers.Release.backfill_wcvp_authorship/0` later).
+    11c. `Gallformers.CatalogMigration.PlantMerges` — plants kept twice
+        merged into the one kept (`plant_merges.csv`), with the editorial
+        plant merge, once everything about them exists and the counts are
+        reconciled; nothing is logged for replay.
     12. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
         rebuilt from all of the above. During the run no lookup-table
         refresh is enqueued (`Gallformers.Catalog.without_gall_index_refresh/1`):
@@ -87,7 +91,8 @@ defmodule Gallformers.CatalogMigration do
   Steps 1 and 9–11 report what needs a curator (worksheets in the report,
   written as CSV by `Report.write_curation/2`) and apply the decisions in
   `priv/catalog_migration/` (`Gallformers.CatalogMigration.Curated`); step
-  2 applies `taxon_merges.csv` and `kingdoms.csv`, which have no worksheet,
+  2 applies `taxon_merges.csv` and `kingdoms.csv` and step 11c
+  `plant_merges.csv`, which have no worksheet,
   checked against today's taxonomy rows before anything is written (as
   `range_decisions.csv` scopes are against today's places), then
   `added_taxa.csv` and `placements.csv`; step 4 applies
@@ -111,6 +116,8 @@ defmodule Gallformers.CatalogMigration do
       Gallformers.Articles,
       Gallformers.Audit,
       Gallformers.Catalog,
+      # The editorial plant merge, for `plant_merges.csv` (`PlantMerges`).
+      Gallformers.Import,
       Gallformers.Ranges,
       Gallformers.Repo,
       Gallformers.Sources,
@@ -138,6 +145,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Notes
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Placements
+  alias Gallformers.CatalogMigration.PlantMerges
   alias Gallformers.CatalogMigration.Ranges
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.CatalogMigration.Taxa, as: MigrationTaxa
@@ -162,6 +170,10 @@ defmodule Gallformers.CatalogMigration do
     "DELETE FROM taxon_inaturalist",
     "UPDATE image SET gall_id = NULL, taxon_id = NULL " <>
       "WHERE gall_id IS NOT NULL OR taxon_id IS NOT NULL",
+    # A review's own rows: the terms its Galls wait on, a curator's edits
+    # to its statements (the replay log makes both again).
+    "DELETE FROM pending_trait_terms",
+    "DELETE FROM package_statement_edits",
     "DELETE FROM queue_items",
     "DELETE FROM batch_unmapped",
     "DELETE FROM batch_statements",
@@ -205,7 +217,7 @@ defmodule Gallformers.CatalogMigration do
     * `:name_suffixes` — the name-suffix mapping file (default the shipped
       one)
     * `:non_galls`, `:range_decisions`, `:aliases`, `:keys`,
-      `:taxon_merges`, `:kingdoms`, `:added_taxa`, `:placements`,
+      `:taxon_merges`, `:plant_merges`, `:kingdoms`, `:added_taxa`, `:placements`,
       `:generation_group_taxa` — the curated decision files (`Gallformers.CatalogMigration.Curated`;
       default the shipped ones)
     * `:pending` — `:fail` (the default, and the only mode for production)
@@ -265,10 +277,16 @@ defmodule Gallformers.CatalogMigration do
         |> then(&Aliases.reconcile(curated_facts, &1))
         |> then(&LegacyTaxonomy.reconcile(taxonomy, plan.source_id, &1))
         |> then(&wcvp_authorship(actor, &1))
+        |> then(&plant_merges(actor, curated.plant_merges, &1))
         |> rebuild_gall_index()
       end)
     end
   end
+
+  # Step 11c: plants kept twice, merged once everything about them exists,
+  # and after the counts above are reconciled against today's tables.
+  defp plant_merges(actor, %{merges: merges, stale: stale}, report),
+    do: PlantMerges.run(actor, merges, stale, report)
 
   @ambiguous_authorship "Plant names WCVP holds ambiguously (authorship left blank)"
 
@@ -321,6 +339,7 @@ defmodule Gallformers.CatalogMigration do
       aliases: &Aliases.load/1,
       keys: &Keys.load/1,
       taxon_merges: &TaxonMerges.load/1,
+      plant_merges: &PlantMerges.load/1,
       kingdoms: &Kingdoms.load/1,
       added_taxa: &AddedTaxa.load/1,
       placements: &Placements.load/1,
@@ -344,7 +363,8 @@ defmodule Gallformers.CatalogMigration do
     rows = Map.new(Old.taxonomy(), &{&1.id, &1})
 
     with {:ok, merges, merges_stale} <- TaxonMerges.check(curated.taxon_merges, rows),
-         {:ok, kingdoms, kingdoms_stale} <- Kingdoms.check(curated.kingdoms, rows, merges) do
+         {:ok, kingdoms, kingdoms_stale} <- Kingdoms.check(curated.kingdoms, rows, merges),
+         {:ok, plant_merges, plant_stale} <- PlantMerges.check(curated.plant_merges) do
       taxa = %{
         merges: merges,
         kingdoms: kingdoms,
@@ -353,7 +373,10 @@ defmodule Gallformers.CatalogMigration do
         placements: curated.placements
       }
 
-      {:ok, Map.put(curated, :taxa, taxa)}
+      {:ok,
+       curated
+       |> Map.put(:taxa, taxa)
+       |> Map.put(:plant_merges, %{merges: plant_merges, stale: plant_stale})}
     end
   end
 
