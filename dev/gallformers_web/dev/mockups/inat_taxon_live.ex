@@ -149,6 +149,26 @@ defmodule GallformersWeb.Dev.Mockups.InatTaxonLive do
   def handle_async(:card_inat, _failed, socket),
     do: {:noreply, update(socket, :card, &%{&1 | inat: []})}
 
+  def handle_async(:search, _failed, socket),
+    do: {:noreply, assign(socket, results: [], error: "iNaturalist couldn't be reached.")}
+
+  def handle_async(:taxon, {:ok, {:ok, taxon, matched}}, socket) do
+    plan = plan(taxon, matched)
+
+    {:noreply,
+     assign(socket,
+       step: :look,
+       taxon: taxon,
+       plan: plan,
+       ticks: plan.ticked,
+       more?: false,
+       higher?: false
+     )}
+  end
+
+  def handle_async(:taxon, _failed, socket),
+    do: {:noreply, assign(socket, step: :find, error: "iNaturalist couldn't be reached.")}
+
   defp card_search(socket) do
     q = String.trim(socket.assigns.card_query)
     plant? = socket.assigns.q.plant?
@@ -184,26 +204,6 @@ defmodule GallformersWeb.Dev.Mockups.InatTaxonLive do
     |> cancel_async(:card_inat)
     |> start_async(:card_inat, fn -> search_inat(q) end)
   end
-
-  def handle_async(:search, _failed, socket),
-    do: {:noreply, assign(socket, results: [], error: "iNaturalist couldn't be reached.")}
-
-  def handle_async(:taxon, {:ok, {:ok, taxon, matched}}, socket) do
-    plan = plan(taxon, matched)
-
-    {:noreply,
-     assign(socket,
-       step: :look,
-       taxon: taxon,
-       plan: plan,
-       ticks: plan.ticked,
-       more?: false,
-       higher?: false
-     )}
-  end
-
-  def handle_async(:taxon, _failed, socket),
-    do: {:noreply, assign(socket, step: :find, error: "iNaturalist couldn't be reached.")}
 
   defp search(socket) do
     q = String.trim(socket.assigns.query)
