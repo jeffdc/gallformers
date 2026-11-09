@@ -3,7 +3,7 @@ status: planned
 created: 2026-11-08
 updated: 2026-11-09
 epic: taxonomy
-relates: [e1d2, 8ba0, f923, 6611, c800]
+relates: [e1d2, 8ba0, f923, 6611, c800, b230]
 ---
 
 # Add a taxon from iNaturalist

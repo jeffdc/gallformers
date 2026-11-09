@@ -3,7 +3,7 @@ status: planned
 created: 2026-10-30
 updated: 2026-11-09
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28, ca45, c800]
+relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28, ca45, c800, b230]
 ---
 
 # Import review UI: requirements for a redesign

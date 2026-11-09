@@ -3,7 +3,7 @@ status: raw
 created: 2026-11-09
 updated: 2026-11-09
 epic: platform
-relates: [6611, cb28, b016]
+relates: [6611, cb28, b016, b230]
 ---
 
 # Guardrails that hold: stop duplicate code and half-finished replacements

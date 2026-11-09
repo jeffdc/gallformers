@@ -1,9 +1,9 @@
 ---
 status: done
 created: 2026-11-07
-updated: 2026-11-08
+updated: 2026-11-09
 epic: taxogall
-relates: [d3b0, ec2c, bc0d]
+relates: [d3b0, ec2c, bc0d, b230]
 ---
 
 # Fact inspector: one viewer and editor for every Fact, with Add from observation

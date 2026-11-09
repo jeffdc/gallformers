@@ -3,7 +3,7 @@ status: done
 created: 2026-11-07
 updated: 2026-11-08
 epic: taxogall
-relates: [6611, 294c, f14c, c90c, ca45]
+relates: [6611, 294c, f14c, c90c, ca45, b230]
 ---
 
 # Review back end: pipeline and resolver fixes found in the review redesign
