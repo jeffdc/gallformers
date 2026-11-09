@@ -23,7 +23,7 @@ The behavior contract for the Articles list (`/articles`, `ArticlesController`),
 
 - **Articles and keys on the design system** (Jeff approved the mockups, 2026-11-05).
   - `prose` (built) styles all running text: articles at 18px, ID Notes and the source reader in serif (A−/A+ step 14, 16, 18, 20px), Privacy, the admin preview. Markdown headings start at section level. The typography plugin and the legacy `.prose` rules are gone.
-  - Glossary links keep the text's color with a dotted underline.
+  - Glossary links keep the text's color with a dotted underline. Superseded (Jeff, 2026-11-08, matter `87a1` question 13): the dotted underline is `fact_ref`'s alone, so glossary terms are plain links to their entry, the first sentence of the definition in a `tooltip`.
   - Articles list: first built as a reading list; Jeff found it stark, and approved a livelier mockup (2026-11-05): topics as `chip_nav` chips; on the unfiltered list the newest article featured (`article_card featured`, "Newest"); the rest as `article_card`s in a grid (3, 2 or 1 across), each tinted by its first topic with a large tilted icon (`ArticlesHTML` maps topics to tone and icon); admin pencils on the cards; a "More to read" row of `link_tile`s (Identification keys with the count, Glossary, Filter guide). The Keys list keeps the reading-list layout for now.
   - An article: `page_header` (Articles crumb; By, Published, Updated, Topics; Edit for admins), a "Draft" warning notice, the text in `prose` (`max-w-text`), Related articles in the rail. A contents list was considered and dropped.
   - Keys list: the articles' list layout, with each key's scope and couplet count (`Keys.list_keys/0` gives `couplet_count`).

@@ -38,4 +38,41 @@ defmodule GallformersWeb.UIComponentsTest do
       assert html =~ "tan"
     end
   end
+
+  # The dotted underline is fact_ref's alone (matter 87a1, question 13): a
+  # glossary term is a plain link to its entry, its definition in a tooltip.
+  describe "glossary_tooltip" do
+    test "the term, in parentheses, links to its glossary entry; its definition's first sentence is the tooltip" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.glossary_tooltip
+          term="sexual"
+          glossary_word="sexgen"
+          definition="The sexual generation has males and females. It forms in spring."
+        />
+        """)
+
+      assert [link] = query(html, "a[href='/glossary#sexgen']") |> Enum.to_list()
+      assert LazyHTML.text(link) == "sexual"
+      assert text(html, "[role=tooltip]") == "The sexual generation has males and females."
+      assert query(html, "[aria-describedby] a[href='/glossary#sexgen']") |> Enum.any?()
+
+      # The parentheses sit right against the tooltip (an inline-flex: its
+      # whitespace isn't shown).
+      assert html =~ ~r/>\(<span id="glossary-sexgen" class="gf-tooltip\s*">/
+      assert html =~ ~r/<\/span>\)<\/span>\s*$/
+
+      refute html =~ "border-dotted"
+    end
+
+    test "with no definition, just the link" do
+      assigns = %{}
+      html = rendered_to_string(~H|<.glossary_tooltip term="agamic" />|)
+
+      assert query(html, "a[href='/glossary#agamic']") |> Enum.any?()
+      refute query(html, "[role=tooltip]") |> Enum.any?()
+    end
+  end
 end

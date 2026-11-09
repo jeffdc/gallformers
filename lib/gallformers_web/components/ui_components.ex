@@ -461,25 +461,19 @@ defmodule GallformersWeb.UIComponents do
 
   def tooltip(assigns) do
     ~H"""
-    <span id={@id} class={["group/tip relative inline-flex", @class]}>
+    <span id={@id} class={["gf-tooltip", @class]}>
       <span aria-describedby={"#{@id}-text"}>{render_slot(@inner_block)}</span>
-      <span
-        id={"#{@id}-text"}
-        role="tooltip"
-        class="pointer-events-none absolute top-full left-0 z-50 mt-1 hidden w-64 rounded-ctl bg-ink px-3 py-2 text-caption font-normal text-paper shadow-float group-focus-within/tip:block group-hover/tip:block"
-      >
-        {@text}
-      </span>
+      <span id={"#{@id}-text"} role="tooltip" class="gf-tooltip-text">{@text}</span>
     </span>
     """
   end
 
   @doc """
-  Renders a glossary term with hover tooltip showing its definition.
-
-  Displays the term inline with a dotted underline and help cursor.
-  On hover, shows the first sentence of the definition with a link
-  to the full glossary entry.
+  A glossary term in a name, as the Gall page's generation qualifier
+  ("(agamic)"): a plain link to its glossary entry (`/glossary#word`), the
+  first sentence of its definition in a `tooltip` on hover and keyboard
+  focus. The link works on touch, where the tooltip doesn't show. The
+  dotted underline is `fact_ref`'s alone (matter `87a1`).
 
   ## Examples
 
@@ -492,32 +486,21 @@ defmodule GallformersWeb.UIComponents do
     doc: "the glossary word to link to, if different from term (e.g., \"sexgen\" for \"sexual\")"
 
   attr :definition, :string, default: nil, doc: "the full glossary definition"
-  attr :class, :any, default: nil, doc: "additional CSS classes"
+  attr :class, :any, default: nil, doc: "layout only"
 
   def glossary_tooltip(assigns) do
+    word = String.downcase(assigns.glossary_word || assigns.term)
+
     assigns =
-      assigns
-      |> assign(:short_definition, first_sentence(assigns.definition))
-      |> assign_new(:link_word, fn -> assigns.glossary_word || assigns.term end)
+      assign(assigns,
+        short_definition: first_sentence(assigns.definition),
+        href: "/glossary##{word}",
+        tip_id: "glossary-#{word}"
+      )
 
     ~H"""
-    <span class={["relative inline-flex group", @class]}>
-      <span class="cursor-help border-b border-dotted border-muted">({@term})</span>
-      <span
-        class="absolute top-full left-1/2 z-50 mt-2 hidden w-80 -translate-x-1/2 rounded-ctl bg-ink px-3 py-2 text-meta font-normal not-italic text-paper shadow-float group-hover:block"
-        role="tooltip"
-      >
-        <span class="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-4 border-x-transparent border-t-transparent border-b-ink" />
-        <span class="font-semibold">{@link_word}:</span>
-        <span :if={@short_definition != ""}>{@short_definition}</span>
-        <a
-          href={"/glossary##{String.downcase(@link_word)}"}
-          class="mt-1 block text-caption text-paper underline"
-        >
-          View in glossary &rarr;
-        </a>
-      </span>
-    </span>
+    <span :if={@short_definition != ""} class={@class} phx-no-format>(<.tooltip id={@tip_id} text={@short_definition}><.link href={@href}>{@term}</.link></.tooltip>)</span>
+    <span :if={@short_definition == ""} class={@class} phx-no-format>(<.link href={@href}>{@term}</.link>)</span>
     """
   end
 
