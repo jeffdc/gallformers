@@ -133,6 +133,56 @@ defmodule GallformersWeb.CurationComponentsTest do
     end
   end
 
+  describe "a Source's readings fixed (87a1)" do
+    @weld %{
+      authority: {:source, 12, "Weld 1959"},
+      short: "Readings fixed: Weld 1959",
+      title: "Readings fixed: Weld 1959",
+      count: 1,
+      applies: "Applies as one package of Weld 1959."
+    }
+
+    test "the tray has a chip for the Source" do
+      assigns = %{summary: %{count: 1, lines: ["a"], oldest_at: nil, groups: [@weld]}}
+      html = rendered_to_string(~H|<.change_tray summary={@summary} />|)
+
+      assert text(html, "#change-tray [data-authority=source-12]") ==
+               "Readings fixed: Weld 1959 · 1"
+    end
+
+    test "Review has a section for the Source, with the fix's Why" do
+      assigns = %{
+        items: [
+          %{
+            id: 4,
+            kind: :reading,
+            text: "Fix our reading of Weld 1959: host Quercus alba → Quercus bicolor",
+            flags: [],
+            authority: {:source, 12, "Weld 1959"},
+            evidence: %{text: "Weld names Q. bicolor.", observations: [], source: nil}
+          }
+        ],
+        groups: [@weld]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.review_apply
+          id="review"
+          items={@items}
+          groups={@groups}
+          evidence={%{text: "", observations: [], source_id: nil}}
+        />
+        """)
+
+      section = "#review [data-authority=source-12]"
+      assert text(html, "#{section} h3") =~ "Readings fixed: Weld 1959"
+      assert count(html, "#{section} #review-item-4") == 1
+      assert text(html, "#{section} #review-item-4") =~ "Weld names Q. bicolor."
+      assert count(html, "#review-evidence") == 0
+    end
+  end
+
   describe "review_apply, by authority (87a1)" do
     test "a section per authority: its title and count, what applying it does, its changes" do
       assigns = %{

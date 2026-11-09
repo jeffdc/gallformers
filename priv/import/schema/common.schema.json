@@ -51,7 +51,7 @@
     },
 
     "reading_source": {
-      "description": "A reading fix (Gallformers only, matter 87a1): a Source Gallformers holds, whose statements Gallformers read wrongly, read again. Its Facts are that Source's statements, at its date and in its words; a Fact marked unstated takes the Source's statement of it away (the Source doesn't say it), and one that replaces an unstated Fact of the batch is what the Source does say. The quotes are the stored Source's (gallformers_document_item_id), so there is no document. Batches with this Source use mode add.",
+      "description": "A reading fix (Gallformers only, matter 87a1): a Source Gallformers holds, whose statements Gallformers read wrongly, read again. Its Facts (a gall batch) or acts (a taxonomy batch) are that Source's statements, at its date and in its words; one marked unstated takes the Source's statement of it away (the Source doesn't say it), and one that replaces an unstated one of the batch is what the Source does say. The quotes are the stored Source's (gallformers_document_item_id), so there is no document; a Source Gallformers holds no quotes of (the legacy data) is fixed with none. Batches with this Source use mode add.",
       "type": "object",
       "required": ["reading_of"],
       "properties": {
@@ -59,7 +59,9 @@
           "type": "object",
           "required": ["gallformers_source_id"],
           "properties": {
-            "gallformers_source_id": { "type": "integer", "minimum": 1, "description": "Gallformers' ID for the Source read again." }
+            "gallformers_source_id": { "type": "integer", "minimum": 1, "description": "Gallformers' ID for the Source read again." },
+            "why": { "type": "string", "minLength": 1, "description": "Optional: the curator's reason for the fix, in their words (\"Weld names Q. lobata; we read the next line\"). Kept with the package and shown with the fix on the Source's page." },
+            "accept": { "const": true, "description": "Optional, taxonomy batches only: the curator fixing the reading accepts the taxonomic statements it states in place of the misread ones (\"Accept it now\"), so the tree follows them where they win; without it they await a curator in the taxonomy queue." }
           },
           "additionalProperties": false
         }
@@ -197,9 +199,8 @@
     },
 
     "evidence": {
-      "description": "At least one per Fact or act. A quote from the document, or (Gallformers batches only) a dated statement.",
+      "description": "At least one per Fact or act (validate.py checks it): a quote from the document, or (Gallformers batches only) a dated statement. None only in a reading fix of a Source Gallformers holds no quotes of (the legacy data): the statement as Gallformers holds it.",
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "if": { "required": ["statement"] },
@@ -212,13 +213,16 @@
       "description": "Evidence from the Source's document: a verbatim quote and the item it appears in, or a whole item.",
       "type": "object",
       "if": { "required": ["whole_item"] },
-      "then": { "required": ["item"], "properties": { "quote": false } },
+      "then": {
+        "anyOf": [{ "required": ["item"] }, { "required": ["gallformers_document_item_id"] }],
+        "properties": { "quote": false }
+      },
       "else": { "required": ["quote"] },
       "properties": {
         "item": { "type": "string", "pattern": "^#/", "description": "Reference of the document item the evidence comes from (a DoclingDocument self_ref, e.g. '#/texts/42'). Required whenever the batch has a document." },
-        "gallformers_document_item_id": { "type": "integer", "minimum": 1, "description": "A reading fix only: the stored document item of the Source read again that the quote comes from." },
+        "gallformers_document_item_id": { "type": "integer", "minimum": 1, "description": "A reading fix only: the stored document item of the Source read again that the quote (or whole_item) comes from, in place of item." },
         "quote": { "type": "string", "minLength": 1, "description": "Verbatim text from the item, long enough to be unambiguous within it." },
-        "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph). Use it with item, in place of quote, in a batch with a document." },
+        "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph). Use it with item (a reading fix: gallformers_document_item_id), in place of quote." },
         "page": { "type": "string", "description": "The page number as printed in the Source, if known." },
         "url": { "type": "string", "format": "uri", "description": "Deep link to this place in the Source (e.g. a scanned-book page or a website's species page)." },
         "cites": {

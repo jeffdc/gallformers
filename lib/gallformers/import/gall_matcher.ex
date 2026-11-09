@@ -170,8 +170,10 @@ defmodule Gallformers.Import.GallMatcher do
   defp noted_gall_id(_source), do: nil
 
   # A curator's own statement (Gallformers, no note), written from the
-  # Gall's page: the Gall it names by ID is that Gall.
+  # Gall's page, or a curator's reading fix of a Source (matter 87a1): the
+  # Gall it names by ID is that Gall.
   defp curated?(%{"gallformers" => true} = source), do: not Map.has_key?(source, "note")
+  defp curated?(%{"reading_of" => %{}}), do: true
   defp curated?(_source), do: false
 
   defp note_gall(g, gall_id, method) do

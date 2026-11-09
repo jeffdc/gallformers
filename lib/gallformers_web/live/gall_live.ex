@@ -118,7 +118,7 @@ defmodule GallformersWeb.GallLive do
   defp select_fact(socket, text) when is_binary(text) do
     with {:ok, key} <- FactKey.decode(text),
          %{} = fact <- find_fact(socket.assigns.gall_facts, key) do
-      assign(socket, selected: key, fact: fact, adding: nil)
+      socket |> put_fact(key, fact) |> assign(adding: nil)
     else
       _ -> assign(socket, selected: nil, fact: nil)
     end
@@ -133,14 +133,19 @@ defmodule GallformersWeb.GallLive do
 
   defp observe(socket, _none), do: assign(socket, observation: nil)
 
+  # A Fact of the page, or one no longer current (from the full record).
   defp find_fact(facts, key) do
     traits = Enum.flat_map(facts.traits, & &1.facts)
 
     Enum.find(
-      facts.inducer ++ facts.hosts ++ traits ++ facts.range ++ facts.aliases,
+      facts.inducer ++ facts.hosts ++ traits ++ facts.range ++ facts.aliases ++ facts.past,
       &(&1.key == key)
     )
   end
+
+  # The inspector's Fact, with its history (`Gallformers.Import.fact_history/1`).
+  defp put_fact(socket, key, fact),
+    do: assign(socket, selected: key, fact: fact, history: Import.fact_history(fact.fact_id))
 
   # The page's path with the Fact `key` selected (nil: none), in Edit mode
   # still when it is on.
@@ -273,7 +278,7 @@ defmodule GallformersWeb.GallLive do
   defp reselect(%{assigns: %{selected: key}} = socket) when key != nil do
     case find_fact(socket.assigns.gall_facts, key) do
       nil -> assign(socket, selected: nil, fact: nil)
-      fact -> assign(socket, fact: fact)
+      fact -> put_fact(socket, key, fact)
     end
   end
 
@@ -346,6 +351,8 @@ defmodule GallformersWeb.GallLive do
            selected_source: nil,
            modal_font_size: :base,
            sources_expanded: false,
+           full_record: false,
+           history: [],
            sources_order: :asc,
            map_open: false,
            facts: load_facts(socket, gall_id),
@@ -730,6 +737,11 @@ defmodule GallformersWeb.GallLive do
     {:noreply, assign(socket, sources_expanded: true)}
   end
 
+  # The Facts section, the full record (history included), is shown when
+  # asked for: the inspector reads each Fact (matter `87a1`).
+  def handle_event("toggle_full_record", _params, socket),
+    do: {:noreply, update(socket, :full_record, &(!&1))}
+
   @impl true
   def handle_event("sources_order", %{"order" => order}, socket) when order in ["asc", "desc"],
     do: {:noreply, assign(socket, sources_order: String.to_existing_atom(order))}
@@ -946,12 +958,16 @@ defmodule GallformersWeb.GallLive do
 
             <.section id="gall-inducer" title="Inducer">
               <div class="flex flex-col gap-1">
-                <.fact_ref
-                  :for={inducer <- @gall_facts.inducer}
-                  fact={inducer}
-                  selected={@selected}
-                  on_select="select_fact"
-                />
+                <p :for={inducer <- @gall_facts.inducer} class="flex flex-wrap items-baseline gap-x-1">
+                  <.fact_ref fact={inducer} selected={@selected} on_select="select_fact" />
+                  <span
+                    :if={broad = inducer.value[:broad_sense]}
+                    data-part="broad-sense"
+                    class="text-meta text-ink-2"
+                  >
+                    in its old broad sense, before {broad.source || "a Source"} split it; which taxon induces it is not known yet
+                  </span>
+                </p>
                 <p :if={@gall_facts.inducer == []} class="text-ui text-muted">
                   No Inducer: the Gall is undescribed.
                 </p>
@@ -1181,14 +1197,27 @@ defmodule GallformersWeb.GallLive do
               title="Facts"
               count={current_count(@fact_entries)}
             >
-              <:aside>What Gallformers holds about this gall, with the Sources that say it</:aside>
+              <:aside>Every statement, withdrawn and superseded ones included</:aside>
               <.facts_view
+                :if={@full_record}
                 id="gall-facts-view"
                 galls={@facts}
                 mode={:public}
                 gall_header={false}
                 history
+                refs={Map.new(@gall_facts.past, &{&1.fact_id, &1})}
+                on_select="select_fact"
+                selected={@selected}
               />
+              <.button
+                variant="secondary"
+                phx-click="toggle_full_record"
+                aria-expanded={to_string(@full_record)}
+                aria-controls="gall-facts-view"
+                class={@full_record && "mt-3"}
+              >
+                {if @full_record, do: "Hide the full record", else: "Show the full record"}
+              </.button>
             </.section>
           </div>
 
@@ -1210,11 +1239,13 @@ defmodule GallformersWeb.GallLive do
               gall={@gall}
               curator={@curator}
               pending={(@fact && Map.get(@pending, @fact.key)) || []}
+              history={@history}
             />
             <.fact_inspector
               :if={!@editing and @fact}
               id="fact-inspector"
               fact={@fact}
+              history={@history}
               of={@gall}
               on_close="close_fact"
             />

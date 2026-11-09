@@ -268,7 +268,7 @@ defmodule Gallformers.ImportFixtures do
       mode: :add,
       producer_batch_id: "applied-#{n}",
       sha256: String.duplicate("0", 64),
-      content: %{},
+      content: Keyword.get(opts, :content, %{}),
       status: batch_status,
       applied_at: if(batch_status == :applied, do: applied_at)
     })

@@ -1082,6 +1082,263 @@ defmodule Gallformers.CurationTest do
     end
   end
 
+  describe "fixing a reading (87a1: a package of that Source, at its date)" do
+    @misread "Common on Q. lobata throughout the hills"
+
+    # Weld states the Host with a quote of its stored document; Kinsey too.
+    setup ctx do
+      {:ok, document} =
+        Sources.store_document(ctx.ada, ctx.weld, Gallformers.DoclingFixtures.document_json())
+
+      item = Sources.get_document_item(document, "#/texts/2")
+      kinsey = source_fixture("Kinsey", "1920")
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          ctx.ada,
+          %{type: "host_of", subject_taxon_id: ctx.oak.id, object_gall_id: ctx.gall.id},
+          confirm(ctx.weld, %{
+            evidence: [%{document_item_id: item.id, quote: @misread, page: "41"}],
+            names: [%{taxon_id: ctx.oak.id, name_as_written: "Q. curatula", role: "subject"}]
+          })
+        )
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          ctx.ada,
+          %{type: "host_of", subject_taxon_id: ctx.oak.id, object_gall_id: ctx.gall.id},
+          confirm(kinsey, %{evidence: [%{quote: "On Q. curata."}]})
+        )
+
+      %{kinsey: kinsey, item: item, bicolor: plant_fixture(name: "Quercus bicolorata")}
+    end
+
+    defp reading!(ctx, source, to) do
+      add!(ctx.ada, %{
+        kind: :reading,
+        gall_id: ctx.gall.id,
+        source_id: source.id,
+        key: {:host, ctx.oak.id},
+        to: to
+      })
+    end
+
+    defp host_sources(ctx, plant) do
+      case Catalog.find_gall_fact(ctx.gall.id, {:host, plant.id}) do
+        {:ok, nil} -> []
+        {:ok, id} -> id |> Facts.list_attributions() |> Enum.map(& &1.source_id) |> Enum.sort()
+      end
+    end
+
+    test "a reading fix is under the Source's authority, in words", ctx do
+      weld = Wording.source_name(ctx.weld)
+      item = reading!(ctx, ctx.weld, {:host, ctx.bicolor.id})
+      gone = reading!(ctx, ctx.kinsey, nil)
+
+      assert item.text == "Fix our reading of #{weld}: host Quercus curata → Quercus bicolorata"
+
+      assert gone.text ==
+               "Fix our reading of #{Wording.source_name(ctx.kinsey)}: it doesn't say host: Quercus curata"
+
+      by_id = Map.new(Curation.preview(ctx.ada), &{&1.id, &1})
+      assert by_id[item.id].authority == {:source, ctx.weld.id, weld}
+      assert [%{kind: :reading, text: text}] = by_id[item.id].flags
+      assert text == "#{weld}'s statement, at its date (1959)"
+
+      new_host!(ctx)
+      kinsey = Wording.source_name(ctx.kinsey)
+
+      # Gallformers first, then each Source by name, then editorial.
+      assert [
+               %{authority: :gallformers, count: 1},
+               %{authority: {:source, kinsey_id, ^kinsey}, count: 1},
+               %{authority: {:source, weld_id, ^weld}, count: 1, title: title, short: short} =
+                 group
+             ] = Curation.summary(ctx.ada).groups
+
+      assert {kinsey_id, weld_id} == {ctx.kinsey.id, ctx.weld.id}
+      assert title == "Readings fixed: #{weld}"
+      assert short == "Readings fixed: #{weld}"
+      applies = group.applies
+
+      assert applies ==
+               "Applies as one package of #{weld}: under its authority, at its date; you and each misreading are audited."
+    end
+
+    test "each Source's reading of a Fact is an item of its own", ctx do
+      first = reading!(ctx, ctx.weld, nil)
+      second = reading!(ctx, ctx.kinsey, nil)
+      again = reading!(ctx, ctx.weld, {:host, ctx.bicolor.id})
+
+      assert again.id == first.id
+      assert length(Curation.open_set(ctx.ada).items) == 2
+      assert second.id != first.id
+    end
+
+    test "only a Source that states the Fact with its quotes, never Gallformers' own", ctx do
+      spec = %{kind: :reading, gall_id: ctx.gall.id, key: {:host, ctx.bicolor.id}, to: nil}
+
+      assert {:error, :not_stated} =
+               Curation.add_item(ctx.ada, Map.put(spec, :source_id, ctx.weld.id))
+
+      own = %{spec | key: {:host, ctx.oak.id}}
+      gallformers_states!(ctx, ctx.host, "1")
+
+      assert {:error, :own_source} =
+               Curation.add_item(ctx.ada, Map.put(own, :source_id, ctx.gallformers.id))
+
+      quoteless = source_fixture("Felt", "1940")
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          ctx.ada,
+          %{type: "host_of", subject_taxon_id: ctx.oak.id, object_gall_id: ctx.gall.id},
+          confirm(quoteless)
+        )
+
+      assert {:error, :no_quotes} =
+               Curation.add_item(ctx.ada, Map.put(own, :source_id, quoteless.id))
+
+      assert {:error, :invalid_spec} =
+               Curation.add_item(
+                 ctx.ada,
+                 %{own | to: {:host, ctx.oak.id}} |> Map.put(:source_id, ctx.weld.id)
+               )
+    end
+
+    test "applying makes a package of that Source, at its date; Gallformers states nothing",
+         ctx do
+      Curation.subscribe(ctx.ada)
+      item = reading!(ctx, ctx.weld, {:host, ctx.bicolor.id})
+
+      {:ok, _} =
+        Curation.set_item_evidence(ctx.ada, item.id, %{text: "Weld names Q. bicolorata."})
+
+      assert {:ok, %{submitted: [id], held: []}} = Curation.apply(ctx.ada)
+      assert id == item.id
+      assert_received {:change_set, {:outcome, ^id, :applied}}
+
+      assert host_sources(ctx, ctx.oak) == Enum.sort([ctx.kinsey.id])
+      assert host_sources(ctx, ctx.bicolor) == [ctx.weld.id]
+
+      {:ok, fact_id} = Catalog.find_gall_fact(ctx.gall.id, {:host, ctx.bicolor.id})
+      assert [weld] = Facts.list_attributions(fact_id)
+      assert weld.stated_on == ~D[1959-01-01]
+      assert [%{quote: @misread, page: "41", document_item_id: item_id}] = weld.evidence
+      assert item_id == ctx.item.id
+
+      # The Source's words for the plant stay, read now as the plant it names.
+      bicolor_id = ctx.bicolor.id
+
+      assert [%{taxon_id: ^bicolor_id, name_as_written: "Q. curatula", name_reading: reading}] =
+               weld.names
+
+      assert reading == "Quercus bicolorata"
+
+      assert %{entries: [%Package{source_id: source_id} = package]} = Import.list_packages()
+      assert source_id == ctx.weld.id
+      assert [batch] = Import.list_batches(package)
+
+      assert batch.content["source"] == %{
+               "reading_of" => %{
+                 "gallformers_source_id" => ctx.weld.id,
+                 "why" => "Weld names Q. bicolorata."
+               }
+             }
+
+      assert Curation.open_set(ctx.ada) == nil
+    end
+
+    test "it doesn't say this: the Source's statement goes, the others' stay", ctx do
+      reading!(ctx, ctx.weld, nil)
+
+      assert {:ok, %{submitted: [_], held: []}} = Curation.apply(ctx.ada)
+      assert host_sources(ctx, ctx.oak) == [ctx.kinsey.id]
+    end
+
+    test "applying makes one Gallformers package and one package per Source whose reading was fixed",
+         ctx do
+      new_host!(ctx)
+      reading!(ctx, ctx.weld, nil)
+      reading!(ctx, ctx.kinsey, {:host, ctx.bicolor.id})
+
+      assert {:ok, %{submitted: [_, _, _], held: []}} = Curation.apply(ctx.ada)
+
+      sources = for p <- Import.list_packages().entries, do: p.source_id
+      assert Enum.sort(sources) == Enum.sort([ctx.gallformers.id, ctx.weld.id, ctx.kinsey.id])
+      assert host_sources(ctx, ctx.oak) == []
+      assert host_sources(ctx, ctx.bicolor) == [ctx.kinsey.id]
+    end
+  end
+
+  # The admin Source page fixes a reading at once (matter 87a1): any
+  # Source's, the legacy data's (no quotes) and its taxonomic statements.
+  describe "fixing a reading at once" do
+    test "the legacy data's statement, with no quotes", ctx do
+      legacy = Sources.get_legacy_data_source()
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          ctx.ada,
+          %{type: "host_of", subject_taxon_id: ctx.oak.id, object_gall_id: ctx.gall.id},
+          confirm(legacy, %{stated: nil})
+        )
+
+      spec = %{
+        kind: :reading,
+        gall_id: ctx.gall.id,
+        source_id: legacy.id,
+        key: {:host, ctx.oak.id},
+        to: nil
+      }
+
+      assert {:ok, %Package{source_id: source_id}} =
+               Curation.fix_reading(ctx.ada, spec, "The old data's genus Host.")
+
+      assert source_id == legacy.id
+      {:ok, fact_id} = Catalog.find_gall_fact(ctx.gall.id, {:host, ctx.oak.id})
+      assert Facts.get_attribution(fact_id, legacy.id) == nil
+      assert %Attribution{} = Facts.get_attribution(fact_id, ctx.weld.id)
+    end
+
+    test "a taxonomic statement: another parent, accepted in the same step", ctx do
+      family = taxon_fixture(rank: :family, name: "Aphididae", kingdom: "Animalia")
+      aphis = taxon_fixture(rank: :genus, name: "Aphis", kingdom: "Animalia", parent: family)
+
+      other =
+        taxon_fixture(rank: :genus, name: "Amphorophora", kingdom: "Animalia", parent: family)
+
+      species = taxon_fixture(name: "Aphis rubifolii", kingdom: "Animalia", parent: aphis)
+
+      {:ok, %{fact: fact, attribution: attribution}} =
+        Taxa.assert_placement(
+          ctx.ada,
+          %{taxon_id: species.id, parent_id: aphis.id},
+          confirm(ctx.weld, %{evidence: [%{quote: "Aphis rubifolii Thomas"}]})
+        )
+
+      {:ok, _} = Import.TaxonomicDecisions.decide(ctx.ada, :accept, attribution.id)
+
+      assert {:ok, %Package{}} =
+               Curation.fix_taxonomic_reading(
+                 ctx.ada,
+                 ctx.weld.id,
+                 fact.id,
+                 {:parent, other.id},
+                 "Moved in the paper.",
+                 accept: true
+               )
+
+      assert Facts.get_attribution(fact.id, ctx.weld.id) == nil
+      assert Taxa.get_taxon!(species.id).parent_id == other.id
+
+      {:ok, moved} = Taxa.find_act_fact(:placement, %{taxon_id: species.id, parent_id: other.id})
+
+      assert [%{quote: "Aphis rubifolii Thomas"}] =
+               Facts.list_attributions(moved) |> hd() |> Map.get(:evidence)
+    end
+  end
+
   describe "the import job's outcomes" do
     test "a package waiting for review leaves its items waiting, with its link", ctx do
       Curation.subscribe(ctx.ada)

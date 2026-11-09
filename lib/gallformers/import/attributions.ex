@@ -5,6 +5,7 @@ defmodule Gallformers.Import.Attributions do
 
     * **Quote evidence** becomes one evidence row per entry: the item's
       stored `document_item_id` (from the Source's stored `document.json`),
+      (a reading fix's quotes give it, `gallformers_document_item_id`),
       the quote or `whole_item`, the printed `page`, the `url`, and `cites`
       as `cites_as_written`. Gallformers locates and stores each quote's
       span.
@@ -53,7 +54,7 @@ defmodule Gallformers.Import.Attributions do
   defp quote_evidence(evidence, items) do
     for %{} = e <- evidence, not Map.has_key?(e, "statement") do
       %{
-        document_item_id: e["item"] && Map.get(items, e["item"]),
+        document_item_id: document_item_id(e, items),
         quote: e["quote"],
         whole_item: e["whole_item"] == true,
         page: e["page"],
@@ -62,6 +63,12 @@ defmodule Gallformers.Import.Attributions do
       }
     end
   end
+
+  # A reading fix's quotes name the stored Source's item by its ID.
+  defp document_item_id(%{"gallformers_document_item_id" => id}, _items) when is_integer(id),
+    do: id
+
+  defp document_item_id(e, items), do: e["item"] && Map.get(items, e["item"])
 
   defp observations(evidence) do
     for %{} = e <- evidence,

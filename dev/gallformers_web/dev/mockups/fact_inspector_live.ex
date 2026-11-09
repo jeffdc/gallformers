@@ -2,7 +2,9 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
   @moduledoc """
   Mockup (matter `d3b0`, "The Fact inspector"): the Gall page where the
   Fact viewer and the Fact editor are one thing.
-  `/dev/mockups/fact-inspector/:id` (reading), `?edit` (editing).
+  `/dev/mockups/fact-inspector/:id` (reading), `?edit` (editing),
+  `?withdrawn` (the inspector on a Fact no longer current, opened from the
+  full record).
 
   The page reads as the Gall page does; every Fact-backed value (Inducer,
   Hosts, Trait values, range places, common names) is a `fact_ref`.
@@ -17,6 +19,13 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
   Real: the Gall, its Facts and every statement (`FactEditMock.gall_panel/1`),
   the tray and Review and apply (`FactEditMock`, nothing is written).
   PROPOSED: `fact_ref`, `fact_inspector` and its actions.
+
+  PROPOSED (matter `87a1`, "A Fact's history", Jeff 2026-11-08): History at
+  the inspector's foot, a disclosure, each change to the Fact newest first
+  in plain words (who, when, what happened); here its entries for the
+  Sources' statements are the real ones, and a reading fix and an earlier
+  Gallformers position are samples. `?withdrawn` shows the standing line of
+  a Fact no longer current.
   """
   use GallformersWeb, :live_view
 
@@ -47,6 +56,7 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
            selected: nil,
            action: nil,
            corrections?: false,
+           withdrawn?: false,
            hint_dismissed?: false,
            obs: empty_obs(),
            curator: GallformersWeb.Live.UserAuth.curator(socket.assigns.current_user),
@@ -61,7 +71,13 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
 
   @impl true
   def handle_params(params, _uri, socket),
-    do: {:noreply, assign(socket, editing: Map.has_key?(params, "edit"), action: nil)}
+    do:
+      {:noreply,
+       assign(socket,
+         editing: Map.has_key?(params, "edit"),
+         withdrawn?: Map.has_key?(params, "withdrawn"),
+         action: nil
+       )}
 
   defp empty_obs,
     do: %{url: "", proposal: nil, error: nil, items: MapSet.new(), photos: MapSet.new()}
@@ -464,6 +480,7 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
                 editing={@editing}
                 action={@action}
                 corrections?={@corrections?}
+                withdrawn?={@withdrawn?}
                 obs={@obs}
                 cats={@cats}
               />
@@ -582,6 +599,7 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
   attr :editing, :boolean, required: true
   attr :action, :any, required: true
   attr :corrections?, :boolean, required: true
+  attr :withdrawn?, :boolean, default: false
   attr :obs, :map, default: nil
   attr :cats, :map, default: %{}
 
@@ -750,7 +768,8 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
             Enum.map(others, &{:source, &1}),
         counting: Enum.count(lines, &(&1.state == :counts)),
         unconfirmed?: lines != [] and Enum.all?(lines, &(&1.own? and &1.date == "undated")),
-        any_other?: others != []
+        any_other?: others != [],
+        history: history(lines, assigns.withdrawn?)
       )
 
     ~H"""
@@ -763,7 +782,12 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
       </p>
     </div>
 
-    <p class="mt-3 flex flex-wrap items-center gap-2 text-ui text-ink-2">
+    <%!-- PROPOSED: a Fact no longer current, opened from the full record --%>
+    <p :if={@withdrawn?} class="mt-3 flex flex-wrap items-center gap-2 text-ui text-ink-2">
+      <.chip variant={:neutral}>Withdrawn</.chip>
+      <span>Weld 2001 says it isn't so, newer than every Source that says so.</span>
+    </p>
+    <p :if={!@withdrawn?} class="mt-3 flex flex-wrap items-center gap-2 text-ui text-ink-2">
       <.chip :if={@unconfirmed?} variant={:warn}>Unconfirmed</.chip>
       <.chip :if={!@unconfirmed?} variant={:ok}>Holds</.chip>
       <span :if={@unconfirmed?}>Only in Gallformers' original data; no other Source states it.</span>
@@ -865,8 +889,69 @@ defmodule GallformersWeb.Dev.Mockups.FactInspectorLive do
         {if @corrections?, do: "Done fixing readings", else: "Found an error in a Source reading?"}
       </button>
     </div>
+
+    <%!-- PROPOSED: History, each change to the Fact newest first: when, what happened, who --%>
+    <details class="mt-4 border-t border-line pt-3">
+      <summary class="cursor-pointer text-meta text-link">History ({length(@history)})</summary>
+      <ol class="mt-2 flex flex-col gap-2">
+        <li :for={h <- @history} class="grid grid-cols-[6rem_1fr] gap-2 text-meta">
+          <span class="text-muted">{h.when}</span>
+          <span class="text-ink-2">
+            {h.what}<span :if={h.who} class="text-muted"> ({h.who})</span>
+            <span :if={h.sample?} class="text-caption text-muted"> · sample</span>
+          </span>
+        </li>
+      </ol>
+    </details>
     """
   end
+
+  # The Fact's history, newest first: each Source's statement (real), with
+  # a reading fix and an earlier Gallformers position as samples.
+  defp history(lines, withdrawn?) do
+    real =
+      for line <- lines do
+        %{
+          when: if(line.date in [nil, "undated"], do: "undated", else: line.date),
+          what: history_words(line),
+          who: if(line.own?, do: nil, else: "import"),
+          sample?: false
+        }
+      end
+
+    samples =
+      [
+        %{
+          when: "2026-11-02",
+          what: "Kinsey 1920: our reading fixed, it doesn't say this",
+          who: "Ada",
+          sample?: true
+        },
+        %{when: "2025-06-01", what: "Gallformers stated it", who: "Jeff", sample?: true}
+      ] ++
+        if withdrawn?,
+          do: [
+            %{
+              when: "2026-03-14",
+              what: "Withdrawn: Weld 2001 says it isn't so",
+              who: "import",
+              sample?: true
+            }
+          ],
+          else: []
+
+    # Undated (the old site's data) is the oldest.
+    Enum.sort_by(samples ++ real, &if(&1.when == "undated", do: "0000", else: &1.when), :desc)
+  end
+
+  defp history_words(%{own?: true, date: date}) when date in [nil, "undated"],
+    do: "In Gallformers' original data"
+
+  defp history_words(%{own?: true} = line), do: "Gallformers " <> stated(line)
+  defp history_words(line), do: "#{line.name} #{stated(line)}"
+
+  defp stated(%{stance: :denies}), do: "said it isn't so"
+  defp stated(_line), do: "stated it"
 
   # "says so", "says it isn't so"
   defp says(%{stance: :denies}), do: "says it isn't so"

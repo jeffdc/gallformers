@@ -12,8 +12,12 @@ defmodule Gallformers.Curation.Statements do
   observation 123.", "As Weld 1959 states.") or, with nothing, from the
   item ("A curator's statement: host: Quercus alba.").
   """
+  alias Gallformers.Catalog
   alias Gallformers.Curation.Wording
+  alias Gallformers.Facts
+  alias Gallformers.Facts.Attribution
   alias Gallformers.Places
+  alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Taxa
 
@@ -39,6 +43,94 @@ defmodule Gallformers.Curation.Statements do
       |> put_if("when_as_written", stance == "confirm" && spec[:when])
     end
   end
+
+  @doc """
+  The statements of a reading fix's decoded `spec` (matter `87a1`), for a
+  batch `source.reading_of` its Source: the misread statement marked
+  `unstated`, and what the Source does say in its place (each of `to`),
+  marked `"replaces" => :unstated` (the batch gives it the unstated
+  Fact's ID); when `to` is several values and the misread one is among
+  them, it stays and the others are stated besides. Each carries the
+  Source's words from its statement: its
+  stance, quotes (the stored items by `gallformers_document_item_id`),
+  pages, links, Observations, and its words as written for a value. `[]`
+  when the Source no longer states the Fact.
+  """
+  @spec for_reading(map()) :: [map()]
+  def for_reading(%{kind: :reading, gall_id: gall_id, source_id: source_id, key: key} = spec) do
+    with {:ok, fact_id} when is_integer(fact_id) <- Catalog.find_gall_fact(gall_id, key),
+         %Attribution{} = a <- Facts.get_attribution(fact_id, source_id) do
+      a = Repo.preload(a, [:evidence, :observations])
+      said = %{"stance" => Atom.to_string(a.stance), "evidence" => source_evidence(a)}
+
+      tos = List.wrap(spec.to)
+
+      # The misread value among several the Source gives stays stated; the
+      # others are what it says too.
+      if key in tos do
+        for to <- List.delete(tos, key), do: Map.merge(as_written(fact(to), a), said)
+      else
+        [Map.merge(as_written(fact(key), a), Map.put(said, "unstated", true))] ++
+          for to <- tos,
+              do: Map.merge(as_written(fact(to), a), Map.put(said, "replaces", :unstated))
+      end
+    else
+      _ -> []
+    end
+  end
+
+  # The Source's quotes as written, with its Observations on the first.
+  defp source_evidence(%Attribution{evidence: evidence, observations: observations}) do
+    quotes =
+      for e <- evidence do
+        if(e.whole_item, do: %{"whole_item" => true}, else: %{"quote" => e.quote})
+        |> put_if("gallformers_document_item_id", e.document_item_id)
+        |> put_if("page", e.page)
+        |> put_if("url", e.url)
+        |> put_if("cites", e.cites_as_written && %{"as_written" => e.cites_as_written})
+      end
+
+    case {quotes, observations} do
+      {[first | rest], [_ | _]} ->
+        seen =
+          Enum.map(observations, &%{"provider" => to_string(&1.provider), "id" => &1.external_id})
+
+        [Map.put(first, "observations", seen) | rest]
+
+      _ ->
+        quotes
+    end
+  end
+
+  # The Source's own words for a value: a Trait's term, a place as written,
+  # when and at what stage a record was made.
+  defp as_written(%{"kind" => "trait", "value" => value} = fact, a),
+    do: %{
+      fact
+      | "value" => %{value | "as_written" => a.term || a.value_as_written || value["as_written"]}
+    }
+
+  defp as_written(%{"place" => place} = fact, a) do
+    %{fact | "place" => %{place | "as_written" => a.value_as_written || place["as_written"]}}
+    |> put_if("when_as_written", fact["kind"] == "occurrence" && a.when_as_written)
+    |> put_if("stage_as_written", fact["kind"] == "occurrence" && a.stage_as_written)
+  end
+
+  # A Host or Inducer: the Source's own words for the taxon, read now as the
+  # taxon the fix names (`name_reading`).
+  defp as_written(%{"kind" => "relationship", "subject" => {:taxon, taxon}} = fact, a) do
+    subject = Enum.find(Repo.preload(a, :names).names, &(&1.role == "subject"))
+
+    case (subject && subject.name_as_written) || a.value_as_written do
+      written when is_binary(written) ->
+        %{fact | "subject" => {:taxon, Map.put(taxon, :name_as_written, written)}}
+
+      nil ->
+        fact
+    end
+  end
+
+  defp as_written(fact, _a), do: fact
 
   defp fact({role, taxon_id}) when role in [:inducer, :host] do
     %{

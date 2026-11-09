@@ -12,6 +12,14 @@ defmodule Gallformers.Curation.Spec do
       that exist, a Trait value the vocabulary holds.
     * **Note:** `%{kind: :note, gall_id, key, text}` — on a Fact the Gall
       has.
+    * **Reading fix:** `%{kind: :reading, gall_id, source_id, key, to}`
+      (matter `87a1`) — Source `source_id` states the Fact `key` with its
+      quotes, and Gallformers read it wrongly: `to` (a key of the same
+      kind, or several: a Trait's values) is what it says in its place,
+      nil that it doesn't say this.
+      Refused for a Source that doesn't state it (`:not_stated`), one of
+      Gallformers' own (`:own_source`) and a statement with no quotes
+      (`:no_quotes`).
     * **Editorial item:** `%{kind: :editorial, subject: {:gall, id} |
       {:plant, id}, field, value}`, plus `based_on` (text) on a plant's.
       Gall fields: `:completeness` (boolean), `:abundance` (an abundance
@@ -25,7 +33,9 @@ defmodule Gallformers.Curation.Spec do
   """
   alias Gallformers.Catalog
   alias Gallformers.Curation.Key
+  alias Gallformers.Facts
   alias Gallformers.Places
+  alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Taxa
 
@@ -36,10 +46,11 @@ defmodule Gallformers.Curation.Spec do
 
   @typedoc "A checked item: what `change_set_items` stores of it."
   @type checked :: %{
-          kind: :fact | :note | :editorial | :photo,
-          subject: {:gall | :plant, integer()},
-          key: Key.t(),
-          stored: map()
+          required(:kind) => :fact | :note | :editorial | :photo | :reading,
+          required(:subject) => {:gall | :plant, integer()},
+          required(:key) => Key.t(),
+          required(:stored) => map(),
+          optional(:source_id) => integer()
         }
 
   @doc "The editorial fields of a Gall and of a plant."
@@ -106,6 +117,11 @@ defmodule Gallformers.Curation.Spec do
     end
   end
 
+  # Fixing how Gallformers read a Source's statement of a Fact (matter
+  # `87a1`): what it does say in its place (`to`, a key of the same kind),
+  # or nil, that it doesn't say this.
+  def check(%{kind: :reading} = spec), do: check_reading(spec, tray: true)
+
   # An iNaturalist observation's photo for a Gall (matter `87a1`).
   def check(%{kind: :photo, gall_id: gall_id, observation_id: obs_id, photo_id: photo_id})
       when is_integer(gall_id) and is_integer(obs_id) and is_integer(photo_id) do
@@ -121,6 +137,36 @@ defmodule Gallformers.Curation.Spec do
   end
 
   def check(_spec), do: {:error, :invalid_spec}
+
+  @doc """
+  Checks a reading fix's spec: `{:ok, checked}` or `{:error, reason}`. In
+  the tray (`tray: true`, `check/1`'s) the Source must not be one of
+  Gallformers' own (`:own_source`: its statements change as Gallformers'
+  do) and must quote what it says (`:no_quotes`); fixed at once, from the
+  admin Source page (`tray: false`), any Source that states the Fact.
+  """
+  @spec check_reading(map(), keyword()) :: {:ok, checked()} | {:error, atom()}
+  def check_reading(%{kind: :reading, gall_id: gall_id, source_id: source_id, key: key} = spec,
+        tray: tray?
+      ) do
+    to = spec[:to]
+
+    with :ok <- gall(gall_id),
+         :ok <- fact_key(gall_id, key),
+         :ok <- reading_to(gall_id, key, to),
+         :ok <- states(gall_id, source_id, key, tray?) do
+      {:ok,
+       %{
+         kind: :reading,
+         subject: {:gall, gall_id},
+         key: key,
+         source_id: source_id,
+         stored: %{"source_id" => source_id, "to" => encode_to(to)}
+       }}
+    end
+  end
+
+  def check_reading(_spec, _opts), do: {:error, :invalid_spec}
 
   defp gall(id) when is_integer(id),
     do: if(Catalog.get_gall(id), do: :ok, else: {:error, :no_such_gall})
@@ -161,6 +207,45 @@ defmodule Gallformers.Curation.Spec do
   defp present(text) do
     if is_binary(text) and String.trim(text) != "", do: :ok, else: {:error, :invalid_spec}
   end
+
+  defp reading_to(_gall_id, _key, nil), do: :ok
+
+  # Several values: what the Source says, the misread one among them when
+  # it says that too.
+  defp reading_to(gall_id, key, [_, _ | _] = tos) do
+    Enum.reduce_while(List.delete(tos, key), :ok, fn to, :ok ->
+      case reading_to(gall_id, key, to) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp reading_to(gall_id, key, to) do
+    with :ok <- correction(:correct, key, to), do: fact_key(gall_id, to)
+  end
+
+  defp encode_to(nil), do: nil
+  defp encode_to(tos) when is_list(tos), do: Enum.map(tos, &Key.encode/1)
+  defp encode_to(to), do: Key.encode(to)
+
+  # The Source states the Fact, quoting what it says, and is not one of
+  # Gallformers' own (their statements are changed as Gallformers changes).
+  defp states(gall_id, source_id, key, tray?) when is_integer(source_id) do
+    with {:ok, fact_id} when is_integer(fact_id) <- Catalog.find_gall_fact(gall_id, key),
+         %{} = attribution <- Facts.get_attribution(fact_id, source_id) do
+      cond do
+        not tray? -> :ok
+        source_id in Sources.own_source_ids() -> {:error, :own_source}
+        Repo.preload(attribution, :evidence).evidence == [] -> {:error, :no_quotes}
+        true -> :ok
+      end
+    else
+      _ -> {:error, :not_stated}
+    end
+  end
+
+  defp states(_gall_id, _source_id, _key, _tray?), do: {:error, :invalid_spec}
 
   defp correction(:correct, key, to) do
     if Key.fact?(to) and elem(to, 0) == elem(key, 0) and to != key,
@@ -254,16 +339,15 @@ defmodule Gallformers.Curation.Spec do
   end
 
   @doc "The spec an item stored (`subject`, `key` and `stored` spec), as `add_item/2` takes it."
-  @spec decode(:fact | :note | :editorial | :photo, {atom(), integer()}, Key.t(), map()) ::
+  @spec decode(
+          :fact | :note | :editorial | :photo | :reading,
+          {atom(), integer()},
+          Key.t(),
+          map()
+        ) ::
           map()
   def decode(:fact, {:gall, gall_id}, key, stored) do
-    to =
-      with text when is_binary(text) <- stored["to"],
-           {:ok, to} <- Key.load(text) do
-        to
-      else
-        _ -> nil
-      end
+    to = decode_key(stored["to"])
 
     %{
       kind: :fact,
@@ -273,6 +357,16 @@ defmodule Gallformers.Curation.Spec do
       to: to
     }
     |> put_present(:when, stored["when"])
+  end
+
+  def decode(:reading, {:gall, gall_id}, key, stored) do
+    %{
+      kind: :reading,
+      gall_id: gall_id,
+      source_id: stored["source_id"],
+      key: key,
+      to: decode_to(stored["to"])
+    }
   end
 
   def decode(:photo, {:gall, gall_id}, _key, stored),
@@ -295,6 +389,18 @@ defmodule Gallformers.Curation.Spec do
       based_on: stored["based_on"]
     }
   end
+
+  defp decode_key(text) when is_binary(text) do
+    case Key.load(text) do
+      {:ok, key} -> key
+      :error -> nil
+    end
+  end
+
+  defp decode_key(_text), do: nil
+
+  defp decode_to(texts) when is_list(texts), do: Enum.map(texts, &decode_key/1)
+  defp decode_to(text), do: decode_key(text)
 
   defp decode_value(:name_parts, parts),
     do: Map.new(parts, fn {k, v} -> {String.to_existing_atom(k), v} end)

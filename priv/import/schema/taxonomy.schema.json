@@ -52,6 +52,14 @@
           "type": "string",
           "minLength": 1,
           "description": "Optional. The Source's own status words for this act, as written: 'syn. nov.' (this Source makes the synonymy), 'stat. rev.', 'incorrect spelling', 'nomen dubium', 'combination by Smith (1900)'. Free text."
+        },
+        "unstated": {
+          "const": true,
+          "description": "A reading fix only: the Source doesn't say this; its statement of the act is taken away."
+        },
+        "replaces": {
+          "$ref": "common.schema.json#/$defs/act_id",
+          "description": "A reading fix only: the unstated act of this batch that this one is what the Source says in place of."
         }
       }
     },

@@ -8,7 +8,7 @@
   "produced_at": "2026-11-08T14:00:00Z",
   "producer": { "name": "gallformers-curation", "version": "1" },
 
-  "source": { "reading_of": { "gallformers_source_id": 59 } },
+  "source": { "reading_of": { "gallformers_source_id": 59, "why": "Weld names Q. bicolor; Q. alba was read from the line above." } },
 
   "taxa": [
     { "ref": "t1", "name_as_written": "Andricus quercuscalifornicus", "rank": "species" },

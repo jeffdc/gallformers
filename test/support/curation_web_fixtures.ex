@@ -53,4 +53,20 @@ defmodule GallformersWeb.CurationWebFixtures do
       spring: spring
     }
   end
+
+  @doc """
+  Weld's statement of the Host, quoted ("On Q. webcurata, rarely", p. 41),
+  as a Source's statement read from its text is: so its reading can be
+  fixed (matter `87a1`).
+  """
+  def quote_weld_host!(actor, ctx) do
+    {:ok, _} =
+      Catalog.assert_relationship(
+        actor,
+        %{type: "host_of", subject_taxon_id: ctx.oak.id, object_gall_id: ctx.gall.id},
+        confirm(ctx.weld, %{evidence: [%{quote: "On Q. webcurata, rarely", page: "41"}]})
+      )
+
+    ctx
+  end
 end

@@ -99,7 +99,10 @@ defmodule GallformersWeb.CurationComponents do
           {@summary.count} {if @summary.count == 1, do: "change", else: "changes"} in your tray
         </span>
         <span data-part="groups" class="flex flex-wrap gap-1.5">
-          <span :for={group <- Map.get(@summary, :groups, [])} data-authority={group.authority}>
+          <span
+            :for={group <- Map.get(@summary, :groups, [])}
+            data-authority={authority_key(group.authority)}
+          >
             <.chip variant={:neutral} size="sm">{group.short} · {group.count}</.chip>
           </span>
         </span>
@@ -162,7 +165,7 @@ defmodule GallformersWeb.CurationComponents do
       <%= if @groups do %>
         <section
           :for={group <- @groups}
-          data-authority={group.authority}
+          data-authority={authority_key(group.authority)}
           class="flex flex-col gap-1"
         >
           <h3 class="flex items-baseline gap-2 text-subsection">
@@ -323,6 +326,10 @@ defmodule GallformersWeb.CurationComponents do
   # The set's evidence is asked while a Fact item has none of its own.
   defp shared_evidence?(items),
     do: Enum.any?(items, &(&1.kind == :fact and is_nil(&1[:evidence])))
+
+  # An authority as an attribute: "gallformers", "editorial", "source-12".
+  defp authority_key({:source, id, _name}), do: "source-#{id}"
+  defp authority_key(authority), do: to_string(authority)
 
   defp needs?(item, kind), do: Enum.any?(item.flags, &(&1.kind == kind))
 

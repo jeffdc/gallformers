@@ -57,7 +57,7 @@ defmodule Gallformers.Curation do
     ],
     exports: [ChangeSet, Item, Key, PackageListener]
 
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query, only: [from: 2, dynamic: 2]
 
   alias Gallformers.Audit.Actor
   alias Gallformers.Catalog
@@ -68,6 +68,7 @@ defmodule Gallformers.Curation do
   alias Gallformers.Curation.Key
   alias Gallformers.Curation.Review
   alias Gallformers.Curation.Spec
+  alias Gallformers.Curation.TaxonomicReading
   alias Gallformers.Curation.Wording
   alias Gallformers.Facts
   alias Gallformers.Repo
@@ -146,6 +147,7 @@ defmodule Gallformers.Curation do
   def add_item(%Actor{type: :user} = actor, spec) when is_map(spec) do
     with {:ok, checked} <- Spec.check(spec) do
       {type, subject_id} = checked.subject
+      source_id = checked[:source_id]
       now = DateTime.utc_now()
 
       result =
@@ -159,6 +161,7 @@ defmodule Gallformers.Curation do
                   i.change_set_id == ^set.id and i.kind == ^checked.kind and
                     i.subject_type == ^type and i.subject_id == ^subject_id and
                     i.key == ^checked.key,
+                where: ^same_source(source_id),
                 lock: "FOR UPDATE"
               )
             )
@@ -185,7 +188,8 @@ defmodule Gallformers.Curation do
                     kind: checked.kind,
                     subject_type: type,
                     subject_id: subject_id,
-                    key: checked.key
+                    key: checked.key,
+                    source_id: source_id
                   },
                   attrs
                 )
@@ -199,6 +203,10 @@ defmodule Gallformers.Curation do
       end
     end
   end
+
+  # One item per key, and for a reading per Source too.
+  defp same_source(nil), do: dynamic([i], is_nil(i.source_id))
+  defp same_source(id), do: dynamic([i], i.source_id == ^id)
 
   @doc "Takes an item out of the curator's set. `{:error, :not_found}` if it is not theirs."
   @spec remove_item(Actor.t(), integer()) :: :ok | {:error, :not_found}
@@ -267,6 +275,61 @@ defmodule Gallformers.Curation do
       item = item |> Ecto.Changeset.change(evidence: stored) |> Repo.update!()
       changed(actor, [])
       {:ok, decorate(item)}
+    end
+  end
+
+  # -- a reading fixed at once ------------------------------------------------------
+
+  @doc """
+  Fixes a reading at once, outside the tray (the admin Source page's
+  corrections, matter `87a1`): `spec` as `add_item/2` takes a reading item
+  (`to` may be several keys, a Trait's values; any Source that states the
+  Fact, the legacy data's and one with no quotes included), `why` the
+  curator's words (or nil), submitted as a package of that Source
+  (`Gallformers.Curation.Applying.submit_reading_fix/3`). `{:ok, package}`,
+  or `{:error, reason}`: `add_item/2`'s reasons, or why it couldn't be
+  submitted (words).
+  """
+  @spec fix_reading(Actor.t(), map(), String.t() | nil) ::
+          {:ok, Gallformers.Import.Package.t()} | {:error, atom() | String.t()}
+  def fix_reading(%Actor{} = actor, %{kind: :reading} = spec, why) do
+    with {:ok, checked} <- Spec.check_reading(spec, tray: false) do
+      decoded = Spec.decode(:reading, checked.subject, checked.key, checked.stored)
+      why = if is_binary(why) and String.trim(why) != "", do: String.trim(why)
+      Applying.submit_reading_fix(actor, decoded, why)
+    end
+  end
+
+  @doc """
+  Fixes how Gallformers read Source `source_id`'s taxonomic statement, Fact
+  `fact_id`, at once (the admin Source page, matter `87a1`): `:withdraw`
+  (it doesn't say it), `{:parent, taxon_id}` (a placement under another
+  parent) or `{:accepted, taxon_id}` (a synonym of another taxon), `why`
+  the curator's words; `accept: true` accepts what it states in place of
+  the misread statement (else it awaits a curator in the taxonomy queue).
+  Submitted as a taxonomy batch of that Source
+  (`Gallformers.Curation.TaxonomicReading`). `{:ok, package}`, or
+  `{:error, reason}`: `:not_stated`, `:not_correctable`, `:unchanged`, or
+  why it couldn't be submitted (words).
+  """
+  @spec fix_taxonomic_reading(
+          Actor.t(),
+          integer(),
+          integer(),
+          term(),
+          String.t() | nil,
+          keyword()
+        ) ::
+          {:ok, Gallformers.Import.Package.t()} | {:error, atom() | String.t()}
+  def fix_taxonomic_reading(%Actor{} = actor, source_id, fact_id, fix, why, opts \\ []) do
+    why = if is_binary(why) and String.trim(why) != "", do: String.trim(why)
+
+    with {:ok, batch} <-
+           TaxonomicReading.batch(source_id, fact_id, fix, why, Keyword.get(opts, :accept, false)) do
+      case Gallformers.Import.submit_reading_fix(actor, %{"taxonomy.json" => batch}) do
+        {:ok, package} -> {:ok, package}
+        {:error, reason} -> {:error, "the reading fix could not be submitted: #{inspect(reason)}"}
+      end
     end
   end
 
@@ -518,17 +581,24 @@ defmodule Gallformers.Curation do
 
   @typedoc """
   The authority a change is made under (matter `d3b0`, "One tray, items
-  grouped by authority"): a Gallformers change (a Fact item), or editorial
-  (a note, an editorial field: applied to the record, not as a package).
+  grouped by authority"): a Gallformers change (a Fact item); a Source's,
+  fixing how Gallformers read it (a reading item, matter `87a1`: the
+  Source's ID and name); or editorial (a note, an editorial field: applied
+  to the record, not as a package).
   """
-  @type authority :: :gallformers | :editorial
+  @type authority :: :gallformers | {:source, integer(), String.t()} | :editorial
 
-  @doc "The authority `item` is made under (`t:authority/0`)."
+  @doc "The authority `item` (decorated) is made under (`t:authority/0`)."
   @spec authority(Item.t()) :: authority()
   def authority(%Item{kind: :fact}), do: :gallformers
+
+  def authority(%Item{kind: :reading, source_id: id}),
+    do: {:source, id, Wording.source_name(Gallformers.Sources.get_source!(id))}
+
   def authority(%Item{}), do: :editorial
 
-  # Each authority's items counted, Gallformers' first, with its words.
+  # Each authority's items counted, Gallformers' first, then each Source's
+  # by name, then editorial, with its words.
   defp groups(items) do
     items
     |> Enum.frequencies_by(&authority/1)
@@ -538,8 +608,9 @@ defmodule Gallformers.Curation do
     end)
   end
 
-  defp authority_order(:gallformers), do: 0
-  defp authority_order(:editorial), do: 2
+  defp authority_order(:gallformers), do: {0, ""}
+  defp authority_order({:source, _id, name}), do: {1, name}
+  defp authority_order(:editorial), do: {2, ""}
 
   # -- applying ------------------------------------------------------------------
 
@@ -554,6 +625,8 @@ defmodule Gallformers.Curation do
       Sources hold is submitted, adding Gallformers' statement;
     * the other Fact items become one Gallformers package (`submitted`):
       they wait in the tray for its outcome, broadcast per item;
+    * reading items become one package per Source whose reading they fix
+      (`submitted`), under its authority, at its date (matter `87a1`);
     * an item that is blocked, needs a reason or needs confirmation it was
       not given, or fails, stays in the tray (`held`, with the reason).
 
@@ -598,22 +671,24 @@ defmodule Gallformers.Curation do
     noops = for {item, :noop} <- decided, do: item
     to_submit = for {item, :submit} <- decided, do: {item, Applying.evidence(item, set.evidence)}
     {submission, submitted, failed_submit} = submit(actor, to_submit)
+    {readings, read, failed_read} = read(actor, for({item, :reading} <- decided, do: item))
 
     applied = applied_now ++ noops
 
     held =
-      for({item, {:hold, reason}} <- decided, do: {item, reason}) ++ failed_now ++ failed_submit
+      for({item, {:hold, reason}} <- decided, do: {item, reason}) ++
+        failed_now ++ failed_submit ++ failed_read
 
     Enum.each(applied, &Repo.delete!/1)
     Enum.each(held, fn {item, reason} -> hold!(item, reason) end)
     drop_empty_set(set.id)
     changed(actor, Enum.map(items, & &1.subject))
 
-    with {:ok, package, _refs} <- submission, do: settle_package(package.id)
+    for {:ok, package, _refs} <- [submission | readings], do: settle_package(package.id)
 
     %{
       applied: Enum.map(applied, & &1.id),
-      submitted: Enum.map(submitted, & &1.id),
+      submitted: Enum.map(submitted ++ read, & &1.id),
       held: Enum.map(held, fn {item, reason} -> {item.id, reason} end)
     }
   end
@@ -637,9 +712,24 @@ defmodule Gallformers.Curation do
     {submission, submitted, unnamed ++ failed}
   end
 
+  # Reading items: {each Source's submission, submitted items, [{item, reason}]}.
+  defp read(_actor, []), do: {[], [], []}
+
+  defp read(actor, items) do
+    Enum.reduce(Applying.submit_readings(actor, items), {[], [], []}, fn
+      {items, {:ok, package, refs} = submission}, {submissions, read, held} ->
+        Enum.each(items, &put_submitted(&1.id, package.id, refs[&1.id]))
+        {submissions ++ [submission], read ++ items, held}
+
+      {items, {:error, reason}}, {submissions, read, held} ->
+        {submissions, read, held ++ for(item <- items, do: {item, reason})}
+    end)
+  end
+
   defp flag_kind(flag) when is_tuple(flag), do: elem(flag, 0)
   defp flag_kind(flag), do: flag
 
+  # Held back for a flag, else how the item applies.
   defp decide(item, flags, confirmed) do
     cond do
       Map.has_key?(flags, :blocked) ->
@@ -651,16 +741,22 @@ defmodule Gallformers.Curation do
       Map.has_key?(flags, :needs_confirmation) and item.id not in confirmed ->
         {:hold, Wording.flag_text(:needs_confirmation)}
 
-      item.kind != :fact ->
-        :now
-
-      Map.has_key?(flags, :held) and not Map.has_key?(flags, :adds_statement) ->
-        :noop
-
       true ->
-        :submit
+        how(item.kind, flags)
     end
   end
+
+  # A reading fix: a package of its Source; a Fact item Gallformers states
+  # already: nothing to do; another: Gallformers' package; the rest at once.
+  defp how(:reading, _flags), do: :reading
+
+  defp how(:fact, flags) do
+    if Map.has_key?(flags, :held) and not Map.has_key?(flags, :adds_statement),
+      do: :noop,
+      else: :submit
+  end
+
+  defp how(_kind, _flags), do: :now
 
   defp record_submission(nil, _to_submit), do: {[], []}
 
@@ -821,7 +917,8 @@ defmodule Gallformers.Curation do
 
   # What an item saw when added: the Facts its key names and their standings,
   # or the field's value.
-  defp seen(%{kind: kind, subject: {:gall, gall_id}, key: key}) when kind in [:fact, :note] do
+  defp seen(%{kind: kind, subject: {:gall, gall_id}, key: key})
+       when kind in [:fact, :note, :reading] do
     case Catalog.find_gall_fact(gall_id, key) do
       {:ok, nil} -> %{"fact_id" => nil}
       {:ok, id} -> %{"fact_id" => id, "standing" => to_string(Facts.get_fact!(id).standing)}

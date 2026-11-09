@@ -46,6 +46,11 @@ defmodule Gallformers.Import.ApplyTaxonomy do
   A taxon skipped by a curator (`"skipped"`: decided skip, or its dispute
   decided skip) is not created, and the acts that name it are not written.
 
+  A reading fix (`source.reading_of`, matter `87a1`) takes the Source's
+  statement of an `unstated` act away (`Gallformers.Import.Diff.unstate/2`);
+  what it states in its place is asked like any other difference, or, with
+  `reading_of.accept`, accepted as the submitting curator.
+
   ## The context
 
   `run/1` takes a map: `:actor`, `:source`, `:batch` (with its decoded
@@ -283,10 +288,37 @@ defmodule Gallformers.Import.ApplyTaxonomy do
           accept_created(ctx, act, attribution, key, refs)
 
         {attribution, reason} ->
-          {:ok, List.wrap(TaxonomyQueue.question(attribution.id, reason, act["id"]))}
+          differs(ctx, act, attribution, reason)
       end
     end
   end
+
+  # A statement that differs from the tree: asked, or accepted when a
+  # reading fix's curator accepts it in the same step.
+  defp differs(ctx, act, attribution, reason) do
+    if accepted_reading?(ctx, act),
+      do: accept(ctx, attribution),
+      else: {:ok, List.wrap(TaxonomyQueue.question(attribution.id, reason, act["id"]))}
+  end
+
+  # A reading fix the curator accepts in the same step (`reading_of.accept`,
+  # matter `87a1`): what it states in place of a misread act is accepted,
+  # so the tree follows it where it wins; not asked.
+  defp accepted_reading?(ctx, act) do
+    match?(%{"reading_of" => %{"accept" => true}}, ctx.batch.content["source"]) and
+      not Map.has_key?(act, "unstated")
+  end
+
+  defp accept(ctx, attribution) do
+    if attribution.accepted_at == nil and
+         Facts.needs_acceptance?(attribution_kind(attribution), attribution.source_id) do
+      with {:ok, _} <- Facts.accept(ctx.actor, attribution.id), do: {:ok, []}
+    else
+      {:ok, []}
+    end
+  end
+
+  defp attribution_kind(attribution), do: Facts.get_fact!(attribution.fact_id).kind
 
   # A created taxon's name or placement as it was created with: accepted.
   defp accept_created(ctx, %{"kind" => kind, "stance" => "confirm"}, attribution, key, refs)
@@ -357,6 +389,10 @@ defmodule Gallformers.Import.ApplyTaxonomy do
 
   defp write_fact(ctx, diff, act, refs) do
     case key_and_extra(act, refs) do
+      {:ok, kind, key, _extra} when is_map_key(act, "unstated") ->
+        with {:ok, outcome} <- Diff.unstate(diff, %{kind: kind, key: key}),
+             do: {:ok, outcome, key}
+
       {:ok, kind, key, extra} ->
         attribution =
           act

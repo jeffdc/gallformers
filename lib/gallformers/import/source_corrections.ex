@@ -1,8 +1,14 @@
 defmodule Gallformers.Import.SourceCorrections do
   @moduledoc """
-  Corrections to a Source's applied Facts (matter `f14c`, "The Source's
-  Facts after approval", agreed with Jeff 2026-11-04), for errors made in
-  the original ingestion, the legacy data's included.
+  Corrections in place to a Source's applied Facts (matter `f14c`, "The
+  Source's Facts after approval", agreed with Jeff 2026-11-04), for errors
+  made in the original ingestion, the legacy data's included: retired
+  (matter `87a1`, Jeff 2026-11-08). A fix today is a reading fix of the
+  Source, a package of it through the one ingestion path
+  (`Gallformers.Curation.fix_reading/3`,
+  `Gallformers.Curation.fix_taxonomic_reading/6`). What stays is the
+  replay: the corrections logged before still replay (`replay/3`), made
+  again as they were, and are listed with the Source's fixes (`list/1`).
 
   A correction never edits a Fact: a Fact can hold several Sources'
   attributions. The curator **withdraws the Source's attribution** where
@@ -117,7 +123,8 @@ defmodule Gallformers.Import.SourceCorrections do
   Corrects Source `source_id`'s statement of Fact `fact_id` with
   `correction` (see the module doc), `note` saying why (required), as
   `actor`. Options: `accept: true` accepts a taxonomic statement stated
-  anew in the same step; `author_name` (replaying) the correction's author.
+  anew in the same step; `author_name` the correction's author. Called by
+  `replay/3` only: a fix today is a reading fix (matter `87a1`).
   """
   @spec correct(Actor.t(), integer(), integer(), correction(), String.t() | nil, keyword()) ::
           {:ok, result()} | {:error, error()}
@@ -198,32 +205,38 @@ defmodule Gallformers.Import.SourceCorrections do
   defp gall_subject(source_id, fact_id) do
     with [entry] <- FactsView.entries(source_id, [fact_id]),
          gall_id when is_integer(gall_id) <- entry.gall,
-         {:ok, gall_key} <- gall_key(entry) do
+         {:ok, gall_key} <- entry_key(entry) do
       {:ok, %{type: :gall, fact_id: fact_id, gall_id: gall_id, gall_key: gall_key}}
     else
       _ -> {:error, :not_correctable}
     end
   end
 
-  defp gall_key(%{kind: :relationship, value: %{type: "host_of", subject: %{taxon_id: id}}})
-       when is_integer(id),
-       do: {:ok, {:host, id}}
+  @doc """
+  The Gall page key (`Gallformers.Catalog.gall_fact_key/0`) of a gall
+  Fact's entry in the Facts view (`Gallformers.Import.FactsView`), or
+  `:error` for one with no stable key.
+  """
+  @spec entry_key(map()) :: {:ok, Gallformers.Catalog.gall_fact_key()} | :error
+  def entry_key(%{kind: :relationship, value: %{type: "host_of", subject: %{taxon_id: id}}})
+      when is_integer(id),
+      do: {:ok, {:host, id}}
 
-  defp gall_key(%{kind: :relationship, value: %{type: "inducer_of", subject: %{taxon_id: id}}})
-       when is_integer(id),
-       do: {:ok, {:inducer, id}}
+  def entry_key(%{kind: :relationship, value: %{type: "inducer_of", subject: %{taxon_id: id}}})
+      when is_integer(id),
+      do: {:ok, {:inducer, id}}
 
-  defp gall_key(%{kind: :trait, value: %{trait: trait, value: value}})
-       when is_binary(trait) and is_binary(value),
-       do: {:ok, {:trait, trait, value}}
+  def entry_key(%{kind: :trait, value: %{trait: trait, value: value}})
+      when is_binary(trait) and is_binary(value),
+      do: {:ok, {:trait, trait, value}}
 
-  defp gall_key(%{kind: :alias, value: %{name: name}}), do: {:ok, {:alias, name}}
+  def entry_key(%{kind: :alias, value: %{name: name}}), do: {:ok, {:alias, name}}
 
-  defp gall_key(%{kind: :range, value: %{adjustment: adjustment, place: %{id: id}}}),
+  def entry_key(%{kind: :range, value: %{adjustment: adjustment, place: %{id: id}}}),
     do: {:ok, {:range, adjustment, id}}
 
-  defp gall_key(%{kind: :occurrence, value: %{place: %{id: id}}}), do: {:ok, {:occurrence, id}}
-  defp gall_key(_entry), do: :error
+  def entry_key(%{kind: :occurrence, value: %{place: %{id: id}}}), do: {:ok, {:occurrence, id}}
+  def entry_key(_entry), do: :error
 
   # -- the plan ---------------------------------------------------------------------
 

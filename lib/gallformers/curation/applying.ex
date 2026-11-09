@@ -23,6 +23,10 @@ defmodule Gallformers.Curation.Applying do
       submitted. A newer Gallformers statement keeps the Observations its
       earlier one cited.
 
+  **Reading items** (fixing how Gallformers read a Source, matter `87a1`)
+  become one package per Source (`submit_readings/2`): the Source's
+  statements read again, under its authority, at its date.
+
   `dry_run/2` applies an editorial item or note in a transaction that is
   always rolled back, so Review sees every check the apply makes.
   """
@@ -295,6 +299,90 @@ defmodule Gallformers.Curation.Applying do
     else
       {:error, reason} -> {:error, "the statement could not be submitted: #{reason_text(reason)}"}
     end
+  end
+
+  # -- reading fixes -------------------------------------------------------------
+
+  @doc """
+  Submits reading items (decorated) as one package per Source (matter
+  `87a1`): each Source's items one gall batch `source.reading_of` that
+  Source (`Gallformers.Curation.Statements.for_reading/1`, Galls and taxa
+  given by ID), its `why` the items' own Why's words, through
+  `Gallformers.Import.submit_reading_fix/2`. One result per Source:
+  `{items, {:ok, package, refs}}` (the Fact refs each item became, by item
+  ID) or `{items, {:error, reason}}`.
+  """
+  @spec submit_readings(Actor.t(), [Item.t()]) :: [
+          {[Item.t()],
+           {:ok, Import.Package.t(), %{integer() => [String.t()]}} | {:error, String.t()}}
+        ]
+  def submit_readings(actor, items) do
+    items
+    |> Enum.group_by(& &1.spec.source_id)
+    |> Enum.sort_by(fn {source_id, _items} -> source_id end)
+    |> Enum.map(fn {source_id, items} ->
+      fixes = for item <- items, do: {item.id, item.spec, item.evidence && item.evidence.text}
+      {items, submit_reading(actor, source_id, fixes)}
+    end)
+  end
+
+  @doc """
+  Submits one reading fix at once, outside the tray (the admin Source
+  page's): `spec` a decoded reading spec, `why` the curator's words or nil.
+  `{:ok, package}` or `{:error, reason}` (words).
+  """
+  @spec submit_reading_fix(Actor.t(), map(), String.t() | nil) ::
+          {:ok, Import.Package.t()} | {:error, String.t()}
+  def submit_reading_fix(actor, spec, why) do
+    with {:ok, package, _refs} <- submit_reading(actor, spec.source_id, [{:fix, spec, why}]),
+         do: {:ok, package}
+  end
+
+  # `fixes` are `{id, spec, why}`, all of Source `source_id`.
+  defp submit_reading(actor, source_id, fixes) do
+    {entries, refs, _n} =
+      fixes
+      |> Enum.group_by(fn {_id, spec, _why} -> spec.gall_id end)
+      |> Enum.reduce({[], %{}, 0}, fn {gall_id, fixes}, {entries, refs, n} ->
+        {facts, refs, n} =
+          Enum.reduce(fixes, {[], refs, n}, fn {id, spec, _why}, {acc, refs, n} ->
+            facts = Statements.for_reading(spec)
+            ids = for i <- 1..length(facts)//1, do: "f#{n + i}"
+            {acc ++ facts, Map.put(refs, id, ids), n + length(facts)}
+          end)
+
+        {entries ++ [{Catalog.gall_summary(gall_id), facts}], refs, n}
+      end)
+
+    whys = for {_id, _spec, why} <- fixes, is_binary(why), uniq: true, do: why
+
+    with {:ok, batch} <- GallformersFragment.galls_batch(entries, taxon_ids: true),
+         batch = reading_batch(batch, source_id, whys),
+         {:ok, package} <- Import.submit_reading_fix(actor, %{"gall.json" => batch}) do
+      {:ok, package, refs}
+    else
+      {:error, reason} ->
+        {:error, "the reading fix could not be submitted: #{reason_text(reason)}"}
+    end
+  end
+
+  # The fragment as a reading fix of `source_id`: its source, its Why, and
+  # each replacing Fact naming the unstated one it follows.
+  defp reading_batch(batch, source_id, whys) do
+    reading =
+      %{"gallformers_source_id" => source_id}
+      |> then(&if whys == [], do: &1, else: Map.put(&1, "why", Enum.join(whys, " ")))
+
+    {facts, _unstated} =
+      Enum.map_reduce(batch["facts"], nil, fn fact, unstated ->
+        cond do
+          fact["unstated"] -> {fact, fact["id"]}
+          fact["replaces"] == :unstated -> {%{fact | "replaces" => unstated}, unstated}
+          true -> {fact, unstated}
+        end
+      end)
+
+    %{batch | "source" => %{"reading_of" => reading}, "facts" => facts}
   end
 
   # -- outcomes ------------------------------------------------------------------

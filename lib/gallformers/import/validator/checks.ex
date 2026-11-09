@@ -130,6 +130,12 @@ defmodule Gallformers.Import.Validator.Checks do
 
   # -- evidence ----------------------------------------------------------------
 
+  # At least one, except in a reading fix of a Source with no quotes.
+  defp evidence(%{batch: %{"source" => %{"reading_of" => _}}} = c, [], _where), do: c
+
+  defp evidence(c, [], where),
+    do: error(c, "#{where}: evidence needs at least one entry (none only in a reading fix)")
+
   defp evidence(c, evidence, where) when is_list(evidence) do
     evidence
     |> Enum.with_index()
@@ -210,6 +216,7 @@ defmodule Gallformers.Import.Validator.Checks do
 
   defp taxonomy_batch(c) do
     c = unique_ids(c, "acts")
+    by_id = Map.new(list(c, "acts"), &{&1["id"], &1})
 
     list(c, "acts")
     |> Enum.with_index()
@@ -220,6 +227,7 @@ defmodule Gallformers.Import.Validator.Checks do
       |> act_taxa(act, where)
       |> act_rank(act, where)
       |> evidence(act["evidence"], where)
+      |> reading(act, by_id, where, "act")
     end)
   end
 
@@ -251,7 +259,7 @@ defmodule Gallformers.Import.Validator.Checks do
   defp gall_batch(c) do
     facts = list(c, "facts")
     by_id = Map.new(facts, &{&1["id"], &1})
-    c = unique_ids(c, "facts")
+    c = c |> unique_ids("facts") |> reading_accept()
 
     c =
       list(c, "galls")
@@ -270,7 +278,7 @@ defmodule Gallformers.Import.Validator.Checks do
       |> Enum.reduce({c, init}, fn {fact, i}, {acc, seen} ->
         where = "facts/#{i}"
         {acc, seen} = fact_checks(acc, seen, fact, by_id, where)
-        {acc |> evidence(fact["evidence"], where) |> reading(fact, by_id, where), seen}
+        {acc |> evidence(fact["evidence"], where) |> reading(fact, by_id, where, "Fact"), seen}
       end)
 
     c
@@ -279,18 +287,26 @@ defmodule Gallformers.Import.Validator.Checks do
     |> gall_statements(seen)
   end
 
+  # Accepting what a reading fix states is for taxonomic statements only.
+  defp reading_accept(%{batch: %{"source" => %{"reading_of" => %{"accept" => true}}}} = c),
+    do:
+      error(c, "source/reading_of: accept is only for a reading fix of taxonomy (taxonomy.json)")
+
+  defp reading_accept(c), do: c
+
   # A reading fix's marks (matter 87a1): only in a reading fix
-  # (`source.reading_of`); replaces names an unstated Fact of the batch.
-  defp reading(%{batch: %{"source" => %{"reading_of" => _}}} = c, fact, by_id, where) do
+  # (`source.reading_of`); replaces names an unstated Fact (or act, `what`)
+  # of the batch.
+  defp reading(%{batch: %{"source" => %{"reading_of" => _}}} = c, fact, by_id, where, what) do
     cond do
       fact["unstated"] && Map.has_key?(fact, "replaces") ->
-        error(c, "#{where}: an unstated Fact replaces nothing")
+        error(c, "#{where}: an unstated #{what} replaces nothing")
 
       Map.has_key?(fact, "replaces") and
           not match?(%{"unstated" => true}, by_id[fact["replaces"]]) ->
         error(
           c,
-          "#{where}: replaces #{fact["replaces"]}, which is not an unstated Fact in this batch"
+          "#{where}: replaces #{fact["replaces"]}, which is not an unstated #{what} in this batch"
         )
 
       true ->
@@ -298,7 +314,7 @@ defmodule Gallformers.Import.Validator.Checks do
     end
   end
 
-  defp reading(c, fact, _by_id, where) do
+  defp reading(c, fact, _by_id, where, _what) do
     c =
       Enum.reduce(["unstated", "replaces"], c, fn key, c ->
         if Map.has_key?(fact, key),

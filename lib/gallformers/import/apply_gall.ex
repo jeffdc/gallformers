@@ -38,7 +38,8 @@ defmodule Gallformers.Import.ApplyGall do
        `Gallformers.Import.GallDecisions.chosen_hosts/2`; the dispute's
        wins), is written on that plant, its statement's detail noting
        `"chosen_host_taxon_id"`.
-       Trait Facts go on the categories their terms are placed under
+       Trait Facts (but a reading fix's, written with the value the
+       curator gave) go on the categories their terms are placed under
        (`Gallformers.Import.TraitTerms.apply_plan/3`): a term placed by the
        readers' agreement is placed first, for every Source; a use that is
        a question, or kept as text, is stored on its Gall as a waiting
@@ -52,6 +53,8 @@ defmodule Gallformers.Import.ApplyGall do
        written the same way, the entries' evidence as its evidence. Decided
        after the batch is applied, these are written then (`run_set_aside/2`),
        as are the Trait Facts a question's decision writes (`run_facts/3`).
+       A reading fix's `unstated` Fact (matter `87a1`) is not stated: the
+       Source's statement of it is taken away (`Gallformers.Import.Diff.unstate/2`).
     3. `mode: replace` removes the Source's gall attributions the batch no
        longer states.
     4. Same-date conflicts the standings report, and the batch's Galls whose
@@ -91,7 +94,13 @@ defmodule Gallformers.Import.ApplyGall do
          {:ok, galls, gall_updates} <- galls(ctx, taxa),
          :ok <- TraitTerms.record_edits(ctx.actor, terms.edits) do
       diff = diff_context(ctx)
-      facts = Enum.reject(List.wrap(content["facts"]), &(&1["kind"] == "trait"))
+
+      facts =
+        content["facts"]
+        |> List.wrap()
+        |> Enum.reject(&placed_term?(content, &1))
+        |> Enum.map(&reading_term(content, &1))
+
       {qualifiers, others} = Enum.split_with(facts, &(&1["kind"] == "qualifier"))
       set_aside = SetAside.facts(Map.get(ctx, :set_aside, []))
       missed = MissedNames.facts(Map.get(ctx, :missed, []))
@@ -123,6 +132,19 @@ defmodule Gallformers.Import.ApplyGall do
       end
     end
   end
+
+  # A Trait Fact is written through its term's placement
+  # (`Gallformers.Import.TraitTerms`), except in a reading fix, whose
+  # curator gave its value.
+  defp placed_term?(%{"source" => %{"reading_of" => _}}, _fact), do: false
+  defp placed_term?(_content, fact), do: fact["kind"] == "trait"
+
+  # A reading fix's Trait Fact keeps the Source's term (its value as
+  # written), as a placed term's does.
+  defp reading_term(%{"source" => %{"reading_of" => _}}, %{"kind" => "trait"} = fact),
+    do: Map.put_new(fact, "term", get_in(fact, ["value", "as_written"]))
+
+  defp reading_term(_content, fact), do: fact
 
   @doc """
   What `run/1` writes for the batch's Trait terms
@@ -430,6 +452,9 @@ defmodule Gallformers.Import.ApplyGall do
       {:ok, Diff.unresolved("dropped by a curator: #{ctx.drop[fact["id"]]}")}
     else
       case key_and_extra(fact, refs) do
+        {:ok, kind, key, _extra} when is_map_key(fact, "unstated") ->
+          Diff.unstate(diff, %{kind: kind, key: key})
+
         {:ok, kind, key, extra} ->
           attribution =
             fact

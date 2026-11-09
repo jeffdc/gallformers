@@ -16,9 +16,10 @@ defmodule Gallformers.Import.GallformersFragment do
       is above species rank or missing — or, for a Gall with neither, by
       the first Host its statements confirm; `gallformers_gall_id` is
       checked against that;
-    * declares each taxon once (`taxa[]`, by its accepted name and rank;
-      with `gallformers_taxon_id` when `taxon_ids: true`), the identifying
-      ones first;
+    * declares each taxon once (`taxa[]`, by its accepted name and rank, or
+      as a Source wrote it, `name_as_written` on the placeholder's taxon,
+      read as its accepted name; with `gallformers_taxon_id` when
+      `taxon_ids: true`), the identifying ones first;
     * numbers the Facts `f1`, `f2`, … in the order given.
 
   `{:error, :unidentified}` for a Gall it cannot name.
@@ -134,12 +135,17 @@ defmodule Gallformers.Import.GallformersFragment do
     for fact <- facts, {_key, {:taxon, taxon}} <- fact, do: taxon
   end
 
+  # A taxon given as a Source wrote it (a reading fix's, `name_as_written`)
+  # is declared so, read as its accepted name (`name_reading`).
   defp declared(taxon, refs, opts) do
+    written = Map.get(taxon, :name_as_written)
+
     %{
       "ref" => refs[taxon.taxon_id],
-      "name_as_written" => taxon.name,
+      "name_as_written" => written || taxon.name,
       "rank" => Atom.to_string(taxon.rank)
     }
+    |> put_if("name_reading", written && written != taxon.name && taxon.name)
     |> put_if("gallformers_taxon_id", Keyword.get(opts, :taxon_ids) && taxon.taxon_id)
   end
 

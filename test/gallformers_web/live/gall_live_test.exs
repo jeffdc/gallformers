@@ -252,6 +252,9 @@ defmodule GallformersWeb.GallLiveTest do
       %{gall: gall_fixture()}
     end
 
+    defp show_full_record(view),
+      do: view |> element("#gall-facts button", "Show the full record") |> render_click()
+
     test "everyone sees them by category, each with its Sources linked", %{
       conn: conn,
       gall: gall
@@ -269,6 +272,7 @@ defmodule GallformersWeb.GallLiveTest do
         )
 
       {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+      show_full_record(view)
 
       assert has_element?(view, "#gall-facts h2", "Facts")
       red = "#gall-facts [data-role=current] [data-category=traits] [data-trait=color]"
@@ -294,6 +298,7 @@ defmodule GallformersWeb.GallLiveTest do
       trait!(gall, {"detachable", "detachable"}, confirm(weld))
 
       {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+      show_full_record(view)
 
       current = "#gall-facts [data-role=current]"
       history = "#gall-facts details[data-role=history]"
@@ -308,6 +313,57 @@ defmodule GallformersWeb.GallLiveTest do
       assert has_element?(view, "#{history} [data-trait=color]", "denied by")
       assert has_element?(view, "#{history} [data-trait=color] a[href='/source/#{weld.id}']")
       assert has_element?(view, "#{history} [data-trait=detachable]", "superseded")
+    end
+
+    # The inspector reads each Fact (matter 87a1); the section is the full
+    # record, history included, shown when asked for.
+    test "the full record is hidden until asked for, and can be hidden again", %{
+      conn: conn,
+      gall: gall
+    } do
+      trait!(gall, {"color", "red"}, confirm(source_fixture("Kinsey", "1959")))
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+
+      assert has_element?(view, "#gall-facts h2", "Facts")
+      refute has_element?(view, "#gall-facts-view")
+
+      show_full_record(view)
+      assert has_element?(view, "#gall-facts-view [data-trait=color]", "red")
+
+      view |> element("#gall-facts button", "Hide the full record") |> render_click()
+      refute has_element?(view, "#gall-facts-view")
+    end
+
+    # A Fact no longer current opens in the inspector from the full record
+    # (matter 87a1, "A Fact's history").
+    test "a withdrawn Fact opens in the inspector from the full record, with its history", %{
+      conn: conn,
+      gall: gall
+    } do
+      kinsey = source_fixture("Kinsey", "1959")
+      weld = source_fixture("Weld", "2001")
+      trait!(gall, {"color", "red"}, confirm(kinsey))
+      trait!(gall, {"color", "red"}, deny(weld))
+      trait!(gall, {"detachable", "integral"}, confirm(kinsey))
+
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}")
+      show_full_record(view)
+
+      view
+      |> element("#gall-facts details[data-role=history] button[phx-value-key='trait:color:red']")
+      |> render_click()
+
+      assert_patch(view, ~p"/gall/#{gall.id}?fact=trait:color:red")
+      assert has_element?(view, "#fact-inspector [data-part=standing]", "Withdrawn")
+      assert has_element?(view, "#fact-inspector [data-part=standing]", "says it isn't so")
+      assert has_element?(view, "#fact-inspector [data-part=history] summary", "History")
+    end
+
+    test "a current Fact's inspector has its history", %{conn: conn, gall: gall} do
+      trait!(gall, {"color", "red"}, confirm(source_fixture("Kinsey", "1959")))
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall.id}?fact=trait:color:red")
+
+      assert has_element?(view, "#fact-inspector [data-part=history] li", "stated it")
     end
 
     test "a Gall with no Facts has no Facts section", %{conn: conn, gall: gall} do

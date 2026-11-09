@@ -26,6 +26,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.Replay
   alias Gallformers.Import.SourceCorrection
+  alias Gallformers.Import.SourceCorrections
   alias Gallformers.Sources
   alias Gallformers.Taxa
 
@@ -87,7 +88,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       _ = host!(ctx.gall, ctx.rubus, confirm(ctx.paper))
 
       assert {:ok, %{correction: correction, withdrawn: [withdrawn], asserted: []}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.legacy.id,
                  fact.id,
@@ -113,7 +114,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = host!(ctx.gall, ctx.rubus, confirm(ctx.legacy, %{stated: nil}))
 
       {:ok, _} =
-        Import.correct_source_fact(test_actor(), ctx.legacy.id, fact.id, :withdraw, "Not said.")
+        SourceCorrections.correct(test_actor(), ctx.legacy.id, fact.id, :withdraw, "Not said.")
 
       assert standing(fact.id) == :unsupported
     end
@@ -122,10 +123,10 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = host!(ctx.gall, ctx.rubus, confirm(ctx.legacy, %{stated: nil}))
 
       assert {:error, :note_required} =
-               Import.correct_source_fact(test_actor(), ctx.legacy.id, fact.id, :withdraw, "  ")
+               SourceCorrections.correct(test_actor(), ctx.legacy.id, fact.id, :withdraw, "  ")
 
       assert {:error, :not_found} =
-               Import.correct_source_fact(test_actor(), ctx.paper.id, fact.id, :withdraw, "Why")
+               SourceCorrections.correct(test_actor(), ctx.paper.id, fact.id, :withdraw, "Why")
 
       assert %Attribution{} = Facts.get_attribution(fact.id, ctx.legacy.id)
       assert Import.list_source_corrections(ctx.legacy.id) == []
@@ -138,7 +139,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       assert %{updated: nil, legacy?: true} = Import.source_dates([ctx.legacy.id])[ctx.legacy.id]
 
       {:ok, %{correction: correction}} =
-        Import.correct_source_fact(test_actor(), ctx.legacy.id, fact.id, :withdraw, "Not said.")
+        SourceCorrections.correct(test_actor(), ctx.legacy.id, fact.id, :withdraw, "Not said.")
 
       assert [entry] = entries(:source_correction)
       assert entry.key["source"] == Import.StableRef.source(ctx.legacy.id)
@@ -161,12 +162,12 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
 
   describe "stating what the Source said instead" do
     test "another Host: the statement moves to that plant with the Source's words", ctx do
-      words = %{value_as_written: "Rubus", evidence: [%{quote: "on Rubus villosus frondosus"}]}
+      words = %{value_as_written: "Rubus"}
       fact = host!(ctx.gall, ctx.rubus, confirm(ctx.paper, words))
       _ = host!(ctx.gall, ctx.rubus, confirm(ctx.legacy, %{stated: nil}))
 
       assert {:ok, %{withdrawn: [withdrawn], asserted: [asserted], correction: correction}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  fact.id,
@@ -182,7 +183,6 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       [moved] = for a <- Facts.list_attributions(asserted), a.source_id == ctx.paper.id, do: a
       assert moved.value_as_written == "Rubus"
       assert moved.stated_on == ~D[2026-01-01]
-      assert [%{quote: "on Rubus villosus frondosus"}] = moved.evidence
       assert standing(asserted) == :current
 
       assert correction.kind == :host
@@ -194,7 +194,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       held = host!(ctx.gall, ctx.idaeus, confirm(ctx.paper, %{value_as_written: "R. idaeus"}))
 
       assert {:ok, %{withdrawn: [_], asserted: [asserted]}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  fact.id,
@@ -210,7 +210,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = host!(ctx.gall, ctx.rubus, confirm(ctx.paper))
 
       assert {:error, :unchanged} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  fact.id,
@@ -223,7 +223,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = trait!(ctx.gall, "color", "red", confirm(ctx.paper, %{term: "reddish"}))
 
       assert {:ok, %{withdrawn: [withdrawn], asserted: asserted}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  fact.id,
@@ -245,7 +245,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = trait!(ctx.gall, "color", "red", confirm(ctx.paper))
 
       assert {:ok, %{withdrawn: [], asserted: [_brown]}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  fact.id,
@@ -260,7 +260,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = trait!(ctx.gall, "color", "red", confirm(ctx.paper))
 
       assert {:error, :not_correctable} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  fact.id,
@@ -315,7 +315,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
 
     test "withdrawn, the tree follows what is left", ctx do
       assert {:ok, %{withdrawn: [_]}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  ctx.placement.id,
@@ -329,7 +329,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
 
     test "another parent, accepted in the same step: the tree follows", ctx do
       assert {:ok, %{asserted: [asserted]}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  ctx.placement.id,
@@ -346,7 +346,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
 
     test "another parent, not accepted: it awaits a curator, asked in the queue", ctx do
       assert {:ok, %{asserted: [asserted]}} =
-               Import.correct_source_fact(
+               SourceCorrections.correct(
                  test_actor(),
                  ctx.paper.id,
                  ctx.placement.id,
@@ -362,7 +362,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
 
     test "a withdrawn statement's open question goes with it", ctx do
       {:ok, %{asserted: [asserted]}} =
-        Import.correct_source_fact(
+        SourceCorrections.correct(
           test_actor(),
           ctx.paper.id,
           ctx.placement.id,
@@ -374,9 +374,39 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       assert [_question] = open_questions(attribution.id)
 
       {:ok, _} =
-        Import.correct_source_fact(test_actor(), ctx.paper.id, asserted, :withdraw, "No, wrong.")
+        SourceCorrections.correct(test_actor(), ctx.paper.id, asserted, :withdraw, "No, wrong.")
 
       assert open_questions(attribution.id) == []
+    end
+  end
+
+  # A fix today is a reading fix (matter 87a1); a correction logged before
+  # still replays.
+  describe "a quoted Source's gall Fact" do
+    setup ctx do
+      words = %{value_as_written: "Rubus", evidence: [%{quote: "on Rubus villosus frondosus"}]}
+      %{fact: host!(ctx.gall, ctx.rubus, confirm(ctx.paper, words))}
+    end
+
+    test "a correction logged before still replays, the Source's quotes carried", ctx do
+      key = %{
+        "source" => Import.StableRef.source(ctx.paper.id),
+        "gall" => Import.StableRef.gall(ctx.gall.id),
+        "fact" => %{"kind" => "host", "taxon" => Import.StableRef.taxon(ctx.rubus.id)}
+      }
+
+      payload = %{
+        "op" => "host",
+        "to" => Import.StableRef.taxon(ctx.frondosus.id),
+        "note" => "It is frondosus.",
+        "author" => "Cora"
+      }
+
+      assert :ok = Import.SourceCorrections.replay(test_actor(), key, payload)
+
+      assert Facts.get_attribution(ctx.fact.id, ctx.paper.id) == nil
+      moved = Facts.get_attribution(host_fact(ctx.gall, ctx.frondosus), ctx.paper.id)
+      assert [%{quote: "on Rubus villosus frondosus"}] = Repo.preload(moved, :evidence).evidence
     end
   end
 
@@ -386,7 +416,7 @@ defmodule Gallformers.Import.SourceCorrectionsTest do
       fact = host!(ctx.gall, ctx.rubus, words)
 
       {:ok, _} =
-        Import.correct_source_fact(
+        SourceCorrections.correct(
           test_actor(),
           ctx.paper.id,
           fact.id,

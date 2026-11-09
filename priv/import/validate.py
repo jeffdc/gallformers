@@ -207,6 +207,8 @@ class PackageChecks:
             self.error(f"{where}: Gall {ref} is not declared in galls")
 
     def evidence(self, evidence, where):
+        if not evidence and "reading_of" not in self.batch.get("source", {}):
+            self.error(f"{where}: evidence needs at least one entry (none only in a reading fix)")
         for i, ev in enumerate(evidence):
             path = f"{where}/evidence/{i}"
             if "statement" in ev and self.note:
@@ -229,8 +231,8 @@ class PackageChecks:
                 hint = f"; found in {', '.join(elsewhere[:3])}" if elsewhere else "; not found anywhere in the document"
                 self.error(f"{path}: quote not found in {ref}{hint}: {quote[:80]!r}")
 
-    def reading(self, fact, by_id, where):
-        """A reading fix's marks (matter 87a1): only in a reading fix; replaces names an unstated Fact."""
+    def reading(self, fact, by_id, where, what="Fact"):
+        """A reading fix's marks (matter 87a1): only in a reading fix; replaces names an unstated Fact (or act)."""
         reading = "reading_of" in self.batch.get("source", {})
         if not reading:
             for key in ("unstated", "replaces"):
@@ -243,11 +245,11 @@ class PackageChecks:
                     )
             return
         if fact.get("unstated") and "replaces" in fact:
-            self.error(f"{where}: an unstated Fact replaces nothing")
+            self.error(f"{where}: an unstated {what} replaces nothing")
         elif "replaces" in fact:
             target = by_id.get(fact["replaces"])
             if target is None or not target.get("unstated"):
-                self.error(f"{where}: replaces {fact['replaces']}, which is not an unstated Fact in this batch")
+                self.error(f"{where}: replaces {fact['replaces']}, which is not an unstated {what} in this batch")
 
     def term(self, fact, where):
         """A format 4 trait Fact's term is the Source's own words: found, ignoring case, in one of
@@ -273,6 +275,7 @@ class PackageChecks:
 
     def taxonomy_batch(self):
         self.unique_ids("acts")
+        by_id = {a.get("id"): a for a in self.batch.get("acts", [])}
         for i, act in enumerate(self.batch.get("acts", [])):
             where = f"acts/{i}"
             for key in ("taxon", "parent", "name", "accepted"):
@@ -285,11 +288,14 @@ class PackageChecks:
             if kind == "split" and self.above_family(act.get("taxon")):
                 self.error(f"{where}: split above family is not supported")
             self.evidence(act.get("evidence", []), where)
+            self.reading(act, by_id, where, "act")
 
     def gall_batch(self):
         facts = self.batch.get("facts", [])
         by_id = {f.get("id"): f for f in facts}
         self.unique_ids("facts")
+        if self.batch.get("source", {}).get("reading_of", {}).get("accept"):
+            self.error("source/reading_of: accept is only for a reading fix of taxonomy (taxonomy.json)")
         for i, g in enumerate(self.batch.get("galls", [])):
             ident = g.get("identified_by", {})
             self.taxon(ident.get("inducer"), f"galls/{i}/identified_by")

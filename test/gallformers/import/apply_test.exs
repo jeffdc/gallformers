@@ -307,7 +307,7 @@ defmodule Gallformers.Import.ApplyTest do
                fact_statement(package, "gall.json", "f2")
     end
 
-    test "an observation's quality grade and thumbnail stay on the statement (87a1)", ctx do
+    test "an observation's quality grade and thumbnail stay on the statement (87a1)", _ctx do
       gallformers = gallformers_source()
 
       batch = %{

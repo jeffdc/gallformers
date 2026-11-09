@@ -294,6 +294,55 @@ defmodule GallformersWeb.FactInspectorTest do
     end
   end
 
+  # A Fact's history (matter 87a1): at the inspector's foot, newest first.
+  describe "fact_inspector, history" do
+    test "History: each change, newest first, when, what and who" do
+      assigns = %{
+        fact: host(),
+        history: [
+          %{
+            at: ~N[2026-11-02 10:00:00],
+            what: "Kinsey 1920: our reading fixed, it doesn't say this",
+            who: "Ada"
+          },
+          %{at: ~N[2026-03-14 09:00:00], what: "Withdrawn", who: nil},
+          %{at: nil, what: "In Gallformers' original data", who: nil}
+        ]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.fact_inspector id="fact-inspector" fact={@fact} of={gall()} on_close="close" history={@history} />
+        """)
+
+      assert text(html, "[data-part=history] summary") == "History (3)"
+
+      assert html
+             |> query("[data-part=history] li")
+             |> Enum.map(&(&1 |> LazyHTML.text() |> String.split() |> Enum.join(" "))) ==
+               [
+                 "2026-11-02 Kinsey 1920: our reading fixed, it doesn't say this (Ada)",
+                 "2026-03-14 Withdrawn",
+                 "undated In Gallformers' original data"
+               ]
+    end
+
+    test "no history, no disclosure" do
+      assert count(inspector(host()), "[data-part=history]") == 0
+    end
+
+    test "a withdrawn Fact says so, and who says it isn't so" do
+      fact =
+        host(
+          standing: :withdrawn,
+          sources: [line(source_id: 61, name: "Weld 2001", date: "2001", stance: :deny), line([])]
+        )
+
+      html = inspector(fact)
+      assert text(html, "[data-part=standing]") == "Withdrawn Weld 2001 says it isn't so."
+    end
+  end
+
   describe "fact_inspector, Edit mode" do
     test "Gallformers' block holds the page's actions" do
       assigns = %{fact: host(gallformers: original_data())}
@@ -336,6 +385,42 @@ defmodule GallformersWeb.FactInspectorTest do
 
       assert count(html, "[data-part=actions]") == 0
       assert count(html, "[data-source=gallformers]") == 0
+    end
+
+    test "each other Source's block holds the page's reading fix, given its statement" do
+      assigns = %{fact: host(gallformers: original_data())}
+
+      html =
+        rendered_to_string(~H"""
+        <.fact_inspector id="fact-inspector" fact={@fact} of={gall()} on_close="close" editing>
+          <:reading :let={line}><button>Fix our reading of {line.name}…</button></:reading>
+          <:footer><button>Found an error in a Source reading?</button></:footer>
+        </.fact_inspector>
+        """)
+
+      assert text(html, "[data-source='60'] [data-part=reading]") ==
+               "Fix our reading of Kinsey 1920…"
+
+      assert text(html, "[data-source='59'] [data-part=reading]") ==
+               "Fix our reading of Weld 1959…"
+
+      assert count(html, "[data-source=gallformers] [data-part=reading]") == 0
+      assert text(html, "[data-part=footer]") == "Found an error in a Source reading?"
+    end
+
+    test "reading, no reading fixes even when the page gives them" do
+      assigns = %{fact: host()}
+
+      html =
+        rendered_to_string(~H"""
+        <.fact_inspector id="fact-inspector" fact={@fact} of={gall()} on_close="close">
+          <:reading><button>Fix our reading…</button></:reading>
+          <:footer><button>Found an error in a Source reading?</button></:footer>
+        </.fact_inspector>
+        """)
+
+      assert count(html, "[data-part=reading]") == 0
+      assert count(html, "[data-part=footer]") == 0
     end
 
     test "a new Fact: what it will be, for which Gall, and the page's form" do
