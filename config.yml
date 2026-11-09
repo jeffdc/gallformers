@@ -4,6 +4,10 @@ remote: origin
 done_checks:
     - make done-checks
 layers:
+    domain:
+        - lib/gallformers/**
+        - lib/mix/**
+        - lib/*.ex
     ui:
         - lib/gallformers_web/**
         - assets/**
