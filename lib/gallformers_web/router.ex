@@ -353,6 +353,9 @@ defmodule GallformersWeb.Router do
 
         # A Source's review as one view: checking our reading (6611, f14c).
         live "/mockups/source-reading/:package_id", Mockups.SourceReadingLive
+
+        # A taxon from iNaturalist, from a review question (matter cb28).
+        live "/mockups/inat-taxon", Mockups.InatTaxonLive
       end
     end
   end
