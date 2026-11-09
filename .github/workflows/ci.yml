@@ -16,6 +16,8 @@ on:
       - 'Dockerfile'
       - 'Dockerfile.preview'
       - 'scripts/**'
+      - 'dev/**'
+      - '.credo.exs'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
@@ -32,6 +34,8 @@ on:
       - 'Dockerfile'
       - 'Dockerfile.preview'
       - 'scripts/**'
+      - 'dev/**'
+      - '.credo.exs'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
@@ -148,6 +152,48 @@ jobs:
 
       - name: Build assets
         run: mix assets.deploy
+
+  # Dialyzer in the dev environment, as `make ci` runs it (dev compiles dev/,
+  # the custom Credo checks). Its own job and cache, so it runs alongside the
+  # others; the PLT (priv/plts) is rebuilt only when deps or the toolchain
+  # change. Dropped by accident in January (matter c800) and restored here.
+  dialyzer:
+    name: Dialyzer
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: dev
+
+    defaults:
+      run:
+        shell: 'nix develop -c bash -e {0}'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Build dev shell
+        shell: bash
+        run: nix build --no-link .#devShells.x86_64-linux.default
+
+      - name: Restore dependencies and PLT cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            deps
+            _build
+            priv/plts
+          key: ${{ runner.os }}-dialyzer-${{ hashFiles('flake.lock') }}-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-dialyzer-${{ hashFiles('flake.lock') }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Run Dialyzer
+        run: |
+          mkdir -p priv/plts
+          mix dialyzer --format github --format dialyxir
 
   api-version-check:
     name: API Version Check
