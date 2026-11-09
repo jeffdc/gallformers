@@ -29,7 +29,7 @@ defmodule Gallformers.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [precommit: :test, "gallformers.guardrails.baseline": :test]
     ]
   end
 

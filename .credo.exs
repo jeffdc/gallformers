@@ -55,6 +55,65 @@
            }},
           {Gallformers.Credo.Checks.Architecture.NoMockingLibraries, []},
 
+          # One entry point per capability (matter c800). This is the one
+          # place the owners live; change them only by deciding to. Pending
+          # callers predate the check: the list only shrinks.
+          {Gallformers.Credo.Checks.Architecture.SingleEntryPoint,
+           capabilities: [
+             %{
+               name: "WCVP name search",
+               calls: [
+                 {Gallformers.Wcvp.Lookup, [:search, :search_contains]},
+                 {:wcvp_lookup, [:search, :search_contains]}
+               ],
+               scope: "lib/gallformers_web/",
+               owners: [GallformersWeb.Choices],
+               pending: [
+                 {GallformersWeb.Admin.ReviewLive.Answer, "b230"},
+                 {GallformersWeb.Admin.TaxonomyLive.New, "b230"},
+                 {GallformersWeb.Admin.TaxonomyLive.RangeEditor, "b230"}
+               ]
+             },
+             %{
+               name: "iNat taxon search",
+               calls: [
+                 {Gallformers.Import, [:search_inat_taxa]},
+                 {Gallformers.INaturalist.Taxa, [:search]}
+               ],
+               scope: "lib/gallformers_web/",
+               owners: [GallformersWeb.Choices],
+               pending: [
+                 {GallformersWeb.Admin.ReviewLive.Answer, "b230"},
+                 {GallformersWeb.Admin.InatTaxonPanel, "b230"}
+               ]
+             },
+             %{
+               name: "Host choices",
+               calls: [{Gallformers.Taxa, [:host_choices]}],
+               scope: "lib/gallformers_web/",
+               owners: [GallformersWeb.Choices],
+               pending: [{GallformersWeb.Admin.ReviewLive.Answer, "b230"}]
+             },
+             %{
+               name: "Review decisions",
+               calls: [{Gallformers.Import, [:decide_queue_item, :decide_group]}],
+               scope: "lib/gallformers_web/",
+               owners: [GallformersWeb.Admin.ReviewLive.Answer],
+               pending: [{GallformersWeb.Admin.ReviewLive.Review, "b230"}]
+             },
+             %{
+               name: "Taxon creation",
+               calls: [{Gallformers.Taxa, [:create_taxon]}],
+               scope: "lib/",
+               owners: [
+                 Gallformers.Import,
+                 Gallformers.Import.ApplyTaxonomy,
+                 Gallformers.CatalogMigration.Taxa
+               ],
+               pending: []
+             }
+           ]},
+
           # Test quality checks (custom — only scan test/)
           # FlashOnlyAssertions and TestsOwnTheirData disabled until b016 remediation
           # {Gallformers.Credo.Checks.TestQuality.FlashOnlyAssertions,
@@ -131,6 +190,21 @@
         disabled: [
           # Disable module doc requirement for now
           {Credo.Check.Readability.ModuleDoc, false}
+        ]
+      }
+    },
+    # Copied code (matter c800), checked against a shrink-only baseline by
+    # test/gallformers/guardrails/duplicate_code_test.exs rather than by
+    # `credo --strict`. See each block with: mix credo --config-name duplicates
+    %{
+      name: "duplicates",
+      files: %{
+        included: ["lib/", "test/"],
+        excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
+      },
+      checks: %{
+        enabled: [
+          {Credo.Check.Design.DuplicatedCode, [mass_threshold: 40]}
         ]
       }
     }

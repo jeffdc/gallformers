@@ -1,98 +1,55 @@
-**CRITICAL**: 
+**CRITICAL**:
 - Investigation Before Action
 - Search Before You Write
 - The most common agent failure is writing new code for something that already exists. Do not do this.
 - Do not commit until `mix precommit` passes clean. No exceptions for failures that look pre-existing or unrelated to your change: fix them. A test that fails only sometimes has a cause (timing, data, async race); find it rather than re-running until green.
 - Features and bug fixes: write the failing test first and watch it fail for the expected reason, then implement.
-- Always compile with `--warnings-as-errors`**. When verifying code changes, NEVER use plain `mix compile` - always use `mix compile --warnings-as-errors` or run `mix precommit`. CI enforces warnings-as-errors, so skipping this locally will cause CI failures.
+- Always compile with `--warnings-as-errors`, never plain `mix compile` (or run `mix precommit`). CI enforces it.
+
+This file holds rules only. Program status goes in matters, detail in the docs it links. Keep it short enough to be read in full.
 
 ## Running mix and the databases
 
 - `mix test` and `mix precommit` choose the test environment themselves. Don't prefix them with `MIX_ENV`.
 - Other mix commands (`mix run`, `mix gallformers.*` tasks) default to `dev` and act on the dev database. Before running one that writes, know which database it targets; use `MIX_ENV=test` for throwaway scripts.
 - The dev shell (`flake.nix`) points `PGHOST`/`PGPORT` at the project's own Postgres 17 on `127.0.0.1:54317`, not a system Postgres on 5432 that may hold databases with the same names. The dev repos refuse to start without `PGPORT` (`Gallformers.Repo.DevShell`). When telling someone where data lives, check with `psql -At -c "select current_setting('port')"`.
+- Tests use their own database, one per checkout (`config/test_db_names.exs`), rebuilt by `make test` (`make test-db` to rebuild by hand). It holds `priv/repo/test_seeds.sql` converted by the catalog migration; see [README.md](README.md). Add a test case as old-style seed rows, with their curated decisions in `test/support/fixtures/catalog_migration/`. Look higher taxa up with `Gallformers.Taxa.get_by_legacy_id/2`: their IDs aren't stable.
 
-## Background Jobs
+## Background jobs
 
-Use `Oban` for durable, retryable, or scheduled background work. Reserve plain `GenServer` loops and `Process.send_after/3` for in-memory process behavior where persistence, retries, and operator visibility do not matter. The canonical queue dashboard is mounted at `/admin/jobs`.
-
-### Test Database
-
-Tests use a **separate PostgreSQL test database** (`gallformers_test`; in a git worktree `gallformers_test_<worktree>`, and likewise `wcvp_test_<worktree>`, so checkouts never share one: `config/test_db_names.exs`) that is:
-- **Schema-only**: Created via Ecto migrations (no production data)
-- **Minimal seed data**: Loaded from `priv/repo/test_seeds.sql` with just enough data for tests. The seeds fill the old tables; the catalog migration (`mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3`) then converts them into the new tables (Galls, taxa, Facts), so both exist. Add a test case by adding old-style seed rows; their curated decisions go in `test/support/fixtures/catalog_migration/`.
-- **Rebuilt fresh**: `make test` rebuilds the test DB before each run (CI runs the same steps)
-- **Higher-taxon IDs are not stable** in the converted data: look taxa up with `Gallformers.Taxa.get_by_legacy_id/2`, not by hard-coded ID. Gall and plant IDs keep their seed IDs.
-
-```bash
-make test-db               # Rebuild test database manually (rarely needed)
-```
+Use `Oban` for durable, retryable, or scheduled background work. Reserve plain `GenServer` loops and `Process.send_after/3` for in-memory process behavior where persistence, retries, and operator visibility do not matter. The queue dashboard is at `/admin/jobs`.
 
 ## Design system and UI components
 
-**CRITICAL**: All UI follows the design system in **[docs/design-system/](docs/design-system/README.md)**. Read its README before writing or changing any UI. Use its components; do NOT implement custom/inline versions of them. Creating new UI patterns or components requires explicit user approval.
-
-- **Components**: [docs/design-system/components.md](docs/design-system/components.md) is the catalog (status per component: Proposed, Approved, Built, Retiring). Components live in `lib/gallformers_web/components/`.
-- **Tokens**: style with the semantic utilities (`text-ink`, `bg-surface`, `text-section`, `rounded-panel` …) from `assets/css/system/tokens.css`. No Tailwind palette colors, default type scale, hex values, `dark:` variants or arbitrary values.
-- **Conformance**: `test/gallformers_web/design_system/conformance_test.exs` fails on new off-system styling. Fix the code; never raise the baseline to make it pass. After moving code onto the system, lock the gain in with `mix gallformers.design_system.baseline`.
-
-### Before Adding UI Code
+**CRITICAL**: All UI follows the design system in **[docs/design-system/](docs/design-system/README.md)**. Read its README before writing or changing any UI. Use its components ([the catalog](docs/design-system/components.md)); do NOT implement custom/inline versions of them. Creating new UI patterns or components requires explicit user approval.
 
 1. **Check the catalog and existing pages** for a component or pattern that fits.
 2. **If one almost fits**, extend it (and its catalog entry).
 3. **If none fits**, ASK. Write the proposed component's catalog entry for approval; don't build it inline.
 
-See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for details as needed.
+The conformance test fails on new off-system styling. Fix the code; never raise its baseline to make it pass. See [CODING_STANDARDS.md](./CODING_STANDARDS.md) for details as needed.
 
-## Domain Model
+## Domain model
 
-- **[docs/domain/domain-model.md](docs/domain/domain-model.md)** records the **domain language** being discovered for the redesign (galls, organisms, Sources, Observations). It is about the domain, not software, and is **not yet implemented**. The software design draft lives in matter `8567`.
-- **The current code and database** follow [docs/domain/general.md](docs/domain/general.md) and [docs/domain/admin-domain-reference.md](docs/domain/admin-domain-reference.md) ("everything is a species") until the taxonomy migration (matter `8567`).
-- **On the `taxogall` branch** the new back-end lives beside the old one: `Catalog`, `Taxa`, `Facts`, `Import`, `Audit` and the extended `Sources` (schema in matter `9449`, program punchlist in `50ff`). The public pages (matter `803b`) and the admin (matter `a856`: review queue, Gall page, taxonomy admin, Source editor) run on it; the old domain modules (`Galls`, `Plants`, `Species`, `Taxonomy`) are gone. The old tables stay until cutover — the catalog migration reads them by raw SQL, and `Galls.Identification` is kept only for `mix gallformers.catalog.id_parity`.
-- Don't use the target model to explain current code, or the current docs to design new work.
+- On `taxogall` the code runs on the new back-end (`Catalog`, `Taxa`, `Facts`, `Import`, `Audit`, `Sources`); its state and what's left is matter `50ff`. The old tables stay until cutover, read only by the catalog migration; [docs/domain/general.md](docs/domain/general.md) and [admin-domain-reference.md](docs/domain/admin-domain-reference.md) describe them.
+- [docs/domain/domain-model.md](docs/domain/domain-model.md) is the domain language being discovered for the redesign. It is about the domain, not software, and is not implemented. Don't use it to explain current code, or the old docs to design new work.
 
-## Work Tracking & Planning
+## Work tracking: mull is the single source of truth
 
-### Mull is the single source of truth
+All work tracking (ideas, plans, research, status) lives in **mull matters**. No plan documents are committed to git: `docs/plans/` is gitignored scratch, and a plan's decisions go into its matter before the session ends, so a future session can pick the work up from the matter alone. Summarize decisions and rationale; don't copy plans verbatim.
 
-All work tracking — ideas, plans, research, status — lives in **mull matters**. There are no separate plan documents committed to git.
+- `mull show <id>` to load a matter; `mull add "title" --epic <name>` to capture new work
+- `mull append <id> - <<'EOF'` to add body text, always piped via stdin; `--replace` to rewrite the body
+- `mull plan <id>` once its plan is agreed; `mull done <id>` when the work is complete
 
-- `mull add "title" --epic <name>` to capture new work
-- `mull append <id> - <<'EOF'` to add body text (always pipe via stdin, never use inline text args)
-- `mull append <id> - --replace` to rewrite a matter's body (pipe via stdin)
-- `mull done <id>` when work is complete
-- `mull rm <id>` to permanently delete (done matters are purged periodically; git history preserves them)
+Each plan task says what it deletes ("Deletes:") and the functions it calls ("Calls:", never "as in X"). Code-writing agents are spawned as `builder`. One matter per session.
 
-### No plan files in git
+| Content | Location |
+|---------|----------|
+| Work tracking, plans, status | Mull matter body |
+| Domain model definition | `docs/domain/domain-model.md` |
+| Incident docs | `docs/incidents/` |
+| Operational procedures | `runbooks/` |
+| AWS infrastructure (OpenTofu) | `infra/` |
 
-The `docs/plans/` directory is gitignored. Some skills may write files there as working drafts during a session — that's fine, but those files are ephemeral scratch paper. **The plan content must be captured in the mull matter before the session ends.**
-
-After a planning or brainstorming session:
-1. Distill key decisions, architecture choices, and remaining work into the matter body
-2. The matter should be self-contained — a future session should be able to pick up the work from the matter alone
-3. Don't copy plans verbatim. Summarize decisions and rationale. Drop implementation checklists that will be recreated when work begins.
-
-### What goes where
-
-| Content | Location | Persisted? |
-|---------|----------|------------|
-| Work tracking, plans, status | Mull matter body | Yes (until purged) |
-| Domain model definition | `docs/domain/domain-model.md` | Yes |
-| Ephemeral planning drafts | `docs/plans/` (gitignored) | No |
-| Incident docs | `docs/incidents/` | Yes |
-| Operational procedures | `runbooks/` | Yes |
-
-### Planning workflow
-
-When planning work for a matter:
-1. Load the matter with `mull show <id>` to get context
-2. Do research, brainstorm, design — use whatever tools help
-3. Write findings and decisions into the matter via `mull append`
-4. When the plan is solid, mark the matter as `planned` with `mull plan <id>`
-
-Check the `infra/` dir for OpenTofu defintions if you need to work with the AWS infrastructure.
-
-## Getting Help
-
-- Check README.md for setup issues
-- See [runbooks/](runbooks/) for operational procedures
+Setup problems: [README.md](README.md).

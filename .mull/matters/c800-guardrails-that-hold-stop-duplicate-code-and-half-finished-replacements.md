@@ -1,5 +1,5 @@
 ---
-status: raw
+status: planned
 created: 2026-11-09
 updated: 2026-11-09
 epic: platform
@@ -8,49 +8,132 @@ relates: [6611, cb28, b016, b230]
 
 # Guardrails that hold: stop duplicate code and half-finished replacements
 
-## Why this matter exists
+# Guardrails that hold: stop duplicate code and half-finished replacements
 
-Between 2026-11-06 and 2026-11-08 the taxogall review work (matters `6611` and `cb28`) moved faster than our plans and guardrails could hold: 51, 27 and 35 commits on those three days, against at most 21 a day before. The result was duplicate code and replacements left half finished. Jeff and Claude share the blame: we rushed past what the process could sustain.
+## Why
 
-What went wrong, found by tracing the matters and git history (2026-11-09):
+From 2026-11-06 to 11-08 the taxogall review work (`6611`, `cb28`) outran its plans and guardrails. It left duplicate code (two WCVP searches, two iNat searches, two question UIs on one back end) and replacements left half done (the old step and Facts pages still routed). CLAUDE.md already said "Search Before You Write", and the rule was broken anyway. So these guardrails fail the build or block the commit. Written rules are kept to a minimum. The cleanup of what's already there is `b230` (the slop audit); this matter adds the guardrails only.
 
-- **The plans wrote the duplication in.** 6611 Task 7 specified "Search…, Add a new plant ↗, Leave out" for a Host with no match, two answers that do the same thing. 6611 kept the old row component "for the Renames page and the old step pages until they go", so two question UIs ran on one back end. The reuse line said "WCVP search as in `TaxonomyLive.New`", which invites a copy rather than naming the function to call. The cb28 plan gave the iNat panel its own find step and turned the card's iNat search on for one page only, which made a second iNat search and a hint that's wrong on other pages.
-- **Retiring went last.** 6611 put "retire the old pages" at the end. New features (missed names, the iNat import) were built before it ran, so each had to work in both UIs.
-- **Written rules didn't hold.** CLAUDE.md already says "Search Before You Write" and that the most common failure is writing code that already exists. It was broken anyway. Long sessions made it worse: the main session was rebuilt from summaries 4 times between 11-07 and 11-09, so "use the existing X" survived only as a summary line, and agents were briefed from those summaries.
-- **Corrections Jeff had to make in that stretch:** Esc in the typeahead (the shared hook already promised it), batch Accept skipping every Trait, two iNat searches in a mockup, a misread instruction, and the review build done without failing tests first.
+## Decisions (Jeff, 2026-11-09)
 
-The full inventory of what needs cleaning up is the slop audit of 2026-11-09 (tracked in its own matter). Use it as the test set here: a guardrail is worth adding if it would have caught some of those cases.
+- Today's duplicates get a shrink-only baseline. `b230` cleans them up.
+- The reviewer runs on Sonnet 5.5. Its gate is a hard block.
+- CLAUDE.md is trimmed and kept under 5,000 bytes.
 
-## The principle
+## Done
 
-Prose rules get read, then traded away under pressure. Checks that fail the build don't. Prefer guardrails that fail `mix precommit` or CI, then ones built into the tools (hooks, agent definitions, plan templates), and only then written guidance. Keep any written guidance short enough to be read in full.
+- **CLAUDE.md trimmed** from 7,763 to 4,698 bytes (uncommitted). It had grown back from 4.0 KB since the April trim, a line or two per feature commit: taxogall status, detail already held in other docs, and rules moved out of memory. All rules kept; status replaced by a pointer to `50ff`; detail replaced by links. Dropped the seed-ID line (it invited hard-coded IDs, which `NoHardcodedIds` forbids) and the `mull rm` line.
 
-## Guardrails agreed (Jeff, 2026-11-09: add all five)
+## Tasks
 
-1. **Credo's duplicate-code check.** `.credo.exs` lists its enabled checks one by one and leaves out `Credo.Check.Design.DuplicatedCode`. Turn it on and tune its `mass_threshold` against the codebase. Decide how to handle what it finds today: fix it, or a baseline that can only shrink, like the design-system conformance test. It catches copied blocks, not "the same mechanic written differently", which is why item 2 exists.
-2. **One entry point per capability, enforced.** A custom Credo check (beside the existing ones in `dev/credo/checks/architecture`), or a `mix xref`-based test, that allows each shared capability to be called from one named module only. First candidates: the name searches (Gallformers taxa and Host choices, WCVP, iNaturalist), the review's decide functions (`Import.decide_queue_item/3` and the rest), and taxon creation. A second "name not found" search should then fail precommit instead of turning up in a walkthrough. The allowlist lives in one place and changes only when someone decides to change it.
-3. **Replacing means deleting, in the same task.** Every plan task that builds a replacement also deletes what it replaces. No "keep the old one for now". Every reuse names the function to call, never "as in X". Every agent hand-back lists each new public function and why an existing one didn't fit. Work out where this lives so it's actually used: a plan template, a skill, a check on the matter, or a test that lists modules being retired and fails once their replacement has landed.
-4. **A fresh review of each diff before commit, by a different model.** A reviewer with no stake in the plan gets the diff and one question first: what in here already exists in the codebase? It reads the code itself, not the author's summary. **The review should run on a different model from the one that wrote the code**, so it doesn't share the author's blind spots. Decide how it's triggered (a skill, a hook, a step in the commit routine), which model, what it reports, and what blocks a commit.
-5. **Shorter sessions and a slower pace.** One matter per session, starting fresh rather than compacting again and again. Matters already hold the decisions, so a fresh start loses less than a summary does. Finish and clean up one feature before starting the next. Explore what can make this stick rather than rely on intent, for example a warning when a session has compacted more than N times, or a docket rule that a matter can't start while another of its epic has retirements outstanding.
+Each lands test-first, with a test proving it fails on a known bad case, and `mix precommit` clean. Together they add about 3 seconds to precommit.
 
-## Others to explore
+### 1. Duplicate-code check with a shrink-only baseline
 
-Not agreed yet. Bring each back to Jeff with a recommendation.
+- `.credo.exs` gets a second config, `duplicates`: `Credo.Check.Design.DuplicatedCode`, `mass_threshold: 40`, over `lib/` and `test/`. The default config doesn't run it, so `credo --strict` is unchanged.
+- `test/gallformers/guardrails/duplicate_code_test.exs` runs that config through `Credo.run/1`, reads `Credo.Execution.get_issues/1`, and groups the findings by their set of files.
+  - It fails when a group occurs more often than `test/support/duplicate_code_baseline.json` allows, or occurs and isn't in the baseline.
+  - It also fails when the baseline allows more than occurs, so a cleanup is locked in.
+  - Same shape as the design-system conformance test.
+- `mix gallformers.guardrails.baseline` writes the baseline. It's run once for today's code, and after each `b230` cleanup.
+- Today: 11 pairs in `lib/`, about 20 groups in `test/`. Cost: 2.4 seconds.
+- Proof: a test that a block copied between two fixture files is reported.
 
-- **Claude Code hooks** (`.claude/settings.json`). For example, a hook when a new module or component file is created that asks for the existing one it doesn't duplicate, or a Stop hook that runs the cheap checks.
-- **Project agent definitions** (`.claude/agents/`) for the reviewer in item 4 and for builders. Each would have its model, tools and standing instructions fixed, so a brief can't drop them.
-- **No orphan pages.** A test that every routed LiveView is linked from somewhere, or is listed as deliberately unlinked. The old step and Facts pages lived on unlinked.
-- **Wider design-system conformance.** Extend the conformance test to the patterns the audit found: raw link-styled buttons instead of `button variant="link"`, hand-rolled panels, and copy-matching in code.
-- **Test fixtures.** A shared fixtures module and a check against copying setup between test files. The audit found one fixture copied five times.
-- **A slimmer CLAUDE.md.** Cut it so its rules are read in full, and move detail to linked docs. Measure what it costs in context today.
-- **A periodic slop audit**, like the 2026-11-09 one, run on a schedule or at the end of each matter, with its findings filed as matters.
-- **Better Elixir clone detection** than Credo's, if any is worth adding. Check before recommending one.
-- **The worktree and branch flow:** whether merging taxogall into feature worktrees and fast-forwarding back hides duplication that a PR-style diff review would show.
+### 2. One entry point per capability
 
-## How to work this matter
+`dev/credo/checks/architecture/single_entry_point.ex`, enabled in the default config, reads its capabilities from its params in `.credo.exs`. That's the only place the allowlist lives.
 
-1. **Explore.** Read this matter, CLAUDE.md, CODING_STANDARDS.md, `docs/design-system/README.md`, `.credo.exs`, `dev/credo/checks/`, `mix.exs` (the `precommit` alias), `.claude/settings.json`, and the slop audit's findings. Find out what each guardrail would take, and whether it would have caught the audit's cases (try it on the code as it stands).
-2. **Plan.** Write a full plan into this matter: each guardrail, how it's enforced, what it costs to run, the baseline for today's code, and the order to add them. Get Jeff's approval, then `mull plan c800`.
-3. **Execute.** Test-first where it's code. Precommit clean. Each guardrail lands with proof it fails on a known bad case.
+- **What it matches:** remote calls to the named functions, including calls made through a behaviour accessor such as `wcvp_lookup().search(...)`.
+- **What it flags:** a call from any module other than the owner.
+- **Pending callers:** each capability has a `pending` list of today's other callers, each with `b230`. The check also fails when a pending module no longer makes the call, so the list can only shrink.
 
-Constraints: Jeff's global rules apply (no destructive commands without asking, commits only when Jeff says, stage files by name, never push to main). A guardrail must not raise an existing baseline to pass. Don't weaken precommit's speed without saying what it costs.
+| Capability | Functions | Scope | Owner | Pending (cleaned up in `b230`) |
+|---|---|---|---|---|
+| WCVP name search | `search/2`, `search_contains/2` on `Wcvp.Lookup` and `wcvp_lookup()` | `lib/gallformers_web/` | `GallformersWeb.Choices` (new `wcvp_plants/2`) | `ReviewLive.Answer`, `TaxonomyLive.New`, `TaxonomyLive.RangeEditor` |
+| iNat taxon search | `Import.search_inat_taxa/1` | `lib/gallformers_web/` | `GallformersWeb.Choices` (new `inat_taxa/1`) | `ReviewLive.Answer`, `InatTaxonPanel` |
+| Host choices | `Taxa.host_choices/2` | `lib/gallformers_web/` | `GallformersWeb.Choices` | `ReviewLive.Answer` |
+| Review decisions | `Import.decide_queue_item/3`, `Import.decide_group/3` | `lib/gallformers_web/` | `ReviewLive.Answer` | `ReviewLive.Review` (batch Accept) |
+| Taxon creation | `Taxa.create_taxon/2` | all of `lib/` | `Import`, `Import.ApplyTaxonomy`, `CatalogMigration.*` | none |
+
+Cost: within `credo --strict`, under a second. Proof: a test that a new direct `wcvp_lookup().search/2` call from a LiveView is reported, and that a pending entry whose call is gone is reported.
+
+### 3. Retirements fail the build
+
+- `test/support/retirements.exs` lists `%{retire: Module, replaced_by: Module, matter: "id"}`.
+- `test/gallformers/guardrails/retirements_test.exs` fails while both modules of an entry exist.
+- Lands with an empty list and a test of the checker on a made-up entry.
+- **Rule:** a task that builds a replacement adds its entry first, as its failing test, and deletes the old module in the same commit.
+- 6611 Task 10 starts by adding `ItemRow`, `ReviewLive.Step` and `ReviewLive.Facts`, each replaced by `ReviewLive.Review`. While an entry is outstanding nothing else can be committed, which is how one feature's cleanup gets finished before the next starts.
+
+### 4. Reviewer agent and commit gate
+
+- **`.claude/agents/reuse-reviewer.md`:**
+  - `model: sonnet`; tools: Read, Grep, Glob, and Bash for the two scripts below.
+  - Standing question: what in this diff already exists in the codebase? It also asks: does a replacement here leave its old code in place, and does a commit outside a taxogall cleanup add to CLAUDE.md?
+  - It reads the code itself, not the author's summary.
+  - Its report lists each finding with the path of the existing code, then a verdict.
+- **What blocks:** a finding that names existing code the diff duplicates, or a replacement without its deletion. Everything else is noted and passes.
+- **`dev/guardrails/review_packet.sh`** writes the staged diff and the new public functions, components and modules (pulled from the diff, so not the author's account) to `.git/gallformers-review/packet.md`.
+- **`dev/guardrails/record_review.sh pass|block`** writes `.git/gallformers-review/<git write-tree>.md` with the reviewer's report and verdict.
+- **`.claude/hooks/require_review.sh`:**
+  - A PreToolUse hook on Bash, registered in `.claude/settings.json`.
+  - It blocks (exit 2) a command containing `git commit` unless the staged tree's file exists with `verdict: pass`.
+  - Merges are allowed (`.git/MERGE_HEAD` present).
+  - Restaging after a fix changes the tree, so the fixed diff is reviewed again.
+- **Commit routine:** stage by name, run the packet script, spawn `reuse-reviewer` on the packet, fix and restage until it passes, commit.
+- **Disputes:** an author who disputes a block asks Jeff, and doesn't re-run the reviewer for a different answer.
+- **Scope:** only commits made through Claude Code are gated.
+- Cost: one Sonnet run per commit.
+- Proof: a test of the hook script with a staged change and no review (blocked), with a passing review (allowed), and during a merge (allowed).
+
+### 5. Builder agent and plan lines
+
+- **`.claude/agents/builder.md`:**
+  - `model: inherit`. Every agent that writes code in this repo is spawned as `builder`.
+  - Standing instructions: search before writing, and call the functions the task names.
+  - It does the task's deletions in the same change.
+  - Its hand-back lists each new public function, component and module, and why an existing one didn't fit.
+- **CLAUDE.md, one line:** each plan task names what it deletes ("Deletes:") and the functions it calls ("Calls:", never "as in X"); code-writing agents are `builder`; one matter per session.
+
+### 6. Session hooks
+
+- **`.claude/hooks/compaction_count.sh`:** a SessionStart hook on `compact`.
+  - It counts compactions per session in `.git/gallformers-sessions/<session_id>`.
+  - From the second one on, it prints into the new context: "This session has compacted N times. Finish the current task, record where it stands in its matter, and start a fresh session."
+- **`.claude/hooks/new_lib_file.sh`:** a PreToolUse hook on Write.
+  - The first Write of a file that doesn't yet exist under `lib/` is blocked once, with: "Name the existing modules you checked and why none fits, then write it again." The next attempt at that path passes.
+- Proof: tests of both scripts against sample hook input.
+
+### 7. CLAUDE.md stays under 5,000 bytes
+
+`test/gallformers/guardrails/claude_md_test.exs` fails when `CLAUDE.md` is over 5,000 bytes. Raising the limit is Jeff's call. Lands after task 5's line is in.
+
+## Not doing
+
+- **An orphan-page test:** the retirements test covers replaced pages, the audit's case. A link finder over the router turns up about 60 false hits (API, dashboards, auth).
+- **New conformance rules** for link-styled buttons and hand-rolled panels: `b230` writes them once it has the cases.
+- **A shared test-fixtures module:** task 1 catches copied fixtures. Their cleanup is `b230`.
+- **Another clone detector, or a periodic slop audit:** tasks 1, 2 and 4 cover them.
+- **Changes to the worktree flow:** the commit gate reviews every commit's diff, whatever the flow.
+
+## Order
+
+1, 3, 2, 7, 4, 5, 6. The cheap build checks go first. The gate goes before the builder and the session hooks, so those land through it.
+
+
+## Built (2026-11-09, uncommitted)
+
+All seven tasks are built and tested; nothing is committed.
+
+- **1.** `duplicates` config in `.credo.exs`; `Gallformers.Guardrails.DuplicateCode` (`test/support/guardrails/`), its test, and `mix gallformers.guardrails.baseline` (runs in test). Baseline: 24 sets of files, 63 findings.
+- **2.** `Gallformers.Credo.Checks.Architecture.SingleEntryPoint` with 11 tests. Configured in `.credo.exs` as the table above. On its first run it caught a stale pending entry: `ItemRow` decides through `Answer` and doesn't call `Import.decide_*` itself (its mentions are docs), so it came off the list. A direct `wcvp_lookup().search` added to `HostRangeLive` was flagged, then reverted.
+- **3.** `Gallformers.Guardrails.Retirements`, `test/support/retirements.exs` (empty), 5 tests.
+- **4.** `dev/guardrails/review_packet.sh`, `dev/guardrails/record_review.sh`, `.claude/hooks/require_review.sh`, `.claude/agents/reuse-reviewer.md`, 10 tests. The hook is registered and live: a `git commit --dry-run` was blocked. The scripts were written before their test, against the TDD rule; the test came after and caught the packet printing a relative path. The reviewer agent hasn't run on a real packet yet.
+- **5.** `.claude/agents/builder.md`; CLAUDE.md's planning line (now 4,874 bytes).
+- **6.** `.claude/hooks/compaction_count.sh` and `.claude/hooks/new_lib_file.sh`, 7 tests. Both registered; the new-file hook is live (a probe Write under `lib/` was blocked). The compaction hook fires only on a real compaction.
+- **7.** `test/gallformers/guardrails/claude_md_test.exs`; proven to fail over 5,000 bytes.
+
+**Checks (corrected):** the first report said format was clean; it wasn't (the exit status was read through a pipe), and Jeff had to format three files. Under `mix precommit` the copied-code test also failed every time: `credo --strict` starts Credo's supervisor in the same VM without starting the application, so `DuplicateCode` asserting `{:ok, _} = Application.ensure_all_started(:credo)` failed as already started. Plain `mix test` never showed it. Fixed: an already-running Credo counts as started. `mix precommit` now exits 0 (4,542 tests, 0 failures, exclusions clean). Outside this matter: the dev-env compile fails on a Boundary reference in `dev/gallformers_web/dev/mockups/fact_edit_mock.ex:1000` (committed with cb28; precommit compiles in test).
+
+**Left:** commit. The reviewer's first real run was on the plant-merge work: it blocked `PlantMerges` for copying `TaxonMerges`' load, parse and chain checks; 6611 Task 10 adds the first retirement entries.
+
