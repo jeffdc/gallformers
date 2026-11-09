@@ -1,5 +1,5 @@
 ---
-status: raw
+status: done
 created: 2026-11-07
 updated: 2026-11-08
 epic: taxogall
@@ -70,3 +70,12 @@ Found while redesigning the import review with Jeff (2026-11-07; design in `6611
 - **12:** no producer re-run for a missed name. Jeff: it's far too powerful a tool for such a small scope. How a listed name is acted on is still to be discussed.
 
 - **12 back end built (uncommitted until the review handles the kind).** `Import.MissedNames`: resolving queues one `:missed_name` item per name `UnusedNames` lists, on the gall batch (`n:<normalized name>`). It never holds approval and has no proposal. Decisions: `%{"dismiss" => true}`, or `%{"state" => %{"kind" => "inducer_of" | "host_of", "taxon_id", "gall_id", "items"}}`, which writes one Relationship Fact on a Gall Gallformers holds. It is attributed to the package's Source, with the name as written and the chosen blocks as whole-item evidence. It's written when the gall batch is applied, or at once if it already is, and it replays. Migration `20261109130000_add_missed_name_queue_kind`. `UnusedNames` now prints a name without the punctuation after it ("Quercus douglasii", not "Quercus douglasii."). Review side: the 6611 session adds the card (Not needed / Add a statement… in the 87a1 editor).
+
+
+## Done (2026-11-08)
+
+All committed on `taxogall`: items 1, 2 and 4 in `171c326e`; 3, 5, 6, 7 and 8 in `50435243`; 10 and 11 in `14c67ffb`; 12 (back end) and 13 in `20782866`. Both migrations have run on `gallformers_taxogall` and `gallformers_dev`. Item 9 is `c90c`. The "Add a statement…" form for a missed name is the review's (`6611`).
+
+
+**Item 13 follow-up (Jeff, 2026-11-08):** a species with one Gall that doesn't alternate generations still goes to the curator when the Source really conflicts with that Gall (form or plant part). Only close forms count as `differ`. That is how it works already, so nothing changes.
+
