@@ -15,6 +15,7 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcePage do
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView, only: [put_flash: 3]
 
+  alias Gallformers.Catalog
   alias Gallformers.Import
   alias GallformersWeb.Admin.Review.Questions
   alias GallformersWeb.Admin.Review.Steps
@@ -71,7 +72,7 @@ defmodule GallformersWeb.Admin.ReviewLive.SourcePage do
       summaries: summaries,
       approval: approval(data.packages, entries, summaries),
       stats: Loader.stats(data.packages),
-      definitions: Loader.definitions()
+      definitions: Catalog.trait_definitions()
     )
   end
 

@@ -16,6 +16,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Renames do
 
   import GallformersWeb.ReviewComponents
 
+  alias Gallformers.Catalog
   alias GallformersWeb.Admin.Review.Questions
   alias GallformersWeb.Admin.ReviewLive.ItemRow
   alias GallformersWeb.Admin.ReviewLive.Loader
@@ -51,7 +52,11 @@ defmodule GallformersWeb.Admin.ReviewLive.Renames do
 
   defp load(socket) do
     status = if socket.assigns.show_decided, do: :all, else: :open
-    assign(socket, entries: Loader.renames(status: status), definitions: Loader.definitions())
+
+    assign(socket,
+      entries: Loader.renames(status: status),
+      definitions: Catalog.trait_definitions()
+    )
   end
 
   defp count_text([]), do: "· all decided"
