@@ -16,6 +16,20 @@ layers:
         - services/import-producer/**
     tests:
         - test/**
+    tooling:
+        - dev/githooks/**
+        - dev/guardrails/**
+        - dev/credo/**
+        - .credo.exs
+        - Makefile
+        - mix.exs
+        - mix.lock
+        - .github/**
+        - flake.*
+        - Dockerfile*
+        - fly*.toml
+        - infra/**
+        - scripts/**
     ui:
         - lib/gallformers_web/**
         - assets/**
