@@ -7,6 +7,10 @@ layers:
     data:
         - priv/repo/**
         - priv/catalog_migration/**
+    docs:
+        - docs/**
+        - runbooks/**
+        - '*.md'
     domain:
         - lib/gallformers/**
         - lib/mix/**
