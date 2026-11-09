@@ -3,4 +3,8 @@ release: main
 remote: origin
 done_checks:
     - make done-checks
-layers: {}
+layers:
+    ui:
+        - lib/gallformers_web/**
+        - assets/**
+        - dev/gallformers_web/**
