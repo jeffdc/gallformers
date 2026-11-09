@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# The commit gate (matter c800), for any commit: any agent, any harness, or a
+# terminal. Installed by dev/githooks/install.sh.
+#
+# Blocks the commit until the tree being committed has a passing reuse review:
+# <git dir>/gallformers-review/<tree>.md with "verdict: pass", recorded by
+# dev/guardrails/record_review.sh. Restaging changes the tree, so a fixed
+# change is reviewed again. A commit that concludes a merge goes through.
+#
+# The routine is in AGENTS.md ("Before you commit").
+set -uo pipefail
+
+git_dir=$(git rev-parse --git-dir) || exit 1
+[[ -f "$git_dir/MERGE_HEAD" ]] && exit 0
+
+# git sets GIT_INDEX_FILE for `commit -a` and `commit <paths>`, so this is the
+# tree that would be committed, not only what was staged.
+tree=$(git write-tree) || exit 1
+review="$git_dir/gallformers-review/$tree.md"
+
+if [[ -f "$review" ]] && grep -qx "verdict: pass" "$review"; then
+  exit 0
+fi
+
+if [[ -f "$review" ]]; then
+  echo "Commit gate: the reuse review blocked this change ($review). Fix what it found, restage, and have it reviewed again. If you dispute a finding, ask Jeff; don't re-run the review for a different answer." >&2
+else
+  echo "Commit gate: this change hasn't had a reuse review. Follow \"Before you commit\" in AGENTS.md: run dev/guardrails/review_packet.sh, have a reviewer with fresh context follow dev/guardrails/reviewer.md, and commit once it records a pass." >&2
+fi
+exit 1

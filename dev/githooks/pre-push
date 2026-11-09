@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# The push guard (matter c800), for any push: any agent, any harness, or a
+# terminal. Installed by dev/githooks/install.sh.
+#
+# 1. Blocks force pushes (history rewriting) from anyone.
+# 2. Blocks pushes to main or master from anyone: main changes through a pull
+#    request. To push main yourself, set GALLFORMERS_PUSH_MAIN=1 for that one
+#    push. Agents never do.
+#
+# git passes "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin.
+set -uo pipefail
+
+zero=0000000000000000000000000000000000000000
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # A branch deletion.
+  [[ "$local_sha" = "$zero" ]] && continue
+
+  if [[ "$remote_sha" != "$zero" ]] &&
+    ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo "Blocked: force push to ${remote_ref} (history would be rewritten)." >&2
+    exit 1
+  fi
+
+  branch="${remote_ref#refs/heads/}"
+  if [[ "$branch" = "main" || "$branch" = "master" ]] && [[ "${GALLFORMERS_PUSH_MAIN:-}" != "1" ]]; then
+    echo "Blocked: pushes to main and master go through a pull request." >&2
+    echo "To push it yourself: GALLFORMERS_PUSH_MAIN=1 git push ... (agents never do)." >&2
+    exit 1
+  fi
+done
+
+exit 0

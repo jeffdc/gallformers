@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# The reuse review's packet (matter c800): the staged change, for the
-# reuse-reviewer agent to read before a commit.
+# The reuse review's packet (matter c800): the staged change, for a reviewer
+# with fresh context to read before a commit (dev/guardrails/reviewer.md; the
+# routine is "Before you commit" in AGENTS.md).
 #
 # Writes <git dir>/gallformers-review/packet.md with the staged tree's hash,
-# the new files, the new public definitions (pulled from the diff, so they
+# the files, the new files under lib/ (each needs the reviewer's
+# justification), the new public definitions (pulled from the diff, so they
 # don't depend on the author's account) and the full staged diff. Prints the
 # packet's path.
 set -euo pipefail
@@ -28,6 +30,13 @@ tree=$(git write-tree)
   echo "## Files"
   echo
   git diff --cached --name-status | sed 's/^/    /'
+  echo
+  echo "## New files under lib/"
+  echo
+  echo "For each, the reviewer names the existing modules it searched and why none fits:"
+  echo
+  new_lib=$(git diff --cached --name-only --diff-filter=A -- ':(top)lib/')
+  if [[ -n "$new_lib" ]]; then sed 's/^/    /' <<<"$new_lib"; else echo "    None."; fi
   echo
   echo "## New public definitions"
   echo

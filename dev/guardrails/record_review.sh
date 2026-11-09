@@ -4,8 +4,8 @@
 #     dev/guardrails/record_review.sh pass|block REPORT
 #
 # Writes <git dir>/gallformers-review/<tree>.md: the verdict, then the
-# report. The commit gate (.claude/hooks/require_review.sh) lets a commit
-# through only when the staged tree has a file with "verdict: pass".
+# report. The commit gate (the git pre-commit hook dev/githooks/pre-commit)
+# lets a commit through only when its tree has a file with "verdict: pass".
 #
 # Refuses when the staging has changed since the packet was made: that
 # change hasn't been reviewed.
