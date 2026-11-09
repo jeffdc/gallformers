@@ -4,6 +4,9 @@ remote: origin
 done_checks:
     - make done-checks
 layers:
+    data:
+        - priv/repo/**
+        - priv/catalog_migration/**
     domain:
         - lib/gallformers/**
         - lib/mix/**
