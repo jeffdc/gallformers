@@ -1,0 +1,5 @@
+integration: taxogall
+release: main
+remote: origin
+done_checks: []
+layers: {}
