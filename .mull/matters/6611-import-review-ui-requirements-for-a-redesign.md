@@ -1,9 +1,9 @@
 ---
 status: planned
 created: 2026-10-30
-updated: 2026-11-08
+updated: 2026-11-09
 epic: admin
-relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28, ca45]
+relates: [a856, 20e5, e381, d213, bc0d, c8c3, c90c, cb28, ca45, c800]
 ---
 
 # Import review UI: requirements for a redesign
@@ -407,4 +407,3 @@ Every write is a public `Gallformers.Import` function taking an `Actor`, so the 
 
 
 **Direction (Jeff, 2026-11-08):** about 90% of the edits to the system will come in through ingestion, reviewed here. The Fact viewer and editor (`87a1`) is a different tool, for on-the-fly edits on a Gall or taxon: less common, still critical. The two are not to be merged. Tools the review needs to settle a question in place (the iNat taxon import, `cb28`; adding a plant) are reusable components with the review as their main caller. The review's own edits (the last step's statement edits) are built in the review, not deferred to the Fact editor.
-

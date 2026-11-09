@@ -1,9 +1,9 @@
 ---
 status: planned
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 epic: taxonomy
-relates: [e1d2, 8ba0, f923, 6611]
+relates: [e1d2, 8ba0, f923, 6611, c800]
 ---
 
 # Add a taxon from iNaturalist
@@ -118,4 +118,3 @@ Where the plan was silent, the conservative choice was taken; each is easy to ch
 14. **Requests**: the review's "Another plant…"/"Another taxon…" search asks iNaturalist once per search (debounced, 3 characters or more), beside WCVP; the panel asks once for the taxon. The User-Agent is the existing "Gallformers/1.0 (gallformers.org)".
 
 - Final `mix precommit` (after the mockup's deletion): clean. 12 doctests, 4444 tests, 0 failures (35 excluded); the exclusions check is clean (705 tests, 0 excluded). `mix compile --warnings-as-errors` is clean in dev too. Nothing committed.
-

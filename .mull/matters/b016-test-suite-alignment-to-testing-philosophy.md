@@ -1,9 +1,10 @@
 ---
 status: active
 created: 2026-03-18
-updated: 2026-09-13
+updated: 2026-11-09
 epic: platform
 docs: [docs/testing-philosophy.md]
+relates: [c800]
 ---
 
 # Test suite alignment to testing philosophy
