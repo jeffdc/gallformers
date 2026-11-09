@@ -32,6 +32,7 @@ from producer.run import (
     result_event,
     run_tool,
     sha256,
+    versioned,
 )
 
 PROMPT = paths.PROJECT / "prompts" / "verifier.md"
@@ -53,8 +54,8 @@ CONTRACT_FILES = (
 )
 
 
-def instructions_version() -> str:
-    return f"verifier.md@{sha256(PROMPT)[:12]}"
+def instructions_version(package: Path) -> str:
+    return versioned(PROMPT, contract_text(NOTE_CONTRACT_FILES if note.is_note(package) else ()))
 
 
 def blind(gall: dict) -> dict:
@@ -99,7 +100,7 @@ def contract_text(extra: tuple[str, ...] = ()) -> str:
 def build_review_prompt(package: Path, model: str = MODEL) -> str:
     fixed = {
         "reviewed": {name: sha256(package / name) for name in ("taxonomy.json", "gall.json")},
-        "reviewers": [{"model": model, "instructions_version": instructions_version()}],
+        "reviewers": [{"model": model, "instructions_version": instructions_version(package)}],
     }
     return Template(PROMPT.read_text(encoding="utf-8")).substitute(
         fixed=json.dumps(fixed, indent=2),
@@ -216,7 +217,7 @@ def run_review(
     record: dict = {
         "phase": 5,
         "effort": effort,
-        "instructions_version": instructions_version(),
+        "instructions_version": instructions_version(package),
         "reviewers": [],
     }
     reviews = []

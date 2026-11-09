@@ -71,9 +71,16 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def instructions_version() -> str:
-    """The prompt template's hash: lets the golden set trace output changes to prompt changes."""
-    return f"producer.md@{sha256(PROMPT)[:12]}"
+def versioned(prompt: Path, contract: str) -> str:
+    """A prompt template's hash and that of the contract it carries (the guides,
+    schemas, vocabulary and examples): lets the golden set trace output changes
+    to prompt or guide changes."""
+    digest = hashlib.sha256(contract.encode("utf-8")).hexdigest()
+    return f"{prompt.name}@{sha256(prompt)[:12]} contract@{digest[:12]}"
+
+
+def instructions_version(package: Path) -> str:
+    return versioned(PROMPT, contract_text(NOTE_CONTRACT_FILES if note.is_note(package) else ()))
 
 
 def contract_text(extra: tuple[str, ...] = ()) -> str:
@@ -120,7 +127,7 @@ def envelope(package: Path, phase: int) -> dict:
             "name": "gallformers-import-producer-poc",
             "version": PRODUCER_VERSION,
             "model": MODEL,
-            "instructions_version": instructions_version(),
+            "instructions_version": instructions_version(package),
         },
         "source": source,
     }
@@ -227,7 +234,7 @@ def run_phase(package: Path, phase: int, effort: str = "high", dry_run: bool = F
         "phase": phase,
         "model": MODEL,
         "effort": effort,
-        "instructions_version": instructions_version(),
+        "instructions_version": instructions_version(package),
         "prompt_chars": len(prompt),
         "command": shlex.join(command) + f" < phase{phase}.prompt.md",
     }
