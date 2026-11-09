@@ -11,6 +11,9 @@ layers:
         - lib/gallformers/**
         - lib/mix/**
         - lib/*.ex
+    import:
+        - priv/import/**
+        - services/import-producer/**
     ui:
         - lib/gallformers_web/**
         - assets/**
