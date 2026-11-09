@@ -1,0 +1,10 @@
+---
+kind: decision
+text: 'Look: host range ''select all'' sits in the table header (the bulk row shows only while something is selected)'
+plan: taxogall
+source: matter 50ff, 'For Jeff's review' (the 2026-11-06/07 build)
+by: /Users/jeff/dev/gallformers
+created: "2026-11-09T20:43:22Z"
+---
+
+bc0d's admin migration had put it above the table; this later build moved it into the header.
