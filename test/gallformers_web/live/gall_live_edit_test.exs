@@ -18,6 +18,7 @@ defmodule GallformersWeb.GallLiveEditTest do
   alias Gallformers.Accounts
   alias Gallformers.Audit.Actor
   alias Gallformers.Curation
+  alias Gallformers.Curation.Wording
 
   setup %{conn: conn} do
     {conn, user} = log_in_admin(conn, "Ada Curator")
@@ -228,6 +229,93 @@ defmodule GallformersWeb.GallLiveEditTest do
 
       assert has_element?(view, "#fact-inspector")
       refute has_element?(view, "#fact-inspector button[phx-value-action]")
+    end
+  end
+
+  # Fixing how Gallformers read a Source (matter 87a1, task 9): a level
+  # deeper than Gallformers' own changes, under the Source's authority.
+  describe "fixing a reading of a Source" do
+    setup ctx, do: quote_weld_host!(ctx.actor, ctx)
+
+    defp weld(ctx), do: "#fact-inspector [data-source='#{ctx.weld.id}']"
+
+    defp fix_reading(view, ctx) do
+      view |> element("#fact-readings-toggle") |> render_click()
+      view |> element("#{weld(ctx)} button", "Fix our reading…") |> render_click()
+    end
+
+    test "the toggle shows Fix our reading… on the other Sources only", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+
+      refute has_element?(view, "#fact-inspector button", "Fix our reading…")
+      assert has_element?(view, "#fact-readings-toggle", "Found an error in a Source reading?")
+
+      view |> element("#fact-readings-toggle") |> render_click()
+
+      assert has_element?(view, "#{weld(ctx)} button", "Fix our reading…")
+      refute has_element?(view, "#fact-inspector [data-source=gallformers] [data-part=reading]")
+      assert has_element?(view, "#fact-readings-toggle", "Done fixing readings")
+
+      view |> element("#fact-readings-toggle") |> render_click()
+      refute has_element?(view, "#fact-inspector button", "Fix our reading…")
+    end
+
+    test "the form names the Source and its date", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+      fix_reading(view, ctx)
+      name = Wording.source_name(ctx.weld)
+
+      assert has_element?(view, "#{weld(ctx)} #fact-action-form", "What #{name} actually says")
+      assert has_element?(view, "#{weld(ctx)}", "Under #{name}'s authority, at its date (1959)")
+    end
+
+    test "what the Source does say goes in the tray as its reading fix, with the Why", ctx do
+      bicolor = plant_fixture(name: "Quercus bicolorwebcurata")
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+      fix_reading(view, ctx)
+
+      view
+      |> with_target("#fact-actions")
+      |> render_hook("search_plant", %{"value" => "bicolorweb"})
+
+      view |> element("#fact-action-plant [phx-value-id='#{bicolor.id}']") |> render_click()
+      submit_why(view, "Weld names Q. bicolor on p. 41.")
+
+      assert [{:reading, %{source_id: source_id, key: {:host, oak_id}, to: {:host, to}}}] =
+               items(ctx.actor)
+
+      assert {source_id, oak_id, to} == {ctx.weld.id, ctx.oak.id, bicolor.id}
+      assert [%{evidence: %{text: "Weld names Q. bicolor on p. 41."}}] = tray(ctx.actor)
+
+      assert has_element?(
+               view,
+               "#{weld(ctx)} [data-part=reading]",
+               "In your tray: Fix our reading"
+             )
+
+      refute has_element?(view, "#fact-inspector [data-source=gallformers] [data-part=pending]")
+
+      view |> element("#{weld(ctx)} button", "Take out") |> render_click()
+      assert items(ctx.actor) == []
+    end
+
+    test "It doesn't say this: the Source's statement goes, nothing in its place", ctx do
+      {:ok, view, _html} = open_fact(ctx, "host:#{ctx.oak.id}")
+      fix_reading(view, ctx)
+
+      view
+      |> form("#fact-action-form", %{"why" => "", "unstated" => "true"})
+      |> render_submit()
+
+      assert [{:reading, %{source_id: source_id, to: nil}}] = items(ctx.actor)
+      assert source_id == ctx.weld.id
+    end
+
+    test "readers never see it", ctx do
+      conn = Phoenix.ConnTest.build_conn()
+      {:ok, view, _html} = live(conn, ~p"/gall/#{ctx.gall.id}?fact=host:#{ctx.oak.id}")
+
+      refute has_element?(view, "#fact-readings-toggle")
     end
   end
 

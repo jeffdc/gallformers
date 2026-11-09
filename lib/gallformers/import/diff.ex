@@ -16,6 +16,9 @@ defmodule Gallformers.Import.Diff do
       attribution holds does not replace it (each Gallformers statement is
       dated; the newest stands).
 
+  A reading fix's `unstated` Fact takes the Source's statement of it away
+  (`unstate/2`).
+
   After every statement, `remove_unstated/2` removes, for `mode: replace`,
   the Source's attributions of this batch type that the batch no longer
   states: a Fact left with no support becomes unsupported. `mode: add`
@@ -124,6 +127,26 @@ defmodule Gallformers.Import.Diff do
   end
 
   defp older_gallformers_statement?(_source, _existing, _attrs), do: false
+
+  @doc """
+  Takes the Source's statement of a Fact away (a reading fix's `unstated`
+  Fact, matter `87a1`: the Source doesn't say it): the Fact found by its
+  natural key loses this Source's attribution, and one no Source states
+  any more is no longer current. A Fact the Source doesn't state comes back
+  `:unresolved` with the reason, and nothing is written.
+  """
+  @spec unstate(context(), %{kind: atom(), key: map()}) :: {:ok, outcome()} | {:error, term()}
+  def unstate(ctx, %{kind: kind, key: key}) do
+    with {:ok, fact_id} when is_integer(fact_id) <- ctx.find.(kind, key),
+         true <- Map.has_key?(ctx.existing, fact_id) do
+      with {:ok, conflicts} <- Facts.remove_attribution(ctx.actor, fact_id, ctx.source.id) do
+        {:ok, %{outcome(fact_id, :resolved, nil, conflicts) | flags: ["unstated"]}}
+      end
+    else
+      {:error, changeset} -> {:ok, unresolved("invalid: #{errors(changeset)}")}
+      _not_stated -> {:ok, unresolved("the Source doesn't state this Fact")}
+    end
+  end
 
   @doc "A statement that could not be written, with the reason."
   @spec unresolved(String.t()) :: outcome()

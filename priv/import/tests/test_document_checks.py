@@ -367,3 +367,81 @@ def test_an_unstated_fact_replaces_nothing(tmp_path):
     b["facts"][0]["replaces"] = "f2"
     errors = problems(reading_package(tmp_path, b))
     assert any("facts/0" in p and "an unstated Fact replaces nothing" in p for p in errors)
+
+
+def test_a_reading_fix_may_quote_a_whole_stored_item(tmp_path):
+    b = example("reading-fix")
+    b["facts"][1]["evidence"] = [{"whole_item": True, "gallformers_document_item_id": 1234}]
+    assert problems(reading_package(tmp_path, b)) == []
+
+
+def test_a_reading_fix_may_say_why(tmp_path):
+    b = example("reading-fix")
+    b["source"]["reading_of"]["why"] = "Weld names Q. lobata; we read the next line."
+    assert problems(reading_package(tmp_path, b)) == []
+    b["source"]["reading_of"]["why"] = ""
+    assert any("why" in p for p in problems(reading_package(tmp_path, b)))
+
+
+def reading_taxonomy(tmp_path, acts, accept=False):
+    """A taxonomic reading fix's package: its taxonomy batch alone."""
+    reading_of = {"gallformers_source_id": 59}
+    if accept:
+        reading_of["accept"] = True
+    tb = {
+        "format": "gallformers-import", "format_version": 4, "vocabulary_version": "2026-10-11",
+        "batch_type": "taxonomy", "mode": "add", "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d07",
+        "produced_at": "2026-11-08T14:00:00Z", "producer": {"name": "gallformers-curation", "version": "1"},
+        "source": {"reading_of": reading_of},
+        "taxa": [
+            {"ref": "t1", "name_as_written": "Aphis rubifolii", "rank": "species"},
+            {"ref": "t2", "name_as_written": "Aphis", "rank": "genus"},
+            {"ref": "t3", "name_as_written": "Amphorophora", "rank": "genus"},
+        ],
+        "acts": acts,
+    }
+    (tmp_path / "taxonomy.json").write_text(json.dumps(tb), encoding="utf-8")
+    return tmp_path
+
+
+QUOTE = [{"quote": "Aphis rubifolii", "gallformers_document_item_id": 7, "page": "3"}]
+
+
+def test_a_taxonomic_reading_fix_passes(tmp_path):
+    acts = [
+        {"id": "a1", "stance": "confirm", "kind": "placement", "taxon": "t1", "parent": "t2", "unstated": True, "evidence": QUOTE},
+        {"id": "a2", "stance": "confirm", "kind": "placement", "taxon": "t1", "parent": "t3", "replaces": "a1", "evidence": QUOTE},
+    ]
+    assert problems(reading_taxonomy(tmp_path, acts, accept=True)) == []
+
+
+def test_unstated_and_replaces_acts_only_in_a_reading_fix(package, taxonomy):
+    tb = copy.deepcopy(taxonomy)
+    tb["acts"][0]["unstated"] = True
+    errors = problems(package(gall=None, taxonomy=tb))
+    assert any("acts/0" in p and "only in a reading fix" in p for p in errors), errors
+
+
+def test_a_replacing_act_names_an_unstated_act(tmp_path):
+    acts = [{"id": "a1", "stance": "confirm", "kind": "placement", "taxon": "t1", "parent": "t3", "replaces": "a9", "evidence": QUOTE}]
+    errors = problems(reading_taxonomy(tmp_path, acts))
+    assert any("replaces a9, which is not an unstated act in this batch" in p for p in errors), errors
+
+
+def test_a_reading_fix_of_a_source_with_no_quotes_carries_none(tmp_path):
+    b = example("reading-fix")
+    for fact in b["facts"]:
+        fact["evidence"] = []
+    assert problems(reading_package(tmp_path, b)) == []
+
+
+def test_evidence_is_needed_outside_a_reading_fix(package, batch):
+    b = copy.deepcopy(batch)
+    b["facts"][0]["evidence"] = []
+    assert any("facts/0" in p and "evidence" in p and "at least one" in p for p in problems(package(gall=b)))
+
+
+def test_accept_is_only_for_a_reading_fix_of_taxonomy(tmp_path):
+    b = example("reading-fix")
+    b["source"]["reading_of"]["accept"] = True
+    assert any("accept" in p for p in problems(reading_package(tmp_path, b)))

@@ -122,7 +122,7 @@ Rules:
 
 ## Phase 3 — Gall batch
 
-Write `gall.json` (`schema/gall.schema.json`), using taxon names as they stand after phase 2.
+Write `gall.json` (`schema/gall.schema.json`), using taxon names as they stand after phase 2. Its `taxa` are references for its Facts: a taxon's novelty is claimed once, with its name act in `taxonomy.json`, so a taxon in `gall.json` carries no `new` (as `examples/revision` declares *Andricus exemplaris*).
 
 ### Galls
 

@@ -174,9 +174,16 @@ defmodule Gallformers.Import.TraitTerms do
   with the checkers' placements from `review` (decoded `review.json`, or
   nil). Options: `:file` (the batch's file, default `"gall.json"`), `:drop`
   (Fact refs a curator dropped).
+
+  A reading fix (`source.reading_of`, matter `87a1`) has none: the curator
+  gave each of its Trait Facts its value, which is written as given.
   """
   @spec uses(map(), map() | nil, keyword()) :: [use()]
-  def uses(content, review \\ nil, opts \\ []) do
+  def uses(content, review \\ nil, opts \\ [])
+
+  def uses(%{"source" => %{"reading_of" => _}}, _review, _opts), do: []
+
+  def uses(content, review, opts) do
     file = Keyword.get(opts, :file, "gall.json")
     drop = MapSet.new(Keyword.get(opts, :drop, []))
     v4? = format(content) >= 4

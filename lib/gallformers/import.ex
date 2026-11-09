@@ -81,7 +81,8 @@ defmodule Gallformers.Import do
   (`record_synonym_added/4`, `record_plant_added/2`,
   `record_taxonomy_edit/2`, `record_wcvp_edit/2`), curators' notes on
   Facts and plant edits (`record_fact_note/5`, `record_taxon_note/5`),
-  corrections to a Source's applied Facts (`correct_source_fact/6`), and
+  corrections to a Source's applied Facts made in place before reading
+  fixes (`Gallformers.Import.SourceCorrections`, replayed only), and
   deletes and merges of Galls, taxa and plants (`record_deletion/2`,
   `record_merge/2`).
   `Gallformers.Import.Replay` replays it after the cutover data migration:
@@ -163,6 +164,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.Deletion
   alias Gallformers.Import.Disputes
   alias Gallformers.Import.FactEdits
+  alias Gallformers.Import.FactHistory
   alias Gallformers.Import.FactsView
   alias Gallformers.Import.GallDecisions
   alias Gallformers.Import.GallFacts
@@ -178,6 +180,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.Queue
   alias Gallformers.Import.QueueItem
   alias Gallformers.Import.QueueItemNote
+  alias Gallformers.Import.ReadingFixes
   alias Gallformers.Import.Replay
   alias Gallformers.Import.ReplayEntry
   alias Gallformers.Import.ReplayExport
@@ -2528,35 +2531,34 @@ defmodule Gallformers.Import do
     end
   end
 
-  # -- corrections to a Source's Facts (matter `f14c`) ---------------------------
-
-  @doc """
-  Corrects Source `source_id`'s statement of Fact `fact_id` after approval
-  (`Gallformers.Import.SourceCorrections`): `:withdraw` (the Source didn't
-  say it), or the Fact it did state instead, `{:host, plant_id}`,
-  `{:values, [value]}`, `{:parent, taxon_id | nil}` or
-  `{:accepted, taxon_id}`, its words carried over. The Fact is never
-  edited; other Sources' statements of it stay. `note` (why) is required.
-  Audited, recorded (`list_source_corrections/1`, moving the Source's
-  Updated date) and logged for replay. Options: `accept: true` accepts a
-  taxonomic statement stated anew in the same step (else it awaits a
-  curator, asked in the taxonomy queue).
-  """
-  @spec correct_source_fact(
-          Actor.t(),
-          integer(),
-          integer(),
-          SourceCorrections.correction(),
-          String.t() | nil,
-          keyword()
-        ) :: {:ok, SourceCorrections.result()} | {:error, SourceCorrections.error()}
-  defdelegate correct_source_fact(actor, source_id, fact_id, correction, note, opts \\ []),
-    to: SourceCorrections,
-    as: :correct
+  # -- corrections to a Source's Facts (matter `f14c`; fixed as readings now, 87a1) --
 
   @doc "Source `source_id`'s corrections to its Facts, newest first."
   @spec list_source_corrections(integer()) :: [SourceCorrection.t()]
   defdelegate list_source_corrections(source_id), to: SourceCorrections, as: :list
+
+  @doc """
+  Source `source_id`'s reading fixes (matter `87a1`), newest first, in
+  words: who and when, their Why, what changed
+  (`Gallformers.Import.ReadingFixes`).
+  """
+  @spec list_reading_fixes(integer()) :: [ReadingFixes.fix()]
+  defdelegate list_reading_fixes(source_id), to: ReadingFixes, as: :list
+
+  @doc """
+  The Gall page key of a gall Fact's entry in the Facts view, or `:error`
+  (`Gallformers.Import.SourceCorrections.entry_key/1`).
+  """
+  @spec gall_entry_key(map()) :: {:ok, Catalog.gall_fact_key()} | :error
+  defdelegate gall_entry_key(entry), to: SourceCorrections, as: :entry_key
+
+  @doc """
+  Fact `fact_id`'s history, newest first, in plain words: who stated it or
+  said it isn't so, readings fixed, its standing's changes, then what the
+  old site's data says (`Gallformers.Import.FactHistory`).
+  """
+  @spec fact_history(integer()) :: [FactHistory.entry()]
+  defdelegate fact_history(fact_id), to: FactHistory, as: :for_fact
 
   @doc "How many gall Facts Source `source_id` states."
   @spec source_fact_count(integer()) :: non_neg_integer()
@@ -2795,7 +2797,8 @@ defmodule Gallformers.Import do
 
   @doc """
   Whether a package's files need the readiness gate (`review.json`): every
-  package but one whose batches are all Gallformers' own statements.
+  package but one whose batches are all Gallformers' own statements or
+  reading fixes (`submit_reading_fix/2`).
   """
   @spec review_required?(Validator.package()) :: boolean()
   def review_required?(files) do
@@ -2806,8 +2809,11 @@ defmodule Gallformers.Import do
           {:ok, %{} = batch} <- [Jason.decode(bytes)],
           do: batch["source"]
 
-    sources == [] or not Enum.all?(sources, &match?(%{"gallformers" => true}, &1))
+    sources == [] or not Enum.all?(sources, &(gallformers_statement?(&1) or reading?(&1)))
   end
+
+  defp gallformers_statement?(source), do: match?(%{"gallformers" => true}, source)
+  defp reading?(source), do: match?(%{"reading_of" => %{}}, source)
 
   # -- Gallformers' own statements ---------------------------------------------
 
@@ -2833,26 +2839,51 @@ defmodule Gallformers.Import do
   @spec submit_gallformers_fragment(Actor.t(), %{String.t() => map()}) ::
           {:ok, Package.t()} | {:error, :not_gallformers | term()}
   def submit_gallformers_fragment(%Actor{} = actor, batches) when is_map(batches) do
-    key = "gallformers-" <> Ecto.UUID.generate()
+    if only?(batches, &gallformers_statement?/1),
+      do: submit_fragment(actor, "gallformers-", batches),
+      else: {:error, :not_gallformers}
+  end
+
+  @doc """
+  Takes in a reading fix (matter `87a1`): Gallformers read a Source it
+  holds wrongly, and `batches` (as for `submit_gallformers_fragment/2`) read
+  it again, their source `{"reading_of": {"gallformers_source_id": id}}`. A
+  Fact marked `unstated` takes that Source's statement of it away
+  (`Gallformers.Import.Diff.unstate/2`); the others are the Source's
+  statements, at its date, their quotes naming its stored items. Submitted,
+  validated (no review) and approved as `submit_gallformers_fragment/2`
+  does, as a package of that Source, so it is audited and replayed as any
+  package is.
+
+  `{:error, :not_a_reading_fix}` when `batches` is empty, names another
+  file or has a batch that is not a reading fix.
+  """
+  @spec submit_reading_fix(Actor.t(), %{String.t() => map()}) ::
+          {:ok, Package.t()} | {:error, :not_a_reading_fix | term()}
+  def submit_reading_fix(%Actor{} = actor, batches) when is_map(batches) do
+    if only?(batches, &reading?/1),
+      do: submit_fragment(actor, "reading-", batches),
+      else: {:error, :not_a_reading_fix}
+  end
+
+  defp submit_fragment(actor, prefix, batches) do
+    key = prefix <> Ecto.UUID.generate()
     attrs = if actor.type == :user, do: %{submitter_user_id: actor.id}, else: %{}
 
-    with :ok <- gallformers_batches(batches),
-         :ok <- put_fragment(key, batches),
+    with :ok <- put_fragment(key, batches),
          {:ok, package} <- register_package(actor, key, attrs),
          {:ok, package} <- advance_package(actor, package.id) do
       approve_if_clear(actor, package)
     end
   end
 
-  defp gallformers_batches(batches) do
-    gallformers? = fn {name, batch} ->
-      name in Validator.batch_files() and is_map(batch) and
-        match?(%{"gallformers" => true}, batch["source"])
-    end
-
-    if map_size(batches) > 0 and Enum.all?(batches, gallformers?),
-      do: :ok,
-      else: {:error, :not_gallformers}
+  # Whether `batches` is a non-empty map of batch files whose sources all
+  # pass `source?`.
+  defp only?(batches, source?) do
+    map_size(batches) > 0 and
+      Enum.all?(batches, fn {name, batch} ->
+        name in Validator.batch_files() and is_map(batch) and source?.(batch["source"])
+      end)
   end
 
   defp put_fragment(key, batches) do

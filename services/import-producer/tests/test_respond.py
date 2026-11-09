@@ -103,3 +103,13 @@ def test_phase6_waits_for_every_trait_term_to_be_placed(package, monkeypatch):
     monkeypatch.setattr(respond.subprocess, "run", lambda *a, **k: pytest.fail("phase 6 ran"))
     record = respond.run_respond(package)
     assert "placed" in record["blocked"] and "opus" in record["blocked"]
+
+
+def test_version_follows_the_verify_guide(package, contract):
+    from conftest import edit
+    from producer.respond import instructions_version
+
+    before = instructions_version(package)
+    assert before.startswith("responder.md@")
+    edit(contract / "VERIFY_GUIDE.md")
+    assert instructions_version(package) != before

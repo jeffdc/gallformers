@@ -924,13 +924,18 @@ defmodule Gallformers.Facts do
   end
 
   # `{id, contest}` of the Facts and their slot siblings.
+  # The slots are read first: `slot IN (subquery)` beside `OR` scans every
+  # Fact, while a list lets both conditions use their index.
   defp with_slot_siblings(fact_ids) do
-    slots = from(f in Fact, where: f.id in ^fact_ids and not is_nil(f.slot), select: f.slot)
+    slots =
+      from(f in Fact,
+        where: f.id in ^fact_ids and not is_nil(f.slot),
+        distinct: true,
+        select: f.slot
+      )
+      |> Repo.all()
 
-    from(f in Fact,
-      where: f.id in ^fact_ids or f.slot in subquery(slots),
-      select: {f.id, f.contest}
-    )
+    from(f in Fact, where: f.id in ^fact_ids or f.slot in ^slots, select: {f.id, f.contest})
     |> Repo.all()
   end
 

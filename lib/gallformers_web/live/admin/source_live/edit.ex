@@ -25,6 +25,7 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   import GallformersWeb.Admin.FormComponents, only: [form_actions: 1]
   import GallformersWeb.ReviewComponents, only: [review_in_progress_link: 1]
 
+  alias Gallformers.Audit.ChangeLog
   alias Gallformers.Import
   alias Gallformers.Licenses
   alias Gallformers.Sources
@@ -50,6 +51,8 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   end
 
   defp mount_source(socket, %Source{} = source) do
+    if connected?(socket), do: ChangeLog.subscribe()
+
     {:ok,
      socket
      |> init_form_state()
@@ -168,6 +171,20 @@ defmodule GallformersWeb.Admin.SourceLive.Edit do
   # moves its Updated date.
   @impl true
   def handle_info({:source_corrected, id}, %{assigns: %{source: %{id: id}}} = socket) do
+    {:noreply, assign(socket, :dates, Map.fetch!(Import.source_dates([id]), id))}
+  end
+
+  # Changes were recorded (a reading fix's package applied by the import
+  # job, another curator's change): the Facts and dates read again.
+  def handle_info({:change_log, :changed}, socket) do
+    ChangeLog.flush()
+    id = socket.assigns.source.id
+
+    send_update(GallformersWeb.Admin.SourceLive.Facts,
+      id: "source-facts-corrections",
+      reload: true
+    )
+
     {:noreply, assign(socket, :dates, Map.fetch!(Import.source_dates([id]), id))}
   end
 

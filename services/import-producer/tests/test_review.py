@@ -188,3 +188,16 @@ def test_missing_placements_are_listed_per_reviewer():
     ])  # fmt: skip
     assert missing_placements(v4_gall(), review) == {"sonnet": ["f2"]}
     assert missing_placements({"format_version": 3, "facts": [TRAIT]}, review) == {}
+
+
+def test_version_follows_the_verify_guide(package, contract):
+    from conftest import edit
+
+    def version():
+        prompt = build_review_prompt(package)
+        return re.search(r'"instructions_version": "([^"]+)"', prompt).group(1)
+
+    before = version()
+    assert before.startswith("verifier.md@")
+    edit(contract / "VERIFY_GUIDE.md")
+    assert version() != before

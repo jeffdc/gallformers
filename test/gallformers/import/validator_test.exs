@@ -1276,6 +1276,106 @@ defmodule Gallformers.Import.ValidatorTest do
              ])
     end
 
+    test "a reading fix may quote a whole stored item" do
+      b =
+        put(reading(), ["facts", 1, "evidence"], [
+          %{"whole_item" => true, "gallformers_document_item_id" => 1234}
+        ])
+
+      assert problems(reading_package(b)) == []
+    end
+
+    test "a reading fix may say why" do
+      b = put(reading(), ["source", "reading_of", "why"], "Weld names Q. lobata.")
+      assert problems(reading_package(b)) == []
+
+      b = put(reading(), ["source", "reading_of", "why"], "")
+      assert errors_mention?(problems(reading_package(b)), ["why"])
+    end
+
+    # A taxonomic reading fix: its taxonomy batch alone.
+    defp reading_taxonomy(acts, accept? \\ false) do
+      reading_of = %{"gallformers_source_id" => 59}
+      reading_of = if accept?, do: Map.put(reading_of, "accept", true), else: reading_of
+
+      tb =
+        reading()
+        |> Map.drop(["galls", "facts"])
+        |> Map.merge(%{
+          "batch_type" => "taxonomy",
+          "source" => %{"reading_of" => reading_of},
+          "taxa" => [
+            %{"ref" => "t1", "name_as_written" => "Aphis rubifolii", "rank" => "species"},
+            %{"ref" => "t2", "name_as_written" => "Aphis", "rank" => "genus"},
+            %{"ref" => "t3", "name_as_written" => "Amphorophora", "rank" => "genus"}
+          ],
+          "acts" => acts
+        })
+
+      %{"taxonomy.json" => Jason.encode!(tb)}
+    end
+
+    @quoted [%{"quote" => "Aphis rubifolii", "gallformers_document_item_id" => 7}]
+
+    defp placement_act(id, parent, extra),
+      do:
+        Map.merge(
+          %{
+            "id" => id,
+            "stance" => "confirm",
+            "kind" => "placement",
+            "taxon" => "t1",
+            "parent" => parent,
+            "evidence" => @quoted
+          },
+          extra
+        )
+
+    test "a taxonomic reading fix passes, accepted in the same step" do
+      acts = [
+        placement_act("a1", "t2", %{"unstated" => true}),
+        placement_act("a2", "t3", %{"replaces" => "a1"})
+      ]
+
+      assert problems(reading_taxonomy(acts, true)) == []
+    end
+
+    test "unstated and replaces acts only in a reading fix" do
+      tb = put(taxonomy_batch(), ["acts", 0, "unstated"], true)
+
+      assert errors_mention?(problems(package(gall: nil, taxonomy: tb)), [
+               "acts/0",
+               "only in a reading fix"
+             ])
+    end
+
+    test "a replacing act names an unstated act" do
+      acts = [placement_act("a1", "t3", %{"replaces" => "a9"})]
+
+      assert errors_mention?(problems(reading_taxonomy(acts)), [
+               "replaces a9, which is not an unstated act in this batch"
+             ])
+    end
+
+    test "a reading fix of a Source with no quotes carries none" do
+      b =
+        Map.update!(reading(), "facts", fn facts ->
+          Enum.map(facts, &Map.put(&1, "evidence", []))
+        end)
+
+      assert problems(reading_package(b)) == []
+    end
+
+    test "evidence is needed outside a reading fix" do
+      b = put(batch(), ["facts", 0, "evidence"], [])
+      assert errors_mention?(problems(package(gall: b)), ["facts/0", "evidence", "at least one"])
+    end
+
+    test "accept is only for a reading fix of taxonomy" do
+      b = put(reading(), ["source", "reading_of", "accept"], true)
+      assert errors_mention?(problems(reading_package(b)), ["accept"])
+    end
+
     test "an unstated Fact replaces nothing" do
       b = put(reading(), ["facts", 0, "replaces"], "f2")
 

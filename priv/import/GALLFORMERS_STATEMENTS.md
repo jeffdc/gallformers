@@ -49,3 +49,17 @@ What goes to `unmapped` (slot `other`), with a `note` saying which and the `topi
 - **A hedge** (`PRODUCER_GUIDE.md` rule 7), except a tentative Host from Observations.
 
 Example: `examples/gallformers-note/` (a Host added from an Observation and a recorded occurrence; the note's identification tip is left out).
+
+## Fixing a reading of a Source
+
+When Gallformers read a Source it holds wrongly (took it to say a Host it doesn't, or the wrong Trait value), a curator fixes the reading under that Source's authority, not as a Gallformers statement. The batch is the Source's statements read again; Gallformers takes no position in it. Gallformers builds these from the Fact inspector ("Fix our reading…").
+
+- **Source:** `{ "reading_of": { "gallformers_source_id": …, "why": …, "accept": true } }`: the Source read again, by Gallformers' ID, optionally the curator's reason in their words, and, in a taxonomy batch only, `accept` when the curator accepts the taxonomic statements the fix states ("Accept it now"; without it they await a curator in the taxonomy queue). No bibliographic fields and no `document.json`: the Source and its document are held already.
+- **Gall or taxonomy:** a gall batch fixes Facts; a taxonomy batch fixes acts (a placement, a synonymy) the same way.
+- **`mode`:** always `add`.
+- **A Fact (or act) the Source doesn't say** is the misread statement, marked `"unstated": true`: the Source's statement of it is taken away. Other Sources' statements of it stay.
+- **What the Source does say** in its place, if anything, is a Fact (or act) with `"replaces": "<the unstated Fact's id>"`, stated as the Source states it: its date is the Source's, its words as written and its quotes carried from the misread statement.
+- **Evidence** is the Source's quotes, each naming the stored document's item by `gallformers_document_item_id` in place of `item`; `whole_item` takes it too. Never a `statement`. A Source Gallformers holds no quotes of (the legacy data) is fixed with `"evidence": []`: the statement as Gallformers holds it.
+- **The Gall** is declared with its `gallformers_gall_id`, and taxa with their `gallformers_taxon_id`.
+
+Example: `examples/reading-fix/gall.json` (a Host read as Q. alba that the Source gives as Q. bicolor).

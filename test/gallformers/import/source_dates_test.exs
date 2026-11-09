@@ -5,7 +5,8 @@ defmodule Gallformers.Import.SourceDatesTest do
   first package's batch was applied; Updated, when its data was last
   edited (its latest applied batch, or a later change to an attribution
   of it). A Source from the old data (no applied package, or one that was
-  in Gallformers before its first package) has no Ingested date.
+  in Gallformers before its first package) has no Ingested date. A reading
+  fix (matter `87a1`) moves Updated, never Ingested.
   """
   use Gallformers.DataCase, async: true
 
@@ -92,6 +93,24 @@ defmodule Gallformers.Import.SourceDatesTest do
 
     assert %{ingested: nil, updated: @t2, legacy?: true} ==
              Import.source_dates([source.id])[source.id]
+  end
+
+  test "a reading fix moves Updated, never Ingested: it brings nothing in (87a1)" do
+    reading = %{"source" => %{"reading_of" => %{"gallformers_source_id" => 1}}}
+    source = imported_source()
+    applied_package!(source, @t2, inserted_at: ~U[2026-09-30 00:00:00Z])
+
+    applied_package!(source, @t1, inserted_at: ~U[2026-09-29 00:00:00Z], content: reading)
+    applied_package!(source, @t3, inserted_at: ~U[2026-11-02 00:00:00Z], content: reading)
+
+    assert %{ingested: @t2, updated: @t3, legacy?: false} ==
+             Import.source_dates([source.id])[source.id]
+
+    old = source_fixture("Old cynipid notes", "1920")
+    back_date!(old, ~U[2026-01-01 00:00:00Z])
+    applied_package!(old, @t3, content: reading)
+
+    assert %{ingested: nil, updated: @t3, legacy?: true} == Import.source_dates([old.id])[old.id]
   end
 
   test "every Source asked for is answered; none asked, none answered" do

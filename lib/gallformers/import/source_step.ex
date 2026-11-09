@@ -7,7 +7,9 @@ defmodule Gallformers.Import.SourceStep do
   ## Matching (when the package is resolved)
 
     * A Gallformers batch (`source.gallformers`) is the Gallformers Source.
-    * `gallformers_source_id`, when given, names the Source.
+    * `gallformers_source_id`, when given, names the Source; so does a
+      reading fix's (`source.reading_of`, matter `87a1`), which has no
+      document.
     * Otherwise `Gallformers.Sources.match_source/1`'s conservative rule:
       the DOI, else the citation, else the title — one clear match is the
       Source; anything ambiguous (several Sources; a citation match whose
@@ -92,6 +94,9 @@ defmodule Gallformers.Import.SourceStep do
       nil -> {:error, "there is no Gallformers Source"}
     end
   end
+
+  defp match(%{"reading_of" => %{"gallformers_source_id" => id}}) when is_integer(id),
+    do: match(%{"gallformers_source_id" => id})
 
   defp match(%{"gallformers_source_id" => id}) when is_integer(id) do
     case Sources.get_source(id) do

@@ -17,6 +17,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Merges do
 
   import GallformersWeb.ReviewComponents
 
+  alias Gallformers.Catalog
   alias GallformersWeb.Admin.Review.Questions
   alias GallformersWeb.Admin.ReviewLive.ItemRow
   alias GallformersWeb.Admin.ReviewLive.Loader
@@ -55,7 +56,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Merges do
 
     assign(socket,
       entries: Loader.merge_conflicts(status: status),
-      definitions: Loader.definitions()
+      definitions: Catalog.trait_definitions()
     )
   end
 

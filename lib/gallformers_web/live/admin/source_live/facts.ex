@@ -6,14 +6,16 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   (`GallformersWeb.FactsComponents`), in its corrections mode, for errors
   made in the original ingestion.
 
-  A correction never edits a Fact (a Fact can hold several Sources'
+  A fix never edits a Fact (a Fact can hold several Sources'
   attributions): from a Fact's Correct menu the curator withdraws the
   Source's statement where it didn't say it, or moves it to what it did
   say (Change Host, Change value, Change parent, Change accepted taxon),
-  each with a required note of why (`Gallformers.Import.correct_source_fact/6`:
-  audited, logged for replay). A taxonomic statement moved for a paper
-  awaits a curator unless the correcting curator ticks "Accept it now".
-  The corrections made are listed under the Facts, newest first, and move
+  each with a required note of why. Each is a reading fix of that Source,
+  a package of it through the one ingestion path (matter `87a1`), the
+  note its Why: a gall Fact's (`Gallformers.Curation.fix_reading/3`) or a
+  taxonomic statement's (`Gallformers.Curation.fix_taxonomic_reading/6`),
+  the legacy data's included. A taxonomic statement moved for a paper
+  awaits a curator unless the curator ticks "Accept it now". The fixes made are listed under the Facts, newest first, and move
   the Source's Updated date: the page is told (`{:source_corrected, id}`)
   to show it.
 
@@ -23,7 +25,9 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   them all, and the search narrows them to one Gall. How many it shows at
   once is `all_limit` in this module's application env (default 300).
   The Facts load in the background (`start_async/3`) and stay in place
-  while they reload after a correction.
+  while they reload after a correction, and whenever changes are recorded
+  (the page subscribes, `Gallformers.Audit.ChangeLog`): a reading fix's
+  package is applied by the import job a moment after it is submitted.
 
   The correction's form is the review Facts page's edit form
   (`GallformersWeb.FactsComponents.fact_editor/1`), with its plant search
@@ -35,6 +39,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   import GallformersWeb.FactsComponents
 
   alias Gallformers.Catalog
+  alias Gallformers.Curation
   alias Gallformers.Import
   alias Gallformers.Sources
   alias Gallformers.Taxa
@@ -44,6 +49,12 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   @all_limit 300
 
   @impl true
+  # Changes were recorded (`GallformersWeb.Admin.SourceLive.Edit`): read
+  # the Facts and the fixes again.
+  def update(%{reload: true}, socket) do
+    {:ok, socket |> assign(history: history(socket.assigns.source.id)) |> load()}
+  end
+
   def update(%{source: source, actor: actor} = assigns, socket) do
     first? = not Map.has_key?(socket.assigns, :source)
 
@@ -66,7 +77,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
          gall_query: "",
          gall_results: [],
          gall: nil,
-         corrections: Import.list_source_corrections(source.id),
+         history: history(source.id),
          definitions: Catalog.trait_definitions()
        )
        |> close_editor()
@@ -198,24 +209,21 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   end
 
   def handle_event("correct", params, socket) do
-    %{editing: key, edit_kind: kind, pick: pick, source: source, actor: actor} = socket.assigns
+    %{editing: key, edit_kind: kind, pick: pick, source: source} = socket.assigns
     note = params |> Map.get("note", "") |> String.trim()
     accept = params["accept"] == "true"
     pick = %{pick | note: note, accept: accept}
 
     with %{} = entry <- entry(socket, key),
          {:ok, correction} <- correction(kind, pick),
-         {:ok, _result} <-
-           Import.correct_source_fact(actor, source.id, entry.fact_id, correction, note,
-             accept: accept
-           ) do
+         {:ok, saved} <- fix(socket, entry, correction, note, accept) do
       send(self(), {:source_corrected, source.id})
 
       {:noreply,
        socket
        |> close_editor()
-       |> assign(corrections: Import.list_source_corrections(source.id))
-       |> put_flash(:info, "Correction saved.")
+       |> assign(history: history(source.id))
+       |> put_flash(:info, saved)
        |> load()}
     else
       nil -> {:noreply, close_editor(socket)}
@@ -223,7 +231,53 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
     end
   end
 
-  # The correction as `Gallformers.Import.correct_source_fact/6` takes it.
+  # Every fix is a reading of the Source, a package of it through the one
+  # ingestion path (matter `87a1`): a gall Fact's (`Curation.fix_reading/3`)
+  # or a taxonomic statement's (`Curation.fix_taxonomic_reading/6`).
+  defp fix(_socket, _entry, _correction, "", _accept), do: {:error, :note_required}
+
+  defp fix(socket, %{gall: gall_id} = entry, correction, note, _accept)
+       when is_integer(gall_id) do
+    %{source: source, actor: actor} = socket.assigns
+
+    with {:ok, key} <- entry_key(entry),
+         {:ok, to} <- reading_to(key, correction),
+         spec = %{kind: :reading, gall_id: gall_id, source_id: source.id, key: key, to: to},
+         {:ok, _package} <- Curation.fix_reading(actor, spec, note),
+         do: {:ok, "Reading fixed."}
+  end
+
+  defp fix(socket, entry, correction, note, accept) do
+    %{source: source, actor: actor} = socket.assigns
+
+    with {:ok, _package} <-
+           Curation.fix_taxonomic_reading(actor, source.id, entry.fact_id, correction, note,
+             accept: accept
+           ),
+         do: {:ok, "Reading fixed."}
+  end
+
+  defp entry_key(entry) do
+    case Import.gall_entry_key(entry) do
+      {:ok, key} -> {:ok, key}
+      :error -> {:error, :not_correctable}
+    end
+  end
+
+  defp reading_to(_key, :withdraw), do: {:ok, nil}
+  defp reading_to({:host, _id}, {:host, plant_id}), do: {:ok, {:host, plant_id}}
+
+  defp reading_to({:trait, trait, _value} = key, {:values, values}) do
+    case Enum.map(values, &{:trait, trait, &1}) do
+      [^key] -> {:error, :unchanged}
+      [to] -> {:ok, to}
+      tos -> {:ok, tos}
+    end
+  end
+
+  defp reading_to(_key, _correction), do: {:error, :not_correctable}
+
+  # The fix the editor's choice is.
   defp correction("withdraw", _pick), do: {:ok, :withdraw}
   defp correction("host", %{selected: %{id: id}}), do: {:ok, {:host, id}}
   defp correction("host", _pick), do: {:error, "Pick the plant from the search."}
@@ -238,6 +292,8 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   defp refusal(:unchanged), do: "That is what the Source states already."
   defp refusal(:not_found), do: "The Source no longer states this Fact."
   defp refusal(:not_correctable), do: "This correction doesn't fit this Fact."
+  defp refusal(:not_stated), do: "The Source no longer states this Fact."
+  defp refusal(:invalid_spec), do: "This correction doesn't fit this Fact."
   defp refusal(reason) when is_binary(reason), do: reason
   defp refusal(%Ecto.Changeset{} = changeset), do: inspect(changeset.errors)
   defp refusal({:rejected, _listener, _reason} = reason), do: Import.taxonomy_refusal(reason)
@@ -304,6 +360,18 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
   defp verb(:withdraw), do: "Withdrew"
   defp verb(_kind), do: "Moved"
 
+  # The corrections made in place and the reading fixes, newest first.
+  defp history(source_id) do
+    corrections =
+      for c <- Import.list_source_corrections(source_id), do: {c.inserted_at, {:correction, c}}
+
+    readings = for r <- Import.list_reading_fixes(source_id), do: {r.at, {:reading, r}}
+
+    (corrections ++ readings)
+    |> Enum.sort_by(fn {at, _entry} -> at end, {:desc, DateTime})
+    |> Enum.map(&elem(&1, 1))
+  end
+
   # -- rendering -------------------------------------------------------------------------
 
   @impl true
@@ -314,7 +382,7 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
         <:aside>What this Source states in Gallformers</:aside>
         <div class="flex flex-col gap-block">
           <p class="text-meta text-ink-2">
-            Correct an error from the Source's ingestion here: withdraw what the Source didn't say, or move its statement to what it did say. The Fact itself, and other Sources' statements of it, stay. Each correction needs a note of why.
+            Fix how Gallformers read this Source: withdraw what it didn't say, or move its statement to what it did say. The Fact itself, and other Sources' statements of it, stay. Each fix needs a note of why.
           </p>
 
           <p :if={(@count == 0 and @facts) && @facts.taxonomy.acts == []} class="text-ui text-muted">
@@ -425,23 +493,39 @@ defmodule GallformersWeb.Admin.SourceLive.Facts do
       </.section>
 
       <.section
-        :if={@corrections != []}
+        :if={@history != []}
         id="source-corrections"
-        title="Corrections"
-        count={length(@corrections)}
+        title="Readings fixed"
+        count={length(@history)}
       >
         <:aside>Newest first</:aside>
         <ul class="divide-y divide-line">
-          <li :for={c <- @corrections} id={"source-correction-#{c.id}"} class="py-1.5 text-meta">
-            <p class="text-ink">
-              <span class="font-semibold">{verb(c.kind)}</span>
-              {c.summary}<span :if={c.change}> → {c.change}</span>
-              <span class="text-caption text-muted">
-                · {c.author_name}, {format_date(c.inserted_at, :short)}
-              </span>
-            </p>
-            <p class="text-caption text-ink-2">{c.note}</p>
-          </li>
+          <%= for entry <- @history do %>
+            <%= case entry do %>
+              <% {:correction, c} -> %>
+                <li id={"source-correction-#{c.id}"} class="py-1.5 text-meta">
+                  <p class="text-ink">
+                    <span class="font-semibold">{verb(c.kind)}</span>
+                    {c.summary}<span :if={c.change}> → {c.change}</span>
+                    <span class="text-caption text-muted">
+                      · {c.author_name}, {format_date(c.inserted_at, :short)}
+                    </span>
+                  </p>
+                  <p class="text-caption text-ink-2">{c.note}</p>
+                </li>
+              <% {:reading, r} -> %>
+                <li id={"source-reading-#{r.package_id}"} class="py-1.5 text-meta">
+                  <p class="text-ink">
+                    <span class="font-semibold">Fixed our reading</span>
+                    {Enum.join(r.changes, "; ")}
+                    <span class="text-caption text-muted">
+                      · {r.author_name}, {format_date(r.at, :short)}
+                    </span>
+                  </p>
+                  <p :if={r.why} class="text-caption text-ink-2">{r.why}</p>
+                </li>
+            <% end %>
+          <% end %>
         </ul>
       </.section>
     </div>

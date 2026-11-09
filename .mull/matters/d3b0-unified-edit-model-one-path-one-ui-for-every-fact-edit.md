@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-11-07
-updated: 2026-11-07
+updated: 2026-11-08
 epic: taxogall
 relates: [87a1]
 ---
@@ -98,4 +98,15 @@ The Fact viewer and the Fact editor are one thing. Every Fact-backed value on a 
 
 
 **Captured for the build in `87a1`** (Jeff, 2026-11-07: "I think we have our design").
+
+
+## Carried from 87a1 (closed 2026-11-08)
+
+87a1 built the Fact inspector on the Gall page (reading, Edit mode with Gallformers' actions and reading fixes, Add from observation, the tray by authority, a Fact's history, Facts no longer current opened from the full record). Of this matter's "Still to design", the shared plant search and history are built. Still open, to design here before building:
+- The Inducer, taxon and rank pages through the same inspector (taxonomy).
+- A Source's own page through the inspector.
+- A disputed Fact (Sources disagreeing) and what its standing line says.
+- The editorial fields edited in place.
+- The phone sheet scrolling the selected value into view above itself (87a1 built the plain version).
+- Remove the Facts-panel mockups (`gall_facts_live`, `genus_facts_live`, `species_facts_live`, `FactEditMock`) and the Fact-inspector mockup (`fact_inspector_live`, with its History and `?withdrawn` states) once Jeff OKs it: he wanted to see the real UI first.
 

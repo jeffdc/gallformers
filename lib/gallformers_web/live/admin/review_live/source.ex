@@ -24,6 +24,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
 
   import GallformersWeb.ReviewComponents
 
+  alias Gallformers.Catalog
   alias Gallformers.Import
   alias GallformersWeb.Admin.ReviewLive.ItemRow
   alias GallformersWeb.Admin.ReviewLive.Loader
@@ -155,7 +156,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Source do
       summary: data.summary,
       notes: data.notes,
       note_stats: data.stats,
-      definitions: Loader.definitions()
+      definitions: Catalog.trait_definitions()
     )
   end
 

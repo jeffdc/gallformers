@@ -458,17 +458,35 @@
   .gf-prose details[open] > summary { margin-bottom: 0.5em; }
   .gf-prose details > :not(summary) + * { margin-top: 0.75em; }
 
-  /* A glossary term linked in rendered text (Gallformers.Markdown): the
-     text's own color, a dotted underline, so it reads as a definition, not
-     a way off the page. */
-  a.glossary-link, .gf-prose a.glossary-link {
-    color: inherit;
-    text-decoration: underline dotted var(--gf-muted);
-    text-underline-offset: 0.2em;
+  /* gf-tooltip (UIComponents.tooltip, and glossary terms in rendered
+     text, Gallformers.Markdown): a short explanation below what it wraps,
+     on hover or keyboard focus; an inverse bubble at caption size. */
+  .gf-tooltip {
+    position: relative;
+    display: inline-flex;
   }
-  a.glossary-link:hover, .gf-prose a.glossary-link:hover {
-    color: var(--gf-link-hover);
-    text-decoration-color: currentColor;
+  .gf-tooltip-text {
+    pointer-events: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 50;
+    display: none;
+    width: 16rem;
+    margin-top: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-ctl);
+    background: var(--gf-ink);
+    color: var(--gf-paper);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    font-weight: 400;
+    font-style: normal;
+    box-shadow: var(--gf-shadow-float);
+  }
+  .gf-tooltip:hover > .gf-tooltip-text,
+  .gf-tooltip:focus-within > .gf-tooltip-text {
+    display: block;
   }
 
   /* The theme switch (Layouts.theme_switch): the button shows the current
@@ -481,8 +499,8 @@
   .gf-theme-check { visibility: hidden; }
   [aria-checked="true"] > .gf-theme-check { visibility: visible; }
 
-  /* Rendered text inside a tooltip (glossary_tooltip): an inverse bubble, so
-     marks and code take its color, in italics. */
+  /* Rendered text inside a tooltip: an inverse bubble, so marks and code
+     take its color, in italics. */
   [role="tooltip"] :is(mark, code, em) {
     background: transparent;
     color: inherit;

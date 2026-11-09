@@ -14,7 +14,7 @@ defmodule GallformersWeb.PageComponentsTest do
 
   describe "prose" do
     test "renders Markdown, at a size and in a face" do
-      assigns = %{markdown: "## Field notes\n\nA *detachable* gall."}
+      assigns = %{markdown: "## Field notes\n\nA *zqxitalic* gall."}
 
       html =
         rendered_to_string(~H"""
@@ -24,7 +24,7 @@ defmodule GallformersWeb.PageComponentsTest do
       assert query(html, ".gf-prose") |> LazyHTML.attribute("data-size") == ["lg"]
       assert query(html, ".gf-prose") |> LazyHTML.attribute("data-font") == ["serif"]
       assert text(html, ".gf-prose h2") == "Field notes"
-      assert text(html, ".gf-prose em") == "detachable"
+      assert text(html, ".gf-prose em") == "zqxitalic"
     end
 
     test "wraps its own markup at the default size and face" do

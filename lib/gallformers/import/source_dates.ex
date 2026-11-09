@@ -21,10 +21,18 @@ defmodule Gallformers.Import.SourceDates do
   Gallformers data" instead.
 
   A removed attribution leaves no time of its own; a correction that
-  withdraws one moves Updated by the correction's.
+  withdraws one moves Updated by the correction's. A reading fix (a
+  package reading a held Source again, matter `87a1`) brings nothing in:
+  it moves Updated, never Ingested, and a Source only reading fixes reach
+  is from the old data.
   """
 
   import Ecto.Query, only: [from: 2]
+
+  # A batch reading a held Source again (matter `87a1`): it brings nothing in.
+  defmacrop reading_fix(content) do
+    quote do: fragment("coalesce(? -> 'source' \\? 'reading_of', false)", unquote(content))
+  end
 
   alias Gallformers.Facts
   alias Gallformers.Import.Batch
@@ -57,9 +65,9 @@ defmodule Gallformers.Import.SourceDates do
         select:
           {p.source_id,
            %{
-             first: min(b.applied_at),
+             first: filter(min(b.applied_at), not reading_fix(b.content)),
              last: max(b.applied_at),
-             first_package: min(p.inserted_at),
+             first_package: filter(min(p.inserted_at), not reading_fix(b.content)),
              source_inserted: s.inserted_at,
              source_updated: s.updated_at
            }}
@@ -85,7 +93,9 @@ defmodule Gallformers.Import.SourceDates do
     do: %{ingested: nil, updated: corrected, legacy?: true}
 
   defp dates(applied, attribution, corrected) do
-    legacy? = DateTime.compare(applied.source_inserted, applied.first_package) == :lt
+    legacy? =
+      is_nil(applied.first_package) or
+        DateTime.compare(applied.source_inserted, applied.first_package) == :lt
 
     updated =
       [applied.last, attribution, applied.source_updated, corrected]

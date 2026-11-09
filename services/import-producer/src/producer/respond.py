@@ -30,14 +30,15 @@ from producer.run import (
     result_event,
     run_tool,
     sha256,
+    versioned,
 )
 
 PROMPT = paths.PROJECT / "prompts" / "responder.md"
 DECISIONS = ("agree", "disagree")
 
 
-def instructions_version() -> str:
-    return f"responder.md@{sha256(PROMPT)[:12]}"
+def instructions_version(package: Path) -> str:
+    return versioned(PROMPT, contract_text(NOTE_CONTRACT_FILES if note.is_note(package) else ()))
 
 
 def contract_text(extra: tuple[str, ...] = ()) -> str:
@@ -144,7 +145,7 @@ def run_respond(package: Path, effort: str = "high", dry_run: bool = False) -> d
         "phase": 6,
         "model": MODEL,
         "effort": effort,
-        "instructions_version": instructions_version(),
+        "instructions_version": instructions_version(package),
         "findings": len(review["findings"]),
         "prompt_chars": len(prompt),
         "command": shlex.join(command) + " < phase6.prompt.md",
@@ -175,7 +176,7 @@ def run_respond(package: Path, effort: str = "high", dry_run: bool = False) -> d
         for name in ("taxonomy.json", "gall.json")
         if (package / name).exists()
     }
-    responder = {"model": MODEL, "instructions_version": instructions_version()}
+    responder = {"model": MODEL, "instructions_version": instructions_version(package)}
     try:
         answered = apply_responses(
             review, json.loads(answers_path.read_text(encoding="utf-8")), hashes, responder

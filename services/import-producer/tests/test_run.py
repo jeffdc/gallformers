@@ -77,3 +77,14 @@ def test_child_env_drops_api_key_and_session_vars(monkeypatch):
     assert "ANTHROPIC_API_KEY" not in env
     assert not any(k.startswith("CLAUDE") for k in env)
     assert env["PATH"] == "/usr/bin"
+
+
+def test_version_follows_the_guides_as_well_as_the_prompt(package, contract):
+    from conftest import edit
+
+    before = envelope(build_prompt(package, 3))["producer"]["instructions_version"]
+    assert before.startswith("producer.md@")
+    edit(contract / "PRODUCER_GUIDE.md")
+    after = envelope(build_prompt(package, 3))["producer"]["instructions_version"]
+    assert after.startswith("producer.md@") and after != before
+    assert after.split()[0] == before.split()[0]

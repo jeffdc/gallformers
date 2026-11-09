@@ -48,6 +48,14 @@ defmodule Gallformers.Curation.Wording do
 
   def item_text(%{kind: :note, key: key}), do: "Note on " <> what(key)
 
+  def item_text(%{kind: :reading, source_id: source_id, key: key, to: nil}),
+    do: "Fix our reading of #{source_name(source_id)}: it doesn't say #{what(key)}"
+
+  def item_text(%{kind: :reading, source_id: source_id, key: key, to: to}),
+    do:
+      "Fix our reading of #{source_name(source_id)}: #{label(key)} #{value(key)} → " <>
+        Enum.map_join(List.wrap(to), ", ", &value/1)
+
   def item_text(%{kind: :photo, observation_id: observation_id, photo_id: photo_id}),
     do: "Add photo #{photo_id} of iNaturalist observation #{observation_id}"
 
@@ -75,6 +83,14 @@ defmodule Gallformers.Curation.Wording do
       short: "Gallformers",
       applies:
         "Applies as one Gallformers change: one package of the Gallformers Source, dated when you apply, audited as yours."
+    }
+
+  def authority_words({:source, _id, name}),
+    do: %{
+      title: "Readings fixed: #{name}",
+      short: "Readings fixed: #{name}",
+      applies:
+        "Applies as one package of #{name}: under its authority, at its date; you and each misreading are audited."
     }
 
   def authority_words(:editorial),
@@ -152,8 +168,15 @@ defmodule Gallformers.Curation.Wording do
   def subject_name({:plant, id}), do: taxon_name(id)
 
   @doc "What a Source is called on the review pages (\"Weld 1959\"), or its title."
-  @spec source_name(Source.t()) :: String.t()
+  @spec source_name(Source.t() | integer()) :: String.t()
   def source_name(%Source{} = source), do: Sources.short_name(source) || source.title
+
+  def source_name(id) when is_integer(id) do
+    case Sources.get_source(id) do
+      nil -> "Source #{id}"
+      source -> source_name(source)
+    end
+  end
 
   @doc "A preview flag in words."
   @spec flag_text(term()) :: String.t()
@@ -183,6 +206,9 @@ defmodule Gallformers.Curation.Wording do
       "A reason is needed: it supersedes another Source's statement (give text, an Observation or a Source)"
 
   def flag_text({:blocked, reason}), do: "Can't apply: " <> reason
+
+  def flag_text({:reading, name, date}),
+    do: "#{possessive(name)} statement, at its date (#{date})"
 
   defp statement_words(%{source: source, words: nil}), do: "#{possessive(source)} statement"
   defp statement_words(%{source: source, words: words}), do: "#{possessive(source)} '#{words}'"

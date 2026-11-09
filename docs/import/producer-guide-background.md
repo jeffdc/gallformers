@@ -41,6 +41,7 @@ The decisions behind the import contract in `priv/import/`, each with its reason
 - **State only acts the Source makes or adopts.** Using a name, organizing headings and classification mentioned in passing are context. Placements and reported acts were where runs disagreed most; this line made them consistent.
 - **Misapplied names** carry `sensu`, so a correction ("C. confluens O. S. non Harris") doesn't sink the real species into a synonym.
 - **Provisional names and formal descriptions count as new,** with or without "n. sp.". English wording ("new species") counts as *sp. nov.* does.
+- **A taxon's novelty is claimed once,** in the taxonomy batch with its name act; the gall batch's taxa are references and carry no `new` (Jeff, 2026-11-08). The verifier's rule had said every new taxon carries `new` without naming the batch, so a checker asked for it on the gall batch's taxa as well: five of the 11 disputes in the v6 run of the 1862 Source.
 - **Assigning old records after a split is curator work:** a Source rarely supports it.
 - **Plant taxa come from POWO;** acts on them are out of scope except for gall-forming plants.
 - **Taxa above family are wanted** (parasitoids are often known only to order); lumps and splits above family are not supported.

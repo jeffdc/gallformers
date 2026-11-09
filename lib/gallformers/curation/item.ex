@@ -4,11 +4,13 @@ defmodule Gallformers.Curation.Item do
   `change_set_items`), with a stable ID:
 
     * `kind` — `:fact` (a Gallformers statement: add, withdraw or correct a
-      Fact), `:note` (a note on a Fact) or `:editorial` (a Gall's or plant's
-      editorial field);
+      Fact), `:note` (a note on a Fact), `:editorial` (a Gall's or plant's
+      editorial field), `:photo` (an observation's photo for a Gall) or
+      `:reading` (fixing how Gallformers read a Source's statement of a
+      Fact, matter `87a1`: `source_id` that Source);
     * the subject, `subject_type` (`:gall`, `:plant`) and `subject_id`, and
       `key` (`Gallformers.Curation.Key`): one item per subject and key, of
-      each kind;
+      each kind (and, for a reading, of each Source);
     * `spec` — the edit, stored with string keys (`Gallformers.Curation`
       reads it back as the spec `add_item/2` took);
     * `evidence` — the item's own evidence (nil: the set's);
@@ -35,10 +37,11 @@ defmodule Gallformers.Curation.Item do
   @type t :: %__MODULE__{
           id: integer() | nil,
           change_set_id: integer() | nil,
-          kind: :fact | :note | :editorial | :photo | nil,
+          kind: :fact | :note | :editorial | :photo | :reading | nil,
           subject_type: :gall | :plant | nil,
           subject_id: integer() | nil,
           key: Key.t() | nil,
+          source_id: integer() | nil,
           stored_spec: map() | nil,
           evidence: map() | nil,
           seen: map(),
@@ -58,10 +61,11 @@ defmodule Gallformers.Curation.Item do
         }
 
   schema "change_set_items" do
-    field :kind, Ecto.Enum, values: [:fact, :note, :editorial, :photo]
+    field :kind, Ecto.Enum, values: [:fact, :note, :editorial, :photo, :reading]
     field :subject_type, Ecto.Enum, values: [:gall, :plant]
     field :subject_id, :integer
     field :key, Key
+    field :source_id, :integer
     field :stored_spec, :map, source: :spec
     field :evidence, :map
     field :seen, :map, default: %{}

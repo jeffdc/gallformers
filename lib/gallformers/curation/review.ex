@@ -20,6 +20,9 @@ defmodule Gallformers.Curation.Review do
       the evidence has neither text, an Observation nor a Source (replacing
       only Gallformers' own statements, the legacy data's included, needs
       none);
+    * a reading fix is `{:reading, source, date}`: the Source's statement,
+      at its date (matter `87a1`); blocked when the Source no longer
+      states the Fact;
     * notes and editorial items are `:editorial`; a Gall's code and name
       parts `:needs_confirmation`;
     * `{:changed_since, user, at}` from the audit trail
@@ -87,6 +90,20 @@ defmodule Gallformers.Curation.Review do
 
       _ ->
         [:editorial, {:blocked, "Gallformers holds no such Fact to note"}]
+    end
+  end
+
+  # A reading fix: the Source's statement, at its date; blocked once the
+  # Source no longer states the Fact.
+  def flags(actor, %Item{kind: :reading, spec: spec} = item, _set_evidence) do
+    source = Sources.get_source!(spec.source_id)
+    name = Wording.source_name(source)
+
+    with {:ok, fact_id} when is_integer(fact_id) <- Catalog.find_gall_fact(spec.gall_id, spec.key),
+         %{} <- Facts.get_attribution(fact_id, source.id) do
+      [{:reading, name, source_date(source)}] ++ changed(actor, item, {:facts, [fact_id]})
+    else
+      _ -> [{:blocked, "#{name} no longer states this"}]
     end
   end
 
@@ -327,6 +344,11 @@ defmodule Gallformers.Curation.Review do
   end
 
   # -- the rest ------------------------------------------------------------------
+
+  defp source_date(%{authored_date: %Date{} = date, authored_precision: precision}),
+    do: Sources.PartialDate.format(date, precision || :day)
+
+  defp source_date(_source), do: "undated"
 
   defp changed(%Actor{id: user_id}, %Item{seen_at: since}, target) do
     case AuditTrail.changed_since(target, user_id, since) do

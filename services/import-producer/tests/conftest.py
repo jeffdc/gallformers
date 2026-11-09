@@ -118,3 +118,20 @@ def doc():
             }
         ],
     }
+
+
+@pytest.fixture
+def contract(tmp_path, monkeypatch):
+    """A copy of priv/import the phases read, so a test can change a guide."""
+    import shutil
+
+    from producer import paths
+
+    copy = tmp_path / "contract"
+    shutil.copytree(paths.CONTRACT, copy)
+    monkeypatch.setattr(paths, "CONTRACT", copy)
+    return copy
+
+
+def edit(path, extra="\nA changed rule.\n"):
+    path.write_text(path.read_text(encoding="utf-8") + extra, encoding="utf-8")

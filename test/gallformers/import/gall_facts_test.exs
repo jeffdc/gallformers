@@ -185,6 +185,26 @@ defmodule Gallformers.Import.GallFactsTest do
     assert Import.gall_facts(gall.id).traits == []
   end
 
+  test "the Facts no longer current are its past, each withdrawn or superseded (87a1)",
+       %{gall: gall} do
+    kinsey = source_fixture("Kinsey", "1959")
+    weld = source_fixture("Weld", "2001")
+    trait!(gall, "color", "red", confirm(kinsey))
+    trait!(gall, "color", "red", deny(weld))
+    trait!(gall, "detachable", "integral", confirm(kinsey))
+    trait!(gall, "detachable", "detachable", confirm(weld))
+
+    past = Import.gall_facts(gall.id).past
+
+    assert %{standing: :withdrawn, sources: [%{stance: :deny} | _]} =
+             Enum.find(past, &(&1.key == {:trait, "color", "red"}))
+
+    assert %{standing: :superseded} =
+             Enum.find(past, &(&1.key == {:trait, "detachable", "integral"}))
+
+    refute Enum.find(past, &(&1.key == {:trait, "detachable", "detachable"}))
+  end
+
   test "a Gall with no Facts has empty groups and every Trait not recorded", %{gall: gall} do
     groups = Import.gall_facts(gall.id)
 

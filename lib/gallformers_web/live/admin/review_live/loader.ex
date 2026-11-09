@@ -670,7 +670,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
       packages |> Enum.flat_map(&Map.values(&1.statements)) |> Enum.flat_map(&Map.values/1)
 
     names = names(items, statements)
-    definitions = definitions()
+    definitions = Catalog.trait_definitions()
     batches = packages |> Enum.flat_map(& &1.batches) |> Map.new(&{&1.id, &1})
     by_batch = Map.new(packages |> Enum.flat_map(& &1.statements))
 
@@ -1310,14 +1310,6 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   @doc "Whether a curator rejected `item`'s proposal (`Gallformers.Import.reject_proposal/2`)."
   @spec rejected?(QueueItem.t()) :: boolean()
   def rejected?(item), do: match?(%DateTime{}, Map.get(item, :proposal_rejected_at))
-
-  @doc """
-  The Trait values' definitions, `%{trait => %{value => definition}}`:
-  `Gallformers.Catalog.trait_definitions/0`. Kept while the review pages
-  being rebuilt call it here (matter `87a1` task 12 removes it).
-  """
-  @spec definitions() :: %{String.t() => %{String.t() => String.t() | nil}}
-  def definitions, do: Catalog.trait_definitions()
 
   # The batch's names as written, by ref.
   defp written(%Batch{content: content}), do: written_in(content)

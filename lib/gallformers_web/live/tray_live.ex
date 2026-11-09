@@ -70,7 +70,8 @@ defmodule GallformersWeb.TrayLive do
   end
 
   # Each item for Review; a Fact item with evidence of its own (Add from
-  # observation's) carries it, its Source by title.
+  # observation's) carries it, its Source by title; so does a reading
+  # fix, its Why.
   defp items(entries) do
     sources =
       entries
@@ -91,7 +92,10 @@ defmodule GallformersWeb.TrayLive do
     end)
   end
 
-  defp own_evidence(%{kind: :fact, item: %{evidence: %{} = evidence}}), do: evidence
+  defp own_evidence(%{kind: kind, item: %{evidence: %{} = evidence}})
+       when kind in [:fact, :reading],
+       do: evidence
+
   defp own_evidence(_entry), do: nil
 
   defp with_source(nil, _sources), do: nil

@@ -123,6 +123,30 @@ defmodule GallformersWeb.TrayLiveTest do
              )
     end
 
+    test "a reading fix is in its Source's section, with its Why (87a1)", ctx do
+      quote_weld_host!(ctx.actor, ctx)
+
+      item =
+        add!(ctx.actor, %{
+          kind: :reading,
+          gall_id: ctx.gall.id,
+          source_id: ctx.weld.id,
+          key: {:host, ctx.oak.id},
+          to: nil
+        })
+
+      {:ok, _} = Curation.set_item_evidence(ctx.actor, item.id, %{text: "Weld says rarely."})
+      {:ok, view, _html} = tray(ctx.conn)
+      section = "[data-authority=source-#{ctx.weld.id}]"
+
+      assert has_element?(view, "#change-tray #{section}")
+      view |> element("#change-tray button[phx-click=tray_review]") |> render_click()
+
+      assert has_element?(view, "#review #{section} #review-item-#{item.id}", "Weld says rarely.")
+      assert has_element?(view, "#review #{section} [data-part=applies]", "under its authority")
+      refute has_element?(view, "#review-evidence")
+    end
+
     test "a change taken out leaves the tray", ctx do
       item = withdraw_host!(ctx)
       {:ok, view, _html} = tray(ctx.conn)

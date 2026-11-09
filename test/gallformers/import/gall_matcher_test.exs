@@ -1122,6 +1122,26 @@ defmodule Gallformers.Import.GallMatcherTest do
       assert other.resolution == :ambiguous
     end
 
+    test "a reading fix's Gall given by gallformers_gall_id is that Gall", %{source: source} do
+      wasp = taxon_fixture(name: "Andricus relectus", kingdom: "Animalia")
+      one = gall_fixture(name: "Andricus relectus stem gall")
+      two = gall_fixture(name: "Andricus relectus leaf gall")
+      inducer!(wasp, one, source)
+      inducer!(wasp, two, source)
+
+      batch = %{
+        "batch_type" => "gall",
+        "source" => %{"reading_of" => %{"gallformers_source_id" => source.id}},
+        "galls" => [gall("g1", %{"inducer" => "t1"}, %{"gallformers_gall_id" => two.id})],
+        "facts" => []
+      }
+
+      %{"g1" => s} = batch |> GallMatcher.match_galls([resolved("t1", wasp)]) |> by_ref()
+
+      assert %{resolution: :resolved, method: "gallformers_gall_id", gall_id: gall_id} = s
+      assert gall_id == two.id
+    end
+
     test "another Source's gallformers_gall_id is only checked", %{source: source} do
       wasp = taxon_fixture(name: "Andricus publicus", kingdom: "Animalia")
       one = gall_fixture(name: "Andricus publicus stem gall")

@@ -28,6 +28,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Taxonomy do
 
   import GallformersWeb.ReviewComponents
 
+  alias Gallformers.Catalog
   alias Gallformers.Import
   alias GallformersWeb.Admin.ReviewLive.ItemRow
   alias GallformersWeb.Admin.ReviewLive.Loader
@@ -121,7 +122,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Taxonomy do
   defp load(socket) do
     status = if socket.assigns.show_decided, do: :all, else: :open
     opts = [status: status] ++ if(id = socket.assigns.source_id, do: [source_id: id], else: [])
-    assign(socket, groups: Loader.taxonomy(opts), definitions: Loader.definitions())
+    assign(socket, groups: Loader.taxonomy(opts), definitions: Catalog.trait_definitions())
   end
 
   defp count_text(0), do: "· all decided"

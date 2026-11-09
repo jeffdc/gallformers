@@ -3,7 +3,11 @@ defmodule Gallformers.Markdown do
   Markdown processing with glossary term auto-linking.
 
   Converts markdown text to HTML and automatically links glossary terms
-  to their definitions. Uses ETS caching for efficient repeated lookups.
+  to their entries (`/glossary#word`), the first sentence of each
+  definition in a tooltip (the `gf-tooltip` markup `UIComponents.tooltip/1`
+  renders) on hover and keyboard focus: a plain link, since the dotted
+  underline is `fact_ref`'s alone (matter `87a1`). Uses ETS caching for
+  efficient repeated lookups.
 
   ## Usage
 
@@ -89,14 +93,22 @@ defmodule Gallformers.Markdown do
     if map_size(word_map) == 0 do
       html
     else
-      # Sort words by length (longest first) to avoid partial matches
-      words =
+      # One pass, longest words first, so a tooltip's text is never linked.
+      alternation =
         word_map
         |> Map.keys()
         |> Enum.sort_by(&String.length/1, :desc)
+        |> Enum.map_join("|", &Regex.escape/1)
 
-      Enum.reduce(words, html, fn word, acc ->
-        linkify_word(acc, word, word_map)
+      # Whole words, not inside a tag or an existing link.
+      pattern = ~r/(?<![<\/\w])(?<!\w)\b(#{alternation})\b(?![^<]*>)(?![^<]*<\/a>)/i
+      # Ids of their own per render: one text can be on a page twice.
+      prefix = "gl-#{System.unique_integer([:positive])}"
+      counter = :counters.new(1, [])
+
+      Regex.replace(pattern, html, fn _full, match ->
+        :counters.add(counter, 1, 1)
+        link(match, word_map[String.downcase(match)], "#{prefix}-#{:counters.get(counter, 1)}")
       end)
     end
   end
@@ -152,8 +164,9 @@ defmodule Gallformers.Markdown do
       Glossaries.list_glossary()
       |> Enum.reject(fn entry -> MapSet.member?(@excluded_terms, String.downcase(entry.word)) end)
       |> Enum.reduce(%{}, fn entry, acc ->
-        # Store lowercase word mapping to original word for case-insensitive matching
-        Map.put(acc, String.downcase(entry.word), entry.word)
+        # Lowercase word to its entry's word and first sentence, for
+        # case-insensitive matching.
+        Map.put(acc, String.downcase(entry.word), {entry.word, first_sentence(entry.definition)})
       end)
 
     :ets.insert(@ets_table, {:word_map, word_map, System.monotonic_time(:millisecond)})
@@ -183,16 +196,27 @@ defmodule Gallformers.Markdown do
     end
   end
 
-  defp linkify_word(html, word, word_map) do
-    original_word = Map.get(word_map, word)
-    anchor = String.downcase(original_word) |> URI.encode()
+  # A glossary term: a link to its entry, its definition's first sentence
+  # in a tooltip (`id` the tooltip's) when it has one.
+  defp link(match, {word, definition}, id) do
+    a = ~s(<a href="/glossary##{word |> String.downcase() |> URI.encode()}">#{match}</a>)
 
-    # Build regex pattern for whole word matching (case-insensitive)
-    # Avoid matching inside HTML tags or existing links
-    pattern = ~r/(?<![<\/\w])(?<!\w)\b(#{Regex.escape(word)})\b(?![^<]*>)(?![^<]*<\/a>)/i
+    if definition == "" do
+      a
+    else
+      text = definition |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
-    Regex.replace(pattern, html, fn _full, match ->
-      ~s(<a href="/glossary##{anchor}" class="glossary-link" title="View definition">#{match}</a>)
-    end)
+      ~s(<span class="gf-tooltip"><span aria-describedby="#{id}">#{a}</span>) <>
+        ~s(<span id="#{id}" role="tooltip" class="gf-tooltip-text">#{text}</span></span>)
+    end
   end
+
+  defp first_sentence(text) when is_binary(text) do
+    case String.split(String.trim(text), ~r/(?<=\.)\s/, parts: 2) do
+      [sentence | _] -> String.trim(sentence)
+      [] -> ""
+    end
+  end
+
+  defp first_sentence(_text), do: ""
 end

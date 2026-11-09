@@ -16,7 +16,8 @@ defmodule Gallformers.Import.GallFacts do
     * `standing`: `{:holds, n}`, stated by n Sources whose statements
       count (Gallformers once, however many of its own Sources state it),
       or `:unconfirmed` when only Gallformers' undated original data (the
-      legacy data Source) states it;
+      legacy data Source) states it; for a Fact no longer current (`past`,
+      to open from the full record), `:withdrawn` or `:superseded`;
     * who says so (`Gallformers.Import.FactsView.statements/1`):
       `gallformers`, Gallformers' statement (its newest, of the Gallformers
       Source and the original data; nil when it has stated nothing), and
@@ -32,7 +33,7 @@ defmodule Gallformers.Import.GallFacts do
           kind: :inducer | :host | :trait | :range | :occurrence | :alias,
           trait: String.t() | nil,
           value: map(),
-          standing: {:holds, non_neg_integer()} | :unconfirmed,
+          standing: {:holds, non_neg_integer()} | :unconfirmed | :withdrawn | :superseded,
           gallformers: map() | nil,
           sources: [map()]
         }
@@ -44,7 +45,8 @@ defmodule Gallformers.Import.GallFacts do
           traits: [%{trait: String.t(), facts: [fact()]}],
           traits_missing: [String.t()],
           range: [fact()],
-          aliases: [fact()]
+          aliases: [fact()],
+          past: [fact()]
         }
 
   @doc "The Traits in the order the Gall page shows them."
@@ -72,12 +74,27 @@ defmodule Gallformers.Import.GallFacts do
       traits: traits,
       traits_missing: @trait_order -- recorded,
       range: current(facts.range),
-      aliases: current(facts.aliases)
+      aliases: current(facts.aliases),
+      past: past(facts)
     }
   end
 
   defp current(entries),
     do: for(%{standing: :current} = e <- entries, do: fact(e))
+
+  # The Facts no longer current, to open from the full record: their
+  # standing `:withdrawn` or `:superseded`.
+  defp past(facts) do
+    entries =
+      facts.inducer ++
+        facts.hosts ++
+        Enum.flat_map(facts.traits, fn {_trait, entries} -> entries end) ++
+        facts.range ++ facts.aliases
+
+    for %{standing: standing} = e <- entries,
+        standing in [:withdrawn, :superseded],
+        do: %{fact(e) | standing: standing}
+  end
 
   defp trait_index(trait),
     do: Enum.find_index(@trait_order, &(&1 == trait)) || length(@trait_order)

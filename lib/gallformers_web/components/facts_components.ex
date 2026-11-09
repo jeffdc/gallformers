@@ -268,6 +268,15 @@ defmodule GallformersWeb.FactsComponents do
 
   attr :target, :any, default: nil, doc: "where the menus send their events (`@myself`)"
 
+  attr :refs, :map,
+    default: %{},
+    doc:
+      "Facts to open in the inspector, by Fact ID (`Gallformers.Import.gall_facts/1`'s): " <>
+        "each such row's value is a `fact_ref` sending `on_select`"
+
+  attr :on_select, :string, default: nil
+  attr :selected, :any, default: nil
+
   slot :editor, doc: "the open edit's form, given the entry"
 
   def facts_view(assigns) do
@@ -297,6 +306,9 @@ defmodule GallformersWeb.FactsComponents do
         history={@history}
         corrections={@corrections}
         target={@target}
+        refs={@refs}
+        on_select={@on_select}
+        selected={@selected}
       />
     </div>
     """
@@ -340,6 +352,9 @@ defmodule GallformersWeb.FactsComponents do
   attr :history, :boolean, default: false
   attr :corrections, :boolean, default: false
   attr :target, :any, default: nil
+  attr :refs, :map, default: %{}
+  attr :on_select, :string, default: nil
+  attr :selected, :any, default: nil
 
   defp facts_gall(assigns) do
     {facts, past} =
@@ -443,6 +458,9 @@ defmodule GallformersWeb.FactsComponents do
             questions={@questions}
             passages={@passages}
             on_passage={@on_passage}
+            refs={@refs}
+            on_select={@on_select}
+            selected={@selected}
           />
         </div>
       </details>
@@ -494,6 +512,9 @@ defmodule GallformersWeb.FactsComponents do
   attr :editor, :list, default: []
   attr :corrections, :boolean, default: false
   attr :target, :any, default: nil
+  attr :refs, :map, default: %{}
+  attr :on_select, :string, default: nil
+  attr :selected, :any, default: nil
 
   defp facts_category(assigns) do
     ~H"""
@@ -523,6 +544,9 @@ defmodule GallformersWeb.FactsComponents do
               editor={@editor}
               corrections={@corrections}
               target={@target}
+              refs={@refs}
+              on_select={@on_select}
+              selected={@selected}
             />
           </ul>
         </div>
@@ -540,6 +564,9 @@ defmodule GallformersWeb.FactsComponents do
             editor={@editor}
             corrections={@corrections}
             target={@target}
+            refs={@refs}
+            on_select={@on_select}
+            selected={@selected}
           />
         </ul>
       <% end %>
@@ -856,6 +883,9 @@ defmodule GallformersWeb.FactsComponents do
   attr :editor, :list, default: []
   attr :corrections, :boolean, default: false
   attr :target, :any, default: nil
+  attr :refs, :map, default: %{}
+  attr :on_select, :string, default: nil
+  attr :selected, :any, default: nil
 
   defp fact_row(assigns) do
     entry = assigns.entry
@@ -905,7 +935,13 @@ defmodule GallformersWeb.FactsComponents do
           "inline-flex min-w-0 flex-wrap items-baseline gap-x-1 text-ink",
           @entry.status == :dropped && "line-through text-muted"
         ]}>
-          <.fact_value entry={@entry} />
+          <.fact_ref
+            :if={ref = @refs[@entry.fact_id]}
+            fact={ref}
+            selected={@selected}
+            on_select={@on_select}
+          />
+          <.fact_value :if={!@refs[@entry.fact_id]} entry={@entry} />
         </span>
         <span :if={@written != []} class="text-caption text-muted" title="The Source's words">
           {Enum.map_join(@written, " · ", &"“#{&1}”")}
@@ -1076,8 +1112,8 @@ defmodule GallformersWeb.FactsComponents do
     |> Enum.map(fn {kind, label, _} -> {kind, label} end)
   end
 
-  # The corrections an applied Fact takes
-  # (`Gallformers.Import.correct_source_fact/6`): withdrawing the Source's
+  # The fixes an applied Fact takes (a reading fix of its Source,
+  # `Gallformers.Curation.fix_reading/3`): withdrawing the Source's
   # statement, for those with a stable key, and moving it where the kind
   # allows. Descriptions, qualifiers and other Relationships take none.
   defp correction_kinds(%{category: :taxonomy, kind: kind}) do
@@ -1540,7 +1576,20 @@ defmodule GallformersWeb.FactsComponents do
   attr :editing, :boolean, default: false, doc: "Edit mode: Gallformers' block and its actions"
   attr :on_close, :string, required: true
   attr :target, :any, default: nil
+
+  attr :history, :list,
+    default: [],
+    doc:
+      "the Fact's history, newest first: `%{at, what, who}` (`Gallformers.Import.fact_history/1`)"
+
   slot :actions, doc: "Edit mode: the actions in Gallformers' block"
+
+  slot :reading,
+    doc:
+      "Edit mode: what each other Source's block offers for fixing how it was read, " <>
+        "given its statement (`:let`)"
+
+  slot :footer, doc: "Edit mode: below the blocks (the reading fixes' toggle)"
   slot :inner_block, doc: "a new Fact's form (`:new`), or the observation's (`:observation`)"
 
   def fact_inspector(%{state: state} = assigns) when state in [:new, :observation] do
@@ -1591,6 +1640,12 @@ defmodule GallformersWeb.FactsComponents do
           <% {:holds, n} -> %>
             <.chip variant={:ok}>Holds</.chip>
             <span>Stated by {n} {if n == 1, do: "Source", else: "Sources"}.</span>
+          <% :withdrawn -> %>
+            <.chip variant={:neutral}>Withdrawn</.chip>
+            <span>{withdrawn_words(@fact)}</span>
+          <% :superseded -> %>
+            <.chip variant={:neutral}>Superseded</.chip>
+            <span>A newer Source gives another value.</span>
         <% end %>
       </p>
 
@@ -1605,8 +1660,27 @@ defmodule GallformersWeb.FactsComponents do
           gallformers
           actions={if @editing, do: @actions, else: []}
         />
-        <.statement :for={line <- @fact.sources} line={line} />
+        <.statement
+          :for={line <- @fact.sources}
+          line={line}
+          reading={if @editing, do: @reading, else: []}
+        />
       </div>
+      <div :if={@editing and @footer != []} data-part="footer" class="pt-2">
+        {render_slot(@footer)}
+      </div>
+
+      <details :if={@history != []} data-part="history" class="mt-4 border-t border-line pt-3">
+        <summary class="cursor-pointer text-meta text-link">History ({length(@history)})</summary>
+        <ol class="mt-2 flex flex-col gap-2">
+          <li :for={h <- @history} class="flex gap-3 text-meta">
+            <span class="shrink-0 text-muted tabular-nums">{history_date(h.at)}</span>
+            <span class="text-ink-2">
+              {h.what}<span :if={h.who} class="text-muted"> ({h.who})</span>
+            </span>
+          </li>
+        </ol>
+      </details>
     </section>
     """
   end
@@ -1635,6 +1709,7 @@ defmodule GallformersWeb.FactsComponents do
   attr :line, :map, default: nil, doc: "nil: Gallformers hasn't stated it (Edit mode)"
   attr :gallformers, :boolean, default: false
   attr :actions, :list, default: [], doc: "the actions slot, in Edit mode"
+  attr :reading, :list, default: [], doc: "the reading slot, in Edit mode"
 
   # Gallformers in Edit mode, with nothing stated yet: its block, its actions.
   defp statement(%{line: nil} = assigns) do
@@ -1712,6 +1787,9 @@ defmodule GallformersWeb.FactsComponents do
       <div :if={@actions != []} data-part="actions" class="flex flex-col gap-2 pt-1">
         {render_slot(@actions)}
       </div>
+      <div :if={@reading != []} data-part="reading" class="flex flex-col gap-2 pt-1">
+        {render_slot(@reading, @line)}
+      </div>
     </article>
     """
   end
@@ -1746,6 +1824,19 @@ defmodule GallformersWeb.FactsComponents do
 
   defp state_words(%{state: :declined}), do: " · declined"
   defp state_words(_line), do: ""
+
+  # Who withdrew it: the newest Source that says it isn't so.
+  defp withdrawn_words(fact) do
+    case Enum.find([fact.gallformers | fact.sources], &match?(%{stance: :deny}, &1)) do
+      %{gallformers?: true} -> "Gallformers says it isn't so."
+      %{name: name} -> "#{name} says it isn't so."
+      nil -> "A newer Source says it isn't so."
+    end
+  end
+
+  defp history_date(nil), do: "undated"
+  defp history_date(%NaiveDateTime{} = at), do: at |> NaiveDateTime.to_date() |> Date.to_iso8601()
+  defp history_date(%DateTime{} = at), do: at |> DateTime.to_date() |> Date.to_iso8601()
 
   defp kind_label(%{kind: :host}), do: "Host"
   defp kind_label(%{kind: :inducer}), do: "Inducer"
