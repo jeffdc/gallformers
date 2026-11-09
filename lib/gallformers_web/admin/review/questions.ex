@@ -240,6 +240,7 @@ defmodule GallformersWeb.Admin.Review.Questions do
           | {:generation, String.t()}
           | {:statements, %{String.t() => :keep | :leave | {:reading, integer()}}}
           | {:reason, String.t()}
+          | {:missed, String.t(), integer(), integer()}
 
   # -- sections ------------------------------------------------------------------
 

@@ -428,7 +428,7 @@ defmodule Gallformers.Import.Deletion do
           with(%Gall{} = g <- Catalog.get_gall(id), do: Gall.display_name(g)) || "Gall #{id}"
 
         :taxon ->
-          Taxa.accepted_name(id) || "taxon #{id}"
+          Taxa.accepted_name(id)
       end
   end
 

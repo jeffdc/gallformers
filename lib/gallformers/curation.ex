@@ -556,13 +556,15 @@ defmodule Gallformers.Curation do
 
   @doc """
   What the indicator on every page shows: how many items the curator has,
-  each as a line ("<subject>: <item>"), and when the oldest was added
-  (for the "left a while" reminder).
+  each as a line ("<subject>: <item>"), when the oldest was added (for the
+  "left a while" reminder), and the items counted by authority (`groups`:
+  each `%{authority: t:authority/0, count: n}` with its words).
   """
   @spec summary(Actor.t()) :: %{
           count: non_neg_integer(),
           lines: [String.t()],
-          oldest_at: DateTime.t() | nil
+          oldest_at: DateTime.t() | nil,
+          groups: [map()]
         }
   def summary(%Actor{type: :user} = actor) do
     case open_set(actor) do

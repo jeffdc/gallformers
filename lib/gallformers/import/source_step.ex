@@ -234,10 +234,10 @@ defmodule Gallformers.Import.SourceStep do
   @doc """
   The note a batch of Gallformers statements quotes (`source.note`), or nil:
   its Gall, the date its statements take, and its text (the package
-  document's one item).
+  document's one item; nil when the document has none).
   """
   @spec note(map() | nil, map()) ::
-          %{gall_id: integer(), stated_on: String.t(), text: String.t()} | nil
+          %{gall_id: integer(), stated_on: String.t(), text: String.t() | nil} | nil
   def note(%{"gallformers" => true, "note" => %{} = note}, files) do
     %{
       gall_id: note["gallformers_gall_id"],

@@ -204,9 +204,8 @@ defmodule Gallformers.Curation.Spec do
 
   defp place(id), do: if(Places.get_place(id), do: :ok, else: {:error, :no_such_place})
 
-  defp present(text) do
-    if is_binary(text) and String.trim(text) != "", do: :ok, else: {:error, :invalid_spec}
-  end
+  defp present(text) when is_binary(text),
+    do: if(String.trim(text) != "", do: :ok, else: {:error, :invalid_spec})
 
   defp reading_to(_gall_id, _key, nil), do: :ok
 

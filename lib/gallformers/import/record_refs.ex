@@ -47,17 +47,16 @@ defmodule Gallformers.Import.RecordRefs do
   `history` (cleaned up with them), each with its queue items, statement
   edits and batch statements.
   """
-  @type found :: %{
-          blocking: %{
-            items: [QueueItem.t()],
-            edits: [StatementEdit.t()],
-            statements: [BatchStatement.t()]
-          },
-          history: %{
-            items: [QueueItem.t()],
-            edits: [StatementEdit.t()],
-            statements: [BatchStatement.t()]
-          }
+  @type found :: %{blocking: rows(), history: rows()}
+
+  @typedoc "What `clean_up/3` reads: a `t:found/0`, or just its `history`."
+  @type with_history :: %{required(:history) => rows(), optional(atom()) => term()}
+
+  @typedoc "Queue items, statement edits and batch statements naming the records."
+  @type rows :: %{
+          items: [QueueItem.t()],
+          edits: [StatementEdit.t()],
+          statements: [BatchStatement.t()]
         }
 
   @doc """
@@ -288,13 +287,14 @@ defmodule Gallformers.Import.RecordRefs do
   end
 
   @doc """
-  Cleans up the history `found` holds, for records that go: a decided
+  Cleans up the history `found` holds (only its `history` is read), for
+  records that go: a decided
   item stops naming `entity_ids` and `fact_ids` (taken out of lists, nil
   where one stood alone), a rename proposal about a Gall that goes is
   deleted, edits are deleted, and statements stop naming them (their
   resolved IDs cleared, their candidates dropped).
   """
-  @spec clean_up(found(), [integer()], [integer()]) :: :ok
+  @spec clean_up(with_history(), [integer()], [integer()]) :: :ok
   def clean_up(%{history: history}, entity_ids, fact_ids) do
     {renames, items} = Enum.split_with(history.items, &moot_rename?(&1, entity_ids))
     delete_rows(QueueItem, renames)

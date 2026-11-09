@@ -441,7 +441,7 @@ defmodule Gallformers.Import.ApplyGall do
     %{
       outcome
       | flags: Enum.uniq(outcome.flags ++ ["suggested_other_category"]),
-        detail: Map.put(outcome.detail || %{}, "spot_check", detail)
+        detail: Map.put(outcome.detail, "spot_check", detail)
     }
   end
 
@@ -475,9 +475,7 @@ defmodule Gallformers.Import.ApplyGall do
   # kept so, `Gallformers.Import.Disputes`), noted on its statement.
   defp chosen_host({:ok, outcome}, %{"id" => ref}, %{hosts: %{} = hosts})
        when is_map_key(hosts, ref),
-       do:
-         {:ok,
-          %{outcome | detail: Map.put(outcome.detail || %{}, "chosen_host_taxon_id", hosts[ref])}}
+       do: {:ok, %{outcome | detail: Map.put(outcome.detail, "chosen_host_taxon_id", hosts[ref])}}
 
   defp chosen_host(result, _fact, _refs), do: result
 

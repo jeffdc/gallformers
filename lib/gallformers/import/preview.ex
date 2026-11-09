@@ -160,7 +160,7 @@ defmodule Gallformers.Import.Preview do
   defp item_refs(%QueueItem{statement_ref: ref}), do: [ref]
 
   defp also(%QueueItem{kind: kind, subject: subject}, by_file) when kind != :dispute do
-    for %{"batch" => file, "ref" => ref} <- List.wrap((subject || %{})["also"]),
+    for %{"batch" => file, "ref" => ref} <- List.wrap(subject["also"]),
         id = by_file[file],
         do: {id, ref}
   end
@@ -200,7 +200,7 @@ defmodule Gallformers.Import.Preview do
     from_content =
       for %{"id" => ref} = f <- List.wrap(base.content["facts"]),
           not MapSet.member?(seen, ref),
-          do: unwritten_entry(base, ref, base.drop[ref] || "not stated", key_by_ref, names, f)
+          do: unwritten(base, ref, f, base.drop[ref] || "not stated", key_by_ref, names, nil)
 
     %{
       batch: base.batch,
@@ -326,9 +326,6 @@ defmodule Gallformers.Import.Preview do
     term_item = trait_waiting[ref] && term_item(base, trait_waiting[ref])
     unwritten(base, ref, fact, reason, key_by_ref, names, term_item)
   end
-
-  defp unwritten_entry(base, ref, reason, key_by_ref, names, %{} = fact),
-    do: unwritten(base, ref, fact, reason, key_by_ref, names, nil)
 
   defp unwritten(_base, _ref, nil, _reason, _key_by_ref, _names, _term_item), do: nil
 

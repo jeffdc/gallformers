@@ -1124,7 +1124,7 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   # with its Galls (those on the plant, or those it induces) to offer first.
   defp missed_context(%{item: %QueueItem{kind: :missed_name, subject: subject}} = entry) do
     taxa =
-      for id <- List.wrap((subject || %{})["taxon_ids"]),
+      for id <- List.wrap(subject["taxon_ids"]),
           taxon = ReviewContext.taxon(id),
           do: missed_taxon(taxon)
 
@@ -1152,8 +1152,6 @@ defmodule GallformersWeb.Admin.ReviewLive.Loader do
   # rank by its name; under its genus when the tree holds it. A Host named
   # only by a common name starts with no name.
   defp new_plant(%QueueItem{status: :open, subject: subject}, genera) do
-    subject = subject || %{}
-
     name =
       if subject["common_name"] != true,
         do:

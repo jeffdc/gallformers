@@ -585,7 +585,7 @@ defmodule Gallformers.Import.SourceCorrections do
   @spec search_galls(integer(), String.t(), pos_integer()) :: [%{id: integer(), name: String.t()}]
   def search_galls(source_id, query, limit) when is_integer(source_id) and is_binary(query) do
     hits = Catalog.search_galls(query)
-    stated = galls_stated(source_id, Enum.map(hits, & &1.id))
+    stated = MapSet.new(galls_stated(source_id, Enum.map(hits, & &1.id)))
 
     hits
     |> Enum.filter(&MapSet.member?(stated, &1.id))
@@ -593,8 +593,8 @@ defmodule Gallformers.Import.SourceCorrections do
     |> Enum.map(&%{id: &1.id, name: &1.name})
   end
 
-  # Which of `gall_ids` the Source states a Fact about.
-  defp galls_stated(_source_id, []), do: MapSet.new()
+  # Which of `gall_ids` the Source states a Fact about (may repeat).
+  defp galls_stated(_source_id, []), do: []
 
   defp galls_stated(source_id, gall_ids) do
     plain =
@@ -617,9 +617,7 @@ defmodule Gallformers.Import.SourceCorrections do
         select: r.object_gall_id
       )
 
-    (plain ++ [relationships])
-    |> Enum.flat_map(&Repo.all/1)
-    |> MapSet.new()
+    Enum.flat_map(plain ++ [relationships], &Repo.all/1)
   end
 
   # -- replay -------------------------------------------------------------------------------
