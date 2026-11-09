@@ -1,5 +1,6 @@
 integration: taxogall
 release: main
 remote: origin
-done_checks: []
+done_checks:
+    - make done-checks
 layers: {}
