@@ -24,7 +24,7 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
            genera: [%{hd(sample_family().genera) | name: "Diplolepis", count: 36}]
        },
        wave_two:
-         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_ref fact_inspector review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option review_option-use review_value_list-compact tooltip review_rail review_card taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
+         ~w(data_table fact_list name_list stat empty_state gall_card gall_name gall_summary cynipid_mark photo_viewer category_tile family_card source_entry source_quote field search_field facet_group filter_select notice dialog prose key_couplet article_card chip_nav link_tile bar_chart share_list edit_toggle fact_ref fact_inspector inat_taxon_panel review_apply change_tray change_entry key_path dangerous_delete_modal gf-file file_drop radio_card review_option review_option-use review_value_list-compact tooltip review_rail review_card taxonomic_position fact_editor segmented_switch data_table-selection progress_bar loading_spinner chrome),
        sample_view: "photos",
        sample_choice: "0",
        sample_selected: MapSet.new([2]),
@@ -652,6 +652,58 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
               fact={sample_fact()}
               of={%{name: "Diplolepis rosae", undescribed?: false}}
               on_close="noop"
+            />
+          </div>
+        </.example>
+
+        <.example
+          :let={theme}
+          id="inat_taxon_panel"
+          title="inat_taxon_panel"
+          code={
+            ~S'''
+            <.live_component module={GallformersWeb.Admin.InatTaxonPanel} id="inat" actor={@actor}
+              start={{:taxon, 1449402, "Rubus pensilvanicus"}} back answering class="lg:col-span-4" />
+            '''
+          }
+        >
+          <%!-- transform-gpu holds the sheet (fixed on phones) inside the example --%>
+          <div class="grid max-w-md gap-4 transform-gpu">
+            <GallformersWeb.ReviewComponents.inat_taxon_panel
+              id={"inat-look-#{theme}"}
+              step={:look}
+              plan={sample_inat_plan()}
+              ticked={sample_inat_plan().ticked}
+              back
+              answering
+              credit="iNaturalist, accessed 8 Nov 2026"
+            />
+          </div>
+          <div class="mt-4 grid max-w-md gap-4 transform-gpu">
+            <GallformersWeb.ReviewComponents.inat_taxon_panel
+              id={"inat-find-#{theme}"}
+              step={:find}
+              query="Rubus pensilvanicus"
+              results={[
+                %{
+                  id: 1_449_402,
+                  name: "Arguti",
+                  rank: "section",
+                  common: "Field Highbush Blackberries",
+                  matched: "Rubus pensilvanicus",
+                  observations: 22_268,
+                  active?: true
+                },
+                %{
+                  id: 1_456_990,
+                  name: "Rubus × floricomus",
+                  rank: "hybrid",
+                  common: nil,
+                  matched: "Rubus allegheniensis × pensilvanicus",
+                  observations: 0,
+                  active?: true
+                }
+              ]}
             />
           </div>
         </.example>
@@ -1995,6 +2047,12 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
   end
 
   def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  # inat_taxon_panel's events, which its LiveComponent handles in the app.
+  def handle_event(event, _params, socket)
+      when event in ~w(search pick back close tick more higher choose add),
+      do: {:noreply, socket}
+
   def handle_event("edit_cancel", _params, socket), do: {:noreply, socket}
 
   def handle_event("sample_toggle", %{"key" => key}, socket) do
@@ -2053,6 +2111,69 @@ defmodule GallformersWeb.Dev.DesignSystemLive do
   end
 
   # A Host of Diplolepis rosae, as `Gallformers.Import.gall_facts/1` gives it.
+  # Arguti beside a tree holding Rosaceae and Rubus (iNaturalist's taxon
+  # 1449402, trimmed): what `Gallformers.Import.plan_inat_taxon/2` gives.
+  defp sample_inat_plan do
+    row = fn key, name, rank, ours, state, held ->
+      %{key: key, inat_id: 0, name: name, rank: rank, ours: ours, held: held, state: state}
+    end
+
+    held = %{id: 1, rank: :genus, parent_id: 2, parent: "Rubus"}
+
+    lineage = [
+      row.("a47126", "Plantae", "kingdom", :kingdom, :higher, nil),
+      row.("a211194", "Tracheophyta", "phylum", :phylum, :higher, nil),
+      row.("a47125", "Angiospermae", "subphylum", :subphylum, :higher, nil),
+      row.("a47124", "Magnoliopsida", "class", :class, :higher, nil),
+      row.("a47132", "Rosales", "order", :order, :higher, nil),
+      row.("a47148", "Rosaceae", "family", :family, :held, held),
+      row.("a415343", "Rosoideae", "subfamily", :subfamily, :higher, nil),
+      row.("a922171", "Rubeae", "tribe", :tribe, :higher, nil),
+      row.("a47544", "Rubus", "genus", :genus, :held, held),
+      row.("a1360636", "Rubus", "subgenus", :subgenus, :needed, nil)
+    ]
+
+    children = [
+      row.("c168056", "Rubus frondosus", "species", :species, :move, held),
+      row.("c55923", "Rubus argutus", "species", :species, :add, nil),
+      row.("c1456988", "Rubus laudatus", "species", :species, :add, nil)
+    ]
+
+    %{
+      inat: %{
+        id: 1_449_402,
+        common: "Field Highbush Blackberries",
+        observations: 22_268,
+        url: "https://www.inaturalist.org/taxa/1449402"
+      },
+      name: "Arguti",
+      rank: "section",
+      ours: :section,
+      kingdom: "Plantae",
+      plant?: true,
+      active?: true,
+      replaced_by: [],
+      held: nil,
+      held_any?: true,
+      lineage: lineage,
+      children: children,
+      synonyms: [
+        %{key: "s:Rubus pensilvanicus", name: "Rubus pensilvanicus", matched?: true},
+        %{key: "s:Rubus abactus", name: "Rubus abactus", matched?: false}
+      ],
+      commons: [
+        %{
+          key: "e:Field Highbush Blackberries",
+          name: "Field Highbush Blackberries",
+          preferred?: true
+        },
+        %{key: "e:Pennsylvania Blackberry", name: "Pennsylvania Blackberry", preferred?: false}
+      ],
+      authorship: %{},
+      ticked: MapSet.new(["a1360636", "s:Rubus pensilvanicus", "e:Field Highbush Blackberries"])
+    }
+  end
+
   defp sample_fact do
     line = fn attrs ->
       Map.merge(

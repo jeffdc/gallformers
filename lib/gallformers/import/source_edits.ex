@@ -24,6 +24,11 @@ defmodule Gallformers.Import.SourceEdits do
   matter `f923` Task 8) is `%{"op" => "create"}`, keyed by the new title,
   payload `%{"attrs" => %{"title", "authors", "authored", "doi"}}`; replay
   creates it again unless a Source has that title.
+
+  The iNaturalist Source of a day (`record_inaturalist/2`, matter `cb28`),
+  made on the day's first import from iNaturalist, is
+  `%{"op" => "create_inaturalist"}`, keyed by its title, payload
+  `%{"on" => date}`; replay makes it again unless it is there.
   """
 
   alias Gallformers.Audit
@@ -51,9 +56,10 @@ defmodule Gallformers.Import.SourceEdits do
   Makes `edit` and records it in the replay log, in one transaction
   (`{:create, attrs}` is `record_create/2`).
   """
-  @spec record(Actor.t(), edit() | {:create, map()}) ::
+  @spec record(Actor.t(), edit() | {:create, map()} | {:create_inaturalist, Date.t()}) ::
           {:ok, Source.t()} | {:error, Ecto.Changeset.t() | term()}
   def record(%Actor{} = actor, {:create, attrs}), do: record_create(actor, attrs)
+  def record(%Actor{} = actor, {:create_inaturalist, date}), do: record_inaturalist(actor, date)
 
   def record(%Actor{} = actor, edit) do
     Audit.transaction(actor, "import.record_source_edit", fn ->
@@ -103,6 +109,32 @@ defmodule Gallformers.Import.SourceEdits do
   end
 
   @doc """
+  The iNaturalist Source of `date` (`Gallformers.Sources.inaturalist_source/1`),
+  made and recorded in the replay log the first time, in one transaction
+  audited as `actor`; the one there after.
+  """
+  @spec record_inaturalist(Actor.t(), Date.t()) :: {:ok, Source.t()} | {:error, term()}
+  def record_inaturalist(%Actor{} = actor, %Date{} = date) do
+    case Sources.inaturalist_source(date) do
+      %Source{} = source ->
+        {:ok, source}
+
+      nil ->
+        Audit.transaction(actor, "import.record_inaturalist_source", fn ->
+          actor |> Sources.create_inaturalist_source(date) |> log_inaturalist(date)
+        end)
+    end
+  end
+
+  defp log_inaturalist({:ok, source}, date) do
+    payload = %{"on" => Date.to_iso8601(date)}
+    ReplayLog.append!(:source_edit, key("create_inaturalist", source), payload)
+    source
+  end
+
+  defp log_inaturalist({:error, reason}, _date), do: Repo.rollback(reason)
+
+  @doc """
   The edit a replay log entry records, its Sources found by their stable
   references; `:done` when the entry is already made (its Source renamed by
   it or holding its details, retracted by that notice on that date, no
@@ -143,6 +175,14 @@ defmodule Gallformers.Import.SourceEdits do
     if Sources.get_source_by_title(title),
       do: :done,
       else: {:ok, {:create, Map.take(attrs, @citation_fields)}}
+  end
+
+  def from_entry(%{"op" => "create_inaturalist", "source" => %{"title" => title}}, %{"on" => on}) do
+    with {:ok, date} <- Date.from_iso8601(on) do
+      if Sources.get_source_by_title(title),
+        do: :done,
+        else: {:ok, {:create_inaturalist, date}}
+    end
   end
 
   def from_entry(key, _payload), do: {:error, {:unknown_source_edit, key}}

@@ -194,6 +194,37 @@ defmodule Gallformers.Import.TaxonomyStatementsTest do
              ]
     end
 
+    test "a taxon created with its authorship: the Source's name statement gives it", ctx do
+      attrs = %{
+        name: "Basa auctor",
+        rank: :species,
+        parent_id: ctx.genus.id,
+        kingdom: "Animalia",
+        authorship: "Weld, 1959"
+      }
+
+      assert {:ok, auctor} =
+               Import.record_taxonomy_change(
+                 ctx.actor,
+                 {:source, ctx.weld.id},
+                 {:create_taxon, attrs, []}
+               )
+
+      auctor = Taxa.get_taxon!(auctor.id)
+      assert Enum.find(auctor.names, &(&1.status == :accepted)).authorship == "Weld, 1959"
+
+      {:ok, fact_id} =
+        Taxa.find_act_fact(:name, %{
+          taxon_id: auctor.id,
+          name: "Basa auctor",
+          rank: :species,
+          authorship: "Weld, 1959"
+        })
+
+      assert is_integer(fact_id)
+      assert Sync.check() |> for_taxa([auctor]) == []
+    end
+
     test "an intermediate rank created over existing taxa moves them by the Source's word",
          ctx do
       attrs = %{name: "Basini", rank: :tribe, parent_id: ctx.family.id, kingdom: "Animalia"}

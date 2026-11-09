@@ -329,7 +329,8 @@ defmodule Gallformers.Import.Replay do
             name: name,
             rank: rank,
             parent_id: parent_id,
-            authorship: entry.payload["authorship"]
+            authorship: entry.payload["authorship"],
+            origin: String.to_existing_atom(entry.payload["origin"] || "powo")
           })
         )
       end

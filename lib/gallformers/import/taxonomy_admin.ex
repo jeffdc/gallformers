@@ -42,7 +42,9 @@ defmodule Gallformers.Import.TaxonomyAdmin do
   taxa) and gives a plant its Host range `entries`. A plant (Plantae at
   species rank or below) is added as the Host-name step adds one
   (`Gallformers.Import.record_plant_added/2`); any other taxon is
-  `:curated`, or `:powo` in Plantae.
+  `:curated`, or `:powo` in Plantae. `attrs` may give the `:origin`
+  (`:inaturalist`, a taxon added from iNaturalist) and, for a plant at
+  species rank or below, its `:authorship`.
   """
   @spec create_taxon(Actor.t(), map(), [integer()], [range_entry()]) ::
           {:ok, Taxon.t()} | {:error, term()}
@@ -62,11 +64,15 @@ defmodule Gallformers.Import.TaxonomyAdmin do
 
   defp create(actor, %{kingdom: "Plantae", rank: rank} = attrs) do
     if rank in Rank.species_and_below(),
-      do: Import.record_plant_added(actor, Map.take(attrs, [:name, :rank, :parent_id])),
-      else: create_listed(actor, Map.put(attrs, :origin, :powo))
+      do:
+        Import.record_plant_added(
+          actor,
+          Map.take(attrs, [:name, :rank, :parent_id, :authorship, :origin])
+        ),
+      else: create_listed(actor, Map.put_new(attrs, :origin, :powo))
   end
 
-  defp create(actor, attrs), do: create_listed(actor, Map.put(attrs, :origin, :curated))
+  defp create(actor, attrs), do: create_listed(actor, Map.put_new(attrs, :origin, :curated))
 
   defp create_listed(actor, attrs) do
     edit = {:create_taxon, Map.take(attrs, [:name, :rank, :parent_id, :kingdom, :origin])}

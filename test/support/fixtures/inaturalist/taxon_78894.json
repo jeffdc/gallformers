@@ -1,0 +1,233 @@
+{
+ "total_results": 1,
+ "page": 1,
+ "per_page": 30,
+ "results": [
+  {
+   "id": 78894,
+   "name": "Rubus pensilvanicus",
+   "rank": "species",
+   "rank_level": 10,
+   "is_active": false,
+   "current_synonymous_taxon_ids": [
+    1449402
+   ],
+   "parent_id": 1449402,
+   "ancestor_ids": [
+    48460,
+    47126,
+    211194,
+    47125,
+    47124,
+    47132,
+    47148,
+    415343,
+    922171,
+    47544,
+    1360636,
+    1449402
+   ],
+   "preferred_common_name": "Pennsylvania Blackberry",
+   "observations_count": 2,
+   "iconic_taxon_name": "Plantae",
+   "ancestors": [
+    {
+     "id": 47126,
+     "name": "Plantae",
+     "rank": "kingdom",
+     "rank_level": 70,
+     "is_active": true,
+     "preferred_common_name": "Plants",
+     "observations_count": 162836659,
+     "parent_id": 48460
+    },
+    {
+     "id": 211194,
+     "name": "Tracheophyta",
+     "rank": "phylum",
+     "rank_level": 60,
+     "is_active": true,
+     "preferred_common_name": "Vascular Plants",
+     "observations_count": 157948095,
+     "parent_id": 47126
+    },
+    {
+     "id": 47125,
+     "name": "Angiospermae",
+     "rank": "subphylum",
+     "rank_level": 57,
+     "is_active": true,
+     "preferred_common_name": "flowering plants",
+     "observations_count": 149018952,
+     "parent_id": 211194
+    },
+    {
+     "id": 47124,
+     "name": "Magnoliopsida",
+     "rank": "class",
+     "rank_level": 50,
+     "is_active": true,
+     "preferred_common_name": "Dicots",
+     "observations_count": 124951689,
+     "parent_id": 47125
+    },
+    {
+     "id": 47132,
+     "name": "Rosales",
+     "rank": "order",
+     "rank_level": 40,
+     "is_active": true,
+     "preferred_common_name": "Roses, Elms, Figs, and Allies",
+     "observations_count": 10383240,
+     "parent_id": 47124
+    },
+    {
+     "id": 47148,
+     "name": "Rosaceae",
+     "rank": "family",
+     "rank_level": 30,
+     "is_active": true,
+     "preferred_common_name": "rose family",
+     "observations_count": 7307339,
+     "parent_id": 47132
+    },
+    {
+     "id": 415343,
+     "name": "Rosoideae",
+     "rank": "subfamily",
+     "rank_level": 27,
+     "is_active": true,
+     "preferred_common_name": "brambles, roses, strawberries, and allies",
+     "observations_count": 3954079,
+     "parent_id": 47148
+    },
+    {
+     "id": 922171,
+     "name": "Rubeae",
+     "rank": "tribe",
+     "rank_level": 25,
+     "is_active": true,
+     "preferred_common_name": "Brambles",
+     "observations_count": 1216915,
+     "parent_id": 415343
+    },
+    {
+     "id": 47544,
+     "name": "Rubus",
+     "rank": "genus",
+     "rank_level": 20,
+     "is_active": true,
+     "preferred_common_name": "brambles",
+     "observations_count": 1215558,
+     "parent_id": 922171
+    },
+    {
+     "id": 1360636,
+     "name": "Rubus",
+     "rank": "subgenus",
+     "rank_level": 15,
+     "is_active": true,
+     "preferred_common_name": "Blackberries",
+     "observations_count": 445352,
+     "parent_id": 47544
+    },
+    {
+     "id": 1449402,
+     "name": "Arguti",
+     "rank": "section",
+     "rank_level": 13,
+     "is_active": true,
+     "preferred_common_name": "Field Highbush Blackberries",
+     "observations_count": 22268,
+     "parent_id": 1360636
+    }
+   ],
+   "names": [
+    {
+     "name": "Rubus pensilvanicus",
+     "lexicon": "scientific-names",
+     "is_valid": true,
+     "locale": "sci",
+     "position": 0
+    },
+    {
+     "name": "Pennsylvania Blackberry",
+     "lexicon": "english",
+     "is_valid": true,
+     "locale": "en",
+     "position": 0
+    },
+    {
+     "name": "prickly Florida blackberry",
+     "lexicon": "english",
+     "is_valid": true,
+     "locale": "en",
+     "position": 7
+    },
+    {
+     "name": "Highbush Blackberry",
+     "lexicon": "english",
+     "is_valid": true,
+     "locale": "en",
+     "position": 8
+    },
+    {
+     "name": "sawtooth blackberry",
+     "lexicon": "english",
+     "is_valid": true,
+     "locale": "en",
+     "position": 9
+    },
+    {
+     "name": "オニクロイチゴ",
+     "lexicon": "japanese",
+     "is_valid": true,
+     "locale": "ja",
+     "position": 11
+    },
+    {
+     "name": "ronce de Pennsylvanie",
+     "lexicon": "french",
+     "is_valid": true,
+     "locale": "fr",
+     "position": 12
+    },
+    {
+     "name": "賓州黑莓",
+     "lexicon": "chinese-traditional",
+     "is_valid": true,
+     "locale": "zh",
+     "position": 12
+    },
+    {
+     "name": "Rubus originalis",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 3
+    },
+    {
+     "name": "Rubus ucetanus",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 4
+    },
+    {
+     "name": "Rubus abactus",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 10
+    },
+    {
+     "name": "Rubus tygartensis",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 11
+    }
+   ]
+  }
+ ]
+}

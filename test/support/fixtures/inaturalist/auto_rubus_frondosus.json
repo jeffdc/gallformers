@@ -1,0 +1,35 @@
+{
+ "total_results": 1,
+ "page": 1,
+ "per_page": 6,
+ "results": [
+  {
+   "id": 168056,
+   "name": "Rubus frondosus",
+   "rank": "species",
+   "rank_level": 10,
+   "is_active": true,
+   "current_synonymous_taxon_ids": null,
+   "parent_id": 1449402,
+   "ancestor_ids": [
+    48460,
+    47126,
+    211194,
+    47125,
+    47124,
+    47132,
+    47148,
+    415343,
+    922171,
+    47544,
+    1360636,
+    1449402,
+    168056
+   ],
+   "preferred_common_name": "Leafy-bracted Blackberry",
+   "observations_count": 245,
+   "iconic_taxon_name": "Plantae",
+   "matched_term": "Rubus frondosus"
+  }
+ ]
+}

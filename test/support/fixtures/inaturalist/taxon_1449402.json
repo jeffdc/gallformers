@@ -1,0 +1,466 @@
+{
+ "total_results": 1,
+ "page": 1,
+ "per_page": 30,
+ "results": [
+  {
+   "id": 1449402,
+   "name": "Arguti",
+   "rank": "section",
+   "rank_level": 13,
+   "is_active": true,
+   "current_synonymous_taxon_ids": null,
+   "parent_id": 1360636,
+   "ancestor_ids": [
+    48460,
+    47126,
+    211194,
+    47125,
+    47124,
+    47132,
+    47148,
+    415343,
+    922171,
+    47544,
+    1360636
+   ],
+   "preferred_common_name": "Field Highbush Blackberries",
+   "observations_count": 22268,
+   "iconic_taxon_name": "Plantae",
+   "ancestors": [
+    {
+     "id": 47126,
+     "name": "Plantae",
+     "rank": "kingdom",
+     "rank_level": 70,
+     "is_active": true,
+     "preferred_common_name": "Plants",
+     "observations_count": 162836659,
+     "parent_id": 48460
+    },
+    {
+     "id": 211194,
+     "name": "Tracheophyta",
+     "rank": "phylum",
+     "rank_level": 60,
+     "is_active": true,
+     "preferred_common_name": "Vascular Plants",
+     "observations_count": 157948095,
+     "parent_id": 47126
+    },
+    {
+     "id": 47125,
+     "name": "Angiospermae",
+     "rank": "subphylum",
+     "rank_level": 57,
+     "is_active": true,
+     "preferred_common_name": "flowering plants",
+     "observations_count": 149018952,
+     "parent_id": 211194
+    },
+    {
+     "id": 47124,
+     "name": "Magnoliopsida",
+     "rank": "class",
+     "rank_level": 50,
+     "is_active": true,
+     "preferred_common_name": "Dicots",
+     "observations_count": 124951689,
+     "parent_id": 47125
+    },
+    {
+     "id": 47132,
+     "name": "Rosales",
+     "rank": "order",
+     "rank_level": 40,
+     "is_active": true,
+     "preferred_common_name": "Roses, Elms, Figs, and Allies",
+     "observations_count": 10383240,
+     "parent_id": 47124
+    },
+    {
+     "id": 47148,
+     "name": "Rosaceae",
+     "rank": "family",
+     "rank_level": 30,
+     "is_active": true,
+     "preferred_common_name": "rose family",
+     "observations_count": 7307339,
+     "parent_id": 47132
+    },
+    {
+     "id": 415343,
+     "name": "Rosoideae",
+     "rank": "subfamily",
+     "rank_level": 27,
+     "is_active": true,
+     "preferred_common_name": "brambles, roses, strawberries, and allies",
+     "observations_count": 3954079,
+     "parent_id": 47148
+    },
+    {
+     "id": 922171,
+     "name": "Rubeae",
+     "rank": "tribe",
+     "rank_level": 25,
+     "is_active": true,
+     "preferred_common_name": "Brambles",
+     "observations_count": 1216915,
+     "parent_id": 415343
+    },
+    {
+     "id": 47544,
+     "name": "Rubus",
+     "rank": "genus",
+     "rank_level": 20,
+     "is_active": true,
+     "preferred_common_name": "brambles",
+     "observations_count": 1215558,
+     "parent_id": 922171
+    },
+    {
+     "id": 1360636,
+     "name": "Rubus",
+     "rank": "subgenus",
+     "rank_level": 15,
+     "is_active": true,
+     "preferred_common_name": "Blackberries",
+     "observations_count": 445352,
+     "parent_id": 47544
+    }
+   ],
+   "children": [
+    {
+     "id": 1276041,
+     "name": "Rubus argutus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Sawtooth Blackberry",
+     "observations_count": 1664,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168088,
+     "name": "Rubus laudatus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Bundy blackberry",
+     "observations_count": 565,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1142421,
+     "name": "Rubus oklahomus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Oklahoma blackberry",
+     "observations_count": 380,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168131,
+     "name": "Rubus persistens",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Persistent Blackberry",
+     "observations_count": 335,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168149,
+     "name": "Rubus recurvans",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "recurved blackberry",
+     "observations_count": 307,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168056,
+     "name": "Rubus frondosus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Leafy-bracted Blackberry",
+     "observations_count": 245,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1401244,
+     "name": "Rubus ablatus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Ablated Blackberry",
+     "observations_count": 207,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1267494,
+     "name": "Rubus densissimus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Morgantown blackberry",
+     "observations_count": 21,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1266884,
+     "name": "Rubus revealii",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 19,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168103,
+     "name": "Rubus mollior",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "softleaf blackberry",
+     "observations_count": 18,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1409140,
+     "name": "Rubus subsolanus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 6,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168140,
+     "name": "Rubus prestonensis",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Terra Alta blackberry",
+     "observations_count": 5,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1640951,
+     "name": "Rubus andrewsianus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Andrews' Blackberry",
+     "observations_count": 4,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1640977,
+     "name": "Rubus immanis",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Monstrous Blackberry",
+     "observations_count": 4,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1640956,
+     "name": "Rubus abundiflorus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 3,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168061,
+     "name": "Rubus gnarus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 3,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168175,
+     "name": "Rubus suus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Branched Blackberry",
+     "observations_count": 3,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168079,
+     "name": "Rubus insulanus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 2,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168134,
+     "name": "Rubus philadelphicus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Philadelphia blackberry",
+     "observations_count": 2,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1670705,
+     "name": "Rubus jennisonii",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 1,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168107,
+     "name": "Rubus multispinus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 1,
+     "parent_id": 1449402
+    },
+    {
+     "id": 168018,
+     "name": "Rubus arvensis",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "field blackberry",
+     "observations_count": 1,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1625861,
+     "name": "Rubus largus",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Oakwoods dewberry",
+     "observations_count": 0,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1671121,
+     "name": "Rubus betulifolius",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 0,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1689181,
+     "name": "Rubus janssonii",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "observations_count": 0,
+     "parent_id": 1449402
+    },
+    {
+     "id": 1665368,
+     "name": "Rubus conanicutensis",
+     "rank": "species",
+     "rank_level": 10,
+     "is_active": true,
+     "preferred_common_name": "Conanicut Island Blackberry",
+     "observations_count": 0,
+     "parent_id": 1449402
+    }
+   ],
+   "names": [
+    {
+     "name": "Arguti",
+     "lexicon": "scientific-names",
+     "is_valid": true,
+     "locale": "sci",
+     "position": 0
+    },
+    {
+     "name": "Field Highbush Blackberries",
+     "lexicon": "english",
+     "is_valid": true,
+     "locale": "en",
+     "position": 1
+    },
+    {
+     "name": "オニクロイチゴ",
+     "lexicon": "japanese",
+     "is_valid": true,
+     "locale": "ja",
+     "position": 3
+    },
+    {
+     "name": "Pennsylvania Blackberry",
+     "lexicon": "english",
+     "is_valid": true,
+     "locale": "en",
+     "position": 4
+    },
+    {
+     "name": "ronce de Pennsylvanie",
+     "lexicon": "french",
+     "is_valid": true,
+     "locale": "fr",
+     "position": 11
+    },
+    {
+     "name": "賓州黑莓",
+     "lexicon": "chinese-traditional",
+     "is_valid": true,
+     "locale": "zh",
+     "position": 13
+    },
+    {
+     "name": "Rubus abactus",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 2
+    },
+    {
+     "name": "Rubus pensilvanicus",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 8
+    },
+    {
+     "name": "Rubus originalis",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 9
+    },
+    {
+     "name": "Rubus ucetanus",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 10
+    },
+    {
+     "name": "Rubus tygartensis",
+     "lexicon": "scientific-names",
+     "is_valid": false,
+     "locale": "sci",
+     "position": 12
+    }
+   ]
+  }
+ ]
+}

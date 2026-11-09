@@ -1522,17 +1522,19 @@ defmodule GallformersWeb.Admin.Review.Questions do
     do: %Choice{
       label: "Another plant…",
       hint:
-        "Search Gallformers and WCVP by name. “#{written}” is a common name: " <>
+        "Search Gallformers, WCVP and iNaturalist by name. “#{written}” is a common name: " <>
           "it is not added as a synonym.",
       picker: :plant,
-      as: "common_name"
+      as: "common_name",
+      inat: true
     }
 
   defp another_plant(_written, false),
     do: %Choice{
       label: "Another plant…",
-      hint: "Search Gallformers and WCVP by name.",
-      picker: :plant
+      hint: "Search Gallformers, WCVP and iNaturalist by name.",
+      picker: :plant,
+      inat: true
     }
 
   # A common name that is the genus's own ("oaks") is the genus: offered
@@ -2065,8 +2067,9 @@ defmodule GallformersWeb.Admin.Review.Questions do
   defp another_taxon,
     do: %Choice{
       label: "Another taxon…",
-      hint: "Search the tree by name or synonym.",
-      picker: :taxon
+      hint: "Search Gallformers and iNaturalist by name.",
+      picker: :taxon,
+      inat: true
     }
 
   defp leave_name(item, ctx),

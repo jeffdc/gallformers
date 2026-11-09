@@ -21,12 +21,18 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
   **Everything** lists every open question by section, each with its
   suggestion and Accept; opening one shows its card.
 
+  A question's "Look at it" on an iNaturalist taxon opens the import
+  panel (`GallformersWeb.Admin.InatTaxonPanel`, matter `cb28`) in the
+  rail's place; the taxon it brings in answers the question, and the
+  review moves on as after any answer.
+
   Params: `view=all`, `stage=<step>` (that stage's work first), `hedges`
   (the hedged statements), `facts` (what approving will add).
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.Import
+  alias GallformersWeb.Admin.InatTaxonPanel
   alias GallformersWeb.Admin.Review.Steps
   alias GallformersWeb.Admin.Review.Units
   alias GallformersWeb.Admin.ReviewLive.Answer
@@ -63,7 +69,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
          open_hedge: nil,
          open_missed: nil,
          deny_form: nil,
-         preview: nil
+         preview: nil,
+         inat: nil
        )
        |> SourcePage.load()
        |> taxonomy_open()
@@ -232,6 +239,19 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
     do: {:noreply, Document.handle_event(event, params, socket)}
 
   @impl true
+  # A question's iNaturalist taxon: the import panel opens on it.
+  def handle_info({Answer, {:inat_open, item_id, inat_id, matched}}, socket),
+    do: {:noreply, assign(socket, inat: %{item_id: item_id, start: {:taxon, inat_id, matched}})}
+
+  def handle_info({InatTaxonPanel, :close}, socket), do: {:noreply, assign(socket, inat: nil)}
+
+  # Brought in: its question is answered with it.
+  def handle_info({InatTaxonPanel, {:imported, taxon_id}}, socket) do
+    %{item_id: item_id} = socket.assigns.inat
+    send_update(QuestionCard, id: "q-#{item_id}", imported: taxon_id)
+    {:noreply, assign(socket, inat: nil)}
+  end
+
   def handle_info({QuestionCard, {:decided, item}}, socket) do
     entry = Enum.find(socket.assigns.entries, &(&1.item.id == item.id))
     items = if entry, do: decided_items(entry, item), else: [item]
@@ -567,7 +587,19 @@ defmodule GallformersWeb.Admin.ReviewLive.Review do
           <% end %>
         </div>
 
+        <.live_component
+          :if={@inat}
+          module={InatTaxonPanel}
+          id="inat-taxon"
+          actor={@actor}
+          start={@inat.start}
+          back
+          answering
+          class="lg:col-span-4"
+        />
+
         <ReviewComponents.review_rail
+          :if={!@inat}
           title={@summary.title}
           source_id={@source_id}
           tally={@tally}

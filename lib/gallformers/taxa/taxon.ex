@@ -6,7 +6,8 @@ defmodule Gallformers.Taxa.Taxon do
     * `rank` — the contract's rank list (`Gallformers.Taxa.Rank`).
     * `parent_id` — its place in the editorial tree; changed only through
       `Gallformers.Taxa.place/3`, which validates the tree.
-    * `origin` — `:curated` (gall formers and associates) or `:powo` (plants).
+    * `origin` — `:curated` (gall formers and associates), `:powo` (plants)
+      or `:inaturalist` (a plant added from iNaturalist, matter `cb28`).
     * `kingdom` — `"Plantae"` for plants; set for others when known.
     * `datacomplete`, `abundance_id` — editorial carry-overs from today's
       plant rows, set on plants only (`803b` decision 6): every gall known
@@ -23,7 +24,7 @@ defmodule Gallformers.Taxa.Taxon do
   alias Gallformers.Taxa.Rank
   alias Gallformers.Taxa.TaxonName
 
-  @type origin :: :curated | :powo
+  @type origin :: :curated | :powo | :inaturalist
 
   @type t :: %__MODULE__{
           id: integer() | nil,
@@ -43,7 +44,7 @@ defmodule Gallformers.Taxa.Taxon do
 
   schema "taxa" do
     field :rank, Ecto.Enum, values: Rank.all()
-    field :origin, Ecto.Enum, values: [:curated, :powo]
+    field :origin, Ecto.Enum, values: [:curated, :powo, :inaturalist]
     field :kingdom, :string
     field :datacomplete, :boolean, default: false
     # A foreign key to `abundance`, known by ID.

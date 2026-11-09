@@ -32,6 +32,9 @@ defmodule Gallformers.Import.TaxonomyEdits do
       codes are kept by the data migration)
     * `{:set_wcvp, taxon, attrs}` — `"set_wcvp"`, payload the WCVP link's
       fields as set
+    * `{:set_inat, taxon, inat_id}` — `"set_inat"`, payload its
+      `"inat_id"`: the taxon's iNaturalist taxon (`Gallformers.Taxa.set_inat/3`,
+      matter `cb28`)
 
   Through `Gallformers.Import.record_wcvp_edit/2`, the WCVP actions, whose
   outcome depends on WCVP's data at the time: each is logged as the state
@@ -68,6 +71,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
           | {:delete_taxon, Taxa.taxon_ref()}
           | {:set_host_range, Taxa.taxon_ref(), [Ranges.taxon_place()]}
           | {:set_wcvp, Taxa.taxon_ref(), map()}
+          | {:set_inat, Taxa.taxon_ref(), integer()}
 
   @typedoc "A WCVP action (`Gallformers.Import.record_wcvp_edit/2`)."
   @type wcvp_edit ::
@@ -78,7 +82,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
           | {:clear_match_status, [integer()]}
           | {:confirm_ranges, [integer()]}
 
-  @ops ~w(update_editorial set_authorship remove_synonym remove_common_name delete_taxon set_host_range set_wcvp)
+  @ops ~w(update_editorial set_authorship remove_synonym remove_common_name delete_taxon set_host_range set_wcvp set_inat)
   @link_fields [:wcvp_id, :powo_id, :wcvp_match_status, :range_confirmed, :wcvp_synced_at]
 
   @doc "Whether `Gallformers.Import.record_taxonomy_edit/2` takes `edit` here."
@@ -124,6 +128,9 @@ defmodule Gallformers.Import.TaxonomyEdits do
 
   def entry({:set_wcvp, taxon, attrs}), do: {key("set_wcvp", taxon), link_payload(attrs)}
 
+  def entry({:set_inat, taxon, inat_id}),
+    do: {key("set_inat", taxon), %{"inat_id" => inat_id}}
+
   @doc "Makes the edit."
   @spec run(Actor.t(), edit()) :: {:ok, term()} | {:error, term()}
   def run(actor, {:update_editorial, taxon, attrs}),
@@ -154,6 +161,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
     do: Ranges.update_taxon_places(actor, taxon, entries)
 
   def run(actor, {:set_wcvp, taxon, attrs}), do: Wcvp.put_link(actor, taxon, attrs)
+  def run(actor, {:set_inat, taxon, inat_id}), do: Taxa.set_inat(actor, taxon, inat_id)
 
   @doc """
   The edit a logged entry stands for, its taxa found by their stable
@@ -162,7 +170,7 @@ defmodule Gallformers.Import.TaxonomyEdits do
   later in the log is found by its old name too) and its places by code;
   `:done` for an edit already in place — a name or common name to remove
   that is gone, a taxon to delete that no name names, flags, an authorship,
-  a range or a WCVP link the taxon holds — so a replay run again skips it;
+  a range, a WCVP link or an iNaturalist ID the taxon holds — so a replay run again skips it;
   `:unknown` for an op not handled here.
   """
   @spec decode(map(), map(), (map() -> {:ok, integer()} | {:error, term()})) ::
@@ -243,6 +251,10 @@ defmodule Gallformers.Import.TaxonomyEdits do
     end
   end
 
+  defp decode_edit(%{"op" => "set_inat", "taxon" => taxon}, %{"inat_id" => inat_id}, resolve) do
+    with {:ok, id} <- resolve.(taxon), do: {:ok, {:set_inat, id, inat_id}}
+  end
+
   defp decode_edit(_key, _payload, _resolve), do: :unknown
 
   # Whether the taxon holds the state the edit sets already.
@@ -270,6 +282,8 @@ defmodule Gallformers.Import.TaxonomyEdits do
       link -> link |> TaxonWcvp.changeset(attrs) |> unchanged?()
     end
   end
+
+  defp done?({:set_inat, id, inat_id}), do: Taxa.inat_id(id) == inat_id
 
   defp done?(_edit), do: false
 

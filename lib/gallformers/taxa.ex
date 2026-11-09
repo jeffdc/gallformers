@@ -51,6 +51,7 @@ defmodule Gallformers.Taxa do
       ReadModels.HostPage,
       ReadModels.SpeciesPage,
       Taxon,
+      TaxonInaturalist,
       TaxonName,
       TaxonNote,
       TaxonRedirect,
@@ -85,6 +86,7 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.ReadModels.SpeciesPage
   alias Gallformers.Taxa.Records
   alias Gallformers.Taxa.Taxon
+  alias Gallformers.Taxa.TaxonInaturalist
   alias Gallformers.Taxa.TaxonName
   alias Gallformers.Taxa.TaxonNote
   alias Gallformers.Taxa.TaxonRedirect
@@ -99,7 +101,7 @@ defmodule Gallformers.Taxa do
   @doc """
   Creates a taxon with its accepted name.
 
-  `attrs` (atom keys): `:rank`, `:origin` (`:curated | :powo`) and `:name`
+  `attrs` (atom keys): `:rank`, `:origin` (`:curated | :powo | :inaturalist`) and `:name`
   are required; `:parent_id` (nil for a root), `:kingdom` (taken from the
   parent when not given), the name's `:sensu` and `:authorship`, a plant's
   editorial `:datacomplete` and `:abundance_id`, and `:id` for a migrated
@@ -645,6 +647,49 @@ defmodule Gallformers.Taxa do
         where: l.kind == ^kind and l.legacy_id == ^legacy_id
       )
     )
+  end
+
+  # -- iNaturalist links (matter `cb28`) ------------------------------------------
+
+  @doc "The iNaturalist taxon ID `taxon` is linked to, or nil."
+  @spec inat_id(taxon_ref()) :: integer() | nil
+  def inat_id(taxon) do
+    Repo.one(
+      from(l in TaxonInaturalist, where: l.taxon_id == ^taxon_id(taxon), select: l.inat_id)
+    )
+  end
+
+  @doc "The taxon linked to the iNaturalist taxon `inat_id`, with its names, or nil."
+  @spec get_by_inat_id(integer()) :: Taxon.t() | nil
+  def get_by_inat_id(inat_id) when is_integer(inat_id) do
+    from(t in Taxon,
+      join: l in TaxonInaturalist,
+      on: l.taxon_id == t.id,
+      where: l.inat_id == ^inat_id,
+      preload: [names: ^names_order()]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Links `taxon` to the iNaturalist taxon `inat_id` (replacing any link it
+  had), in a transaction audited as `actor`. `{:error, changeset}` when
+  the iNaturalist taxon is linked to another taxon already. The replay log
+  is `Gallformers.Import.record_taxonomy_edit/2`'s (`{:set_inat, taxon,
+  id}`), which calls this.
+  """
+  @spec set_inat(Actor.t(), taxon_ref(), integer()) ::
+          {:ok, TaxonInaturalist.t()} | {:error, Changeset.t()}
+  def set_inat(%Actor{} = actor, taxon, inat_id) do
+    Audit.transaction(actor, "taxa.set_inat", fn ->
+      id = taxon_id(taxon)
+      link = Repo.get(TaxonInaturalist, id) || %TaxonInaturalist{taxon_id: id}
+
+      link
+      |> TaxonInaturalist.changeset(%{inat_id: inat_id})
+      |> Repo.insert_or_update()
+      |> unwrap_or_rollback()
+    end)
   end
 
   # -- the tree ----------------------------------------------------------------

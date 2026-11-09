@@ -37,8 +37,8 @@ defmodule Gallformers.Import.TaxonomyStatements do
     * `{:create_taxon, attrs, child_ids}` — a new taxon (`:name`, `:rank`,
       `:parent_id`, `:kingdom`; made in the tree through
       `Gallformers.Import.record_taxonomy_edit/2`), with its placement and
-      name as the Source's statements, and each of `child_ids` placed
-      under it;
+      name (with `:authorship`, when given) as the Source's statements, and
+      each of `child_ids` placed under it;
     * `{:move_all, taxon_ids, parent}` — several placements.
 
   A plant is refused (`{:error, :plant}`): plant data is editorial
@@ -261,13 +261,21 @@ defmodule Gallformers.Import.TaxonomyStatements do
   end
 
   defp prepare(actor, {:create_taxon, attrs, child_ids}) do
+    attrs_authorship = attrs[:authorship]
     attrs = attrs |> Map.take([:name, :rank, :parent_id, :kingdom]) |> Map.put(:origin, :curated)
+
+    authorship = blank_to_nil(attrs_authorship)
 
     with {:ok, taxon} <- Import.record_taxonomy_edit(actor, {:create_taxon, attrs}) do
       name = %{taxon_id: taxon.id, name: Taxa.accepted_name(taxon), rank: taxon.rank}
 
+      {name, extra} =
+        if authorship,
+          do: {Map.put(name, :authorship, authorship), %{authorship_as_written: authorship}},
+          else: {name, %{}}
+
       {:ok, taxon.id,
-       [placement(taxon.id, taxon.parent_id), {:name, name, :confirm, %{}}] ++
+       [placement(taxon.id, taxon.parent_id), {:name, name, :confirm, extra}] ++
          Enum.map(child_ids, &placement(&1, taxon.id))}
     end
   end

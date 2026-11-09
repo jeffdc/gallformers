@@ -35,6 +35,8 @@ defmodule GallformersWeb.ReviewComponents do
   import GallformersWeb.PageComponents, only: [panel: 1]
   import GallformersWeb.UIComponents, only: [loading_spinner: 1, tooltip: 1]
 
+  alias Gallformers.Import.InatTaxa
+
   # The rows' columns, as flex items so the column heads line up with the
   # rows: a question row (`review_question_row/1`: the chevron, the Source's
   # words, an arrow, the answer, 1.2 : 1.5) and an older row (`review_row/1`:
@@ -2369,4 +2371,509 @@ defmodule GallformersWeb.ReviewComponents do
     {first, rest} = String.split_at(text, 1)
     String.upcase(first) <> rest
   end
+
+  # -- inat_taxon_panel (matter `cb28`) -----------------------------------------------
+
+  @inat_italic ~w(genus subgenus section species subspecies variety form hybrid)
+
+  @doc """
+  A taxon from iNaturalist, beside the page (matter `cb28`): in the rail's
+  place on wide screens, a bottom sheet on phones (`gf-sheet`). The head,
+  "From iNaturalist" and Close; then one of three steps:
+
+    * `:find` — a search of iNaturalist ("A name, or an iNaturalist link or
+      number"), each result with its rank, common name, observations, the
+      synonym that matched, and "Look at it"; when iNaturalist has nothing,
+      the names WCVP gives for it (`suggest`) as one-click searches;
+    * `:loading` — "Reading it from iNaturalist…";
+    * `:look` — the taxon (`plan`, `Gallformers.Import.InatTaxa.plan/2`)
+      beside our tree: Where it goes (the ranks above the nearest we hold
+      folded into one line until "Show them"), Under it on iNaturalist (the
+      first 8 until "Show N more"), Names, Authorship (a field per taxon
+      added), and the foot: how it is credited, the button saying what it
+      does, Cancel, and with `answering` the taxon the question is
+      answered with.
+
+  It holds no state: the LiveComponent `GallformersWeb.Admin.InatTaxonPanel`
+  does, and gets its events (`target`): `search` (`q`), `pick` (`id`,
+  `matched`), `back`, `close`, `tick` (`key`), `more`, `higher`, `choose`
+  (`rank`, `authorship`), `add`.
+  """
+  attr :id, :string, required: true
+  attr :step, :atom, default: :find, values: [:find, :loading, :look]
+  attr :query, :string, default: ""
+  attr :results, :any, default: [], doc: "the search's results; nil while searching"
+  attr :suggest, :list, default: [], doc: "names WCVP gives for a name iNaturalist hasn't"
+  attr :error, :string, default: nil
+  attr :plan, :map, default: nil
+  attr :ticked, :any, default: MapSet.new()
+  attr :rank, :atom, default: nil, doc: "the rank chosen for a taxon of a rank we don't use"
+  attr :authorship, :map, default: %{}, doc: "the authorship typed, by key"
+  attr :more, :boolean, default: false, doc: "every child shown"
+  attr :higher, :boolean, default: false, doc: "the ranks above unfolded"
+  attr :back, :boolean, default: false, doc: "\"← Other results\" goes back"
+  attr :answering, :boolean, default: false, doc: "a question is answered with the taxon"
+  attr :credit, :string, default: nil, doc: "the Source credited (\"iNaturalist, accessed …\")"
+  attr :target, :any, default: nil
+  attr :class, :any, default: nil
+
+  def inat_taxon_panel(assigns) do
+    ~H"""
+    <aside id={@id} class={["gf-sheet gap-4", @class]} aria-label="From iNaturalist">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="font-brand text-section text-ink">From iNaturalist</h2>
+        <.button
+          icon="ph-x"
+          label="Close"
+          icon_only
+          variant="ghost"
+          phx-click="close"
+          phx-target={@target}
+        />
+      </div>
+      <p :if={@error} data-role="inat-error" class="text-body text-danger">{@error}</p>
+      <%= case @step do %>
+        <% :look -> %>
+          <.inat_look
+            plan={@plan}
+            ticked={@ticked}
+            rank={@rank}
+            authorship={@authorship}
+            more={@more}
+            higher={@higher}
+            back={@back}
+            answering={@answering}
+            credit={@credit}
+            target={@target}
+          />
+        <% :loading -> %>
+          <p class="text-body text-ink-2">Reading it from iNaturalist…</p>
+        <% :find -> %>
+          <.inat_find
+            id={@id}
+            query={@query}
+            results={@results}
+            suggest={@suggest}
+            answering={@answering}
+            target={@target}
+          />
+      <% end %>
+    </aside>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :query, :string, required: true
+  attr :results, :any, required: true
+  attr :suggest, :list, required: true
+  attr :answering, :boolean, required: true
+  attr :target, :any, required: true
+
+  defp inat_find(assigns) do
+    ~H"""
+    <.form
+      for={%{}}
+      id={"#{@id}-find"}
+      phx-change="search"
+      phx-submit="search"
+      phx-target={@target}
+      class="flex flex-col gap-1"
+    >
+      <.search_field
+        id={"#{@id}-q"}
+        name="q"
+        value={@query}
+        label="Search iNaturalist by name"
+        debounce="400"
+      />
+      <p class="text-caption text-muted">A name, or an iNaturalist link or number.</p>
+    </.form>
+    <p :if={@results == nil} class="text-body text-ink-2">Searching iNaturalist…</p>
+    <div :if={@results == [] and String.trim(@query) != ""} class="flex flex-col gap-2">
+      <p class="text-body text-ink-2">
+        iNaturalist has nothing by “{@query}”. {if @answering,
+          do: "Try another name the Source might mean.",
+          else: "Try another name."}
+      </p>
+      <p :if={@suggest != []} class="flex flex-wrap items-center gap-2 text-meta text-ink-2">
+        Names WCVP gives for it:
+        <.button
+          :for={n <- @suggest}
+          size="sm"
+          phx-click="search"
+          phx-value-q={n}
+          phx-target={@target}
+        >
+          <span class="italic">{n}</span>
+        </.button>
+      </p>
+    </div>
+    <ul :if={@results not in [nil, []]} class="flex flex-col">
+      <li
+        :for={r <- @results}
+        data-inat={r.id}
+        class="flex items-center justify-between gap-3 border-b border-line py-2"
+      >
+        <span class="flex min-w-0 flex-col">
+          <span class="text-body text-ink">
+            <span class={inat_italic?(r.rank) && "italic"}>{r.name}</span>
+            <span class="text-meta text-muted">{r.rank}</span>
+          </span>
+          <span class="text-meta text-muted">
+            {[r.common, inat_observations(r.observations)] |> Enum.filter(& &1) |> Enum.join(" · ")}
+          </span>
+          <span :if={inat_matched?(r)} class="text-meta text-ink-2">
+            Matched “{r.matched}”, a name iNaturalist files under it
+          </span>
+        </span>
+        <.button
+          size="sm"
+          phx-click="pick"
+          phx-value-id={r.id}
+          phx-value-matched={r.matched || ""}
+          phx-target={@target}
+        >
+          Look at it
+        </.button>
+      </li>
+    </ul>
+    """
+  end
+
+  attr :plan, :map, required: true
+  attr :ticked, :any, required: true
+  attr :rank, :atom, required: true
+  attr :authorship, :map, required: true
+  attr :more, :boolean, required: true
+  attr :higher, :boolean, required: true
+  attr :back, :boolean, required: true
+  attr :answering, :boolean, required: true
+  attr :credit, :string, required: true
+  attr :target, :any, required: true
+
+  defp inat_look(assigns) do
+    %{plan: plan, ticked: ticked} = assigns
+    {above, below} = Enum.split_while(plan.lineage, &(&1.state in [:higher, :skipped]))
+    {above, below} = if assigns.higher, do: {[], plan.lineage}, else: {above, below}
+    {added, moved, names} = InatTaxa.counts(plan, ticked)
+
+    assigns =
+      assign(assigns,
+        above: above,
+        rows: below,
+        children: if(assigns.more, do: plan.children, else: Enum.take(plan.children, 8)),
+        additions: InatTaxa.additions(plan, ticked, assigns.rank),
+        ranks: InatTaxa.rank_choices(plan, ticked),
+        label: inat_add_label(added, moved, names),
+        ready?: plan.active? and (plan.held != nil or plan.ours != nil or assigns.rank != nil)
+      )
+
+    ~H"""
+    <.button :if={@back} variant="link" size="sm" phx-click="back" phx-target={@target}>
+      ← Other results
+    </.button>
+
+    <div class="flex flex-col gap-0.5">
+      <p class="text-section text-ink">
+        <span class={inat_italic?(@plan.rank) && "italic"}>{@plan.name}</span>
+        <span class="text-meta text-muted">{@plan.rank}</span>
+      </p>
+      <p class="text-meta text-ink-2">
+        {[@plan.inat.common, inat_observations(@plan.inat.observations)]
+        |> Enum.filter(& &1)
+        |> Enum.join(" · ")} ·
+        <a href={@plan.inat.url} target="_blank" rel="noopener" class="text-link hover:underline">
+          iNaturalist ↗
+        </a>
+      </p>
+      <p :if={@plan.held} data-role="inat-held" class="text-meta text-ok">
+        We have it: the import links it and adds what you tick.
+      </p>
+      <.form
+        :if={!@plan.held and !@plan.ours}
+        for={%{}}
+        data-role="inat-rank"
+        phx-change="choose"
+        phx-target={@target}
+        class="flex flex-col gap-1 text-meta text-ink-2"
+      >
+        <label for={"inat-rank-#{@plan.inat.id}"}>
+          iNaturalist ranks it a {@plan.rank}, which we don't use. Add it as:
+        </label>
+        <select id={"inat-rank-#{@plan.inat.id}"} name="rank" class="gf-select">
+          <option value="">Choose a rank</option>
+          <option :for={r <- @ranks} value={r} selected={@rank == r}>{r}</option>
+        </select>
+      </.form>
+    </div>
+
+    <div :if={!@plan.active?} data-role="inat-inactive" class="flex flex-col gap-2">
+      <p class="text-body text-ink-2">
+        iNaturalist no longer uses this taxon: another has replaced it.
+      </p>
+      <.button
+        :for={id <- Enum.take(@plan.replaced_by, 1)}
+        size="sm"
+        phx-click="pick"
+        phx-value-id={id}
+        phx-value-matched={@plan.name}
+        phx-target={@target}
+        class="self-start"
+      >
+        Look at the one that replaced it
+      </.button>
+    </div>
+
+    <section :if={@plan.active?} class="flex flex-col gap-1">
+      <h3 class="text-meta font-semibold text-muted">Where it goes</h3>
+      <p :if={!@plan.held_any?} class="text-meta text-ink-2">
+        We hold nothing above it: it goes in at the top of the tree, as our families do. Tick a rank above it to add that too.
+      </p>
+      <ol class="flex flex-col">
+        <li
+          :if={@above != []}
+          data-role="inat-above"
+          class="flex items-center justify-between gap-3 border-b border-line py-1 text-ui"
+        >
+          <span class="min-w-0 text-ink-2">
+            {inat_fold(@above)}
+            <span class="text-caption text-muted">
+              {length(@above)} {if length(@above) == 1, do: "rank", else: "ranks"} above it we don't hold
+            </span>
+          </span>
+          <.button variant="link" size="sm" phx-click="higher" phx-target={@target}>
+            Show them
+          </.button>
+        </li>
+        <li
+          :for={r <- @rows}
+          data-key={r.key}
+          class="flex items-center justify-between gap-3 border-b border-line py-1 text-ui"
+        >
+          <span class={["min-w-0", r.state == :skipped && "text-muted"]}>
+            <span class={inat_italic?(r.rank) && "italic"}>{r.name}</span>
+            <span class="text-caption text-muted">{r.rank}</span>
+          </span>
+          <%= case r.state do %>
+            <% :held -> %>
+              <span class="text-caption text-ok">We have it</span>
+            <% :skipped -> %>
+              <span class="text-caption text-muted">A rank we don't use</span>
+            <% _missing -> %>
+              <label class="flex items-center gap-2 text-caption text-ink-2">
+                <input
+                  type="checkbox"
+                  class="gf-checkbox"
+                  checked={r.key in @ticked}
+                  phx-click="tick"
+                  phx-value-key={r.key}
+                  phx-target={@target}
+                />
+                {if r.state == :needed, do: "Add: needed to attach it", else: "Add"}
+              </label>
+          <% end %>
+        </li>
+        <li class="flex items-center justify-between gap-3 py-1 text-ui font-semibold">
+          <span>
+            <span class={inat_italic?(@plan.rank) && "italic"}>{@plan.name}</span>
+            <span class="text-caption font-normal text-muted">{@plan.rank}</span>
+          </span>
+          <span class="text-caption font-normal text-ink-2">
+            {if @plan.held, do: "We have it", else: "Added"}
+          </span>
+        </li>
+      </ol>
+      <p :if={Enum.any?(@plan.lineage, &(&1.state == :higher))} class="text-caption text-muted">
+        A rank above one we have would put that one, and its siblings we hold, under it: they stay where they are unless you move them.
+      </p>
+    </section>
+
+    <section :if={@plan.active? and @plan.children != []} class="flex flex-col gap-1">
+      <h3 class="text-meta font-semibold text-muted">
+        Under it on iNaturalist <span class="font-normal">{length(@plan.children)}</span>
+      </h3>
+      <ul class="flex flex-col">
+        <li
+          :for={c <- @children}
+          data-key={c.key}
+          class="flex items-center justify-between gap-3 border-b border-line py-1 text-ui"
+        >
+          <span class={["min-w-0", c.state == :skipped && "text-muted"]}>
+            <span class={inat_italic?(c.rank) && "italic"}>{c.name}</span>
+            <span :if={c.state == :move} class="text-caption text-ink-2">
+              {if c.held.parent,
+                do: "we have it under #{c.held.parent}",
+                else: "we have it at the top of the tree"}
+            </span>
+          </span>
+          <%= case c.state do %>
+            <% :held -> %>
+              <span class="text-caption text-ok">We have it</span>
+            <% :skipped -> %>
+              <span class="text-caption text-muted">A rank we don't use</span>
+            <% state -> %>
+              <label class="flex items-center gap-2 text-caption text-ink-2">
+                <input
+                  type="checkbox"
+                  class="gf-checkbox"
+                  checked={c.key in @ticked}
+                  phx-click="tick"
+                  phx-value-key={c.key}
+                  phx-target={@target}
+                />
+                {if state == :move, do: "Move here", else: "Add"}
+              </label>
+          <% end %>
+        </li>
+      </ul>
+      <.button
+        :if={!@more and length(@plan.children) > 8}
+        variant="link"
+        size="sm"
+        phx-click="more"
+        phx-target={@target}
+      >
+        Show {length(@plan.children) - 8} more
+      </.button>
+    </section>
+
+    <section
+      :if={@plan.active? and (@plan.synonyms != [] or @plan.commons != [])}
+      class="flex flex-col gap-1"
+    >
+      <h3 class="text-meta font-semibold text-muted">Names</h3>
+      <label :for={s <- @plan.synonyms} class="flex items-center gap-2 text-ui text-ink">
+        <input
+          type="checkbox"
+          class="gf-checkbox"
+          checked={s.key in @ticked}
+          phx-click="tick"
+          phx-value-key={s.key}
+          phx-target={@target}
+        />
+        <span class="italic">{s.name}</span>
+        <span class="text-caption text-muted">
+          {if s.matched?, do: "synonym · the name that matched", else: "synonym"}
+        </span>
+      </label>
+      <label :for={c <- @plan.commons} class="flex items-center gap-2 text-ui text-ink">
+        <input
+          type="checkbox"
+          class="gf-checkbox"
+          checked={c.key in @ticked}
+          phx-click="tick"
+          phx-value-key={c.key}
+          phx-target={@target}
+        />
+        {c.name}
+        <span class="text-caption text-muted">
+          {if c.preferred?, do: "common name · iNaturalist's", else: "common name"}
+        </span>
+      </label>
+    </section>
+
+    <.form
+      :if={@plan.active? and @additions != []}
+      for={%{}}
+      data-role="inat-authorship"
+      phx-change="choose"
+      phx-target={@target}
+      class="flex flex-col gap-1"
+    >
+      <h3 class="text-meta font-semibold text-muted">Authorship</h3>
+      <div :for={a <- @additions} class="flex flex-col gap-0.5">
+        <label for={"inat-authorship-#{a.key}"} class="text-ui text-ink">
+          <span class={inat_italic?(to_string(a.rank)) && "italic"}>{a.name}</span>
+        </label>
+        <input
+          type="text"
+          id={"inat-authorship-#{a.key}"}
+          name={"authorship[#{a.key}]"}
+          class="gf-input"
+          value={@authorship[a.key]}
+          placeholder="iNaturalist has no authors: add them if you know them"
+          phx-debounce="300"
+        />
+        <span
+          :if={@plan.authorship[a.key] && @authorship[a.key] == @plan.authorship[a.key]}
+          class="text-caption text-muted"
+        >
+          From WCVP
+        </span>
+      </div>
+    </.form>
+
+    <div :if={@plan.active?} class="flex flex-col gap-2 border-t border-line pt-3">
+      <p class="text-meta text-ink-2">
+        {if @plan.plant?,
+          do:
+            "Marked as from iNaturalist, with its iNaturalist ID. Plants are edited directly, so no statements are recorded.",
+          else: "Each is iNaturalist's statement (#{@credit}), accepted by you."}
+      </p>
+      <div class="flex flex-wrap items-center gap-3">
+        <.button
+          variant="primary"
+          disabled={!@ready?}
+          phx-click="add"
+          phx-target={@target}
+          data-role="inat-add"
+        >
+          {@label}
+        </.button>
+        <.button variant="ghost" phx-click="close" phx-target={@target}>Cancel</.button>
+      </div>
+      <p :if={!@ready?} class="text-caption text-muted">Choose the rank to add it as.</p>
+      <p :if={@answering} class="text-caption text-muted">
+        Then the question is answered with <span class={inat_italic?(@plan.rank) && "italic"}>{@plan.name}</span>.
+      </p>
+    </div>
+    """
+  end
+
+  defp inat_italic?(rank), do: to_string(rank) in @inat_italic
+
+  defp inat_matched?(%{matched: matched, name: name}) when is_binary(matched),
+    do: matched != name
+
+  defp inat_matched?(_result), do: false
+
+  defp inat_fold([one]), do: one.name
+  defp inat_fold([first, last]), do: "#{first.name} › #{last.name}"
+  defp inat_fold([first | _] = rows), do: "#{first.name} › … › #{List.last(rows).name}"
+
+  defp inat_observations(n) do
+    count =
+      n
+      |> Integer.to_string()
+      |> String.reverse()
+      |> String.replace(~r/(\d{3})(?=\d)/, "\\1,")
+      |> String.reverse()
+
+    "#{count} #{if n == 1, do: "observation", else: "observations"}"
+  end
+
+  @doc """
+  What `inat_taxon_panel`'s button says it does: "Add 2 taxa and 2 names",
+  "Add 1 taxon, move 1 and 1 name", "Move 1 and add 2 names", "Use it" when
+  it adds nothing.
+  """
+  @spec inat_add_label(non_neg_integer(), non_neg_integer(), non_neg_integer()) :: String.t()
+  def inat_add_label(0, 0, 0), do: "Use it"
+
+  def inat_add_label(added, moved, names) do
+    # The names share the taxa's "add".
+    names_verb = if added > 0, do: "", else: "add "
+
+    [
+      added > 0 && "add " <> inat_count(added, "taxon", "taxa"),
+      moved > 0 && "move #{moved}",
+      names > 0 && names_verb <> inat_count(names, "name", "names")
+    ]
+    |> Enum.filter(& &1)
+    |> and_list()
+    |> cap()
+  end
+
+  defp inat_count(1, one, _many), do: "1 " <> one
+  defp inat_count(n, _one, many), do: "#{n} " <> many
 end

@@ -213,8 +213,18 @@ defmodule Gallformers.INaturalist do
 
   defp do_fetch_observation(id), do: get_json("observations/#{id}")
 
-  defp get_json(path) do
-    case Req.get("#{@api_base}/#{path}", request_options()) do
+  @doc """
+  GETs `path` of iNaturalist's API (`"taxa/autocomplete"`, under `/v1`)
+  with query `params`, as JSON: `{:ok, body}`, `{:error, :not_found}` for a
+  404, `{:error, {:http_error, status}}` or `{:error, reason}`. Every
+  request names the app, never a person, and goes through the configured
+  `:req_options` (a `Req.Test` stub in tests).
+  """
+  @spec get_json(String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  def get_json(path, params \\ []) do
+    options = if params == [], do: request_options(), else: [params: params] ++ request_options()
+
+    case Req.get("#{@api_base}/#{path}", options) do
       {:ok, %{status: 200, body: body}} when is_map(body) ->
         {:ok, body}
 

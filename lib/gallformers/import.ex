@@ -109,6 +109,8 @@ defmodule Gallformers.Import do
       Gallformers.Facts,
       # Deletes and merges delete and move images (`Gallformers.Import.Deletion`).
       Gallformers.Images,
+      # A taxon brought in from iNaturalist (`Gallformers.Import.InatTaxa`).
+      Gallformers.INaturalist,
       Gallformers.Jobs,
       Gallformers.Licenses,
       Gallformers.Places,
@@ -127,6 +129,7 @@ defmodule Gallformers.Import do
       Events,
       GallComparison,
       GallformersFragment,
+      InatTaxa,
       Package,
       Passages,
       QueueItem,
@@ -166,6 +169,7 @@ defmodule Gallformers.Import do
   alias Gallformers.Import.GallMatcher
   alias Gallformers.Import.GallRenames
   alias Gallformers.Import.HostDecisions
+  alias Gallformers.Import.InatTaxa
   alias Gallformers.Import.Merge
   alias Gallformers.Import.MissedNames
   alias Gallformers.Import.Package
@@ -862,6 +866,13 @@ defmodule Gallformers.Import do
   def list_statements(%Batch{id: batch_id}) do
     Repo.all(from(s in BatchStatement, where: s.batch_id == ^batch_id, order_by: s.id))
   end
+
+  @doc """
+  Every Source's statement of each of `fact_ids`, by Fact ID, oldest first
+  (`Gallformers.Import.FactsView.statements/1`).
+  """
+  @spec fact_statements([integer()]) :: %{integer() => [FactsView.statement()]}
+  defdelegate fact_statements(fact_ids), to: FactsView, as: :statements
 
   @doc """
   The taxon and Gall statements of `batch_ids` with these refs, in one
@@ -3198,28 +3209,37 @@ defmodule Gallformers.Import do
 
   @doc """
   The Host-name step (`d585`): adds a plant (`attrs`: `:name`, `:rank`,
-  `:parent_id`, optional `:authorship`; origin `:powo`, kingdom Plantae)
-  and records it in the replay log, in one transaction.
+  `:parent_id`, optional `:authorship` and `:origin`, `:powo` unless given —
+  `:inaturalist` for a plant added from iNaturalist, matter `cb28`;
+  kingdom Plantae) and records it in the replay log, in one transaction
+  (the payload names an origin other than `:powo`).
   """
   @spec record_plant_added(Actor.t(), map()) :: {:ok, Taxa.Taxon.t()} | {:error, Changeset.t()}
   def record_plant_added(%Actor{} = actor, attrs) when is_map(attrs) do
+    origin = attrs[:origin] || :powo
+
     Audit.transaction(actor, "import.record_plant_added", fn ->
       plant =
         actor
         |> Taxa.create_taxon(
           attrs
           |> Map.take([:name, :rank, :parent_id, :authorship])
-          |> Map.merge(%{origin: :powo, kingdom: "Plantae"})
+          |> Map.merge(%{origin: origin, kingdom: "Plantae"})
         )
         |> unwrap_or_rollback()
+
+      payload = %{
+        "parent" => attrs[:parent_id] && StableRef.taxon(attrs[:parent_id]),
+        "authorship" => attrs[:authorship]
+      }
+
+      payload =
+        if origin == :powo, do: payload, else: Map.put(payload, "origin", to_string(origin))
 
       ReplayLog.append!(
         :plant_added,
         %{"name" => attrs[:name], "rank" => to_string(attrs[:rank])},
-        %{
-          "parent" => attrs[:parent_id] && StableRef.taxon(attrs[:parent_id]),
-          "authorship" => attrs[:authorship]
-        }
+        payload
       )
 
       plant
@@ -3251,8 +3271,9 @@ defmodule Gallformers.Import do
     * `{:delete_taxon, taxon}` — `Gallformers.Taxa.delete_taxon/2`
     * `{:set_host_range, taxon, entries}` — `Gallformers.Ranges.update_taxon_places/3`
     * `{:set_wcvp, taxon, attrs}` — `Gallformers.Ranges.Wcvp.put_link/3`
+    * `{:set_inat, taxon, inat_id}` — `Gallformers.Taxa.set_inat/3`
 
-  The last seven are `Gallformers.Import.TaxonomyEdits`'s, which says how
+  The last eight are `Gallformers.Import.TaxonomyEdits`'s, which says how
   each is logged.
   """
   @spec record_taxonomy_edit(Actor.t(), taxonomy_edit()) :: {:ok, term()} | {:error, term()}
@@ -3334,6 +3355,16 @@ defmodule Gallformers.Import do
   defdelegate record_source_created(actor, attrs), to: SourceEdits, as: :record_create
 
   @doc """
+  The iNaturalist Source of `date` ("iNaturalist, accessed 8 Nov 2026"),
+  made and logged for replay on the day's first import from iNaturalist,
+  the same Source after (`Gallformers.Import.SourceEdits.record_inaturalist/2`,
+  matter `cb28`).
+  """
+  @spec record_inaturalist_source(Actor.t(), Date.t()) ::
+          {:ok, Gallformers.Sources.Source.t()} | {:error, term()}
+  defdelegate record_inaturalist_source(actor, date), to: SourceEdits, as: :record_inaturalist
+
+  @doc """
   A WCVP action of the taxonomy admin or the bulk range review, made
   through `Gallformers.Ranges.Wcvp` and recorded in the replay log as the
   state it left, in one transaction (`Gallformers.Import.TaxonomyEdits`):
@@ -3389,6 +3420,51 @@ defmodule Gallformers.Import do
   """
   @spec wcvp_rank(map()) :: Taxa.Rank.t() | nil
   defdelegate wcvp_rank(record), to: TaxonomyAdmin
+
+  @doc """
+  What bringing iNaturalist's `taxon` into our tree would do, beside it:
+  whether we hold it, its lineage, children and names, what is ticked to
+  start with (`Gallformers.Import.InatTaxa.plan/2`, matter `cb28`).
+  `matched` is the name that matched the search, or nil.
+  """
+  @spec plan_inat_taxon(Gallformers.INaturalist.Taxon.t(), String.t() | nil) :: InatTaxa.plan()
+  defdelegate plan_inat_taxon(taxon, matched), to: InatTaxa, as: :plan
+
+  @doc """
+  The taxa iNaturalist has for `query`, a name or an iNaturalist link or
+  number (`Gallformers.INaturalist.Taxa.search/1`).
+  """
+  @spec search_inat_taxa(String.t()) ::
+          {:ok, [Gallformers.INaturalist.Taxa.result()]} | {:error, term()}
+  defdelegate search_inat_taxa(query), to: Gallformers.INaturalist.Taxa, as: :search
+
+  @doc ~S|The iNaturalist taxon ID in a link to its page ("…/taxa/1449402-Arguti") or digits.|
+  @spec parse_inat_taxon_id(String.t()) :: {:ok, integer()} | :error
+  defdelegate parse_inat_taxon_id(input), to: Gallformers.INaturalist.Taxa, as: :parse_taxon_id
+
+  @doc """
+  Reads iNaturalist's taxon `inat_id` and plans bringing it in
+  (`plan_inat_taxon/2`): `{:ok, plan}`, or `{:error, reason}` when
+  iNaturalist can't be reached or has no such taxon.
+  """
+  @spec look_up_inat_taxon(integer(), String.t() | nil) ::
+          {:ok, InatTaxa.plan()} | {:error, term()}
+  def look_up_inat_taxon(inat_id, matched) do
+    with {:ok, taxon} <- Gallformers.INaturalist.Taxa.fetch(inat_id),
+         do: {:ok, InatTaxa.plan(taxon, matched)}
+  end
+
+  @doc """
+  Brings an iNaturalist taxon into our tree as the curator chose, beside
+  its plan (`plan_inat_taxon/2`): all of it or nothing, every edit in the
+  replay log; a plant edited directly, any other taxon's changes the day's
+  iNaturalist Source's statements, accepted by `actor`
+  (`Gallformers.Import.InatTaxa.carry_out/3`).
+  """
+  @spec record_inat_taxon(Actor.t(), InatTaxa.plan(), InatTaxa.choices()) ::
+          {:ok, %{taxon_id: integer(), added: non_neg_integer(), moved: non_neg_integer()}}
+          | {:error, term()}
+  defdelegate record_inat_taxon(actor, plan, choices), to: InatTaxa, as: :carry_out
 
   @doc "Moves each of `taxon_ids` under `parent_id` (`Gallformers.Import.TaxonomyAdmin.move_all/3`)."
   @spec record_taxa_moved(Actor.t(), [integer()], integer()) ::

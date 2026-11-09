@@ -14,6 +14,14 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   `actor`, `definitions`, `source_name` and `choices` (`visible_choices/1`),
   and hands the events in `events/0` (and every `"search_"` one) and its
   async results to `handle_event/3` and `handle_async/3`.
+
+  With `inat: true` (the one-at-a-time review's card), a choice whose
+  search reaches iNaturalist (`Choice` `inat`: "Another plant…", "Another
+  taxon…", matter `cb28`) lists iNaturalist's taxa too, as "On
+  iNaturalist", read in the background; picking one tells the page
+  `{GallformersWeb.Admin.ReviewLive.Answer, {:inat_open, item_id, inat_id,
+  matched}}`, which opens the import panel on it, and `decide_imported/3`
+  answers the question with the taxon it brought in.
   """
   use GallformersWeb, :html
 
@@ -56,7 +64,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
       unticked: MapSet.new(),
       settled: %{},
       host: nil,
-      error: nil
+      error: nil,
+      inat: false
     ]
 
   @doc "A follow-up input with nothing in it."
@@ -160,6 +169,18 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
     end
   end
 
+  # An iNaturalist taxon: the page opens the import panel on it.
+  def handle_event("select_pick", %{"id" => "inat:" <> _ = id}, socket) do
+    case Enum.find(socket.assigns.pick.results, &(to_string(&1.id) == id)) do
+      %{inat_id: inat_id, matched: matched} ->
+        send(self(), {__MODULE__, {:inat_open, socket.assigns.entry.item.id, inat_id, matched}})
+        {:noreply, socket}
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("select_pick", %{"id" => id}, socket) do
     selected = Enum.find(socket.assigns.pick.results, &(to_string(&1.id) == id))
     {:noreply, update(socket, :pick, &%{&1 | selected: selected, query: "", results: []})}
@@ -235,17 +256,18 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
     {:noreply, assign(socket, unticked: unticked, error: nil)}
   end
 
-  @doc ~S|A plant search's WCVP results, and a Host's WCVP panel.|
-  def handle_async(:wcvp_search, {:ok, {query, results}}, socket) do
+  @doc ~S|A plant search's WCVP results, a search's iNaturalist results, and a Host's WCVP panel.|
+  def handle_async(name, {:ok, {query, results}}, socket)
+      when name in [:wcvp_search, :inat_search] do
     if query == String.trim(socket.assigns.pick.query) do
-      tree = Enum.reject(socket.assigns.pick.results, &(&1.group == "WCVP"))
-      {:noreply, update(socket, :pick, &%{&1 | results: tree ++ results})}
+      {:noreply, update(socket, :pick, &%{&1 | results: put_group(&1.results, results)})}
     else
       {:noreply, socket}
     end
   end
 
-  def handle_async(:wcvp_search, {:exit, _reason}, socket), do: {:noreply, socket}
+  def handle_async(name, {:exit, _reason}, socket) when name in [:wcvp_search, :inat_search],
+    do: {:noreply, socket}
 
   def handle_async(:host_panel, {:ok, host}, socket), do: {:noreply, assign(socket, host: host)}
 
@@ -356,13 +378,16 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   # -- searching -----------------------------------------------------------------
 
   defp search(socket, "taxon", query) do
+    # Grouped when iNaturalist's taxa come after ours.
+    group = if inat?(socket.assigns), do: "In Gallformers"
+
     results =
       query
       |> Taxa.search()
       |> Enum.take(@results)
-      |> Enum.map(&%{id: &1.id, name: &1.name, meta: taxon_meta(&1), group: nil})
+      |> Enum.map(&%{id: &1.id, name: &1.name, meta: taxon_meta(&1), group: group})
 
-    {:noreply, update(socket, :pick, &%{&1 | results: results})}
+    {:noreply, socket |> update(:pick, &%{&1 | results: results}) |> inat_search(query)}
   end
 
   # A new taxon's parent: the taxa ranked above it.
@@ -401,47 +426,64 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
     {:noreply, update(socket, :pick, &%{&1 | results: results})}
   end
 
-  # Plants in the tree, and (for a Host) plants in WCVP to add.
+  # Plants in the tree (for a Host, its genera and sections too), and (for
+  # a Host) plants in WCVP to add and taxa on iNaturalist to bring in.
   defp search(socket, "plant", query) do
-    tree =
-      query
-      |> Taxa.search_plants(@results)
-      |> Enum.map(
-        &%{
-          id: "taxon:#{&1.id}",
-          name: &1.name,
-          meta: aliases(&1.aliases),
-          group: "In Gallformers"
-        }
-      )
-
-    tree = tree ++ section_hits(socket.assigns, query)
+    tree = plant_hits(chosen(socket.assigns), query) ++ section_hits(socket.assigns, query)
     socket = update(socket, :pick, &%{&1 | results: tree})
 
-    if wcvp_choice?(socket.assigns) and String.length(query) >= 3 do
-      {:noreply,
-       start_async(socket, :wcvp_search, fn ->
-         results =
-           query
-           |> wcvp_lookup().search(limit: @results)
-           |> Enum.map(
-             &%{
-               id: "wcvp:#{&1.plant_name_id}",
-               name: &1.taxon_name,
-               meta: &1.taxon_authors,
-               group: "WCVP"
-             }
-           )
+    socket =
+      if wcvp_choice?(socket.assigns) and String.length(query) >= 3 do
+        start_async(socket, :wcvp_search, fn ->
+          results =
+            query
+            |> wcvp_lookup().search(limit: @results)
+            |> Enum.map(
+              &%{
+                id: "wcvp:#{&1.plant_name_id}",
+                name: &1.taxon_name,
+                meta: &1.taxon_authors,
+                group: "WCVP"
+              }
+            )
 
-         {query, results}
-       end)}
-    else
-      {:noreply, socket}
+          {query, results}
+        end)
+      else
+        socket
+      end
+
+    {:noreply, inat_search(socket, query)}
+  end
+
+  # A Host's other plant: species and below, then the genera, subgenera and
+  # sections a Host may be too (`Gallformers.Taxa.host_choices/2`).
+  defp plant_hits(%Choice{picker: :plant}, query) do
+    for hit <- Taxa.host_choices(query, @results) do
+      meta =
+        if hit.group == :plants,
+          do: aliases(hit.aliases),
+          else: to_string(hit.rank)
+
+      %{id: "taxon:#{hit.id}", name: hit.name, meta: meta, group: "In Gallformers"}
     end
   end
 
-  # Sections too, where a Host may be one: a Host dispute's plant meant, a
-  # common-name Host's other plant (no synonym added to it).
+  defp plant_hits(_choice, query) do
+    query
+    |> Taxa.search_plants(@results)
+    |> Enum.map(
+      &%{
+        id: "taxon:#{&1.id}",
+        name: &1.name,
+        meta: aliases(&1.aliases),
+        group: "In Gallformers"
+      }
+    )
+  end
+
+  # Sections too, where a Host may be one: a Host dispute's plant meant.
+  # (A Host's other plant lists them with its genera, `plant_hits/2`.)
   defp section_hits(assigns, query) do
     if sections?(chosen(assigns)) do
       query
@@ -460,8 +502,55 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   defp sections?(%Choice{picker: :statements, statements: statements}),
     do: Enum.any?(statements, &(Map.get(&1, :as) == "host_taxon_id"))
 
-  defp sections?(%Choice{picker: :plant, as: "common_name"}), do: true
   defp sections?(_choice), do: false
+
+  # iNaturalist's taxa for a search that reaches it, read in the background.
+  defp inat_search(socket, query) do
+    if inat?(socket.assigns) and String.length(query) >= 3,
+      do: start_async(socket, :inat_search, fn -> {query, inat_results(query)} end),
+      else: socket
+  end
+
+  # iNaturalist out of reach: no results from it.
+  defp inat_results(query) do
+    case Import.search_inat_taxa(query) do
+      {:ok, taxa} -> Enum.map(taxa, &inat_result/1)
+      {:error, _reason} -> []
+    end
+  end
+
+  defp inat?(assigns), do: assigns[:inat] == true and match?(%Choice{inat: true}, chosen(assigns))
+
+  defp inat_result(taxon) do
+    matched = if taxon.matched not in [nil, taxon.name], do: taxon.matched
+
+    meta =
+      [taxon.rank, taxon.common, matched && "matched “#{matched}”"]
+      |> Enum.filter(& &1)
+      |> Enum.join(" · ")
+
+    %{
+      id: "inat:#{taxon.id}",
+      inat_id: taxon.id,
+      matched: taxon.matched,
+      name: taxon.name,
+      meta: meta,
+      group: "On iNaturalist",
+      look: true
+    }
+  end
+
+  # The groups of a search's results in order: ours, WCVP's, iNaturalist's.
+  @groups ["In Gallformers", "Sections", "WCVP", "On iNaturalist"]
+
+  defp put_group(results, []), do: results
+
+  defp put_group(results, [%{group: group} | _] = new) do
+    (Enum.reject(results, &(&1.group == group)) ++ new)
+    |> Enum.with_index()
+    |> Enum.sort_by(fn {r, i} -> {Enum.find_index(@groups, &(&1 == r.group)) || 0, i} end)
+    |> Enum.map(&elem(&1, 0))
+  end
 
   # Only a Host's plant search may add a plant from WCVP.
   defp wcvp_choice?(assigns), do: match?(%Choice{picker: :plant}, chosen(assigns))
@@ -788,6 +877,22 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
 
       {:error, reason} ->
         {:noreply, assign(socket, error: refusal(reason))}
+    end
+  end
+
+  @doc """
+  Answers the question with the taxon brought in from iNaturalist (matter
+  `cb28`), as the chosen search's Gallformers result would: a Host with
+  the Source's spelling as its synonym, any other name as that taxon;
+  telling the page as `from` (`decide/3`).
+  """
+  def decide_imported(socket, taxon_id, from) do
+    case chosen(socket.assigns) do
+      %Choice{} = choice ->
+        decide(socket, Questions.picked_decision(choice, {:taxon, taxon_id}), from)
+
+      nil ->
+        {:noreply, assign(socket, error: "Choose an answer above.")}
     end
   end
 
@@ -1121,10 +1226,15 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   end
 
   def picker(assigns) do
-    assigns = assign(assigns, what: search_what(assigns.picker))
+    label =
+      if match?(%Choice{inat: true}, assigns.choice),
+        do: search_label({:inat, assigns.picker}),
+        else: search_label(assigns.picker)
+
+    assigns = assign(assigns, what: search_what(assigns.picker), label: label)
 
     ~H"""
-    <.name_search id={@id} what={@what} label={search_label(@picker)} pick={@pick} target={@target} />
+    <.name_search id={@id} what={@what} label={@label} pick={@pick} target={@target} />
     """
   end
 
@@ -1137,6 +1247,8 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
   defp search_label(:taxon), do: "Find a taxon by name or synonym"
   defp search_label(:gall), do: "Find a Gall by name, Inducer or Host"
   defp search_label(:plant), do: "Find a plant by name (Gallformers and WCVP)"
+  defp search_label({:inat, :plant}), do: "Find a plant by name"
+  defp search_label({:inat, :taxon}), do: "Find a taxon by name"
   defp search_label(:place), do: "Find a place by name"
   defp search_label({:reading, _name}), do: "Find the plant meant"
 
@@ -1159,12 +1271,13 @@ defmodule GallformersWeb.Admin.ReviewLive.Answer do
       results={@pick.results}
       selected={@pick.selected}
       display_fn={& &1.name}
-      group_key={if @what == "plant", do: :group}
+      group_key={if @what == "plant" or Enum.any?(@pick.results, & &1[:group]), do: :group}
       target={@target}
     >
       <:result :let={result}>
         <span class="italic">{result.name}</span>
         <span :if={result.meta} class="text-caption text-muted ml-1">{result.meta}</span>
+        <span :if={result[:look]} class="text-caption text-link ml-1">Look at it</span>
       </:result>
     </.typeahead>
     """

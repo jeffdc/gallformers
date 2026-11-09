@@ -42,6 +42,9 @@ defmodule GallformersWeb.Admin.Review.Choice do
       `common_name` nil when the tree holds none.
     * `pending` — the backend doesn't take this decision yet (`6611`
       Task 3): hide it until it does.
+    * `inat` — a `:plant` or `:taxon` choice whose search also lists
+      iNaturalist's taxa, to bring one in and answer with it ("Another
+      plant…", "Another taxon…", matter `cb28`).
 
   What an answer shows besides its label (matter `d213`, Names and Galls
   steps):
@@ -91,7 +94,8 @@ defmodule GallformersWeb.Admin.Review.Choice do
     generations: [],
     sections: [],
     proposed: false,
-    pending: false
+    pending: false,
+    inat: false
   ]
 
   @type picker ::
@@ -134,6 +138,7 @@ defmodule GallformersWeb.Admin.Review.Choice do
           generations: [%{value: String.t(), held: boolean()}],
           sections: [%{id: integer(), name: String.t(), common_name: String.t() | nil}],
           proposed: boolean(),
-          pending: boolean()
+          pending: boolean(),
+          inat: boolean()
         }
 end

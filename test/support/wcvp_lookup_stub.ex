@@ -18,8 +18,11 @@ defmodule Gallformers.Wcvp.LookupStub do
       ("Brown"), "913" of 700 ("Green") — for authorship by name
     - "920" / "Wcvpgenerus" — a genus record (as WCVP holds Stephanomeria),
       native in California
+    - "930" / "Rubus" (L.), a genus record, and "931" / "Rubus frondosus"
+      (Bigelow), as WCVP holds them: authorship for a plant added from
+      iNaturalist (matter `cb28`)
 
-  Only "920" gives its `taxon_rank`; a record without one is read by its
+  Only "920", "930" and "931" give their `taxon_rank`; a record without one is read by its
   name's infraspecific marker.
 
   Like `Gallformers.Wcvp.Lookup`, `search/2` leaves out records that are not
@@ -186,6 +189,33 @@ defmodule Gallformers.Wcvp.LookupStub do
       taxon_status: "Accepted",
       accepted_plant_name_id: "920",
       native_distribution: ["CAL"],
+      introduced_distribution: []
+    },
+    "930" => %WcvpName{
+      plant_name_id: "930",
+      taxon_name: "Rubus",
+      taxon_rank: "Genus",
+      family: "Rosaceae",
+      genus: "Rubus",
+      taxon_authors: "L.",
+      powo_id: "urn:lsid:ipni.org:names:test930",
+      taxon_status: "Accepted",
+      accepted_plant_name_id: "930",
+      native_distribution: [],
+      introduced_distribution: []
+    },
+    "931" => %WcvpName{
+      plant_name_id: "931",
+      taxon_name: "Rubus frondosus",
+      taxon_rank: "Species",
+      family: "Rosaceae",
+      genus: "Rubus",
+      species: "frondosus",
+      taxon_authors: "Bigelow",
+      powo_id: "urn:lsid:ipni.org:names:test931",
+      taxon_status: "Accepted",
+      accepted_plant_name_id: "931",
+      native_distribution: [],
       introduced_distribution: []
     }
   }

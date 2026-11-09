@@ -32,6 +32,12 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
   (`GallformersWeb.ReviewComponents.review_wcvp_panel/1`, `line`), read in
   the background, with POWO and IPNI to search when WCVP has nothing.
 
+  "Another plant…" and "Another taxon…" search iNaturalist too: "Look at
+  it" on one of its taxa asks the page to open the import panel on it
+  (`GallformersWeb.Admin.InatTaxonPanel`, matter `cb28`), and the taxon it
+  brings in answers the question (`send_update/3` with `imported:
+  taxon_id`).
+
   "Add a note…" opens a note box (saved apart from the decision); earlier
   notes are listed under the quotes. Deciding tells the page
   (`{__MODULE__, {:decided, item}}`); a refusal shows in the card.
@@ -51,14 +57,24 @@ defmodule GallformersWeb.Admin.ReviewLive.QuestionCard do
 
   @impl true
   def mount(socket),
-    do: {:ok, assign(socket, Answer.state() ++ [noting: false, trait: %{}, passage: []])}
+    do: {:ok, assign(socket, state() ++ [trait: %{}, passage: []])}
 
+  # The card's searches reach iNaturalist too (matter `cb28`).
+  defp state, do: Answer.state() ++ [noting: false, inat: true]
+
+  # The taxon brought in from iNaturalist answers the question (the page
+  # sends it once the import panel has brought it in).
   @impl true
+  def update(%{imported: taxon_id}, socket) do
+    {:noreply, socket} = Answer.decide_imported(socket, taxon_id, __MODULE__)
+    {:ok, socket}
+  end
+
   def update(assigns, socket) do
     fresh? =
       socket.assigns[:entry] == nil or socket.assigns.entry.item.id != assigns.entry.item.id
 
-    socket = if fresh?, do: assign(socket, Answer.state() ++ [noting: false]), else: socket
+    socket = if fresh?, do: assign(socket, state()), else: socket
     socket = assign(socket, assigns)
     entry = socket.assigns.entry
 

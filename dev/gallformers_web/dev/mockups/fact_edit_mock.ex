@@ -41,7 +41,6 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
   import GallformersWeb.ReviewComponents, only: [review_value_list: 1]
 
   alias Gallformers.{Catalog, Import, Sources, Taxa}
-  alias Gallformers.Import.FactsView
   alias Phoenix.LiveView.Socket
 
   @results 8
@@ -997,7 +996,7 @@ defmodule GallformersWeb.Dev.Mockups.FactEditMock do
   """
   @spec statement_lines([integer()]) :: %{integer() => [map()]}
   def statement_lines(fact_ids) do
-    Map.new(FactsView.statements(fact_ids), fn {fact_id, lines} ->
+    Map.new(Import.fact_statements(fact_ids), fn {fact_id, lines} ->
       {fact_id, Enum.map(lines, &%{&1 | date: &1.date || "undated"})}
     end)
   end

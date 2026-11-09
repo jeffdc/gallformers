@@ -363,6 +363,52 @@ defmodule Gallformers.Sources do
   def get_legacy_data_source,
     do: Repo.get_by(Source, title: @legacy_data_title, kind: :database)
 
+  # -- the iNaturalist Source of a day (matter `cb28`) ----------------------------
+
+  @doc """
+  The title of the iNaturalist Source of `date`: "iNaturalist, accessed 8
+  Nov 2026". A taxon brought in from iNaturalist is credited to the Source
+  of the day it was imported (`Gallformers.Import.record_inaturalist_source/2`).
+  """
+  @spec inaturalist_title(Date.t()) :: String.t()
+  def inaturalist_title(%Date{} = date), do: "iNaturalist, accessed " <> day_words(date)
+
+  @doc "The iNaturalist Source of `date` (`inaturalist_title/1`), or nil."
+  @spec inaturalist_source(Date.t()) :: Source.t() | nil
+  def inaturalist_source(%Date{} = date),
+    do: Repo.get_by(Source, title: inaturalist_title(date), kind: :database)
+
+  @doc """
+  Creates the iNaturalist Source of `date`: a database, by iNaturalist,
+  dated that day, in a transaction audited as `actor`. The replay log is
+  `Gallformers.Import.record_inaturalist_source/2`'s, which calls this.
+  """
+  @spec create_inaturalist_source(Actor.t(), Date.t()) ::
+          {:ok, Source.t()} | {:error, Ecto.Changeset.t()}
+  def create_inaturalist_source(%Actor{} = actor, %Date{} = date) do
+    attrs = %{
+      title: inaturalist_title(date),
+      author: "iNaturalist",
+      authors: ["iNaturalist"],
+      pubyear: Integer.to_string(date.year),
+      link: "https://www.inaturalist.org",
+      url: "https://www.inaturalist.org",
+      citation: "iNaturalist. https://www.inaturalist.org, accessed " <> day_words(date) <> ".",
+      kind: :database,
+      authored: Date.to_iso8601(date)
+    }
+
+    Audit.transaction(actor, "sources.create_inaturalist_source", fn ->
+      case %Source{} |> Source.record_changeset(attrs) |> Repo.insert() do
+        {:ok, source} -> source
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  # "8 Nov 2026".
+  defp day_words(date), do: Calendar.strftime(date, "%-d %b %Y")
+
   @doc """
   The ids of Gallformers' own Sources: the Gallformers Source and the
   legacy data Source, whichever exist.

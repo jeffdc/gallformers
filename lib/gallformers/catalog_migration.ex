@@ -158,6 +158,8 @@ defmodule Gallformers.CatalogMigration do
     "DELETE FROM host_range WHERE species_id IS NULL",
     "UPDATE host_range SET taxon_id = NULL WHERE taxon_id IS NOT NULL",
     "DELETE FROM taxon_wcvp",
+    # iNaturalist links are made by the replay log alone (matter `cb28`).
+    "DELETE FROM taxon_inaturalist",
     "UPDATE image SET gall_id = NULL, taxon_id = NULL " <>
       "WHERE gall_id IS NOT NULL OR taxon_id IS NOT NULL",
     "DELETE FROM queue_items",

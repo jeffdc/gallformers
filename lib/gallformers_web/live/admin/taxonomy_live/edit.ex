@@ -97,6 +97,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
     |> assign(:editorial_form, editorial_form(taxon))
     |> assign_sections(lineage)
     |> assign_link()
+    |> assign(:inat_id, Taxa.inat_id(taxon))
+    |> assign(:inat_form, to_form(%{"taxon" => ""}, as: :inat))
   end
 
   defp reload(socket), do: load_taxon(socket, Taxa.get_taxon!(socket.assigns.taxon.id))
@@ -359,6 +361,21 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
      edit(socket, {:update_editorial, socket.assigns.taxon, attrs}, "Plant details saved")}
   end
 
+  # -- iNaturalist (matter `cb28`) ------------------------------------------------
+
+  # Links the taxon to its iNaturalist taxon, by a link to its page or its
+  # number: the ID only.
+  def handle_event("inat_link", %{"inat" => %{"taxon" => input}}, socket) do
+    case Import.parse_inat_taxon_id(input) do
+      {:ok, inat_id} ->
+        {:noreply, link_inat(socket, inat_id)}
+
+      :error ->
+        {:noreply,
+         put_flash(socket, :error, "Paste an iNaturalist link to the taxon, or its number.")}
+    end
+  end
+
   # -- WCVP --------------------------------------------------------------------
 
   def handle_event("wcvp_match", _params, socket),
@@ -443,6 +460,22 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
 
   defp after_write(socket, {:error, reason}, _message),
     do: put_flash(socket, :error, "Not saved: #{Errors.text(reason)}")
+
+  defp link_inat(socket, inat_id) do
+    %{taxon: taxon} = socket.assigns
+
+    case Taxa.get_by_inat_id(inat_id) do
+      %Taxon{id: id} when id != taxon.id ->
+        put_flash(
+          socket,
+          :error,
+          "iNaturalist's taxon #{inat_id} is linked to #{Taxa.accepted_name(id)} already."
+        )
+
+      _ ->
+        edit(socket, {:set_inat, taxon.id, inat_id}, "Linked to iNaturalist")
+    end
+  end
 
   defp wcvp_edit(socket, edit) do
     case Import.record_wcvp_edit(socket.assigns.actor, edit) do
@@ -854,6 +887,39 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Edit do
                     Clear match status
                   </.button>
                 </div>
+              </div>
+            </.section>
+
+            <.section title="iNaturalist link" class="max-w-form">
+              <div class="flex flex-col gap-block">
+                <.fact_list id="inat-link" columns={2}>
+                  <:item label="iNaturalist taxon">
+                    <a
+                      :if={@inat_id}
+                      href={"https://www.inaturalist.org/taxa/#{@inat_id}"}
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      {@inat_id} ↗
+                    </a>
+                    <span :if={!@inat_id}>Not linked</span>
+                  </:item>
+                </.fact_list>
+                <.form
+                  for={@inat_form}
+                  id="inat-link-form"
+                  phx-submit="inat_link"
+                  class="flex flex-wrap items-end gap-2"
+                >
+                  <.input
+                    field={@inat_form[:taxon]}
+                    label="Its iNaturalist taxon: a link or number"
+                    placeholder="https://www.inaturalist.org/taxa/…"
+                  />
+                  <.button type="submit" variant="secondary" size="sm">
+                    Link to iNaturalist
+                  </.button>
+                </.form>
               </div>
             </.section>
 

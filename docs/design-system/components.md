@@ -56,6 +56,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `review_option` | ReviewComponents | Forms | Built (`use` included) | — |
 | `review_rail` | ReviewComponents | Page structure | Built | the review overview's "Where this Source stands" table, the step tab bar, the repeated Source card and "holds approval" lines |
 | `review_card` | ReviewComponents | Page structure | Built (the `:trait` body comes with the review page) | `ReviewLive.ItemRow`'s expanding rows and the step pages' sections |
+| `inat_taxon_panel` | ReviewComponents (state: `Admin.InatTaxonPanel`) | Domain | Built (approved 2026-11-08) | — |
 | `fact_editor` | FactsComponents | Forms | Built | the review Facts page's and the admin Source page's two copies of the form under a Fact |
 | `save_bar` | FormComponents | Forms | Approved (pending the save model) | per-section Save buttons |
 | `filter_select` | FormComponents | Forms | Built | the ID page's filter dropdowns |
@@ -535,6 +536,24 @@ One unit of a Source's review, the one thing on the page (`6611`). A panel holdi
 - `:facts`: the last step before Approve: what approving will add, by Gall (`facts_view`).
 
 Laid out at the Reading sizes inside the admin shell (`gf-density-reading`, foundations). Keyboard: Enter takes the suggested answer, S skips, up and down move between answers.
+
+### `inat_taxon_panel`
+
+A taxon from iNaturalist, brought into our tree (matter `cb28`; mockup approved by Jeff on 2026-11-08). In the rail's place over the page on wide screens (it takes the whole rail while open; closing it brings the rail back), a bottom sheet on phones: `gf-sheet`, as `fact_inspector`. The head reads "From iNaturalist" with Close (`ph-x`). Three steps:
+
+- **Find** (only when opened without a taxon, as from the New Taxon page): a live search ("Search iNaturalist by name", "A name, or an iNaturalist link or number."). Each result: its name and rank, common name and observations ("22,268 observations"), "Matched “…”, a name iNaturalist files under it" when a synonym matched, and "Look at it". When iNaturalist has nothing for a name, the names WCVP gives for it ("Names WCVP gives for it:") as one-click searches.
+- **Look and choose:** "← Other results" (back to the panel's search, or its caller's); the taxon (name, rank), its common name, observations, "iNaturalist ↗"; "We have it: the import links it and adds what you tick." when we do; for a rank we don't use ("complex"), "iNaturalist ranks it a complex, which we don't use. Add it as:" and a rank select. **Where it goes**: the ranks above the nearest one we hold folded into one line ("Plantae › … › Rosales · 5 ranks above it we don't hold · Show them"), then each rank: "We have it", "Add: needed to attach it" (ticked), "Add", or "A rank we don't use"; the taxon last ("Added" or "We have it"). **Under it on iNaturalist** (with the count): the first 8, held ones first ("we have it under Rubus · Move here"; "Add"), "Show N more". **Names**: synonyms ("synonym · the name that matched") and English common names ("common name · iNaturalist's"). **Authorship**: a field for each taxon added, "From WCVP" when filled from it. An inactive taxon says "iNaturalist no longer uses this taxon: another has replaced it." with "Look at the one that replaced it", and offers no Add.
+- **Foot**: how it is credited (plants: "Marked as from iNaturalist, with its iNaturalist ID. Plants are edited directly, so no statements are recorded."; others: "Each is iNaturalist's statement (iNaturalist, accessed 8 Nov 2026), accepted by you."), the primary button saying what it does ("Add 2 taxa and 2 names", "Add 2 taxa, move 1 and 2 names", "Use it" when it adds nothing), Cancel, and on a question "Then the question is answered with *Arguti*."
+
+```heex
+<.live_component module={GallformersWeb.Admin.InatTaxonPanel} id="inat" actor={@actor}
+  start={{:taxon, 1449402, "Rubus pensilvanicus"}} back answering class="lg:col-span-4" />
+```
+
+- `GallformersWeb.ReviewComponents.inat_taxon_panel/1` draws it from state; `GallformersWeb.Admin.InatTaxonPanel` (a LiveComponent) holds the state, reads iNaturalist in the background and tells the LiveView `{GallformersWeb.Admin.InatTaxonPanel, {:imported, taxon_id}}` or `{…, :close}`.
+- The function component's attributes: `id`, `step` (`:find`, `:loading`, `:look`), `query`, `results`, `suggest`, `error`, `plan` (`Gallformers.Import.plan_inat_taxon/2`), `ticked`, `rank`, `authorship`, `more`, `higher`, `back`, `answering`, `credit`, `target`, `class` (placement). Its events go to `target`: `search`, `pick`, `back`, `close`, `tick`, `more`, `higher`, `choose`, `add`.
+- The LiveComponent's: `id`, `actor`, `start` (`{:taxon, inat_id, matched}`, `{:query, name}` or nil), `back`, `answering`, `class`.
+- Callers: the review's "Another plant…" and "Another taxon…" searches (an iNaturalist result's "Look at it"), the New Taxon page's "From iNaturalist". Not the Fact viewer and editor (`87a1`), a separate tool.
 
 ## Feedback
 
