@@ -1,8 +1,8 @@
 ---
 plan: taxogall
-epic: d51b
+phase: d51b
 title: Map each of the 224 lost old Gall aliases to a synonym, former label or common name
-state: open
+stage: committed
 docs:
   - .mull/matters/b5bd-taxonomy-migration.md
 created: "2026-11-09T20:38:18Z"

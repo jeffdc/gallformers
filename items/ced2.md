@@ -1,8 +1,8 @@
 ---
 plan: taxogall
-epic: 726a
+phase: 726a
 title: 'Merge main into taxogall (#596 role checks, #597 image upload events) and check both fixes hold'
-state: open
+stage: committed
 created: "2026-11-09T20:38:18Z"
 updated: "2026-11-09T20:38:18Z"
 ---

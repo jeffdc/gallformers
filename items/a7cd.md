@@ -1,8 +1,8 @@
 ---
 plan: taxogall
-epic: d51b
+phase: d51b
 title: Make the 7 one-word plant 'species' their genus in the catalog migration
-state: open
+stage: committed
 docs:
   - .mull/matters/b5bd-taxonomy-migration.md
 created: "2026-11-09T20:38:18Z"
