@@ -1,10 +1,12 @@
 ---
 plan: taxogall
 title: 'Uncommitted on taxogall: edits to matters 50ff, 6611, c90c and cb28 (status notes from 2026-11-09, which Jeff''s audit says look correct) and the intake''s Makefile done-checks target'
-stage: captured
+stage: dropped
 kind: idea
 source: git status at intake 2026-11-09
 from: aaf9
 created: "2026-11-09T20:44:57Z"
-updated: "2026-11-11T13:31:56Z"
+updated: "2026-11-11T13:32:49Z"
 ---
+
+Dropped: Stale: the matter edits and the done-checks target were committed in a0434bcf
