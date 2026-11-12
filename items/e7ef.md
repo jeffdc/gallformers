@@ -6,7 +6,7 @@ stage: committed
 docs:
   - .mull/matters/b230-review-cleanup-one-way-to-handle-a-name-we-don-t-have-and-the-2026-11-09-audit.md
 created: "2026-11-09T20:38:17Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-12T21:00:11Z"
 ---
 
 **What:** `GallformersWeb.Choices` (`lib/gallformers_web/choices.ex`) becomes the one place that runs and words a name search. Every caller below moves onto it, and its own search code is deleted. This is b230's Task 3 (findings A "searches", E and F "searches"). It comes after the back end's decision shape (item 11dc) and before the one answer list (item bceb), whose "Find it…" answer is this search. References are as of `65531d59` unless noted; go by function names.
@@ -61,3 +61,5 @@ Also from matter c800, Task 2 (the owners and pending table), and matter cb28, o
 From matter b230, Task 3. The 2026-11-09 audit adds: include TaxonomyLive.RangeEditor (.credo.exs lists it as pending on b230), and name the Choices functions .credo.exs expects, one for WCVP plants and one for iNat taxa. Clear the b230 pending entries in .credo.exs once the callers use Choices. Sizing is the intake's guess: if it doesn't fit one session, mull ask to split it.
 
 Before Model v2 this item needed 7378. Items have no needs now; order work with needs between phases.
+
+**Added 2026-11-12 (Jeff): a Host is always placed.** Jeff: we always place a Host (a match to one we hold, an alias of one we hold, an import from WCVP or iNat, or a manual entry) rather than leave it unresolved. So a WCVP name WCVP leaves Unplaced can be added as a Host like any other WCVP name. Today `host_suggestions.ex` refuses it (about lines 83 and 528, "can't be added from it"); the one WCVP search this item builds offers it, and its line says WCVP leaves it unplaced.
