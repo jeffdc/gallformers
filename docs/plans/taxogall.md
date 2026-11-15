@@ -136,10 +136,10 @@ Production runs on the new back-end and the old system is retired:
 
 ## Why this order
 
-- **The UI, Existing Sources, Review cleanup, Housekeeping, Import at scale, Migration data's fix list and Public site, settled** need nothing first and can run side by side. The UI goes first in practice: Jeff judges the plan by using the screens.
+- **The UI, Existing Sources, Review cleanup, Housekeeping, Import at scale and Public site, settled** need nothing first and can run side by side. The UI goes first in practice: Jeff judges the plan by using the screens.
 - **Design: is all data a Fact?** needs nothing and comes early: its answer may change what One write path, Migration through the import and the UI's interfaces look like.
 - **One write path waits for the review cleanup, the UI and the Fact design.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
-- **Existing Sources comes before any migration work** (Jeff, 2026-11-14): what happens to them decides what the migration carries.
+- **Existing Sources comes before any migration work** (Jeff, 2026-11-14): what happens to them decides what the migration carries, so *Migration data* and *Migration through the import* both wait for it.
 - **Migration through the import** needs one write path (the import is the one writer for Facts) and the Existing Sources decision.
 - **One editor** connects the UI to the one write path, then the full audit runs. **Gall relationships** follow it, since they're edited through it.
 - **Gallformers notes** need one write path: ID notes become an editorial field and the notes' Facts go in as packages.
