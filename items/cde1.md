@@ -6,7 +6,7 @@ stage: committed
 docs:
   - .mull/matters/f465-preview-postgres-setup-with-wcvp-data.md
 created: "2026-11-09T20:38:18Z"
-updated: "2026-11-15T18:47:43Z"
+updated: "2026-11-15T21:23:22Z"
 ---
 
 **Why.** Preview has no Postgres of its own. It used to share `gallformers-db`, which became production's database in the March 2026 Postgres cutover. Step 5 (process Sources into a copy of production, with Jeff and Adam) and step 6 (rehearse and cut over) both need preview to run the taxogall code on its own database, holding WCVP and a converted copy of production. Curators' decisions made there reach production only through preview's replay log (`b5bd` M0, M6), so the database is persistent staging, not a throwaway.
@@ -38,3 +38,5 @@ updated: "2026-11-15T18:47:43Z"
 From matter f465. Needs Jeff: Fly credentials and cost. Sizing is the intake's guess: if it doesn't fit one session, mull ask to split it.
 
 Before Model v2 this item needed 37cb. Items have no needs now; order work with needs between phases.
+
+**First, find out what preview's database settings point at today** (Jeff runs the command): possibly the `gallformers_preview` role and database on the production cluster, which backlog bug 14b2 (credential rotation) also names. **Putting a production copy on Fly sends personal data (users and more) to a service other than Anthropic, so it waits for Jeff's OK.**
