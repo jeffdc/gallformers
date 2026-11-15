@@ -5,6 +5,12 @@ plan: taxogall
 source: matter 50ff, 'Open'; matter 8567; replaces entry 5803
 by: /Users/jeff/dev/gallformers
 created: "2026-11-12T02:23:22Z"
+settled:
+  action: decide
+  note: 'Facts apply to the whole Gall Community: Inducers, Inquilines, Parasitoids and every other member, not a narrower set (Jeff, 2026-11-15)'
+  by: /Users/jeff/dev/gallformers
+  on_request: true
+  at: "2026-11-15T18:28:16Z"
 ---
 
 Background: Gallformers owns its non-plant taxonomy as sourced Facts. Names, authorship, placement, synonymy, ranks and splits are credited to Sources, and a curator accepts or declines each newer paper's statement (taxonomy queue, /admin/review/taxonomy). Plants are editorial, from WCVP. The domain model's Gall Community is everyone involved in a Gall's existence: the Inducer, the Host, Parasitoids, Inquilines, herbivores, successors, and so on. Relationships (inquiline of, parasitoid in, emerged from, …) have taxa at their ends.
