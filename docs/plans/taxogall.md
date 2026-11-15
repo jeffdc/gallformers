@@ -1,25 +1,43 @@
 # Taxogall: Galls and Facts, released
 
-## The picture
+## Operating principles
 
-Gallformers today treats everything as a species. Taxogall replaces that, in place, on the `taxogall` branch, and cuts production over to it.
+- **The long-term goal is a self-curating system** (Jeff, 2026-11-15). Gallformers' data curation should detect anomalies, propose fixes, and ask a human to review and approve. When a decision is close, choose the option that moves toward that.
+- **One source of truth** (Jeff, 2026-11-15). Each thing is written down in one place and pointed to from everywhere else. This plan doesn't repeat the domain doc or the overview doc.
 
-- **Galls** are catalog entries (two generations are two Galls). Everything known about a Gall (its Hosts and other Relationships, Traits, range, recorded occurrences, common names, descriptions) is a **Fact**, attributed to the Sources that confirm or deny it. Gallformers is a Source too.
-- **Taxonomy is Facts too** (Jeff, 2026-11-06). Names, authorship, placements, synonymies, ranks and splits are Facts credited to the Sources that make them. Gallformers states a taxonomic Fact only as a rare exception: an undescribed Gall's Inducer, or a position no paper supports. The tree is whatever the current taxonomic Facts say.
-- **Editorial, not Facts:** Gall naming (derived names with stored name parts: form, generation, Host qualifier) and plant data (names, synonymy, ranges). WCVP makes plant input easier, and curators edit plants freely. Gallformers is not a system of record for plants. The Host relationship (host of) is still a Fact.
-- **Every change goes through one Fact process.** Sources arrive as LLM-produced packages against a validated contract (`priv/import/`). Curators settle questions and approve. Gallformers' own edits go through the same process. Decisions are logged and replayed at cutover.
-- **The pipeline is the migration** for everything that lives in Sources. Existing Sources are re-processed into the new model before release. Only what can't come out of a Source migrates directly: Gall skeletons (ID, name, Gallformers code, URL, images, editorial data), the skeletal taxonomy, Hosts with their ranges, curators' range exceptions, Sources as records, keys and other non-Fact data.
+## What this plan delivers
 
-Domain language: `docs/domain/domain-model.md`. It records the domain language as it is being worked out. It is not a description of the software, so don't use it to explain the current code. Import contract: `priv/import/` and `docs/import/producer-guide-background.md`. Source intake procedure: `runbooks/source-intake.md`.
+Gallformers today treats everything as a species. Taxogall replaces that with Galls, Facts and Sources, in place on the `taxogall` branch, and cuts production over to it.
+
+- **The domain** (what a Gall, Fact, Source, Relationship, Trait and the rest are, and how they relate): `docs/domain/domain-model.md`. It records the domain language as it's worked out; it doesn't describe the software.
+- **How Gallformers works, and how that differs from the old site**, for curators, developers and agents: a Gallformers overview doc, still to be written (see *Design work still to do*).
+- **Import contract:** `priv/import/` and `docs/import/producer-guide-background.md`. Source intake procedure: `runbooks/source-intake.md`.
+- The 2026-11-12 audit of where the code stands: `docs/plans/2026-11-12-history-audit/` (local, gitignored, until it's folded in).
 
 ## Build approach
 
 A new back-end, built whole on `taxogall`, replaces the old one in place. There is no facade and no dual-write.
 
-- **Why:** the back-end changes so much that it is a rewrite. About 80% of today's UI is admin, which the new model replaces anyway. The public 20% changes little. Old and new never run side by side: there is one rehearsed cutover, and the data migration runs as a separate step from a production copy.
-- **New:** the domain core (Galls, taxa, Sources and Facts, import, read models). **Reused as it is:** auth and users, Oban, S3 storage and images, WCVP/POWO plant ranges, places and maps, search infrastructure, maintenance mode and deploy.
+- **Why:** the back-end changes so much that it is a rewrite. About 80% of today's UI is admin, which the new model replaces anyway. The public 20% changes little. Old and new never run side by side: there is one rehearsed cutover.
+- **New:** the domain core (Galls, taxa, Sources and Facts, import, read models, audit). **Reused as it is:** auth and users, Oban, S3 storage and images, WCVP/POWO plant ranges, places and maps, search infrastructure, maintenance mode and deploy.
+- **The UI first** (Jeff, 2026-11-14). The whole UI is accounted for against what Gallformers needs, and what's missing is built early against the back-end interfaces, stubbed where they don't exist yet. Jeff judges the plan's completeness by using the screens.
 - **Branch drift** is handled by merging `main` into `taxogall` regularly. Production hotfixes land on `main` and flow over.
 - **Rejected:** building alongside the old system (a separate Postgres schema, duplicate public page modules behind a route flip, or empty tables shipped dark to main). That doubles every public page until cutover and puts schema churn into production migrations.
+
+## One write path (Jeff, 2026-11-12)
+
+The architecture rule every phase follows:
+
+- **For any data, exactly two ways in:** one editing screen in the UI, and the import. Both call the same underlying code to validate, write and read it. No second editing screen, and no second code path.
+- **A Fact edit is an ingestion.** A curator's edit under the Gallformers Source is a small package of that Source through the same code path as a paper's import, with the same rules. It applies immediately if it is valid.
+- **Manual editing is one of two things:** correcting how an accepted Source was read, under that Source's authority and at its date; or a change under Gallformers' authority.
+- **A Gallformers curator can do anything under the Gallformers Source**, including changing a Gall's Inducer, generation and descriptions, creating a Gall, and setting a range to "only here".
+- **Plants just go in**, but through exactly one code path that writes a plant.
+- **Replay is mechanical.** Every write goes through its one path, so replay re-applies the same writes in order. No per-kind replay code.
+
+## Audit (core architecture)
+
+Audit is a layer underneath everything else, so new code doesn't have to think about it beyond naming who is acting. Today the database itself records every insert, update and delete on a tracked table (Carbonite triggers), against the transaction's actor and operation, and refuses a write to a tracked table that names no actor. 46 tables are tracked; the Source records and Host ranges are not. Whether the layer is complete, and whether code ever has to do more than name the actor, is design work (below).
 
 ## Design principles (Gallformers' owned taxonomy)
 
@@ -29,26 +47,17 @@ Adam and Jeff (2026-10-03/04): taxonomic Facts need Source attribution just as g
 
 **Rules:**
 
-1. **Plants:** Gallformers is not an authority on plants. Plant taxa start from POWO/WCVP and live in the same taxonomy structure. Curators adjust them editorially (audit log, no Facts), including host ranges.
-2. **Taxon origin:** *curated* (gall formers and associates, including the rare gall-forming plant) or *POWO-imported* (plants).
+1. **Plants:** Gallformers is not an authority on plants. Plant taxa start from POWO/WCVP or iNaturalist and live in the same taxonomy structure. Curators adjust them editorially (audit log, no Facts), including host ranges.
+2. **Taxon origin:** *curated* (the whole Gall Community: Inducers, Inquilines, Parasitoids and every other member, and the rare gall-forming plant; Jeff, 2026-11-15) or *imported* (plants from POWO/WCVP or iNaturalist). iNaturalist also backs the import of non-plant taxonomy (genera, sections, families and above).
 3. **Isolation:** taxonomy knows nothing about Galls. The gall system knows taxa only by ID and through the taxonomy API. The UI may hide the separation.
-4. **IDs:** there is one shared ID sequence for Galls and all taxa, continuing today's species sequence. Galls keep their species IDs (`/gall/:id`) and plants keep theirs (`/host/:id`). Inducer and higher taxa get new IDs, with a crosswalk for the old higher-taxon IDs. Why: image paths are `gall/{species_id}/…` for galls and plants alike, and `Images.Audit` parses them. With one sequence, paths, the audit and URLs don't change.
-5. **Taxonomic Facts** on curated taxa are sourced to the literature. A curator's acceptance gates them (see *Taxonomy as Facts* below). Taxonomic acts (rename, move, merge, split) are sourced and keep history.
+4. **IDs:** there is one shared ID sequence for Galls and all taxa, continuing today's species sequence. Galls keep their species IDs (`/gall/:id`) and plants keep theirs (`/host/:id`). Inducer and higher taxa get new IDs, with a crosswalk for the old higher-taxon IDs. Why: image paths are `gall/{species_id}/…` for galls and plants alike, and `Images.Audit` parses them.
+5. **Taxonomic Facts** on curated taxa are sourced to the literature. A curator's acceptance gates them (see *Taxonomy as Facts*). Taxonomic acts (rename, move, merge, split) are sourced and keep history.
 6. **Change events are synchronous, with the dependency inverted.** Taxonomy calls registered "taxon changed" listeners inside its own transaction. If the gall side can't accept a change, the taxonomy change fails. The exception is Gall names: a rename that follows from a taxonomy change is a proposal a curator reviews, and a name collision flags the proposal instead of failing the change. Only expensive derived work (search indexing, read-model refresh) runs async.
 7. **Sources–Facts:** Gallformers is a Source. Observations are never Sources; a Source's statement cites them. Attribution (whose authority) is separate from audit (who changed it).
-8. **Relationships** are owned by the gall system, and every Relationship happens in a Gall. Types and qualifiers are a system-level fixed list, changed only by a database update. Hyperparasitism is derived, not stored. Alternate generations are explicit, and mismatches are flagged.
-9. **Gall names** are derived from the Inducer plus name parts stored on each Gall (form, generation, Host), overridable and unique. Undescribed Galls use a stored descriptor. A rename that follows from a taxon rename is reviewed by a curator before it takes effect, because the Gallformers code is derived from the name and ties existing iNat observations to Galls.
-10. **Ranges:** a Gall's potential range is the union of its Hosts' ranges (native and introduced, genus-level Hosts included). It is computed, not stored. The only stored adjustments are range Facts (exclusion, and "only"), stated by Sources or by Gallformers. There are no inclusions: a Gall recorded where no Host grows is a statement about a Host's range. Missing data is not absence: a Gall with no range data must still show in every region.
-11. and 12. (import is never curated afterwards; every write is a pipeline batch) are superseded by the unified edit model below.
-
-**The unified edit model** (Jeff, 2026-11-07; replaces rules 11 and 12):
-
-- Any Source may state any Fact. The literature is the usual authority.
-- New Facts come in exactly two ways: ingesting a Source to approval, or editing or adding a Fact on a Fact-bearing entity (a Gall, or Gallformers' non-plant taxonomy). An edit is the ingestion of a Gallformers statement, through the same code path as a Source ingestion.
-- There is one Gallformers Source. Each change is a package of it: small, timestamped and audited. The old site's data is its undated base.
-- Review edits and corrections of a misreading are made under the reviewed Source's authority, at its date.
-- Sources never reference each other formally. Delete is only for data added by mistake.
-- All edits that can be inline are inline on the main pages, with one shared set of components, mechanics and validators. The Fact inspector is both the Fact viewer and the Fact editor.
+8. **Relationships** are owned by the gall system, and every Relationship happens in a Gall. Types and qualifiers are a system-level fixed list (15 kinds), changed only by a database update. Hyperparasitism is derived, not stored. Alternate generations are explicit, and mismatches are flagged.
+9. **Traits belong to the Gall** and never vary by Host (Jeff, 2026-11-15).
+10. **Gall names** are derived from the Inducer plus name parts stored on each Gall (form, generation, Host), overridable and unique. Undescribed Galls use a stored descriptor. A rename that follows from a taxon rename is reviewed by a curator before it takes effect, because the Gallformers code is derived from the name and ties existing iNat observations to Galls.
+11. **Ranges:** a Gall's potential range is the union of its Hosts' ranges (native and introduced, genus-level Hosts included). It is computed, not stored. The only stored adjustments are range Facts (exclusion, and "only"), stated by Sources or by Gallformers. There are no inclusions: a Gall recorded where no Host grows is a statement about a Host's range. Missing data is not absence: a Gall with no range data must still show in every region. (To be revisited: see *Design work still to do*.)
 
 **Sources–Facts mechanics:**
 
@@ -57,18 +66,17 @@ Adam and Jeff (2026-10-03/04): taxonomic Facts need Source attribution just as g
 - Corrections and later revisions are newer Sources. A retraction cancels all of a Source's stances, and the Source stays visible, marked.
 - Standings: current, withdrawn, superseded, retracted, unsupported (hidden).
 - Each Fact kind has a natural key. An attribution carries its stance, quote and page hint, `name_as_written` for each taxon the Source names, cited Observations, and statement text.
-- The "Gallformers legacy data" (the old site's data) is undated, so any real Source outranks it. A Fact supported only by legacy data is shown as unconfirmed.
+- Any Source may state any Fact. Sources never reference each other formally. Delete is only for data added by mistake or testing.
+- **There are two Gallformers Sources** (Jeff, 2026-11-14). **Gallformers legacy data** holds the old site's data and is undated, so every dated statement from any other Source, Gallformers included, overrides it; a Fact supported only by legacy data shows as unconfirmed. **Gallformers** holds the curators' own statements; each is dated by its change (timestamped, since several happen a day), and a newer Gallformers change replaces Gallformers' earlier word on the same Fact.
 
-**Taxonomy as Facts (phase 2, before release):**
+**Taxonomy as Facts (before release):**
 
-- The literature is the authority, gated by a curator. A Source's taxonomic statement competes by the Source's date, but counts only once a curator accepts it. A curator who doesn't follow a paper declines it with a reason, and no Gallformers statement is written.
+- The literature is the authority, gated by a curator. A Source's taxonomic statement competes by the Source's date, but counts only once a curator accepts it. A curator who doesn't follow a paper declines it with a reason.
 - A question arises only when an unaccepted statement is newer than the latest accepted one for that taxon. Accepting a statement closes open questions about the same taxon from older papers as history.
 - Taxonomy questions don't hold a Source's approval. Name-resolution questions do.
-- Today's tree becomes undated legacy statements at cutover, so the backscan can correct it.
-- The tree tables stay what every page reads. They are rewritten from the slot winners in the same transaction, and a rebuild-and-compare check guards them.
+- Today's tree comes in as Gallformers legacy data, so the backscan can correct it.
+- The tree tables stay what every page reads. They are rewritten from the accepted statements in the same transaction, and a rebuild-and-compare check guards them.
 - An accepted split asks, per Gall, which daughter induces it. An accepted lump moves B's Galls to A.
-- Tree edits in the admin are credited to the Source they follow ("Based on which Source?").
-- Plants are the exception: their taxonomy is editorial.
 
 **Generation groups:** a generation is a stage of the Inducer's life cycle that induces a clearly different Gall. Groups of values (heterogony, seasonal, rust stages, aphid life cycle) are a system list mapped to taxa. The Inducer's nearest mapped ancestor decides which groups apply to a Gall.
 
@@ -76,54 +84,74 @@ Adam and Jeff (2026-10-03/04): taxonomic Facts need Source attribution just as g
 
 **Outside scope:** plant taxonomy as a field of work, Relationships not tied to a Gall, owning Observations, and a phylogeny view.
 
+## The old site's data and the Gallformers notes
+
+- **All of the old site's data comes over as Gallformers legacy data** (Jeff, 2026-11-15). Its Facts go in as packages of Gallformers legacy data through the same import path as any paper. Only what isn't a Fact is copied directly, each kind through its one writer: Gall skeletons (ID, name, Gallformers code, URL, images, editorial data), plants with their ranges, Sources as records, keys and other non-Fact data.
+- **What happens to each existing Source** is decided in its own phase, before any migration work.
+- **The old notes are sorted by code** (Jeff, 2026-11-12): deterministic, repeatable code splits them into undescribed-Gall descriptions, pure ID notes, and other (to be worked out once we see them). Nothing is imported blindly.
+- **Undescribed-Gall notes are processed as Sources** (Jeff, 2026-11-15), adding Facts as normal. They may or may not confirm what's already held from legacy data. How to date those Facts needs analysis, and is a task of its own.
+- **Pure ID notes are editorial:** an ID Notes field on the Gall, attached to no Source.
+- **The old season tags are dropped**; Sources supply season under its new definition (Jeff, 2026-11-12).
+
+## Cutover (Jeff, 2026-11-12)
+
+- Real data is built on preview, then in production, never on a developer's machine. Sources are processed into a migrated production copy on preview.
+- At cutover, production is migrated fresh and preview's work is replayed onto it, so the live site stays editable while Sources are processed.
+- Replay is rehearsed onto a separate database early, in the Preview environment phase, and the whole cutover is rehearsed until boring.
+- Merging `taxogall` into `main` deploys to production at once, so the cutover runbook guards against an accidental merge or manual deploy.
+
+## Design work still to do
+
+Each of these is decided before the work that depends on it; each becomes an item in its phase.
+
+- **The fate of each existing Source** (its own phase).
+- **The full UI accounting** (its own phase).
+- **The Gallformers overview doc:** how Gallformers works, for curators, developers and agents, and how it differs from the old site.
+- **Ranges:** how they should work, both for the ID tool (the same as the range shown) and for curating range data.
+- **Exactly which data is editorial.**
+- **How a curator produces a Source package and gets it into the system.**
+- **Audit:** confirm the layer is complete and that code only names its actor.
+- **The old public API's fate,** early: whether anyone uses it, and whether to disable it in production until release.
+- **The taxonomy API:** a separate design session, learning from prior art such as iNaturalist's curation of swaps, splits and merges (Jeff, 2026-11-15).
+- **One unified approach to editing:** first a shared understanding of how editing should work (Jeff's answer on the Fact inspector, 2026-11-15: probably not every edit through the inspector).
+- **Dating the Facts from undescribed-Gall notes:** an analysis.
+
 ## When the plan is done
 
 Production runs on the new back-end and the old system is retired:
 
-- **Every existing Source has been processed** into the production copy on preview and approved or denied by curators.
-- **The Gallformers notes have been processed before release.** The notes plan says how:
-  - undescribed Galls keep their current-data Facts and their notes as text;
-  - described notes' patterned statements are handled by code;
-  - the judgement minority goes to a chunked LLM or to a curator.
-
-  That plan has to be reconciled with the edit model first. The edit model makes ID notes editorial records on the Gall, and processes old notes into Gallformers changes that carry the notes' own dates.
-- **The cutover has been rehearsed until boring** (timing, the replay log for every decision kind, rollback). Production has been cut over in a maintenance window, the verification suite passes against production, and `taxogall` is merged to `main`.
+- **Every existing Source has been dealt with** as its phase decides, and the Sources to be processed have been processed on preview and approved or denied by curators.
+- **The Gallformers notes have been handled** as above, before release.
+- **Public taxon pages for non-plant taxa, the Gall merge workflow and iNat taxon IDs are done** (Jeff, 2026-11-15: before release, not after).
+- **The cutover has been rehearsed until boring** (timing, the replay, rollback). Production has been cut over in a maintenance window, the verification suite passes against production, and `taxogall` is merged to `main`.
 - **After release:** the old tables and `species_id` columns are dropped. The domain docs, `CLAUDE.md` and runbooks describe the new model. Records left with no Facts have been reviewed for removal.
 
-**Success criteria** (2026-10-06):
+**Release gates** (from the 2026-10-06 success criteria, now checked before cutover):
 
 - ID-tool parity with today on a sample of real queries. The expected differences are Hosts' introduced ranges, and every Gall's range now being its Hosts' whole WCVP range.
-- 100% Fact–Source coverage: every Fact comes from a Source's batch, or from Gallformers data for what no Source holds.
+- 100% Fact–Source coverage: every Fact comes from a Source's package, or from Gallformers legacy data for what no Source holds.
 - Jeff's judgement that old vs new looks similar, with much better data.
 - Trial metrics: agreement with the database, error attribution, quote verification rate, cost per Source.
 
 ## Why this order
 
-- **Review cleanup, Housekeeping, Import at scale, Preview environment and Migration data** need nothing and can run side by side now.
-- **Edit model: back end comes after Review cleanup.** The edit model moves review decisions onto Source packages: a review decision that changes the tree becomes that Source's statement. So it builds on the review's cleaned-up decision code (one decision shape, one carry-out).
-- **Edit model: one editor comes after the back end** (Jeff, 2026-11-07). The edit framework comes first, then the five editors are rebuilt onto it. Once the editor is settled comes the full system audit for sub-agent messes and design-system violations.
-- **Gallformers notes come after the edit model's back end.** The edit model decided that ID notes are editorial, and that old notes are processed into Gallformers changes carrying the notes' own dates. That needs the package model first.
-- **Process Sources on preview** comes after three phases:
-  - **the edit model's back end:** decisions made on preview reach production through preview's replay log, so they must be recorded the way the final model records them;
-  - **Import at scale:** about $9 a Source today, over ~927 Sources;
-  - **the Preview environment:** Sources are processed into a production copy on preview, which needs its own Postgres with WCVP.
-- **Rehearse and cut over** needs everything that changes what reaches production: the leftovers and merging main (Housekeeping), the settled editor and the audit, the processed notes, the processed Sources, and the migration's data fixes. Release is sequenced with the backscan, and the notes are processed before release.
-- **After release** waits for the cutover. The old tables stay until then, because the catalog migration reads them.
+- **The UI, Existing Sources, Review cleanup, Housekeeping, Import at scale, Migration data's fix list and Public site, settled** need nothing first and can run side by side. The UI goes first in practice: Jeff judges the plan by using the screens.
+- **One write path waits for the review cleanup and the UI.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
+- **Existing Sources comes before any migration work** (Jeff, 2026-11-14): what happens to them decides what the migration carries.
+- **Migration through the import** needs one write path (the import is the one writer for Facts) and the Existing Sources decision.
+- **One editor** connects the UI to the one write path, then the full audit runs. **Gall relationships** follow it, since they're edited through it.
+- **Gallformers notes** need one write path: ID notes become an editorial field and the notes' Facts go in as packages.
+- **Preview environment** needs one write path for its replay rehearsal.
+- **Process Sources on preview** needs one write path, the migration through the import, the import at scale, preview, and the Existing Sources decision.
+- **Rehearse and cut over** needs everything that changes what reaches production.
+- **After release** waits for the cutover. The old tables stay until then, because the migration reads them.
 
 ## After release (scope)
 
-- Drop the old tables (the `species`-centric model) and the `species_id` columns on `image` and `host_range`. Audit the `source` table with Carbonite.
+- Drop the old tables (the `species`-centric model) and the `species_id` columns on `image` and `host_range`. Track the Source records in the audit layer (today they aren't).
 - Replace `docs/domain/general.md` and `docs/domain/admin-domain-reference.md`. Update `CLAUDE.md` and the runbooks that assume the old tables (e.g. `runbooks/restore-deleted-gall.md`).
 - Review records left with no Facts for removal, old genus-level Hosts included, once most Sources are processed. Fix wrong Host ranges on the Host.
 - Deferred features: search and the API over Source terms, and the PDF page view.
-- Follow-on work outside this plan: public taxon pages for non-plant taxa, the Gall merge workflow, iNat taxon IDs, phenology, data completeness scoring, notifications, interoperability (Darwin Core, GBIF, Wikidata), DNA barcodes, iNat integration, GallOnt trait vocabulary, a host-family filter, API v2 parity, a mobile-first ID tool, and out-of-range records as Host-range proposals.
+- Follow-on work outside this plan: phenology, data completeness scoring, notifications, interoperability (Darwin Core, GBIF, Wikidata), DNA barcodes, iNat integration, GallOnt trait vocabulary, a host-family filter, a mobile-first ID tool, and out-of-range records as Host-range proposals. The public API's future (including API v2 parity) follows from its design item above.
 
-## Open design questions (intent)
-
-- **Scope of the curated taxonomy:** all Gall Community members (Inducers, Inquilines, Parasitoids, …) or a narrower set?
-- **Traits that vary by Host:** the domain doc leans no, but this needs a definitive answer.
-- **Notes:** do undescribed notes' "observed in…" become occurrence Facts? Are the judgement notes handled by an LLM or by a curator? Does a note's taxonomic position become a Gallformers taxonomic Fact?
-- **Taxonomy API:** learn from prior art (iNaturalist's curation of swaps, splits and merges) before finalizing it. Not urgent.
-- **The Fact inspector:** should every Fact edit begin and end in the inspector, with the main view as presentation?
-
-Sources: matters 50ff ('The picture', 'Order to release', 'After release', 'Open'), 8567, f923, d3b0, b5bd (M0, M5–M7).
+Sources: matters 50ff, 8567, f923, d3b0, b5bd (M0, M5–M7), and Jeff's decisions of 2026-11-12, 11-14 and 11-15 (mull decision log).
