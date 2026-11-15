@@ -5,6 +5,12 @@ plan: taxogall
 source: 'intake 2026-11-09: .github/workflows/ci.yml runs only on push to main and PRs into main; replaces entry 29fd'
 by: /Users/jeff/dev/gallformers
 created: "2026-11-12T02:23:22Z"
+settled:
+  action: decide
+  note: A pull request from taxogall into main, the standard way; it exists for the checks and is never merged before cutover (Jeff, 2026-11-15)
+  by: /Users/jeff/dev/gallformers
+  on_request: true
+  at: "2026-11-15T18:48:20Z"
 ---
 
 Background (matter c800, 2026-11-09). Dialyzer had been out of GitHub CI since January by accident. 55aa083c added it in a second workflow, v2-ci.yml; d33fe6f0 deleted that file as legacy; the surviving ci.yml never had a dialyzer step. So 13 dialyzer errors from Nov 6–8 landed unseen; c800 fixed them, and `make ci` is green.
