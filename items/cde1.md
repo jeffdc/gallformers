@@ -6,7 +6,7 @@ stage: committed
 docs:
   - .mull/matters/f465-preview-postgres-setup-with-wcvp-data.md
 created: "2026-11-09T20:38:18Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-15T18:47:43Z"
 ---
 
 **Why.** Preview has no Postgres of its own. It used to share `gallformers-db`, which became production's database in the March 2026 Postgres cutover. Step 5 (process Sources into a copy of production, with Jeff and Adam) and step 6 (rehearse and cut over) both need preview to run the taxogall code on its own database, holding WCVP and a converted copy of production. Curators' decisions made there reach production only through preview's replay log (`b5bd` M0, M6), so the database is persistent staging, not a throwaway.
@@ -19,7 +19,7 @@ updated: "2026-11-12T02:23:22Z"
    - pg_restore the S3 dump artifact into it. `mix gallformers.wcvp.restore` defaults to `https://gallformers-backups.s3.amazonaws.com/public/wcvp.dump`. The command in `runbooks/wcvp.md` is `pg_restore --clean --if-exists --no-owner --no-acl -d wcvp -h localhost -p <proxy port>`.
    - WCVP isn't managed by Ecto migrations.
 4. **Restore a production copy into the main database.** The latest full backup is `s3://gallformers-full-backups/<date>/gallformers.dump` (how `make download-db` finds it). See `runbooks/restore-database.md`.
-   - The production copy includes private tables such as `users` (personal details), and loading it onto a Fly machine sends it to a service other than Anthropic. Jeff's standing rule: say what is being sent and where, and wait for his OK.
+   - The production copy includes private tables such as `users` (personal details), and loading it onto a Fly machine sends it to a service other than Anthropic. Jeff's standing rule: say what is being sent and where, and wait for their OK.
 5. **Deploy taxogall to preview, then convert.** `make preview` runs `fly deploy --config fly.preview.toml`, and the schema migrations run at boot (`docker-entrypoint-preview.sh`). Then run the catalog migration as its own step, never at boot (`b5bd` M0): `fly ssh console -a gallformers-preview`, then `bin/gallformers eval "Gallformers.Release.migrate_catalog()"`.
    - It is strict: it stops with nothing written on any pending curated decision or duplicate taxon key.
    - It starts WCVP (plant authorship is one of its steps) and the private storage.

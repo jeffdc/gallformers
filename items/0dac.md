@@ -6,7 +6,7 @@ stage: committed
 docs:
   - .mull/matters/b5bd-taxonomy-migration.md
 created: "2026-11-09T20:38:18Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-15T18:47:43Z"
 ---
 
 **What Jeff wants (2026-11-05).** The Gall page's "Also known as" must include **all** of a Gall's old names, old common names included. Today some old aliases don't reach the new model, so this item is a migration check: map each old Gall alias to a synonym, a former label or a common name, so that every old name shows on the Gall page.
@@ -56,7 +56,7 @@ order by o.gall_id, o.name;
 3. Where a decided synonym is lost by normalisation (author dropped, whitespace), say whether the Gall page should show the name as written. If it should, the fix is in how the migration stores the name, not in `aliases.csv`. Ask Jeff before changing the normalisation rule.
 4. Add a test case for each new kind of decision as old-style seed rows (`priv/repo/test_seeds.sql`), with the curated decision in `test/support/fixtures/catalog_migration/aliases.csv` (per CLAUDE.md), test first.
 
-**Done when** the query above, re-run after a strict catalog migration (`MIX_ENV=dev PGDATABASE=<copy> mix gallformers.catalog.migrate --no-s3`, nothing pending), returns only aliases Jeff has agreed to drop, plus any he has agreed may show only in a normalised form. Every other old Gall alias then shows on the Gall page as a synonym, former label or common name.
+**Done when** the query above, re-run after a strict catalog migration (`MIX_ENV=dev PGDATABASE=<copy> mix gallformers.catalog.migrate --no-s3`, nothing pending), returns only aliases Jeff has agreed to drop, plus any they have agreed may show only in a normalised form. Every other old Gall alias then shows on the Gall page as a synonym, former label or common name.
 
 **The 224** (`gallformers_taxogall`, 2026-11-11; Gall IDs are the old species IDs, which Galls keep):
 
