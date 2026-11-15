@@ -104,6 +104,7 @@ Adam and Jeff (2026-10-03/04): taxonomic Facts need Source attribution just as g
 
 Each of these is decided before the work that depends on it; each becomes an item in its phase.
 
+- **Is all data a Fact?** (its own phase, ahead of One write path; Jeff, 2026-11-15). Every piece of data tied to Facts, or every write a change with only sourced knowledge as Facts.
 - **The fate of each existing Source** (its own phase).
 - **The full UI accounting** (its own phase).
 - **The Gallformers overview doc:** how Gallformers works, for curators, developers and agents, and how it differs from the old site.
@@ -136,7 +137,8 @@ Production runs on the new back-end and the old system is retired:
 ## Why this order
 
 - **The UI, Existing Sources, Review cleanup, Housekeeping, Import at scale, Migration data's fix list and Public site, settled** need nothing first and can run side by side. The UI goes first in practice: Jeff judges the plan by using the screens.
-- **One write path waits for the review cleanup and the UI.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
+- **Design: is all data a Fact?** needs nothing and comes early: its answer may change what One write path, Migration through the import and the UI's interfaces look like.
+- **One write path waits for the review cleanup, the UI and the Fact design.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
 - **Existing Sources comes before any migration work** (Jeff, 2026-11-14): what happens to them decides what the migration carries.
 - **Migration through the import** needs one write path (the import is the one writer for Facts) and the Existing Sources decision.
 - **One editor** connects the UI to the one write path, then the full audit runs. **Gall relationships** follow it, since they're edited through it.
