@@ -1,0 +1,14 @@
+{
+  "tree": "3d8983d47a7b9630c26b79eb7dc21b1ea84df6d5",
+  "commit": "4608e4e90e6ca6148d8eab396a71243437d4faf5",
+  "at": "2026-11-16T15:34:37Z",
+  "by": "/Users/jeff/dev/gallformers",
+  "passed": true,
+  "results": [
+    {
+      "command": "make done-checks",
+      "exit": 0,
+      "duration_ms": 142563
+    }
+  ]
+}
