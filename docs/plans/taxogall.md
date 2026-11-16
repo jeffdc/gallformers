@@ -136,15 +136,15 @@ Production runs on the new back-end and the old system is retired:
 
 ## Why this order
 
-- **The UI, Existing Sources, Review cleanup, Housekeeping, Import at scale and Public site, settled** need nothing first and can run side by side. The UI goes first in practice: Jeff judges the plan by using the screens.
-- **Design: is all data a Fact?** needs nothing and comes early: its answer may change what One write path, Migration through the import and the UI's interfaces look like.
-- **One write path waits for the review cleanup, the UI and the Fact design.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
-- **Existing Sources comes before any migration work** (Jeff, 2026-11-14): what happens to them decides what the migration carries, so *Migration data* and *Migration through the import* both wait for it.
-- **Migration through the import** needs one write path (the import is the one writer for Facts) and the Existing Sources decision.
+- **Decisions first comes first** (Jeff, 2026-11-16): the decisions that shape more than one phase, or that Jeff has prioritised, are settled before any building. Every other phase waits for it, except **The UI**, whose accounting runs alongside it, since Jeff judges the plan by using the screens.
+- **Review cleanup, Housekeeping, Import at scale and Public site, settled** follow Decisions first and can run side by side.
+- **One write path waits for Decisions first, the review cleanup and the UI.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
+- **The existing Sources are decided before any migration work** (Jeff, 2026-11-14), in Decisions first.
+- **Migration through the import** needs one write path (the import is the one writer for Facts).
 - **One editor** connects the UI to the one write path, then the full audit runs. **Gall relationships** follow it, since they're edited through it.
 - **Gallformers notes** need one write path: ID notes become an editorial field and the notes' Facts go in as packages.
 - **Preview environment** needs one write path for its replay rehearsal.
-- **Process Sources on preview** needs one write path, the migration through the import, the import at scale, preview, and the Existing Sources decision.
+- **Process Sources on preview** needs one write path, the migration through the import, the import at scale and preview.
 - **Rehearse and cut over** needs everything that changes what reaches production.
 - **After release** waits for the cutover. The old tables stay until then, because the migration reads them.
 

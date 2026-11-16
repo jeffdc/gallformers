@@ -1,8 +1,8 @@
 ---
 plan: taxogall
-title: 'Design: is all data a Fact?'
+title: Decisions first
 created: "2026-11-15T20:22:24Z"
-updated: "2026-11-15T20:22:24Z"
+updated: "2026-11-16T14:11:29Z"
 ---
 
-Settle with Jeff whether every piece of data is tied to Facts (one mechanism for writes, history and replay) or every write is a change and only sourced knowledge is a Fact, before One write path starts (Jeff, 2026-11-15).
+The decisions that shape more than one phase, or that Jeff has prioritised, settled before any building: the old API's fate, is all data a Fact, the existing Sources, the notes analyses, ranges, how curators produce packages, the taxonomy API (Jeff, 2026-11-16).
