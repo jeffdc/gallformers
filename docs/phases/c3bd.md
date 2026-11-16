@@ -12,7 +12,7 @@ Everything a visitor sees is decided, matches what's decided, and is listed for 
 ## Done when
 
 - How the ID tool and search behave is written down, the code matches it, and a fresh comparison with production shows only the expected differences.
-- The old API's fate is decided and done, and the API's version is settled.
+- The API is released as v3 (decision 03d0), and v2 returns 410.
 - The public data download works on the new tables.
 - The known public bugs (Source page, rank pages, Host page, canonical tag) are fixed, and non-plant taxa have public pages.
 - Every Gallformers taxon that has an iNaturalist counterpart is linked to it.
