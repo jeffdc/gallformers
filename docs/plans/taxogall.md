@@ -19,7 +19,7 @@ Gallformers today treats everything as a species. Taxogall replaces that with Ga
 A new back-end, built whole on `taxogall`, replaces the old one in place. There is no facade and no dual-write.
 
 - **Why:** the back-end changes so much that it is a rewrite. About 80% of today's UI is admin, which the new model replaces anyway. The public 20% changes little. Old and new never run side by side: there is one rehearsed cutover.
-- **New:** the domain core (Galls, taxa, Sources and Facts, import, read models, audit), and ranges and places, rebuilt on PostGIS (rule 11). **Reused as it is:** auth and users, Oban, S3 storage and images, search infrastructure, maintenance mode and deploy.
+- **New:** the domain core (Galls, taxa, Sources and Facts, import, read models, audit), and ranges and places, rebuilt on PostGIS (see *Ranges* under *Design principles*). **Reused as it is:** auth and users, Oban, S3 storage and images, search infrastructure, maintenance mode and deploy.
 - **The UI first** (Jeff, 2026-11-14). The whole UI is accounted for against what Gallformers needs, and what's missing is built early against the back-end interfaces, stubbed where they don't exist yet. Jeff judges the plan's completeness by using the screens.
 - **Branch drift** is handled by merging `main` into `taxogall` regularly. Production hotfixes land on `main` and flow over.
 - **Rejected:** building alongside the old system (a separate Postgres schema, duplicate public page modules behind a route flip, or empty tables shipped dark to main). That doubles every public page until cutover and puts schema churn into production migrations.
