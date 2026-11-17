@@ -5,4 +5,10 @@ plan: taxogall
 item: "6936"
 by: /Users/jeff/dev/gallformers
 created: "2026-11-17T01:22:21Z"
+settled:
+  action: decide
+  note: I am unsure where it will all run in the long run. We can run some of it on my local plan and I will give some to Adam to run as well.
+  by: Jeff
+  human: true
+  at: "2026-11-17T16:08:03Z"
 ---
