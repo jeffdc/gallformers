@@ -147,7 +147,8 @@ Production runs on the new back-end and the old system is retired:
 - **Review cleanup, Housekeeping, Import at scale and Public site, settled** follow Decisions first and can run side by side.
 - **One write path waits for Decisions first, the review cleanup and the UI.** The cleanup gives it one decision shape and one carry-out to build on; the UI defines the interfaces it fills in.
 - **The existing Sources are decided before any migration work** (Jeff, 2026-11-14), in Decisions first.
-- **Migration through the import** needs one write path (the import is the one writer for Facts).
+- **Ranges** has its own phase (Jeff, 2026-11-16): it needs Decisions first and one write path, and the migration through the import and the cutover wait for it.
+- **Migration through the import** needs one write path and Ranges (the import is the one writer for Facts).
 - **One editor** connects the UI to the one write path, then the full audit runs. **Gall relationships** follow it, since they're edited through it.
 - **Gallformers notes** need one write path: ID notes become an editorial field and the notes' Facts go in as packages.
 - **Preview environment** needs one write path for its replay rehearsal.
