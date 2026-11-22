@@ -117,7 +117,7 @@ Each of these is decided before the work that depends on it; each becomes an ite
 - **The full UI accounting** (its own phase).
 - **The Gallformers overview doc:** how Gallformers works, for curators, developers and agents, and how it differs from the old site.
 - **Ranges: the screens and curation** (the model was settled 2026-11-16; item 7128).
-- **How a curator produces a Source package and gets it into the system.**
+- **How a curator produces a Source package and gets it into the system:** designed on item 274b (2026-11-21). Documents are collected, verified and converted on today's production site (phase *Collecting Source documents*); Jeff and Adam read them with the producer locally against preview (*Import at scale*, *Preview environment*).
 - **Audit:** confirm the layer is complete and that code only names its actor.
 - **The old public API's fate,** early: whether anyone uses it, and whether to disable it in production until release.
 - **The taxonomy API:** a separate design session, learning from prior art such as iNaturalist's curation of swaps, splits and merges (Jeff, 2026-11-15).
@@ -152,7 +152,8 @@ Production runs on the new back-end and the old system is retired:
 - **One editor** connects the UI to the one write path, then the full audit runs. **Gall relationships** follow it, since they're edited through it.
 - **Gallformers notes** need one write path: ID notes become an editorial field and the notes' Facts go in as packages.
 - **Preview environment** needs one write path for its replay rehearsal.
-- **Process Sources on preview** needs one write path, the migration through the import, the import at scale and preview.
+- **Collecting Source documents** follows Decisions first and is built on today's production site, built once so it moves into taxogall unchanged (Jeff, 2026-11-21): curators beyond Jeff and Adam can gather documents while the rest is built.
+- **Process Sources on preview** needs one write path, the migration through the import, the import at scale, preview, and the collected documents.
 - **Rehearse and cut over** needs everything that changes what reaches production.
 - **After release** waits for the cutover. The old tables stay until then, because the migration reads them.
 
