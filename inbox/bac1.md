@@ -5,6 +5,11 @@ plan: taxogall
 source: matter cb28, 'Open questions for Jeff' (conservative choices where the plan was silent); replaces entry 6559
 by: /Users/jeff/dev/gallformers
 created: "2026-11-12T02:23:22Z"
+settled:
+  action: accept
+  by: /Users/jeff/dev/gallformers
+  on_request: true
+  at: "2026-11-22T14:55:39Z"
 ---
 
 cb28 open question 6. The situation: decided with Jeff, the panel's primary button says what it does ("Add 2 taxa and 2 names"; "move N" when moving). The mockup didn't cover a change that adds no taxa, only names or moves.

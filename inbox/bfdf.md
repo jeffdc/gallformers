@@ -5,6 +5,12 @@ plan: taxogall
 source: matters 87a1 and d3b0, 'Carried from 87a1'; Jeff's 2026-11-09 audit; replaces entry c9e6
 by: /Users/jeff/dev/gallformers
 created: "2026-11-12T02:23:22Z"
+settled:
+  action: decide
+  note: Keep the six Fact-editing mockups until the unified editing design (cf5a) is settled, then delete them with their routes and mockups.md entries
+  by: /Users/jeff/dev/gallformers
+  on_request: true
+  at: "2026-11-22T14:55:39Z"
 ---
 
 In dev/gallformers_web/dev/mockups/. Deleting a mockup also deletes its route (`lib/gallformers_web/router.ex`, the `:dev_mockups` live_session) and its `docs/design-system/mockups.md` entry. As of a0434bcf `mockups.md` lists none of these (it says 'There are no mockups at the moment', which is stale) and its rule is 'Delete a mockup once its page is built'.

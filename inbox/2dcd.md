@@ -5,6 +5,12 @@ plan: taxogall
 source: matter cb28, 'What's left (2026-11-09)'; replaces entry 2cb4
 by: /Users/jeff/dev/gallformers
 created: "2026-11-12T02:23:22Z"
+settled:
+  action: do
+  item: 4f08
+  by: /Users/jeff/dev/gallformers
+  on_request: true
+  at: "2026-11-22T14:55:39Z"
 ---
 
 What cb28 built (on taxogall, e69af545; the `taxon_inaturalist` migration is applied to `gallformers_taxogall`): from a review question, and from the taxonomy admin, find a taxon on iNaturalist, see it beside our tree, choose what to bring in (the taxon, the ancestors it needs, its children, its names), and add it in one change credited to iNaturalist; the question is then answered with that taxon. Its last task, the real-data check, was never run (the builder couldn't use the shared dev databases).

@@ -5,6 +5,11 @@ plan: taxogall
 source: matter bc0d, 'Handoff update (2026-11-06)', 'Behaviour/look changes ... for Jeff to review'; replaces entry 3b61
 by: /Users/jeff/dev/gallformers
 created: "2026-11-12T02:23:22Z"
+settled:
+  action: accept
+  by: /Users/jeff/dev/gallformers
+  on_request: true
+  at: "2026-11-22T14:55:39Z"
 ---
 
 What was decided. Six parallel agents moved the admin onto the design system on 2026-11-06 (the conformance baseline fell from 1,850 to 15). Along the way they made the behaviour and look changes below, which bc0d listed for Jeff to review. The matter records no separate reason for each, beyond moving the screens onto the system's components and tokens. Where a change is in line with the design system's direction (bc0d round 1 and the catalog), that is noted.
