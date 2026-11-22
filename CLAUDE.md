@@ -17,7 +17,7 @@ This file (AGENTS.md is the same file) holds rules only, for any agent. Status l
 
 ## Before you commit
 
-The pre-commit hook (`dev/githooks/`, installed by `make hooks`) blocks a commit without a passing review.
+The pre-commit hook (`dev/githooks/`, installed by `make hooks`) blocks a commit without a passing review. A commit touching only `docs/`, `runbooks/` or the top-level README needs none.
 
 1. Stage files by name, then run `dev/guardrails/review_packet.sh`.
 2. A reviewer with fresh context, not yours, follows `dev/guardrails/reviewer.md` on the packet and records its verdict.

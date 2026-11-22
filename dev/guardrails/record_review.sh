@@ -2,10 +2,13 @@
 # Records the reuse review's verdict for the staged tree (matter c800).
 #
 #     dev/guardrails/record_review.sh pass|block REPORT
+#     dev/guardrails/record_review.sh pass|block - < report
 #
 # Writes <git dir>/gallformers-review/<tree>.md: the verdict, then the
-# report. The commit gate (the git pre-commit hook dev/githooks/pre-commit)
-# lets a commit through only when its tree has a file with "verdict: pass".
+# report, read from the file REPORT or, given "-", from standard input (so a
+# reviewer needn't write a file of its own). The commit gate (the git
+# pre-commit hook dev/githooks/pre-commit) lets a commit through only when its
+# tree has a file with "verdict: pass".
 #
 # Refuses when the staging has changed since the packet was made: that
 # change hasn't been reviewed.
@@ -14,10 +17,22 @@ set -euo pipefail
 verdict=${1:-}
 report=${2:-}
 
-if [[ "$verdict" != "pass" && "$verdict" != "block" ]] || [[ ! -f "$report" ]]; then
-  echo "usage: $0 pass|block REPORT" >&2
+usage() {
+  echo "usage: $0 pass|block REPORT, or $0 pass|block - with the report on standard input" >&2
   exit 1
+}
+
+[[ "$verdict" == "pass" || "$verdict" == "block" ]] || usage
+
+if [[ "$report" == "-" ]]; then
+  text=$(cat)
+elif [[ -f "$report" ]]; then
+  text=$(cat "$report")
+else
+  usage
 fi
+
+[[ -n "$text" ]] || usage
 
 git_dir=$(cd "$(git rev-parse --git-dir)" && pwd)
 dir="$git_dir/gallformers-review"
@@ -35,7 +50,7 @@ fi
   echo "verdict: $verdict"
   echo "tree: $tree"
   echo
-  cat "$report"
+  printf '%s\n' "$text"
 } > "$dir/$tree.md"
 
 echo "$dir/$tree.md"

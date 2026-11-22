@@ -5,7 +5,8 @@
 # Blocks the commit until the tree being committed has a passing reuse review:
 # <git dir>/gallformers-review/<tree>.md with "verdict: pass", recorded by
 # dev/guardrails/record_review.sh. Restaging changes the tree, so a fixed
-# change is reviewed again. A commit that concludes a merge goes through.
+# change is reviewed again. A commit that concludes a merge goes through, and
+# so does one touching only prose (docs/, runbooks/, the top-level README).
 #
 # The routine is in AGENTS.md ("Before you commit").
 set -uo pipefail
@@ -16,6 +17,22 @@ git_dir=$(git rev-parse --git-dir) || exit 1
 # git sets GIT_INDEX_FILE for `commit -a` and `commit <paths>`, so this is the
 # tree that would be committed, not only what was staged.
 tree=$(git write-tree) || exit 1
+
+# The review is about code, so a commit touching only prose goes through:
+# files under docs/ or runbooks/, and the top-level README. AGENTS.md (and
+# CLAUDE.md, the same file) is always reviewed. --no-renames lists a move by
+# both its paths, so moving code into docs/ is still reviewed.
+files=$(git diff --cached --no-renames --name-only) || exit 1
+if [[ -n "$files" ]]; then
+  prose_only=1
+  while IFS= read -r file; do
+    case "$file" in
+      docs/* | runbooks/* | README.md) ;;
+      *) prose_only=0 ;;
+    esac
+  done <<<"$files"
+  [[ $prose_only == 1 ]] && exit 0
+fi
 review="$git_dir/gallformers-review/$tree.md"
 
 if [[ -f "$review" ]] && grep -qx "verdict: pass" "$review"; then

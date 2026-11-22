@@ -133,6 +133,68 @@ defmodule Gallformers.Guardrails.CommitGateTest do
     end
   end
 
+  describe "a commit that touches no code" do
+    setup %{tmp_dir: dir} do
+      git!(dir, ["reset", "-q", "a.ex"])
+      :ok
+    end
+
+    defp stage(dir, files) do
+      for file <- files do
+        path = Path.join(dir, file)
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, "Prose.\n")
+      end
+
+      git!(dir, ["add" | files])
+    end
+
+    test "under docs/ and runbooks/, or the top-level README, goes through unreviewed",
+         %{tmp_dir: dir} do
+      before = head(dir)
+
+      stage(dir, ["docs/talks/summary.md", "docs/talks/summary.pdf", "runbooks/r.md", "README.md"])
+
+      assert {_, 0} = git(dir, ["commit", "-q", "-m", "Add the summary"])
+      assert head(dir) != before
+    end
+
+    test "that also touches AGENTS.md or CLAUDE.md needs a review", %{tmp_dir: dir} do
+      for rules <- ["AGENTS.md", "CLAUDE.md"] do
+        stage(dir, ["docs/notes.md", rules])
+
+        {out, status} = git(dir, ["commit", "-m", "Notes"])
+
+        assert status != 0
+        assert out =~ "hasn't had a reuse review"
+        git!(dir, ["reset", "-q", rules])
+      end
+    end
+
+    test "mixed with code needs a review", %{tmp_dir: dir} do
+      stage(dir, ["docs/notes.md"])
+      git!(dir, ["add", "a.ex"])
+
+      assert {_, status} = git(dir, ["commit", "-m", "Notes and code"])
+      assert status != 0
+    end
+
+    test "a README below the top level needs a review", %{tmp_dir: dir} do
+      stage(dir, ["lib/README.md"])
+
+      assert {_, status} = git(dir, ["commit", "-m", "A lib README"])
+      assert status != 0
+    end
+
+    test "moving code into docs/ needs a review", %{tmp_dir: dir} do
+      File.mkdir_p!(Path.join(dir, "docs"))
+      git!(dir, ["mv", "a.ex", "docs/a.ex"])
+
+      assert {_, status} = git(dir, ["commit", "-m", "Move A"])
+      assert status != 0
+    end
+  end
+
   describe "install.sh" do
     test "installs a wrapper that runs the checkout's own hook", %{tmp_dir: dir} do
       installed = Path.join(dir, ".git/hooks/pre-commit")
@@ -175,6 +237,36 @@ defmodule Gallformers.Guardrails.CommitGateTest do
       refute section =~ "notes.md"
       refute section =~ "a.ex"
     end
+  end
+
+  test "a review can be recorded from standard input, with no report file", %{tmp_dir: dir} do
+    {_, 0} = cmd(dir, @packet, [])
+    File.write!(Path.join(dir, "report.in"), "No findings.\n")
+
+    {out, 0} =
+      System.cmd("sh", ["-c", "#{@record} pass - < report.in"],
+        cd: dir,
+        env: @env,
+        stderr_to_stdout: true
+      )
+
+    recorded = out |> String.trim() |> File.read!()
+    assert recorded =~ "verdict: pass"
+    assert recorded =~ "No findings."
+    assert {_, 0} = git(dir, ["commit", "-q", "-m", "Add new_fun"])
+  end
+
+  test "an empty report on standard input isn't recorded", %{tmp_dir: dir} do
+    {_, 0} = cmd(dir, @packet, [])
+
+    assert {out, 1} =
+             System.cmd("sh", ["-c", "#{@record} pass - < /dev/null"],
+               cd: dir,
+               env: @env,
+               stderr_to_stdout: true
+             )
+
+    assert out =~ "usage"
   end
 
   test "a review isn't recorded once the staging changed", %{tmp_dir: dir} do

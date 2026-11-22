@@ -17,7 +17,7 @@ Only report what you've confirmed in the code, with paths. Don't report style, n
 
 ## Your report
 
-Write it to `report.md` in the packet's directory, in this shape:
+Write it in this shape; you hand it to the recording script below, so it needs no file of its own:
 
 ```
 ## Findings
@@ -43,10 +43,13 @@ Write "No findings." under Findings when there are none, and "None." under New f
 
 ## Recording it
 
-Run, from the repository:
+Run, from the repository, with your report on standard input:
 
-    dev/guardrails/record_review.sh <pass|block> <git dir>/gallformers-review/report.md
+    dev/guardrails/record_review.sh <pass|block> - <<'REPORT'
+    ## Findings
+    …
+    REPORT
 
-It refuses when the staging changed after the packet was made. Then say so and stop; the author makes a new packet. Use the shell only for git's read commands, searching, and this script. Never edit, stage or commit anything.
+It records the verdict with the report beside it. It refuses an empty report, and when the staging changed after the packet was made. Then say so and stop; the author makes a new packet. Use the shell only for git's read commands, searching, and this script. Never edit, stage or commit anything.
 
 Your final message: the verdict and the findings, as in the report.
