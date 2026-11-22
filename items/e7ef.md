@@ -1,12 +1,13 @@
 ---
 plan: taxogall
 phase: db43
+rank: 90
 title: One name search in GallformersWeb.Choices
 stage: committed
 docs:
   - .mull/matters/b230-review-cleanup-one-way-to-handle-a-name-we-don-t-have-and-the-2026-11-09-audit.md
 created: "2026-11-09T20:38:17Z"
-updated: "2026-11-12T21:00:11Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **What:** `GallformersWeb.Choices` (`lib/gallformers_web/choices.ex`) becomes the one place that runs and words a name search. Every caller below moves onto it, and its own search code is deleted. This is b230's Task 3 (findings A "searches", E and F "searches"). It comes after the back end's decision shape (item 11dc) and before the one answer list (item bceb), whose "Find it…" answer is this search. References are as of `65531d59` unless noted; go by function names.

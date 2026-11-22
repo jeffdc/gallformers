@@ -1,12 +1,14 @@
 ---
 plan: taxogall
+phase: "81e9"
 title: An optional proposed descriptor for undescribed Galls in the import contract
 stage: captured
 kind: idea
 category: import
 source: matter 86e7; loose end 6aab (migrated)
+triaged: "2026-11-22T02:26:29Z"
 created: "2026-11-11T13:32:49Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **The idea** (`86e7`, "After the tasks", and its follow-ups): "Contract follow-up (not in this plan): an optional proposed descriptor for undescribed Galls in `294c`."

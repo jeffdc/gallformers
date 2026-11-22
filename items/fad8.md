@@ -1,12 +1,13 @@
 ---
 plan: taxogall
 phase: db43
+rank: 110
 title: Review design-system fixes (link buttons, panels, one section heading, the shared photo grid)
 stage: committed
 docs:
   - .mull/matters/b230-review-cleanup-one-way-to-handle-a-name-we-don-t-have-and-the-2026-11-09-audit.md
 created: "2026-11-09T20:38:17Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **What:** design-system fixes in the review and the Fact inspector (the 2026-11-09 audit's finding G). Built components replace hand-rolled markup: `button variant="link"` for raw link buttons and `panel` for hand-rolled panels. "Names we didn't read" gets its own `review_card` kind, the section heading is written once, and the Fact inspector's photo picker and `InatImportComponent` share one photo grid. This is b230's Task 8. It's small and can go in any order after item f926 (retiring `ItemRow`). Jeff's decision 7 (2026-11-09): everything in this cleanup is done here, including the Fact inspector's (87a1) code. References are as of `65531d59`; go by what the markup does.

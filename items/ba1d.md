@@ -1,12 +1,13 @@
 ---
 plan: taxogall
 phase: db43
+rank: 70
 title: 'Review tests: shared fixtures, and the causes of the ''client exited'' errors'
 stage: committed
 docs:
   - .mull/matters/b230-review-cleanup-one-way-to-handle-a-name-we-don-t-have-and-the-2026-11-09-audit.md
 created: "2026-11-09T20:38:17Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **What:** two test cleanups from the 2026-11-09 audit (finding H). First, move the copied test fixtures and helpers into the shared support modules and delete the copies. Second, find the cause of each "Postgrex … client exited" error in the test log and fix it, so `mix precommit`'s log is free of them. This is b230's Task 9. It's small and can go in any order after item f926 (retiring `ItemRow`). References are as of `65531d59`.

@@ -4,8 +4,9 @@ stage: captured
 kind: idea
 source: matter 96b1; kept by Jeff at intake, 2026-11-09
 from: fdf1
+triaged: "2026-11-22T02:26:29Z"
 created: "2026-11-09T23:47:44Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 The JavaScript bundle grew about 5× when MapLibre GL was added. In March 2026 the production bundle was about 1.2 MB uncompressed and 341 KB gzipped. The dev build shows esbuild's 2 MB warning, inflated by inline source maps.

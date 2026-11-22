@@ -1,12 +1,13 @@
 ---
 plan: taxogall
 phase: db43
+rank: 80
 title: One answer list and the in-place 'Add it by hand'; the iNat panel hands its choice back
 stage: committed
 docs:
   - .mull/matters/b230-review-cleanup-one-way-to-handle-a-name-we-don-t-have-and-the-2026-11-09-audit.md
 created: "2026-11-09T20:38:17Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **What:** every question about a name we don't hold (or can't place) offers the same answers in the same order, from one builder in `GallformersWeb.Admin.Review.Questions`. "Add it by hand…" opens in place, replacing the "Add a new plant ↗" link. The iNat panel in the review hands its choice back to the card instead of importing at once. This is b230's Task 4 (finding A "answers", and the iNat-hint bug in finding C). It builds on the one decision shape and carry-out (item 11dc: `{taxon_id}` | `{wcvp_id}` | `{inat: …}` | `{new: …}` | `{skip}`) and on the one search in `GallformersWeb.Choices` (item e7ef), which is its "Find it…". References are as of `65531d59` (`questions.ex` lines after about 241 are +1 since); go by function names.

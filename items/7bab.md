@@ -1,6 +1,7 @@
 ---
 plan: taxogall
 phase: "64e1"
+rank: 10
 title: 'Fact inspector is too slow to use: opening it on a Trait or other Fact takes 3-4 s, and so does changing the selected Fact'
 stage: committed
 kind: bug
@@ -8,7 +9,7 @@ category: performance
 source: Jeff, 2026-11-09, trying the taxogall build
 from: 74ac
 created: "2026-11-09T20:55:40Z"
-updated: "2026-11-15T20:37:15Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 Jeff: 'not workable as is.' Not investigated or reproduced; no cause assumed.

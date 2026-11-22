@@ -1,10 +1,11 @@
 ---
 plan: taxogall
 phase: 726a
+rank: 30
 title: 'Merge main into taxogall (#596 role checks, #597 image upload events) and check both fixes hold'
 stage: committed
 created: "2026-11-09T20:38:18Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 Merge `main` into `taxogall`, so that taxogall holds every production fix, then check that both fixes still hold on taxogall.

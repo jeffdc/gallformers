@@ -1,12 +1,13 @@
 ---
 plan: taxogall
 phase: d51b
+rank: 10
 title: Map each of the 224 lost old Gall aliases to a synonym, former label or common name
 stage: committed
 docs:
   - .mull/matters/b5bd-taxonomy-migration.md
 created: "2026-11-09T20:38:18Z"
-updated: "2026-11-15T18:47:43Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **What Jeff wants (2026-11-05).** The Gall page's "Also known as" must include **all** of a Gall's old names, old common names included. Today some old aliases don't reach the new model, so this item is a migration check: map each old Gall alias to a synonym, a former label or a common name, so that every old name shows on the Gall page.

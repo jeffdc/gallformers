@@ -1,12 +1,13 @@
 ---
 plan: taxogall
 phase: d51b
+rank: 20
 title: Make the 7 one-word plant 'species' their genus in the catalog migration
 stage: committed
 docs:
   - .mull/matters/b5bd-taxonomy-migration.md
 created: "2026-11-09T20:38:18Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T02:26:29Z"
 ---
 
 **The problem.** Seven old-site plants are one-word "species" sitting under a genus of the same name. Each is linked to a WCVP record of rank Genus. The catalog migration turns every plant `species` row that isn't a genus placeholder into a species-rank taxon. These seven therefore become bogus species named like their genus, instead of standing for the genus. They were found in the dev cutover rehearsal (2026-11-07).
