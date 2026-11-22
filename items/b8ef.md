@@ -1,10 +1,11 @@
 ---
+rank: 10
 title: 'Dev image storage without production keys: a local adapter for Storage.Images'
 stage: committed
 docs:
   - .mull/matters/b4d8-dev-image-storage-without-production-keys.md
 created: "2026-11-09T23:35:21Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T01:54:30Z"
 ---
 
 Give `Gallformers.Storage.Images` a storage adapter, as the private bucket has, so a local dev server can upload, resize, show and delete images with no AWS credentials.

@@ -1,10 +1,11 @@
 ---
+rank: 20
 title: Move the database snapshot workflow onto GitHub OIDC and retire the litestream-gallformers IAM user
 stage: committed
 docs:
   - .mull/matters/6ee3-backup-workflow-on-github-oidc-retire-the-litestream-gallformers-iam-user.md
 created: "2026-11-09T23:35:21Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T01:54:30Z"
 ---
 
 Move the daily `Database Snapshot` workflow off long-lived AWS access keys onto GitHub's OIDC federation, then retire the `litestream-gallformers` IAM user.

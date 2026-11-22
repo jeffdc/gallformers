@@ -1,10 +1,11 @@
 ---
+rank: 30
 title: Track 404s on unrouted paths in analytics
 stage: committed
 docs:
   - .mull/matters/6d82-analytics-track-404s-on-unrouted-paths.md
 created: "2026-11-09T23:35:21Z"
-updated: "2026-11-12T02:23:22Z"
+updated: "2026-11-22T01:54:30Z"
 ---
 
 Record page views for requests to unrouted paths (404s), which analytics misses today.
