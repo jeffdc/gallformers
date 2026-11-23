@@ -238,27 +238,19 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
       |> Playwright.Page.locator("#delete-confirmation")
       |> Playwright.Locator.press_sequentially!(name)
     end)
-
-    # Wait for InputEvent hook to enable the submit button
-    :timer.sleep(500)
-
-    conn
+    # Waits for the InputEvent hook to enable the submit button
     |> click_button("Delete Forever")
-
-    # Wait for the delete + redirect
-    :timer.sleep(2000)
-    conn
   end
 
   # Fill a taxonomy form field using Playwright's native interactions.
-  # Select all existing text (Meta+a on macOS), then type the new value
+  # Select all existing text (Meta+a on macOS, Control+a elsewhere), then type the new value
   # which fires input/change events that LiveView picks up via phx-change.
   defp fill_taxonomy_field(conn, field, value) do
     selector = ~s(#taxonomy-form [name="taxonomy[#{field}]"])
 
     conn
     |> unwrap(&Playwright.Page.click!(&1, selector))
-    |> unwrap(&Playwright.Page.press!(&1, selector, "Meta+a"))
+    |> unwrap(&Playwright.Page.press!(&1, selector, "ControlOrMeta+a"))
     |> unwrap(fn page ->
       page
       |> Playwright.Page.locator(selector)

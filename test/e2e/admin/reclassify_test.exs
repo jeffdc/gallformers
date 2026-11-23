@@ -213,10 +213,6 @@ defmodule GallformersWeb.E2E.ReclassifyTest do
       |> Playwright.Locator.get_by_text("Cancel")
       |> Playwright.Locator.click!()
     end)
-
-    # Give time for the modal to animate out
-    :timer.sleep(300)
-    conn
   end
 
   # ──────────────────────────────────────────────────────────────────
