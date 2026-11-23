@@ -958,7 +958,7 @@ defmodule GallformersWeb.DataDisplayComponents do
   attr :navigate, :string, default: nil, doc: "LiveView navigation path"
   attr :confirm, :string, default: nil, doc: "confirmation message"
   attr :class, :any, default: nil, doc: "additional CSS classes"
-  attr :rest, :global, include: ~w(phx-click phx-value-id disabled)
+  attr :rest, :global, include: ~w(phx-click phx-value-id disabled target)
 
   def action_button(assigns) do
     variant_classes = %{

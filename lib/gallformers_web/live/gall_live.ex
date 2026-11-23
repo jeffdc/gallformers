@@ -444,9 +444,9 @@ defmodule GallformersWeb.GallLive do
                         href={"/host/#{host.host_species_id}"}
                         class="hover:underline"
                       ><.taxon_name
-                          name={host.host_name}
-                          genus_placeholder={host[:genus_placeholder] == true}
-                        /></.link>
+                        name={host.host_name}
+                        genus_placeholder={host[:genus_placeholder] == true}
+                      /></.link>
                     </span>
                   </div>
                   <.link

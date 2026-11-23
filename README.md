@@ -73,7 +73,7 @@ Tests use a separate PostgreSQL database (`gallformers_test`) built from:
 
 ## E2E Testing
 
-Browser-based E2E tests use [phoenix_test_playwright](https://hex.pm/packages/phoenix_test_playwright) with Firefox. All tests run against a production data copy and are **excluded from regular test runs** and CI.
+Browser-based E2E tests use [Fluffy](https://hex.pm/packages/fluffy) with Firefox. All tests run against a production data copy and are **excluded from regular test runs** and CI.
 
 Requires Playwright browsers — see [Prerequisites](#installing-playwright-browsers-for-e2e-tests).
 

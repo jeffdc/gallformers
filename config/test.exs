@@ -41,32 +41,14 @@ config :gallformers, GallformersWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "QXMJq8FP0hqnpEVCf4NmW0l3LLZMBoncyOmBqm2OrxKFnFuPBa7iIlHN6+5sD8dE"
 
-# PhoenixTest + Playwright E2E configuration (only used when GALLFORMERS_E2E=1)
-#
-# IMPORTANT: phoenix_test_playwright config quirks (hard-won knowledge):
-#
-# 1. Namespace: The library reads config from `:phoenix_test, :playwright` —
-#    NOT from `:phoenix_test_playwright`. Using the wrong namespace silently
-#    falls back to defaults (chromium).
-#
-# 2. browser_pools must be explicit: Setting `browser: :firefox` at the top
-#    level is NOT enough. The browser pool gets its own defaults via
-#    NimbleOptions schema, and the library's `replace_lazy` merge only runs
-#    when `browser_pools` is already present in the config. If omitted,
-#    NimbleOptions applies the schema default `[[id: :default_pool]]` AFTER
-#    the merge attempt, so the pool never sees the top-level `browser` setting
-#    and defaults to `:chromium`. You must set the browser in BOTH places.
-#
-# 3. Multi-browser: browser_pools supports multiple pools for cross-browser
-#    testing (e.g. firefox, webkit, chromium). Each pool needs its own id
-#    and browser setting.
-config :phoenix_test, otp_app: :gallformers
+# Fluffy + Playwright E2E configuration (only used when GALLFORMERS_E2E=1)
+config :fluffy, endpoint: GallformersWeb.Endpoint, ecto_repos: [Gallformers.Repo]
 
-config :phoenix_test, :playwright,
-  browser: :firefox,
-  browser_pools: [[id: :default_pool, browser: :firefox]],
-  screenshot: true,
-  screenshot_dir: "test/screenshots"
+config :playwright, :test,
+  browser_name: :firefox,
+  # Headed mode for debugging: E2E_HEADED=1 make e2e
+  headless: System.get_env("E2E_HEADED") != "1",
+  screenshot: :on
 
 # In test we don't send emails
 config :gallformers, Gallformers.Mailer, adapter: Swoosh.Adapters.Test

@@ -106,7 +106,7 @@ defmodule GallformersWeb.E2E.ReclassifyHostTest do
     })()
     """
 
-    conn |> evaluate(js)
+    conn |> unwrap(&Playwright.Page.evaluate!(&1, js))
 
     :timer.sleep(500)
     conn
@@ -117,13 +117,18 @@ defmodule GallformersWeb.E2E.ReclassifyHostTest do
     |> push_to_component("reclassify_clear_genus")
     |> push_to_component("reclassify_search_genus", %{value: genus_name})
     |> assert_has("#reclassify-genus-picker-results")
-    |> click("#reclassify-genus-picker-results button")
+    |> unwrap(&Playwright.Page.click!(&1, "#reclassify-genus-picker-results button"))
     |> assert_has("#reclassify-genus-picker-selected")
   end
 
   defp click_reclassify_save(conn) do
     conn
-    |> click("#reclassify-modal button", "Save")
+    |> unwrap(fn page ->
+      page
+      |> Playwright.Page.locator("#reclassify-modal button")
+      |> Playwright.Locator.get_by_text("Save")
+      |> Playwright.Locator.click!()
+    end)
   end
 
   # ──────────────────────────────────────────────────────────────────

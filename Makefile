@@ -212,7 +212,7 @@ test-check-exclusions:
 # Install Playwright browsers (required once, or after Playwright version bumps)
 e2e-setup:
 	@echo "Installing Playwright browsers..."
-	@npx --prefix assets playwright install firefox --with-deps
+	@MIX_ENV=test mix playwright.install firefox --with-deps
 	@echo ""
 	@echo "Done. Run 'make e2e' to run E2E tests."
 

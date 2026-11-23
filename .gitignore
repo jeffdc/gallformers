@@ -112,9 +112,8 @@ api/bin/
 .env.local
 .env*.local
 
-# E2E test artifacts (Wallaby)
-/test/screenshots/*.png
-!/test/screenshots/.gitkeep
+# E2E test artifacts
+/test-results/
 
 # OpenTofu / Terraform
 .terraform/

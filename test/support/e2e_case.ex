@@ -49,6 +49,7 @@ defmodule GallformersWeb.E2ECase do
   """
 
   use ExUnit.CaseTemplate
+  use Playwright.Test
 
   import Ecto.Query
 
@@ -56,32 +57,13 @@ defmodule GallformersWeb.E2ECase do
 
   using do
     quote do
-      import PhoenixTest
+      use Playwright.Test
 
-      import PhoenixTest.Playwright,
-        only: [
-          click: 2,
-          click: 3,
-          click: 4,
-          click_button: 4,
-          click_link: 4,
-          evaluate: 2,
-          evaluate: 3,
-          evaluate: 4,
-          type: 3,
-          type: 4,
-          press: 3,
-          press: 4,
-          screenshot: 2,
-          screenshot: 3,
-          step: 3,
-          visit: 3,
-          with_dialog: 3
-        ]
+      import Fluffy.PhoenixTest
     end
   end
 
-  setup_all context do
+  setup_all do
     # Verify production data is loaded
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Gallformers.Repo, shared: true)
 
@@ -99,8 +81,7 @@ defmodule GallformersWeb.E2ECase do
       """
     end
 
-    # Launch browser via Playwright
-    PhoenixTest.Playwright.Case.do_setup_all(context)
+    :ok
   end
 
   setup context do
@@ -108,7 +89,9 @@ defmodule GallformersWeb.E2ECase do
     Application.put_env(:gallformers, :dev_auth_bypass, true)
     on_exit(fn -> Application.delete_env(:gallformers, :dev_auth_bypass) end)
 
-    # Create Playwright session (handles Ecto sandbox internally)
-    PhoenixTest.Playwright.Case.do_setup(context)
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Gallformers.Repo, shared: not context.async)
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+
+    %{conn: Fluffy.PhoenixTest.start_session(:playwright)}
   end
 end

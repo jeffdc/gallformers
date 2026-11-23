@@ -233,7 +233,11 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
   # Type the confirmation name and submit the cascade delete form.
   defp confirm_cascade_delete(conn, name) do
     conn
-    |> type("#delete-confirmation", name)
+    |> unwrap(fn page ->
+      page
+      |> Playwright.Page.locator("#delete-confirmation")
+      |> Playwright.Locator.press_sequentially!(name)
+    end)
 
     # Wait for InputEvent hook to enable the submit button
     :timer.sleep(500)
@@ -253,9 +257,13 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
     selector = ~s(#taxonomy-form [name="taxonomy[#{field}]"])
 
     conn
-    |> click(selector)
-    |> press(selector, "Meta+a")
-    |> type(selector, value)
+    |> unwrap(&Playwright.Page.click!(&1, selector))
+    |> unwrap(&Playwright.Page.press!(&1, selector, "Meta+a"))
+    |> unwrap(fn page ->
+      page
+      |> Playwright.Page.locator(selector)
+      |> Playwright.Locator.press_sequentially!(value)
+    end)
 
     # Wait for LiveView to process phx-change
     :timer.sleep(500)

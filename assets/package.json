@@ -18,7 +18,6 @@
   "devDependencies": {
     "browserslist-useragent-regexp": "^4.1.4",
     "jsdom": "^29.0.0",
-    "playwright": "^1.59.1",
     "vitest": "^4.1.0"
   }
 }

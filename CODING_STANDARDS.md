@@ -1149,7 +1149,7 @@ cat app.log | jq -c 'select(.msg | test("Postgrex"; "i") // false)'
 
 ## E2E Tests (Browser-based)
 
-E2E tests use [phoenix_test_playwright](https://hex.pm/packages/phoenix_test_playwright) with Firefox. They're **excluded from regular test runs** and require a production data copy in the test database.
+E2E tests use [Fluffy](https://hex.pm/packages/fluffy) with Firefox. They're **excluded from regular test runs** and require a production data copy in the test database.
 
 **Prerequisites**: Install Playwright browsers.
 ```bash

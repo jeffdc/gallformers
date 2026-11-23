@@ -51,7 +51,7 @@ defmodule Gallformers.MixProject do
       {:oban_web, "~> 2.11"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      {:phoenix_live_view, "~> 1.2.10"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
@@ -93,8 +93,7 @@ defmodule Gallformers.MixProject do
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # E2E browser testing (Playwright, separate from regular test suite)
-      {:phoenix_test, "~> 0.4", only: :test, runtime: false},
-      {:phoenix_test_playwright, "~> 0.12", only: :test, runtime: false}
+      {:fluffy, "~> 0.9.0-rc.5", only: :test}
     ]
   end
 
