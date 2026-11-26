@@ -9,6 +9,7 @@ defmodule GallformersWeb.E2E.ReclassifyHostTest do
   use GallformersWeb.E2ECase
 
   import Ecto.Query
+  import Fluffy.Locator, only: [by_css: 1]
 
   alias Gallformers.Repo
 
@@ -106,7 +107,7 @@ defmodule GallformersWeb.E2E.ReclassifyHostTest do
     })()
     """
 
-    conn |> unwrap(&Playwright.Page.evaluate!(&1, js))
+    Fluffy.Playwright.evaluate(conn, js)
 
     :timer.sleep(500)
     conn
@@ -117,18 +118,12 @@ defmodule GallformersWeb.E2E.ReclassifyHostTest do
     |> push_to_component("reclassify_clear_genus")
     |> push_to_component("reclassify_search_genus", %{value: genus_name})
     |> assert_has("#reclassify-genus-picker-results")
-    |> unwrap(&Playwright.Page.click!(&1, "#reclassify-genus-picker-results button"))
+    |> Fluffy.click(by_css("#reclassify-genus-picker-results button"))
     |> assert_has("#reclassify-genus-picker-selected")
   end
 
   defp click_reclassify_save(conn) do
-    conn
-    |> unwrap(fn page ->
-      page
-      |> Playwright.Page.locator("#reclassify-modal button")
-      |> Playwright.Locator.get_by_text("Save")
-      |> Playwright.Locator.click!()
-    end)
+    click_button(conn, "#reclassify-modal button", "Save")
   end
 
   # ──────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
   use GallformersWeb.E2ECase
 
   import Ecto.Query
+  import Fluffy.Locator, only: [by_css: 1]
 
   alias Gallformers.Repo
 
@@ -203,25 +204,15 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
   # Shared interaction helpers
   # ──────────────────────────────────────────────────────────────────
 
-  # Poll a DB condition until it returns true (or timeout after ~5s).
+  # Poll a DB condition until it holds (Playwright's default 5s expect timeout).
   # Use instead of flaky flash alert assertions.
-  defp wait_for_db(condition, opts) do
+  defp wait_for_db(conn, condition, opts) do
     message = Keyword.get(opts, :message, "DB condition not met within timeout")
-    attempts = Keyword.get(opts, :attempts, 10)
-    interval = Keyword.get(opts, :interval, 500)
 
-    Enum.reduce_while(1..attempts, nil, fn _i, _acc ->
-      if condition.() do
-        {:halt, :ok}
-      else
-        :timer.sleep(interval)
-        {:cont, nil}
-      end
-    end)
-    |> case do
-      :ok -> :ok
-      _ -> flunk(message)
-    end
+    Fluffy.Expect.expect(
+      conn,
+      Fluffy.Expect.poll(fn _session -> condition.() end, &assert(&1, message))
+    )
   end
 
   # Click the Delete button to open the cascade delete modal.
@@ -233,11 +224,7 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
   # Type the confirmation name and submit the cascade delete form.
   defp confirm_cascade_delete(conn, name) do
     conn
-    |> unwrap(fn page ->
-      page
-      |> Playwright.Page.locator("#delete-confirmation")
-      |> Playwright.Locator.press_sequentially!(name)
-    end)
+    |> Fluffy.Playwright.press_sequentially(by_css("#delete-confirmation"), name)
     # Waits for the InputEvent hook to enable the submit button
     |> click_button("Delete Forever")
   end
@@ -246,16 +233,12 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
   # Select all existing text (Meta+a on macOS, Control+a elsewhere), then type the new value
   # which fires input/change events that LiveView picks up via phx-change.
   defp fill_taxonomy_field(conn, field, value) do
-    selector = ~s(#taxonomy-form [name="taxonomy[#{field}]"])
+    locator = by_css(~s(#taxonomy-form [name="taxonomy[#{field}]"]))
 
     conn
-    |> unwrap(&Playwright.Page.click!(&1, selector))
-    |> unwrap(&Playwright.Page.press!(&1, selector, "ControlOrMeta+a"))
-    |> unwrap(fn page ->
-      page
-      |> Playwright.Page.locator(selector)
-      |> Playwright.Locator.press_sequentially!(value)
-    end)
+    |> Fluffy.click(locator)
+    |> Fluffy.press(locator, "ControlOrMeta+a")
+    |> Fluffy.Playwright.press_sequentially(locator, value)
 
     # Wait for LiveView to process phx-change
     :timer.sleep(500)
@@ -266,9 +249,6 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
   defp submit_taxonomy_form(conn) do
     conn
     |> click_button("Save")
-
-    :timer.sleep(1500)
-    conn
   end
 
   # ──────────────────────────────────────────────────────────────────
@@ -394,6 +374,7 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
 
       # Wait for DB to reflect the rename
       wait_for_db(
+        conn,
         fn ->
           Repo.one(from t in "taxonomy", where: t.id == ^genus.id, select: t.name) == new_name
         end,
@@ -432,6 +413,7 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
 
       # Wait for DB to reflect the rename
       wait_for_db(
+        conn,
         fn ->
           Repo.one(from t in "taxonomy", where: t.id == ^genus.id, select: t.name) == new_name
         end,
@@ -471,6 +453,7 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
 
       # Wait for DB to reflect the rename
       wait_for_db(
+        conn,
         fn ->
           Repo.one(from t in "taxonomy", where: t.id == ^genus.id, select: t.name) == new_name
         end,
@@ -501,6 +484,7 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
 
       # Wait for DB to reflect the description update
       wait_for_db(
+        conn,
         fn ->
           Repo.one(from t in "taxonomy", where: t.id == ^genus.id, select: t.description) ==
             new_desc
@@ -578,6 +562,9 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
       |> visit("/admin/taxonomy/#{test_genus.id}")
       |> fill_taxonomy_field("name", target_genus_name)
       |> submit_taxonomy_form()
+
+      # Nothing observable to wait for when the save is rejected
+      :timer.sleep(1500)
 
       # Verify genus name unchanged in DB (collision should have been rejected)
       unchanged =
