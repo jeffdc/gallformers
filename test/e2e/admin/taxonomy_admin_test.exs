@@ -562,9 +562,9 @@ defmodule GallformersWeb.E2E.TaxonomyAdminTest do
       |> visit("/admin/taxonomy/#{test_genus.id}")
       |> fill_taxonomy_field("name", target_genus_name)
       |> submit_taxonomy_form()
-
-      # Nothing observable to wait for when the save is rejected
-      :timer.sleep(1500)
+      |> assert_has("#flash-error",
+        text: ~s(Cannot rename: "#{test_species.name}" would collide with an existing species)
+      )
 
       # Verify genus name unchanged in DB (collision should have been rejected)
       unchanged =
