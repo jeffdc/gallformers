@@ -173,10 +173,12 @@ defmodule Gallformers.Catalog.Identify do
     Repo.one(from(g in query(filters), select: count(g.gall_id)))
   end
 
-  @doc "Each Trait's values (with their definitions), by Trait, each list by value."
+  @doc "Each Trait's values (with their definitions), by Trait, each list by value, ignoring case."
   @spec options() :: %{String.t() => [TraitValue.t()]}
   def options do
-    from(v in TraitValue, order_by: [v.trait, v.value])
+    # Case-insensitive, then exact, so the order doesn't hang on the
+    # database's collation (macOS and Linux sort case differently).
+    from(v in TraitValue, order_by: [v.trait, fragment("lower(?)", v.value), v.value])
     |> Repo.all()
     |> Enum.group_by(& &1.trait)
   end

@@ -1423,7 +1423,7 @@ defmodule Gallformers.Catalog do
   @spec filter_identified([Identify.result()], String.t()) :: [Identify.result()]
   defdelegate filter_identified(results, text), to: Identify, as: :filter_by_text
 
-  @doc "The ID tool's Trait options: each Trait's values, by Trait, each list by value."
+  @doc "The ID tool's Trait options: each Trait's values, by Trait, each list by value, ignoring case."
   @spec identify_options() :: %{String.t() => [TraitValue.t()]}
   defdelegate identify_options(), to: Identify, as: :options
 

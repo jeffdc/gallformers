@@ -427,7 +427,11 @@ defmodule Gallformers.Catalog.IdentifyTest do
       assert Enum.map(options["season"], & &1.value) == ~w(Fall Spring Summer Winter)
       assert "upper leaf" in Enum.map(options["plant_part"], & &1.value)
       assert Map.keys(options) |> Enum.sort() == Enum.sort(TraitValue.traits())
-      assert %TraitValue{trait: "color", value: "UV"} = hd(options["color"])
+      # Case-insensitive, whatever the database's collation: macOS sorts "UV"
+      # before "black", Linux (production, CI) after it.
+      colors = Enum.map(options["color"], & &1.value)
+      assert "UV" in colors
+      assert colors == Enum.sort_by(colors, &{String.downcase(&1), &1})
     end
   end
 
