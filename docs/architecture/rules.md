@@ -81,7 +81,7 @@ From core-architecture-rules.md's principles (retired 2026-11-26, moved here).
 
 | ID | Rule | Source | Check | Baseline |
 |---|---|---|---|---|
-| O1 | Work is finished only when `make done-checks` passes (test database rebuild, check-toolchain, `mix precommit`, Dialyzer). | AGENTS.md, Work tracking | Local only. CI runs the same checks, but only for `main` and PRs into it. | Pushes to `taxogall` get no CI run. |
+| O1 | Work is finished only when `make done-checks` passes (test database rebuild, check-toolchain, `mix precommit`, Dialyzer). | AGENTS.md, Work tracking | Local only. CI runs the same checks on pushes to `main` and on PRs into `main` or `taxogall`. | Direct pushes to `taxogall` get no CI run. |
 | O2 | Always compile with `--warnings-as-errors`. | AGENTS.md, CRITICAL | precommit, CI | 0 |
 | O3 | No commit without `mix precommit` passing and a passing review by a fresh-context reviewer; docs-only commits need no review. | AGENTS.md, CRITICAL and Before you commit | `dev/githooks/pre-commit` (the review); precommit by hand | Local per clone (`make hooks`); skipped by `--no-verify`; nothing in CI checks a review was recorded. |
 | O4 | No force pushes; never push `main` or `master`. | AGENTS.md, Before you commit | `dev/githooks/pre-push`; the main ruleset on GitHub | 0 |
