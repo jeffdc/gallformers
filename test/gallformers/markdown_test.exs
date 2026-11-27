@@ -101,6 +101,32 @@ defmodule Gallformers.MarkdownTest do
     end
   end
 
+  describe "raw HTML" do
+    test "keeps the tags Source descriptions and articles use" do
+      html =
+        Markdown.render_plain(
+          ~s|<details><summary>Key</summary>\n\nSee <b>this</b> and <a href="https://example.org">that</a>.\n\n</details>|
+        )
+
+      assert html =~ "<details>"
+      assert html =~ "<summary>Key</summary>"
+      assert html =~ "<b>this</b>"
+      assert html =~ ~s(href="https://example.org")
+    end
+
+    test "drops scripts and event handlers, inline or block" do
+      html =
+        Markdown.render_plain(
+          ~s|text <span onclick="steal()">s</span>\n\n<script>alert(1)</script>\n\n<img src="x.png" onerror="steal()">|
+        )
+
+      refute html =~ "onclick"
+      refute html =~ "onerror"
+      refute html =~ "<script"
+      refute html =~ "alert(1)"
+    end
+  end
+
   describe "linkify_glossary_terms/1" do
     test "returns unchanged html when no glossary terms" do
       # Test with text that shouldn't match any terms
