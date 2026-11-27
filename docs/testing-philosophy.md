@@ -68,7 +68,7 @@ All new code and all code changes are test-first. Existing tests are evaluated a
 
 ### 6. Tests create their own world
 
-A test that depends on seed data IDs is a test that breaks when seeds change. Tests set up exactly what they need in `setup` and assert against what they created. Seed data provides a realistic baseline (taxonomy tree, place hierarchy, abundances) but tests never reference it by ID.
+A test that depends on seed data IDs is a test that breaks when seeds change. Tests set up exactly what they need in `setup` and assert against what they created. Seed data provides a realistic baseline (taxonomy tree, place hierarchy, abundances), and new seed rows are how a case reaches the catalog migration (AGENTS.md), but tests never hard-code a seed row's ID: they look it up, for example with `Gallformers.Taxa.get_by_legacy_id/2` (Jeff, 2026-11-26).
 
 ### 7. Boundary validation is not optional
 
@@ -93,7 +93,7 @@ Every input boundary â€” changesets, form params, API params, JS hook payloads â
 **Rules:**
 
 - `async: true` always.
-- No seed data ID references.
+- No hard-coded seed data IDs; look seed rows up.
 - No database queries spanning multiple contexts.
 - No LiveView page mounts (that's integration).
 
@@ -213,7 +213,7 @@ JS is not a second-class citizen. The hooks are complex (RangeMap alone is 800+ 
 Every existing test is evaluated against these criteria:
 
 1. **Does it test behaviour or implementation?** If implementation, rewrite or delete.
-2. **Does it depend on seed data IDs?** If yes, refactor to create its own data.
+2. **Does it hard-code seed data IDs?** If yes, look the rows up, or create its own data.
 3. **Is it in the right tier?** A context test masquerading as a LiveView test should be moved down. A unit test that hits the database across multiple contexts should be moved up.
 4. **Does it verify the right thing?** A LiveView test that checks "flash says success" but not DB state is incomplete.
 5. **Does it cover boundaries?** If the function accepts user input and the test only passes clean data, it's missing cases.

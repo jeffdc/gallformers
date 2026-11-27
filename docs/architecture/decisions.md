@@ -14,6 +14,16 @@ Template:
 - **Source:** commit, PR, plan doc, or mull or matter ID
 ```
 
+## 2026-11-26: Settle the baseline review's findings
+
+- **Why:** the [baseline review](reviews.md#2026-11-26-baseline) left its violations, doc conflicts and proposed rules open for Jeff.
+- **Changes:**
+  - S1: the Fact-owning contexts', Import's and Curation's reads of `facts` and `attributions`, `Audit.ChangeLog`'s joins and CatalogMigration's writes are accepted; the other crossings, and S4's reads of Taxa by Catalog, are fixed through the owners' APIs (backlog).
+  - S10: `abundance` and `species` may be read until cutover.
+  - T3: seed rows are fixtures a test may use, but never by a hard-coded ID (testing-philosophy.md updated). X3: the nonce'd theme-init script is its one exception.
+  - Ten new rules: S11 (business logic never depends on the web layer), X4 (an enforced CSP with a report endpoint), X5 (rate limits on the trusted client IP), X6 (read-only mode stops every write), X7 (every writing screen behind an on_mount role guard), X8 (dev never writes to production storage), O6 (production fails loudly on a missing secret), O7 (errors reach someone; the service is open), O8 (only `main` deploys), O9 (one production machine).
+- **Source:** Jeff, 2026-11-26.
+
 ## 2026-11-26: Keep an architecture baseline, and turn violations into checks
 
 - **Why:** the system's shape lived in agents' heads and in scattered docs that had drifted (core-architecture-rules.md described checks that no longer matched the code; range-system.md and the C4 model described the old model). A baseline to review against, and checks that hold each rule at its baseline, keep it from drifting further. Gallformers adopts the model Oak Compendium set up.
