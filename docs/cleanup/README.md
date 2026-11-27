@@ -39,7 +39,7 @@ Each step is reviewed by Jeff before the next starts.
 | 1 | Lay of the land and this plan | Done (2026-11-26) |
 | 2 | Retire mull's instructions: AGENTS.md / CLAUDE.md (docs-based work tracking, "Old IDs"), the Makefile comment, the project's Claude settings | Done (2026-11-26) |
 | 3 | Branches: delete the fully merged ones; move work onto `taxogall`; keep v1's last commit as the tag `archive/v1-final` | Done (2026-11-26) |
-| 4 | Branches: go through the unmerged ones one by one, find what each is, decide | Next |
+| 4 | Branches: go through the unmerged ones one by one, find what each is, decide | Done (2026-11-26) |
 | 5 | Taxogall's high-level plan: `docs/taxogall/README.md` from mull's plan doc, checked against the 2026-11 reboot presentation; its first child step is revisiting mull's 18 phases | Not started |
 | 6 | Architecture baseline (a fresh session): `docs/architecture/` in the oaks shape, mapped from `taxogall` (see below) | Not started |
 | 7 | Backlog: mull's 27 unphased items and its captured bugs and ideas, only what's still live | Not started |
@@ -77,21 +77,18 @@ Asked for by Jeff through the oaks session, 2026-11-26: gallformers adopts the a
 
 Deleted 2026-11-26: `5352-notes-analysis` (same commit as `taxogall`), `origin/llm-lit-poc`, `origin/source-ingestion`, and `origin/v1-final` once its commit (`c662f9c1`, 2026-02-04) was tagged `archive/v1-final` (Jeff: a tag, since a branch can move and looks like clutter). Already gone from origin when we looked: the dependabot branches, `fix-admin-live-session-auth`, `fix-content-image-upload-events`, `nix-dev-shell`, `s3-refactor`, `retire-old-source-ingestion`, `security-dependency-fixes`, and origin's copies of `postgres-migration`, `python-ingestion-pipeline` and `feature/safer-admin-deletes`.
 
-Still to go through (step 4):
+Gone through one by one and deleted, 2026-11-26 (Jeff), none tagged:
 
-| Branch | Last commit | Commits not on main | Where | First look |
-|---|---|---|---|---|
-| alpha-ui | 2026-05-21 | 39 | local, origin | |
-| workspace-gall-editor | 2026-05-09 | 26 | local, origin | |
-| postgres-migration | 2026-03-15 | 18 | local | Postgres is live, so likely superseded |
-| python-ingestion-pipeline | 2026-05-15 | 17 | local, worktree in `.worktrees/` | The old ingestion was retired |
-| phenology-release | 2026-09-08 | 14 | local | Draft PR #578 (Megachile) |
-| quercus-leafminer-key | 2026-09-08 | 2 | local | One key commit |
-| feature/safer-admin-deletes | 2026-09-02 | 1 | local | |
-| beads-sync | 2026-02-12 | 611 | origin | The tracker before old mull |
-| chore/js-deps-update, chore/python-deps-update | 2026-07-27 | 1 each | origin | |
+- `alpha-ui` and `workspace-gall-editor` (a strict subset of it): the old LLM source-ingestion pipeline and its review workspace (May 2026; matters 83b9, 415f, 6c67, f037). Superseded by the import contract, the producer and the importer; its design work was judged not worth keeping.
+- `python-ingestion-pipeline` and its worktree: the Python half of the same retired pipeline (matter c744).
+- `postgres-migration`: landed on `main` in another form; the cutover closed 2026-03-25.
+- `phenology-release`: a local copy of Megachile's draft PR #578 (the phenology explorer, built on the old model). The PR stays open on Megachile's fork; for the backlog (step 7): port it to the new model after cutover.
+- `quercus-leafminer-key`: Eiseman's leafminer key as JSON, never imported; leafminers aren't galls, and it's kept in another project.
+- `feature/safer-admin-deletes`: landed on `main` (`dangerous_delete_modal`), and carried on in `taxogall`.
+- `beads-sync`: the beads tracker's sync branch from before old mull.
+- `chore/js-deps-update`, `chore/python-deps-update`: stale lockfile updates from July, the second for the retired `services/source-ingestion`.
 
-Kept: `main`, `taxogall`, `mull` (history). Open PRs: #598 "Move browser tests to Fluffy" (ftes), #578 (draft).
+Kept: `main`, `taxogall`, `mull` (history), and the tags `archive/v1-final` and `archive/elixir-snapshot-2026-05-16`. No worktrees. Open PRs: #598 "Move browser tests to Fluffy" (ftes), #578 (draft).
 
 ### Docs
 
@@ -111,3 +108,4 @@ None open.
 - **2026-11-26:** Scanned mull, `.mull/`, docs and branches; wrote this plan. Jeff: plan just in time; taxogall gets one high-level doc pointing to child plans, whose first step is revisiting the phases; delete merged branches; go through unmerged ones one by one; move to `taxogall`; `docs/plans/` needs a big pass; retire every mull instruction. Did steps 2 and 3.
 - **2026-11-26:** Pushed `taxogall`. Tagged v1's last commit `archive/v1-final` and deleted the branch. Committed step 2 after the commit gate's review.
 - **2026-11-26:** Added the architecture baseline (step 6) and adopting the reviewer (step 11), at Jeff's request through the oaks session; Jeff settled its shape.
+- **2026-11-26:** Step 4 done: every unmerged branch gone through with Jeff and deleted.
