@@ -46,7 +46,7 @@ Each step is reviewed by Jeff before the next starts.
 | 8 | Mull's 22 unsettled inbox entries (17 decisions, 4 questions, 1 review): each to Jeff, into the taxogall plan, or dropped | Not started |
 | 9 | `docs/plans/` scratch: a big pass, in batches (fold in, keep as history, or delete with Jeff's OK) | Not started; plan the batches when it starts |
 | 10 | Committed docs: current, update, or history; old-model docs, research, presentations, `docs/5c56-interview-summary.md`; stale mull pointers such as `docs/domain/domain-model.md`'s "design draft lives in mull matter 8567"; the domain doc updated to Jeff's 2026-11-15/16 decisions (Host ranges, observed range, Traits by Host) and organised into the doc set | Not started |
-| 11 | Adopt the architecture reviewer (prompt, packet script, local reports) once oaks settles it, possibly shared through heartwood | Waits for oaks |
+| 11 | Adopt the architecture reviewer from heartwood (see below) | Waits for heartwood v0.1.1 |
 
 **Why this order.** Mull's instructions went first so no session writes to it while it's extracted. The taxogall plan comes next, then the architecture baseline: knowing what's built tells us which docs are current, so the docs passes (9, 10) come after it. Branches, the backlog and the inbox can go in any order.
 
@@ -60,6 +60,14 @@ Asked for by Jeff through the oaks session, 2026-11-26: gallformers adopts the a
 - **Decisions are seeded judiciously** (Jeff, 2026-11-26): only those that shape the architecture, dated, citing their mull or matter ID. Many established decisions live in the existing docs and in the system itself (Boundary config, Credo checks, ratchets), not only in mull. The rest of mull's decisions stay readable with git.
 - **Checks gallformers already has** become rules' checks: Boundary, the custom Credo checks, the design-system and duplicate-code ratchets, `test/support/retirements.exs`, the commit gate, CI.
 - **Mapping:** four read-only agents in parallel, as in oaks: (1) contexts, their tables and the xref graph folded into contexts, with every reach into another context's tables; (2) the web layer: router, auth, LiveViews, components, assets, API; (3) runtime, infra and delivery: Fly, OpenTofu/AWS, Oban, S3, preview; (4) every existing check, and the documented rules no check covers, each with a baseline. From that: README, rules, decisions and a first review entry (violations, gaps in the checks, proposed rules, drift between docs and code).
+
+### Step 11: architecture reviewer
+
+Its shape is decided (Jeff, 2026-11-26, in oaks' `docs/facts-expansion/architecture-groundwork.md`, section 5); it is being built in `heartwood_guardrails` for v0.1.1, beside the reuse review.
+
+- `mix heartwood.architecture` (test env) writes the packet: the `mix xref` graph folded to contexts, every ratchet in `config :heartwood_guardrails, ratchets:` against its baseline, the commits since the last review (those after the last commit that changed `reviews.md`), `mix heartwood.status`, the architecture docs and the app's own questions. `review/architect.md` is the prompt, any model, read-only; `bin/record-architecture <model> -` keeps one report per model per run in git's common directory (`gallformers-architecture/<date-and-HEAD>/<model>.md`), shared by every worktree, nothing to gitignore. Jeff combines a run's reports into one `reviews.md` entry.
+- Gallformers sets in `dev/guardrails/config.sh`: its architecture docs (default `docs/architecture/`), its questions for the reviewer (default `dev/guardrails/architecture.md`) and the Mix projects to graph (default `.`).
+- It needs `heartwood_guardrails` as a dependency (the [backlog](../backlog.md)'s heartwood entry). Under v0.1.0 a `sparse:` dependency sits at `deps/heartwood_guardrails/guardrails`, not where the shim and README say; v0.1.1 fixes it. Until then set `HEARTWOOD_HOME=deps/heartwood_guardrails/guardrails` in `config.sh` and use that path for the hooks, `bin/review-packet` and `bin/check-toolchain`.
 
 ## Lay of the land (scanned 2026-11-26)
 
