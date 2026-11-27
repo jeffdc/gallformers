@@ -13,7 +13,7 @@
     "d3-scale": "^4.0.2",
     "d3-selection": "^3.0.1",
     "maplibre-gl": "^6.15.0",
-    "pmtiles": "^4.4.0"
+    "pmtiles": "^4.5.0"
   },
   "devDependencies": {
     "browserslist-useragent-regexp": "^4.1.4",
