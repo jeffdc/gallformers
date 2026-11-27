@@ -2,6 +2,8 @@
 
 ## Status: Open - Investigation
 
+**Status (2026-11-27):** Closed. Landed: the invalid-URL data migration, `validate_url/2` on `source.link`, `source.licenselink` and `species_source.externallink`, and the `valid_url?/1` guard in the Gall, Host, Source and image templates (matters be64, 1cab and 8257, all in d9b244fa, 2026-02-15, on `main`); the 1GB VM (`fly.toml` `memory = "1024mb"`, 7a2032c3, 2026-02-20); external monitoring as the downdetector Lambda, which requests the home page every 5 minutes and emails on failure (32f0403c, 2026-02-27; it doesn't measure response time); the memory investigation (matter 1edb, done 2026-02-18; see the Feb 18 and Feb 20 reports); errors and crash reports in the on-disk JSON logs, `/data/logs/app.log` (LoggerJSON in place of the custom request logger, 42ec0821, 2026-03-25); and the move to Postgres, which retired SQLite and Litestream (f25f2518, 2026-03-16). Not landed: rate limiting on page routes (the `RateLimiter` plug is still only on the `/api` scope in `router.ex`, on `main` and `taxogall`; matter 220d, not in docs/backlog.md); log shipping to an external service (not in docs/backlog.md; the nearest entry is "Error tracking and alerting").
+
 ## Summary
 
 Production experienced an OOM kill and restart at ~06:39 UTC (1:39 AM ET) on Feb 15.

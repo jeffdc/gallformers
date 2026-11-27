@@ -2,6 +2,8 @@
 
 ## Status: Fixed — deploying cache_size reduction + RAM bump
 
+**Status (2026-11-27):** Closed. Landed: `cache_size: -2000` and the 1GB VM (7a2032c3, 2026-02-20; `fly.toml` still `memory = "1024mb"`); the move to Postgres then removed SQLite, exqlite and the page cache from the app (f25f2518, 2026-03-16; no `ecto_sqlite3` or `cache_size` on `main`), which makes the BEAM allocator tuning moot. Not landed: memory telemetry (`telemetry.ex` defines `vm.memory.total` but no reporter consumes it, only the superadmin LiveDashboard shows it live; docs/backlog.md, "Error tracking and alerting"); the smaller pool (`pool_size` still defaults to 10 in `runtime.exs`; not in docs/backlog.md); rate limiting on page routes (matter 220d, not in docs/backlog.md); read-only pages as controllers (matter 9ad7, partly done; docs/backlog.md, "Convert read-only LiveView pages to controllers where it pays").
+
 ## Summary
 
 Production experienced an OOM kill at ~14:22 UTC (9:22 AM ET) on Feb 20. This is the third

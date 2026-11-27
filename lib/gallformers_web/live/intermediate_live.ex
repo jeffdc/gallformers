@@ -1,8 +1,8 @@
 defmodule GallformersWeb.IntermediateLive do
   @moduledoc """
   The pages of a family and the ranks between family and genus (subfamily,
-  tribe, subtribe), on the design system (matter bc0d; behavior in
-  docs/design-system/inventory/rank-pages.md). The rank comes from the
+  tribe, subtribe), on the design system (matter bc0d; layout in
+  docs/design-system/patterns.md, "Rank pages"). The rank comes from the
   route's live action.
 
   A Gallformer taxon shows two tabs (`?tab=`): its Galls, every Gall whose

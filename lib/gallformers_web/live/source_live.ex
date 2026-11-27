@@ -1,7 +1,7 @@
 defmodule GallformersWeb.SourceLive do
   @moduledoc """
-  The Source page, on the design system (matter bc0d; behavior in
-  docs/design-system/inventory/host-and-source-pages.md): a Source's title,
+  The Source page, on the design system (matter bc0d; layout in
+  docs/design-system/patterns.md, "Detail page"): a Source's title,
   kind, status and retraction (with its notice), its authors, year, DOI,
   ISBN and license, the original, its citation, the Galls it speaks of
   (`Gallformers.Catalog.list_galls_for_source/1`, each opening that Gall's

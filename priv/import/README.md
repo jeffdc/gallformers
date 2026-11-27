@@ -2,7 +2,7 @@
 
 How any tool, person or AI agent delivers what a Source (a paper, book, field guide or web page) says about galls into Gallformers. A producer turns one Source into a **package** of JSON files; Gallformers validates and imports it. This directory is the contract: the rules, the schemas, the vocabularies, examples, and the validator.
 
-Status: format v4, draft (v4, 2026-11-02, matter `d213`: a Trait carries the Source's term and a suggested category, and the reviewer places each term blind; Gallformers still reads v3 packages). It has been tested on five Sources (old scans, a modern paper, a field guide, a web page) with a human-checked error rate of about 1% (`docs/import/producer-guide-background.md` has the decisions; mull matter `8546` has the trial). Gallformers' importer is not built yet.
+Status: format v4, draft (v4, 2026-11-02, matter `d213`: a Trait carries the Source's term and a suggested category, and the reviewer places each term blind; Gallformers still reads v3 packages). It has been tested on five Sources (old scans, a modern paper, a field guide, a web page) with a human-checked error rate of about 1% (`docs/import/producer-guide-background.md` has the decisions; `.mull/archive/8546-pipeline-trial-on-existing-sources-go-no-go.md` has the trial). Gallformers' importer is `Gallformers.Import` (`lib/gallformers/import.ex`).
 
 ## A package
 
@@ -28,11 +28,11 @@ Every statement carries evidence: a verbatim quote and the document item it come
 | `GALLFORMERS_STATEMENTS.md` | Gallformers states its own Facts (observations, curator corrections, a Gall's Gallformers note). |
 | `schema/` | JSON Schemas (2020-12) for `taxonomy.json`, `gall.json` and `review.json`; `common.schema.json` holds the shared parts. |
 | `vocab/` | Controlled lists (`*.schema.json`), `places.json` (place names for codes), and `traits.json` (what each Trait value means, how common Source terms map onto values, and the generation groups). |
-| `examples/` | Five complete packages with fictional Sources: `simple-paper`, `revision` (taxonomy), `retraction`, `gallformers-statement`, `gallformers-note`. Start here to see the format. |
+| `examples/` | Five complete packages with fictional Sources: `simple-paper`, `revision` (taxonomy), `retraction`, `gallformers-statement`, `gallformers-note`; and `reading-fix`, a curator's fix of how a Source was read (`GALLFORMERS_STATEMENTS.md`). Start here to see the format. |
 | `validate.py` | Phase 4, and the readiness check. |
 | `tests/` | The validator's tests. |
 
-The `vocab/` files are generated from the Gallformers database: `MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.import.vocab` writes them (from the repository root, against the rehearsal database), and `--check` lists the files that differ without writing. They share one `vocabulary_version`, a date: it changes to the day of the run when their content changes, or to the date `--version` gives. The data comes from the database and code and the prose from the generator (`Gallformers.Import.Vocab`), so changes go there, never into the files. The database is the source of truth for the Trait values and term mappings: add them through the admin (senior admins decide curators' requests for a new value at `/admin/vocab-requests`; or `Gallformers.Import.record_trait_value_added/2` and `record_term_edit/3`, which record them for replay), then regenerate the files and commit them. The committed `traits.json` only seeds a fresh database: loading it inserts the values and mappings the database lacks and never overwrites one it holds.
+The `vocab/` files are generated from the Gallformers database: `MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.import.vocab` writes them (from the repository root, against the rehearsal database), and `--check` lists the files that differ without writing. They share one `vocabulary_version`, a date: it changes to the day of the run when their content changes, or to the date `--version` gives. The data comes from the database and code and the prose from the generator (`Gallformers.Import.Vocab`), so changes go there, never into the files. The database is the source of truth for the Trait values and term mappings: add them through the admin (superadmins, at `/admin/vocabulary`; or `Gallformers.Import.record_trait_value_added/2` and `record_term_edit/3`, which record them for replay), then regenerate the files and commit them. The committed `traits.json` only seeds a fresh database: loading it inserts the values and mappings the database lacks and never overwrites one it holds.
 
 ## Producing a package with your own agent
 
@@ -67,4 +67,4 @@ uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" --with
 - **Rules:** `PRODUCER_GUIDE.md` (this directory).
 - **Why the rules are what they are, and what Gallformers does on import:** `docs/import/producer-guide-background.md`.
 - **Open questions** (coordinates on recorded occurrences) are listed at the end of that document.
-- Work tracking: mull matters `294c` (this contract), `e381` (the Gallformers side), `8546` (the trial).
+- History: the old tracker's matters `294c` (this contract, `.mull/matters/294c-import-schema-and-validator-pipeline-contract.md`), `e381` (the Gallformers side, `.mull/matters/e381-import-interface-pipeline-to-gallformers.md`) and `8546` (the trial, `.mull/archive/8546-pipeline-trial-on-existing-sources-go-no-go.md`).

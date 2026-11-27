@@ -1,7 +1,7 @@
 defmodule GallformersWeb.GenusLive do
   @moduledoc """
-  The genus page (design system, matter bc0d; behavior in
-  docs/design-system/inventory/rank-pages.md). A genus
+  The genus page (design system, matter bc0d; layout in
+  docs/design-system/patterns.md, "Rank pages"). A genus
   (`Gallformers.Taxa.get_by_name/2`) with its lineage and up to three
   lists, each shown when it has rows (a genus can have both, e.g.
   mistletoes):

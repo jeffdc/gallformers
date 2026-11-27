@@ -667,7 +667,7 @@ When to use an icon, its size and color: [docs/design-system/foundations.md](doc
 
 ### Form Inputs
 
-Use the `<.input>` component from `core_components.ex`; its attributes and behavior are in the design system ([docs/design-system/components.md](docs/design-system/components.md#forms), [inventory/forms.md](docs/design-system/inventory/forms.md)):
+Use the `<.input>` component from `core_components.ex`; its attributes and behavior are in the design system ([docs/design-system/components.md](docs/design-system/components.md#forms)):
 
 ```heex
 <.input field={@form[:word]} type="text" label="Word" />

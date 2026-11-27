@@ -27,7 +27,7 @@ Scientific names are italic at genus rank and below, with authors, rank words an
 
 ## Numbers and dates
 
-- Thousands separators in counts: 3,976 Galls. Tabular figures in tables and stats (automatic in `table`, and in `stat`).
+- Thousands separators in counts: 3,976 Galls. Tabular figures in tables and stats (a `data_table` column marked `numeric`, and `stat`).
 - Dates: `Oct 28, 2026`. Date and time, in admin only: `Oct 28, 2026, 1:43 AM UTC`. Years alone for publications: 1959.
 - Ranges with an en dash: 18–32 mm, 1862–1865.
 - Units with a space: 3 mm, 1–3 cm.

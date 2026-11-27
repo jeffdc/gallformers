@@ -129,10 +129,10 @@ in ewr (Secaucus, NJ). `fly.toml` updated to `primary_region = "ewr"`.
 
 ## Cleanup Remaining
 
-- [ ] Orphaned iad forked volume `vol_r1lkn27mm9336704` — delete once ewr is stable
-- [ ] Old iad machine `e7844005a57d48` — stopped with autostart disabled, remove after confidence period
-- [ ] Original iad volume `vol_vz56250m1w58mozv` — attached to old machine, remove with it
-- [ ] Verify WCVP database is accessible on ewr instance
+- [x] Orphaned iad forked volume `vol_r1lkn27mm9336704` — delete once ewr is stable (done; Jeff, 2026-11-27)
+- [x] Old iad machine `e7844005a57d48` — stopped with autostart disabled, remove after confidence period (done; Jeff, 2026-11-27)
+- [x] Original iad volume `vol_vz56250m1w58mozv` — attached to old machine, remove with it (done; Jeff, 2026-11-27)
+- [x] Verify WCVP database is accessible on ewr instance (done; Jeff, 2026-11-27)
 
 ## Lessons Learned
 

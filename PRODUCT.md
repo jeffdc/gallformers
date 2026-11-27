@@ -28,9 +28,9 @@ What a neighboring site (iNaturalist, BugGuide, a regional gall guide) could not
 
 ## Operating Context
 
-- Public: Gall, Host, genus, section, Place and Source pages; browse pages; the ID tool; dichotomous keys; glossary; search; articles; public analytics.
-- Admin: review queue for imported Source statements, the Gall page editor, taxonomy admin (rename, synonymize, merge, split), Source editor. Admin capabilities are increasingly surfaced on the public pages themselves.
-- Data flows in from the literature (papers, books, BHL), POWO for Host taxonomy and ranges, and iNaturalist for Observations and photos. Data flows out through the public API, a daily PostgreSQL snapshot, and citations.
+- Public: the home page; Gall, Host, species (an Inducer), family, genus, section and other rank, Place and Source pages; browse pages; the ID tool; dichotomous keys; glossary; search; articles; public analytics.
+- Admin: review queue for imported Source statements, Edit mode (`?edit`) on the Gall, Host and species pages, taxonomy admin (rename, synonymize, merge, split), Source editor. Admin capabilities are increasingly surfaced on the public pages themselves.
+- Data flows in from the literature (papers, books, BHL), WCVP (Kew's checklist behind POWO) for Host taxonomy and ranges, and iNaturalist for Observations and photos. Data flows out through the public API, a daily PostgreSQL snapshot, and citations.
 - The domain language (Gall, Host, Inducer, Source, Fact, Trait, Observation, Generation) is defined in `docs/domain/domain-model.md`; on-screen wording follows `docs/design-system/content.md`.
 
 ## Capabilities and Constraints
@@ -39,7 +39,7 @@ What a neighboring site (iNaturalist, BugGuide, a regional gall guide) could not
 - Existing Phoenix LiveView codebase.
 - "Gallformer" is the on-screen noun for the inducing organism. Domain concepts are capitalized when they mean the thing in Gallformers. Scientific names are italic at genus and below, with authors and generation upright.
 - Image licenses and Source attributions must always be shown. Nothing is presented without credit.
-- Roadmap, not yet built: Western Hemisphere expansion, iNaturalist integration (photos, observed range), DNA barcodes, gall associates (Parasitoids, Inquilines and the wider Gall Community), a mobile-first offline ID tool, GBIF/DarwinCore/Wikidata/DOIs, open contribution pathways. Field use on phones is not yet a binding design constraint.
+- Roadmap, not yet built: Western Hemisphere expansion, fuller iNaturalist integration (curators already add an Observation's photos, Host and place to a Gall), DNA barcodes, gall associates (Parasitoids, Inquilines and the wider Gall Community), a mobile-first offline ID tool, GBIF/DarwinCore/Wikidata/DOIs, open contribution pathways. Field use on phones is not yet a binding design constraint.
 
 ## Brand Commitments
 

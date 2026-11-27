@@ -43,7 +43,7 @@ The decisions behind the import contract in `priv/import/`, each with its reason
 - **Provisional names and formal descriptions count as new,** with or without "n. sp.". English wording ("new species") counts as *sp. nov.* does.
 - **A taxon's novelty is claimed once,** in the taxonomy batch with its name act; the gall batch's taxa are references and carry no `new` (Jeff, 2026-11-08). The verifier's rule had said every new taxon carries `new` without naming the batch, so a checker asked for it on the gall batch's taxa as well: five of the 11 disputes in the v6 run of the 1862 Source.
 - **Assigning old records after a split is curator work:** a Source rarely supports it.
-- **Plant taxa come from POWO;** acts on them are out of scope except for gall-forming plants.
+- **Plant taxa come from WCVP** (Kew's checklist behind POWO); acts on them are out of scope except for gall-forming plants.
 - **Taxa above family are wanted** (parasitoids are often known only to order); lumps and splits above family are not supported.
 
 ## Galls
@@ -59,7 +59,7 @@ The decisions behind the import contract in `priv/import/`, each with its reason
 - **No inclusions** (Jeff, 2026-10-26): a Gall's range never extends beyond its Hosts' ranges. A place where the Source says the Gall occurs but no Host grows is a statement about a Host's range, so the batch states it as a recorded occurrence; turning those into Host-range proposals is matter `3272`. When range adjustments for one place compete, the newest statement wins.
 - **Recorded occurrences** (decided with Adam, 2026-10-17): where a Source states a Gall has been recorded, and when and at what stage if it says, is a Fact (`occurrence`). It feeds the range map and the phenology tool, and stays separate from range adjustments. It does not store Observations: a Source (Gallformers included) states the Fact, and any Observations behind it are cited as evidence, as for any Source. Field guides' "Range" paragraphs, dropped until now, become occurrences.
 - **Descriptions are direct quotes only:** verifiable, and the Source's words stay its own. Any summary is Gallformers' own.
-- **Hyperparasitism** is derived by Gallformers from chains of `parasitoid_of`.
+- **Hyperparasitism** is to be derived by Gallformers from chains of `parasitoid_of` (not built yet).
 
 ## Gallformers ID Notes
 
@@ -94,7 +94,7 @@ Decided with Adam, 2026-10-17 (matter `20e5`).
 - **No new values** for oval, cylindrical, swellings, integral leaf thickenings (leaf blister covers them), smooth, rough or pithy; rare terms stay without a category until counts show what recurs.
 - **Oak apple** has an outer shell, very thin or somewhat thicker but never filling the gall.
 - **Colour** is what you see on the Gall, covering included; several colours allowed.
-- **Season** (decided with Adam, 2026-10-17) is when the Gall forms and grows: not when it is seen or found, and not when the Inducer emerges (rearing and emergence dates don't count). Winter applies only where the Host grows in winter. This changes the meaning of the ID tool's season filter, which the site describes as "when galls can be observed" (193 galls tagged Winter, 33 only Winter); today's tags don't carry over, since the database is built fresh from imports.
+- **Season** (decided with Adam, 2026-10-17) is when the Gall forms and grows: not when it is seen or found, and not when the Inducer emerges (rearing and emergence dates don't count). Winter applies only where the Host grows in winter. This changes the meaning of the ID tool's season filter, which the site describes as "when galls can be observed" (193 galls tagged Winter, 33 only Winter); today's tags carry over only as legacy Facts (`Gallformers.CatalogMigration.LegacyFacts`), which any Source outranks; what they become at release is still open.
 - **Detachable** (decided with Adam, 2026-10-17) stays single-valued. `both` means ambiguous: the Gall bursts and drops later, part of it stays behind, or it rarely comes off without major agitation.
 - **Versions:** `format_version` changes only for breaking changes to the shape (4, 2026-11-02: Trait terms and categories; 3 is still read). The vocabulary files share one `vocabulary_version`, a date. They are generated from the database and code (`mix gallformers.import.vocab`, which dates them anew whenever their content changes; `--check` reports files that differ), replacing the hand extraction. The database is the source of truth for Trait values and term mappings: a value is added there, with its definition, and the files are regenerated and committed, never edited by hand.
 - **`non-gall`** is out of scope for import.
@@ -103,9 +103,9 @@ Decided with Adam, 2026-10-17 (matter `20e5`).
 
 Built in Gallformers, not by producers. A batch that fails is reported, not imported.
 
-1. **The taxonomy batch is applied first,** and gall names resolve against the taxonomy with it applied: resolving against today's taxonomy alone would merge taxa the Source keeps apart. Until the taxonomy system is rebuilt (phase 2), "applied" means: every act is recorded, taxa the Source presents as new are created, and acts that disagree with Gallformers' taxonomy go to a curator instead of changing it (2026-10-24).
+1. **The taxonomy batch is applied first,** and gall names resolve against the taxonomy with it applied: resolving against today's taxonomy alone would merge taxa the Source keeps apart. "Applied" means: every act is recorded, taxa the Source presents as new are created, and acts that disagree with Gallformers' taxonomy go to a curator instead of changing it (2026-10-24); the tree follows such an act only once a curator accepts it (`Gallformers.Import.ApplyTaxonomy`).
 2. **Every taxon name resolves** (current names, synonyms, `name_reading`; case, "var.", subgenus and hybrid sign normalised; abbreviations expanded from genera the document names, including genera printed in capitals; 19th-century "C. q. spongifica" names tried as the fused epithet *quercusspongifica*), or is flagged. **No fuzzy matching:** it joined different species.
-3. **Unresolved Host names are resolved before the gall batch,** as part of the taxonomy step (decided with Adam, 2026-10-17; `d585`). Gallformers holds plant synonymy, but POWO is unreliable for the names old gall Sources use. The importer collects the Host names it can't resolve; an admin resolves each (adds a synonym or the plant); only then does the gall batch import.
+3. **Unresolved Host names are resolved before the gall batch,** as part of the taxonomy step (decided with Adam, 2026-10-17; `d585`). Gallformers holds plant synonymy, but WCVP is unreliable for the names old gall Sources use. The importer collects the Host names it can't resolve; an admin resolves each (adds a synonym or the plant); only then does the gall batch import.
 4. **Every Gall resolves to one entry,** or goes to the admin queue. Ambiguous matches (e.g. a generation the Source never names) go with a proposed match and its reason. Undescribed Galls are matched to Gallformers' undescribed entries by genus, Host, and the descriptive words of the entry's name; one candidate is proposed for the admin to confirm, several are offered to pick from. Nothing ambiguous is applied automatically. Each Gall's generation is checked against the groups for its Inducer's taxon; a mismatch goes to the admin queue.
 5. **Disputed findings** from phase 6 appear in the intake view with the statement, its quote, the reviewer's reason and the producer's reason.
 6. **Supplied IDs** must agree with the names and descriptions they accompany.

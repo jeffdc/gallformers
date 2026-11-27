@@ -1,7 +1,7 @@
 defmodule GallformersWeb.GallLive do
   @moduledoc """
-  The Gall page, on the design system (matter bc0d; behavior in
-  docs/design-system/inventory/gall-page.md). A Gall from
+  The Gall page, on the design system (matter bc0d; layout in
+  docs/design-system/patterns.md, "Detail page"). A Gall from
   `Gallformers.Catalog.gall_page/1`: its Inducer's lineage, name and
   generation, the other generation, Hosts, Traits, the Gallformers ID Notes
   (pinned, in full), its Sources by year (each opens in the reader; a

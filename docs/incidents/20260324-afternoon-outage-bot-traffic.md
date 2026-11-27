@@ -2,6 +2,8 @@
 
 ## Status: Open — root cause undetermined, all infrastructure metrics clean
 
+**Status (2026-11-27):** Closed. Landed: persistent structured error logging, with all Logger output (errors, Postgrex events, crash reports) written as JSON to `/data/logs/app.log` on the volume and kept across restarts (LoggerJSON, 42ec0821, 2026-03-25; `config/runtime.exs`). Not landed: BEAM-level and Postgrex/DBConnection telemetry (`telemetry.ex` defines VM and Ecto metrics but no reporter consumes them; docs/backlog.md, "Error tracking and alerting"); rate limiting for bots (the `RateLimiter` plug is still only on `/api`; matter 220d, not in docs/backlog.md); blocking Barkrowler in robots.txt (not in `priv/static/robots.txt` or `robots_controller.ex` on `main` or `taxogall`; not in docs/backlog.md). The root cause was never determined.
+
 ## Summary
 
 Production experienced ~2 hours of degradation and two complete outages between 4:25 PM

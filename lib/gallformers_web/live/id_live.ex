@@ -1267,7 +1267,7 @@ defmodule GallformersWeb.IDLive do
   end
 
   # The single-value filters: each its own form sending `change_filter` with
-  # the filter's name, as before (docs/design-system/inventory/typeahead-and-id.md).
+  # the filter's name, as before (docs/design-system/components.md, `filter_select`).
   attr :value, :string, required: true
   attr :counts, :map, default: %{}
 

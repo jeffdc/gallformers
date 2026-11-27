@@ -2,6 +2,8 @@
 
 ## Status: Open — probable root cause identified
 
+**Status (2026-11-27):** Closed. Landed: the `AliasHandlers` `FunctionClauseError` (the alias type select sent params that matched neither `handle_update_new_alias/2` clause) was fixed by splitting the event in c3878f2d (2026-05-15, on `main`), and on `taxogall` the old admin's `GallLive.Form` and `AliasHandlers` are gone (a075e07a); `Crawl-delay: 10` for all crawlers was already in robots.txt (17b2cdc9, 2026-02-18). Not landed: rate limiting (the `RateLimiter` plug is still only on `/api`; matter 220d, not in docs/backlog.md); profiling `/id` under concurrent load (not in docs/backlog.md); a crawl delay or block aimed at the aggressive crawlers, such as meta-externalagent (not in docs/backlog.md). A fix for the `GallLive.Form.handle_event/3` `FunctionClauseError` is not confirmed: this report doesn't name the event, and c3878f2d, which changed that form's alias handlers, may be it.
+
 ## Summary
 Down alert at 5:41pm ET. Root cause is two bot/crawler traffic bursts that caused memory pressure on shared-cpu VMs with 1GB RAM. The app never returned 5xx errors and continued serving requests throughout — the down alert was likely triggered by a brief health check timeout during memory pressure.
 

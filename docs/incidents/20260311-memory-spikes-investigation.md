@@ -2,6 +2,8 @@
 
 ## Status: Open — probable causes identified, not fully confirmed
 
+**Status (2026-11-27):** Closed. Landed: the rollup fixes (matter c52c, done 2026-03-25): catching up missed days (e6637263, 2026-03-02), batched inserts with no monolithic transaction (19fe9f05, 2026-03-25), and the run at 07:00 UTC, now an Oban cron job that also prunes `page_views` to 30 days (`config/config.exs`, `RollupWorker`, 44536335, 2026-04-21); the move to Postgres took the database and Litestream off the app machine (f25f2518, 2026-03-16), removing the page-cache and Litestream causes suspected here. Whether the manual prune was run is not confirmed. Not landed: rate limiting on page routes (the `RateLimiter` plug is still only on `/api`; matter 220d, not in docs/backlog.md); a BEAM memory breakdown in telemetry (docs/backlog.md, "Error tracking and alerting"); Litestream logging (moot, Litestream is gone); RSS-only memory reporting (not confirmed, not in docs/backlog.md). The cause was never confirmed.
+
 ## Summary
 
 Production shows recurring brief memory spikes (seconds-long) from a ~512 MiB baseline up

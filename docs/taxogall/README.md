@@ -44,27 +44,14 @@ A new back-end, built whole on `taxogall`, replaces the old one in place, with n
 
 The domain's language and its settled rules are in [domain-model.md](../domain/domain-model.md) and aren't repeated here: Galls and their names, taxonomy and the curator gate, plants, taxonomic acts, Sources and Facts (newer work wins, standings, attribution, the two Gallformers Sources, what is a Fact and what is editorial), ranges, Traits and generations, and Relationships. The system as built is in [the architecture docs](../architecture/README.md). This section holds what the work needs beyond them.
 
-**One write path** (Jeff, 2026-11-12):
+**One write path** (Jeff, 2026-11-12; [decision](../architecture/decisions.md#2026-11-12-one-write-path) and rule S5, not yet built in full):
 
 - For any data, exactly two ways in: one editing screen in the UI, and the import. Both call the same code to validate, write and read it.
 - A curator's edit is an ingestion: a small package under the Gallformers Source, through the same code path and rules as a paper's import. Edits collect in the curator's change set and apply when the curator applies it (`Gallformers.Curation`).
 - Manual editing is either correcting how an accepted Source was read, under that Source's authority and at its date, or a change under Gallformers' authority. A Gallformers curator can do anything under the Gallformers Source, including changing a Gall's Inducer, generation and descriptions, creating a Gall, and setting a range to "only here".
 - Replay is mechanical: every write goes through its one path, so replay re-applies the same writes in order, with no per-kind replay code.
 
-**Audit** is a layer underneath everything else: the database records every insert, update and delete on a tracked table (Carbonite triggers) against the transaction's actor, and refuses a write that names no actor. Code only names who is acting. Attribution (whose authority) is separate from audit (who changed it).
-
-**Two systems** (Adam and Jeff, 2026-10-03/04): a taxonomy system (taxa, names, authorship, rank, placement, synonymy, taxonomic acts and their history) and a gall system (Galls, Traits, Relationships, ranges, gall aliases). They share Sources and Facts, history, audit and import, and are black boxes behind Phoenix contexts enforced by `boundary`. The contract between them is stable taxon IDs at any rank; nothing else crosses. Hot reads across the boundary go through published read models; writes that span it compose into one transaction.
-
-- **Plants** are in the same taxonomy structure as the curated taxa.
-- **Isolation:** taxonomy knows nothing about Galls; the gall system knows taxa only by ID and through the taxonomy API. The UI may hide the separation.
-- **IDs:** one shared sequence for Galls and all taxa, continuing today's species sequence. Galls keep their IDs (`/gall/:id`), plants theirs (`/host/:id`), because image paths are keyed by them; Inducers and higher taxa get new IDs, with a crosswalk for the old higher-taxon IDs.
-- **Taxonomic acts:** taxonomy calls registered "taxon changed" listeners inside its own transaction, and the change fails if the gall side can't accept it.
-- **Relationship types and generation groups** are system lists; hyperparasitism is derived, not stored.
-
-**Sources and Facts**, beyond the domain doc:
-
-- Each Fact kind has a natural key.
-- Today's taxonomy tree comes in as Gallformers legacy data. The tree tables stay what every page reads, rewritten from the accepted statements in the same transaction and guarded by a rebuild-and-compare check.
+**Built, and described in the architecture docs** rather than here: the audit layer, the two systems and their isolation, synchronous change events, the ID sequence and crosswalk, a Fact's identity, and the taxon tree kept in step with the accepted Facts ([decisions](../architecture/decisions.md), [rules](../architecture/rules.md) S4 and S6, [Data](../architecture/README.md#data)). Today's taxonomy tree comes in as Gallformers legacy data.
 
 **Dropped** (Jeff, 2026-11-16; d178): the data-complete flags, a Gall's lead Source, and curator notes on Facts and taxa. What is a Fact and what is editorial is in the domain doc.
 
@@ -77,11 +64,11 @@ The domain's language and its settled rules are in [domain-model.md](../domain/d
 
 **The existing Sources** (Jeff, 2026-11-17; 7a50): reprocess the scans, open, paywalled and website Sources (websites one cited page at a time), with a lookup pass for links that aren't the document; Gagné 2026 instead of 1989; Russo 2021 from an author PDF, with its excerpts as fallback; other copyright books stay as Sources with legacy citations until a manual-entry UI after release; drop the uncited Sources but one kept for its photos; merge the duplicates; replace the Sci-Hub links; keep excerpts, hidden per Gall once its package is approved; photos keep their credit.
 
-**Getting a Source in** (Jeff, 2026-11-17 to 11-21; 274b): curators collect, verify and convert documents on today's production site, so other curators can help now; conversion runs on a Fly Sprite. Jeff and Adam run the LLM stages locally on their own subscriptions against preview. Each stage writes once to the Source's folder in the shared private bucket, through signed URLs. The import contract is in `priv/import/` and [the producer guide's background](../import/producer-guide-background.md); the procedure is [source-intake.md](../../runbooks/source-intake.md).
+**Getting a Source in** (Jeff, 2026-11-17 to 11-21; 274b; [decision](../architecture/decisions.md#2026-11-22-get-sources-in-through-a-shared-private-bucket-with-conversion-on-a-sprite-and-the-llm-stages-on-curators-machines)): curators collect, verify and convert documents on today's production site, so other curators can help now; conversion runs on a Fly Sprite. Jeff and Adam run the LLM stages locally on their own subscriptions against preview. Each stage writes once to the Source's folder in the shared private bucket, through signed URLs. The import contract is in `priv/import/` and [the producer guide's background](../import/producer-guide-background.md); the procedure is [source-intake.md](../../runbooks/source-intake.md).
 
-**The old public API** (Jeff, 2026-11-16; 3c4f): it has real users, so it's kept and released as `/api/v3` (3.0.0), with `/api/v2` returning 410 at release.
+**The old public API** (Jeff, 2026-11-16; 3c4f; [decision](../architecture/decisions.md#2026-11-16-keep-the-public-api-released-as-apiv3)): it has real users, so it's kept and released as `/api/v3` (3.0.0), with `/api/v2` returning 410 at release.
 
-**Cutover** (Jeff, 2026-11-12): real data is built on preview, then in production, never on a developer's machine. Sources are processed into a migrated production copy on preview. At cutover, production is migrated fresh and preview's work replayed onto it, so the live site stays editable meanwhile. Replay is rehearsed early onto a separate database, and the cutover until boring. Merging `taxogall` into `main` deploys at once, so the runbook guards against an accidental merge or deploy. The old tables stay until then, because the migration reads them.
+**Cutover** (Jeff, 2026-11-12; [decision](../architecture/decisions.md#2026-11-12-build-real-data-on-preview-and-replay-it-onto-production-at-cutover)): real data is built on preview, then in production, never on a developer's machine. Sources are processed into a migrated production copy on preview. At cutover, production is migrated fresh and preview's work replayed onto it, so the live site stays editable meanwhile. Replay is rehearsed early onto a separate database, and the cutover until boring. Merging `taxogall` into `main` deploys at once, so the runbook guards against an accidental merge or deploy. The old tables stay until then, because the migration reads them.
 
 **Scale isn't a risk:** about 10⁶ rows of Facts and attributions, with a generous ceiling of 10⁷.
 

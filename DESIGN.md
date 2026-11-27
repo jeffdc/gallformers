@@ -21,7 +21,7 @@ Typefaces, the semantic type scale and the two densities (Reading for public, Wo
 
 ## Layout
 
-Layout: [foundations.md](docs/design-system/foundations.md#layout). Page templates (detail, browse, admin list, admin edit, review step): [patterns.md](docs/design-system/patterns.md).
+Layout: [foundations.md](docs/design-system/foundations.md#layout). Page templates (detail, collection, admin dashboard, admin list, admin edit, review step): [patterns.md](docs/design-system/patterns.md).
 
 ## Elevation & Depth
 
@@ -29,7 +29,7 @@ Radius and elevation: [foundations.md](docs/design-system/foundations.md#radius-
 
 ## Components
 
-The catalog, with each component's status (Proposed, Approved, Built, Retiring): [components.md](docs/design-system/components.md). Code: `lib/gallformers_web/components/`. What a replacement must preserve: [inventory/](docs/design-system/inventory/). A new component, pattern or token needs approval before it is built.
+The catalog, with each component's status (Proposed, Approved, Built, Retiring): [components.md](docs/design-system/components.md). Code: `lib/gallformers_web/components/`. A new component, pattern or token needs approval before it is built.
 
 ## Do's and Don'ts
 

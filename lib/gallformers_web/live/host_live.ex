@@ -1,7 +1,7 @@
 defmodule GallformersWeb.HostLive do
   @moduledoc """
-  The Host page, on the design system (matter bc0d; behavior in
-  docs/design-system/inventory/host-and-source-pages.md): a plant from
+  The Host page, on the design system (matter bc0d; layout in
+  docs/design-system/patterns.md, "Detail page"): a plant from
   `Gallformers.Taxa.host_page/1` (its names, each with its authority
   upright after the italic name, and lineage), "Identify a gall
   on …", the Galls on it as the rank pages' list (`GallformersWeb.RankGalls`,

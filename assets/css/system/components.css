@@ -253,7 +253,7 @@
      Form controls (CoreComponents.input, the typeahead family, search_input):
      one height (h-ctl, from the density), one border and radius, one focus.
      Look only: the components' markup and behavior are unchanged
-     (docs/design-system/inventory/forms.md, typeahead-and-id.md).
+     (docs/design-system/components.md, "Forms").
      --------------------------------------------------------------------- */
   .gf-label {
     display: block;

@@ -8,10 +8,9 @@ The design system is how Gallformers looks and behaves: one set of tokens (color
 |---|---|
 | [foundations.md](foundations.md) | Principles, color, typography, spacing and density, layout, radius and elevation, icons, motion, dark mode, accessibility. The tokens and the rules for using them. |
 | [components.md](components.md) | The component catalog: each component's job, when to use it and when not, its attributes and slots, and what it replaces. |
-| [patterns.md](patterns.md) | Page templates (a detail page, a browse page, an admin list, an admin edit page, a review step) and interaction patterns (saving, empty states, confirmations, loading). |
+| [patterns.md](patterns.md) | Page templates (detail, collection, admin dashboard, admin list, admin edit, review step) and interaction patterns (saving, empty states, confirmations, loading). |
 | [content.md](content.md) | Words on screen: voice, the domain's terms, labels, numbers and dates. |
 | [mockups.md](mockups.md) | How to make a mockup in the system's own language. |
-| [inventory/](inventory/) | The behavior contract of today's components: every call site and what it relies on, the hard-won lessons, and what a replacement must preserve. |
 
 The living reference is the style guide page at `/dev/design-system` (development only; `dev/gallformers_web/dev/design_system_live.ex`). It renders every token and every built component in light and dark, with its code. When a component is built, it gets an entry there.
 
@@ -40,9 +39,9 @@ All stylesheet rules live in a cascade layer (`base` or `components`), so a util
 
 Nothing is replaced on its look alone. Before a component replaces another (or a page moves onto the system):
 
-1. Read its entry in [inventory/](inventory/): every call site, what each relies on, the "Must preserve" checklist and the hard-won lessons. If the component isn't inventoried, inventory it first, the same way.
-2. The replacement keeps every behavior on that list. Typeaheads in particular keep their exact mechanics: their look may change, their behavior may not.
-3. A behavior change (even a fix) needs approval; record it under the inventory's "Approved changes".
+1. Read its entry in [components.md](components.md) and the code: every call site, and the events, URL parameters, hooks and tests each relies on.
+2. The replacement keeps every behavior it finds there. Typeaheads in particular keep their exact mechanics: their look may change, their behavior may not.
+3. A behavior change (even a fix) needs approval; record it, with who approved it and when, in the component's entry in [components.md](components.md).
 4. Prefer changing markup around unchanged logic: a page's events, URL parameters and handlers stay as they are, and only its template moves onto the components.
 
 ## Adding to the system

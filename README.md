@@ -181,9 +181,9 @@ The full release workflow:
 2. **Wait for CI** — The "CI" workflow runs check-toolchain, the test database, `mix precommit`, the asset build, Dialyzer and the API version check. On `main` it runs only when the push touches code or build files (its `paths` filter: `lib/**`, `config/**`, `assets/**`, `priv/**` and others)
 3. **Wait for deploy** — On CI success, "Deploy" runs `flyctl deploy --remote-only`, then the smoke tests against `gallformers.fly.dev`
 4. **Verify deploy** — Check that the site is working: `fly status` or visit [gallformers.org](https://gallformers.org)
-5. **Create the release** — Give Claude Code the release prompt, [prompts/release.md](prompts/release.md), review the generated notes, and approve
+5. **Create the release** — a GitHub Release (`gh release create`) whose notes say, in plain language, what changed since the last release
 
-The release prompt handles tag naming, commit collection, and release note generation. Tags use CalVer format: `v2026.2.6`, with `.2`, `.3` suffixes for multiple same-day releases. Release notes are published at [github.com/jeffdc/gallformers/releases](https://github.com/jeffdc/gallformers/releases).
+Tags use CalVer format: `v2026.2.6`, with `.2`, `.3` suffixes for multiple same-day releases. Release notes are published at [github.com/jeffdc/gallformers/releases](https://github.com/jeffdc/gallformers/releases).
 
 ## Backup Strategy
 

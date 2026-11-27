@@ -274,7 +274,7 @@ Gallformers' stipple drawing of a cynipid wasp (`priv/static/images/cynipid_R.sv
 
 ### `fact_ref`
 
-A Fact-backed value on a page (an Inducer, a Host, a Trait value, a range place, a common name) as it reads to everyone: the value with a dotted underline (`decoration-line-strong`, darker on hover), hover text "Who says so?". Selecting it opens the `fact_inspector` on that Fact; the selected value sits on `bg-sky-soft`. The dotted underline is `fact_ref`'s alone: nothing else on a page draws one (glossary terms are links: see `prose`). In Edit mode the page doesn't change shape: each group gains one Add (a `link` `button` with `ph-plus`: "Add a host"), and the Traits not recorded are each an add ("+ color"). Design and build: matter `87a1`; mockup `/dev/mockups/fact-inspector/:id`.
+A Fact-backed value on a page (an Inducer, a Host, a Trait value, a range place, a common name) as it reads to everyone: the value with a dotted underline (`decoration-line-strong`, darker on hover), hover text "Who says so?". Selecting it opens the `fact_inspector` on that Fact; the selected value sits on `bg-sky-soft`. The dotted underline is `fact_ref`'s alone: nothing else on a page draws one (glossary terms are links: see `prose`). In Edit mode the page doesn't change shape: each group gains one Add (a `link` `button` with `ph-plus`: "Add a host"), and the Traits not recorded are each an add ("+ color"). Design and build: matter `87a1`; built on the Gall page (`GallLive`).
 
 ```heex
 <.fact_ref fact={host} selected={@selected} on_select="select_fact" />
@@ -465,7 +465,7 @@ One answer to a curator's question, as a `radio_card`: what it is, what choosing
 
 #### `use`
 
-For the one-at-a-time review (`6611`, mockup `/dev/mockups/source-reading/:package_id`). With `use`, the option is decided in one click: a button at its right ("Use this") sends `on_pick`, and no separate Decide button is needed. An option that needs input first (a plant or Gall search) shows "Search…" in its place, which opens its `follow`. The recommended option's button is primary. Without `use` the option behaves as today (a radio, then Decide).
+For the one-at-a-time review (`6611`; built in `Admin.ReviewLive.QuestionCard`). With `use`, the option is decided in one click: a button at its right ("Use this") sends `on_pick`, and no separate Decide button is needed. An option that needs input first (a plant or Gall search) shows "Search…" in its place, which opens its `follow`. The recommended option's button is primary. Without `use` the option behaves as today (a radio, then Decide).
 
 ### `fact_editor`
 
@@ -489,7 +489,7 @@ Shows unsaved changes and offers Save and Discard. Its role depends on the admin
 
 ### `filter_select`
 
-A filter in the ID page's filter row. It matches the current screens' behavior exactly ([inventory/typeahead-and-id.md](inventory/typeahead-and-id.md)):
+A filter in the ID page's filter row. It keeps the filters' behavior exactly:
 
 - **Single-value filters** (detachable, family, season, alignment, form, walls, cells, shape, color): a select inside its own `<form phx-change="change_filter" phx-value-filter=…>` with `name="value"` and an "Any …" prompt, as today. While a filter is unset, each option shows how many of the loaded results have that value ("leaf midrib (22)"); a set filter is drawn with a brand border.
 - **Multi-value filters** (plant parts, textures): the `multi_select_typeahead` mechanics unchanged (type to filter, chips in options order, Clear all, the mousedown guard, server-tracked focus), restyled to sit in the same row, with the ANY/ALL toggle under it when two or more values are chosen (only ALL is written to the URL).
@@ -526,7 +526,7 @@ The side of a Source's review page: where the curator is, and how to move. Pinne
 - Up next: the next three units of work, one line each;
 - Approve (disabled with "You can approve once the 22 marked questions are answered.") and Deny.
 
-Every count on the page comes from one tally: questions answered and to go, the ones that must be answered before approving among them, the hedged statements apart. Attributes: `title`, `source_id` (the Source in Gallformers, once it is there), `tally`, `stages`, `next`, `approval` (`ReviewLive.SourcePage.approval/3`'s); the events it sends, each required: `on_stage`, `on_hedges`, `on_approve`, `on_deny`, and optionally `on_missed` (opens the names we didn't read, `tally.missed`). Mockup: `/dev/mockups/source-reading/:package_id`.
+Every count on the page comes from one tally: questions answered and to go, the ones that must be answered before approving among them, the hedged statements apart. Attributes: `title`, `source_id` (the Source in Gallformers, once it is there), `tally`, `stages`, `next`, `approval` (`ReviewLive.SourcePage.approval/3`'s); the events it sends, each required: `on_stage`, `on_hedges`, `on_approve`, `on_deny`, and optionally `on_missed` (opens the names we didn't read, `tally.missed`). Built in `Admin.ReviewLive.Review`.
 
 ### `review_card`
 

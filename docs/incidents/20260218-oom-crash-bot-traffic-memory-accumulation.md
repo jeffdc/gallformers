@@ -2,6 +2,8 @@
 
 ## Status: Open — Mitigations deployed, codebase investigation complete, fixes planned
 
+**Status (2026-11-27):** Closed. Landed on `main` on 2026-02-18: LiveView `hibernate_after: 5_000` (in `config/config.exs`, not `endpoint.ex`) and server-side pagination of the admin lists (matter 8ae6, dcf299a8); the AuditCache rework, with scans on demand only, `hibernate_after` and `new_paths ++ acc` in `list_gall_paths_recursive` (matter ee67, 6b7e8fb2); on `taxogall` AuditCache is gone from `lib/` with the old admin (a075e07a). Matter 9ad7 converted Privacy, Filter Guide, Articles, Article and About to controllers (3d5a8f28, #528, 2026-03-09), and `/explore` now redirects. The 1GB VM rejected here landed two days later (`fly.toml`, 7a2032c3). Not landed: the Gall, Host, Source, Place, ID and home pages are still LiveViews (docs/backlog.md, "Convert read-only LiveView pages to controllers where it pays"); live memory telemetry (`telemetry.ex` has no reporter; docs/backlog.md, "Error tracking and alerting").
+
 ## Summary
 
 Production experienced an OOM kill at ~10:58 UTC (5:58 AM ET) on Feb 18 — the second OOM
@@ -301,11 +303,11 @@ on its own within ~18-24 hours of uptime.
 
 - [20260215-request-log-anomalies-oom.md](20260215-request-log-anomalies-oom.md) — Previous
   OOM, 3 days prior. Same underlying issue, different trigger.
-- [Matter 1edb](../../.mull/matters/1edb-investigate-beam-memory-accumulation-causing-oom.md) —
+- [Matter 1edb](../../.mull/archive/1edb-investigate-beam-memory-accumulation-causing-oom.md) —
   Docket item for root cause investigation of memory accumulation.
-- [Matter 8ae6](../../.mull/matters/8ae6-liveview-memory-tuning-hibernate-after-server-side-pagination.md) —
+- [Matter 8ae6](../../.mull/archive/8ae6-liveview-memory-tuning-hibernate-after-server-side-pagination.md) —
   LiveView memory tuning (hibernate_after + server-side pagination).
-- [Matter ee67](../../.mull/matters/ee67-auditcache-performance-rework-lazy-scan-hibernate.md) —
+- [Matter ee67](../../.mull/archive/ee67-auditcache-performance-rework-lazy-scan-hibernate.md) —
   AuditCache performance rework (lazy scan + hibernate).
 - [Matter 9ad7](../../.mull/matters/9ad7-audit-liveview-usage-convert-read-only-pages-to-controllers.md) —
   Audit LiveView usage — convert read-only pages to controllers.

@@ -1,7 +1,7 @@
 defmodule GallformersWeb.SectionLive do
   @moduledoc """
   The section page (a subdivision within a plant genus), on the design
-  system (matter bc0d; behavior in docs/design-system/inventory/rank-pages.md):
+  system (matter bc0d; layout in docs/design-system/patterns.md, "Rank pages"):
   a section (`Gallformers.Taxa.get_by_name/2`) with its lineage and its
   plants, each with the number of Galls on it, filterable by name and by the
   Gallformer genera with Galls on them (the rail). Data through

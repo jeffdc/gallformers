@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg db-start db-stop db-status hooks done-checks
+.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg db-start db-stop db-status hooks done-checks
 
 # Download production database for local dev
 # Downloads full pg_dump from private S3 bucket and restores into local Postgres
