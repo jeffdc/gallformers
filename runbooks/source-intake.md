@@ -16,7 +16,7 @@ The tree carried over from the old Gallformers data is undated, so any accepted 
 
 Questions about following a paper's placement, accepted name or synonymy don't hold up the Source's approval: they wait in one taxonomy queue across all Sources. If you don't follow a paper, decline it with a reason; the tree keeps following the latest paper you accepted, and the reason is shown with the declined paper.
 
-(The question limits, the taxonomy queue and declining are the phase 2 design in matter `f923` and are not built yet.)
+The taxonomy queue is at `/admin/review/taxonomy`.
 
 ### Check the Source's date
 
@@ -60,8 +60,8 @@ The review pages are at `/admin/review`. Each Source's questions come in steps: 
 
 ### Names the producer skipped
 
-The producer can miss a name the Source prints. A list of names the Source prints that Gallformers' tree holds but the batches never mention is being added to the review (matter `d213`). Most entries are Hosts or species named only in comparisons; dismiss those. The ones to act on are species the Source treats that have no statements. It can't see a name that is used but whose taxonomic act was missed, so watch for those on the Names step.
+The producer can miss a name the Source prints. The review lists, as "Names we didn't read", the names the Source prints that Gallformers' tree holds but the batches never mention; they don't hold approval. Most entries are Hosts or species named only in comparisons; mark those not needed. The ones to act on are species the Source treats that have no statements. It can't see a name that is used but whose taxonomic act was missed, so watch for those on the Names step.
 
 ### Undo
 
-Undo of a decided question works only while nothing depends on it: the Source isn't approved, and nothing the decision changed has been edited since. Otherwise, fix it in the taxonomy admin. (Not built yet.)
+Undo of a decided question works only while nothing depends on it: the Source isn't approved, and nothing the decision changed has been edited since. Otherwise, fix it in the taxonomy admin.

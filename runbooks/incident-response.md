@@ -23,7 +23,7 @@ Coordinate response to a production incident affecting service availability.
 
 Record:
 - [ ] Time incident detected: `____:____`
-- [ ] How detected (alert/user report/other): `____________`
+- [ ] How detected (downdetector alert email, status page, user report, other): `____________`
 - [ ] Initial symptoms: `____________`
 - [ ] Severity level: `SEV__`
 
@@ -70,7 +70,8 @@ Choose appropriate action based on diagnosis:
 | Cause | Action |
 |-------|--------|
 | Bad deployment | [Rollback Deployment](./rollback-deployment.md) |
-| Database issue | [Restore Database](./restore-database.md) |
+| Database unreachable or erroring | [Postgres Maintenance](./postgres-maintenance.md) (check `gallformers-db`) |
+| Data corrupted or lost | [Restore Database](./restore-database.md) |
 | Infrastructure (Fly.io) | Check [Fly.io Status](https://status.fly.io) |
 | Unknown | Continue to Step 5 |
 
@@ -107,7 +108,7 @@ Complete within 48 hours of resolution:
 
 ### Incident Report
 
-Document:
+Write it in `docs/incidents/YYYYMMDD-<short-name>.md`. Document:
 1. **Timeline**: When detected, when resolved, key actions taken
 2. **Impact**: Users affected, duration, data loss (if any)
 3. **Root cause**: What caused the incident

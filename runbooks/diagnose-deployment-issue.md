@@ -15,6 +15,14 @@ Determine whether a deployment has failed and identify the root cause.
 
 ## Procedure
 
+### 0. Check for Fly host incidents
+
+```bash
+fly incidents hosts list    # run from the repo root, where fly.toml names the app
+```
+
+Host-level maintenance and hardware incidents don't show in app metrics or on Fly's status page; this is the only place to see them (see [Fly Operations](./fly-operations.md#troubleshooting-an-outage)).
+
 ### 1. Check Application Health
 
 ```bash
@@ -48,7 +56,7 @@ Look for:
 - `** (EXIT)` or `** (RuntimeError)` - Elixir process crashes
 - `GenServer terminating` - GenServer failures
 - `FATAL` or `ERROR` - Application errors
-- `database` or `postgres` - Database connection issues
+- `database` or `postgres` - Database connection issues (then check the database app: `fly status -a gallformers-db`, see [Postgres Maintenance](./postgres-maintenance.md))
 - `migration` - Migration failures
 - `bind` or `listen` - Port binding issues
 
@@ -70,7 +78,7 @@ fly machines list -a gallformers
 
 For each machine, verify:
 - [ ] State is `started`
-- [ ] Region is correct
+- [ ] Region is correct (`ewr`, `fly.toml`)
 - [ ] Image version matches expected release
 
 ## Decision Tree
@@ -79,7 +87,8 @@ For each machine, verify:
 Health check fails?
 ├─ Yes → Check logs for errors
 │        ├─ Panic/crash → See: rollback-deployment.md
-│        ├─ Database error → See: restore-database.md
+│        ├─ Database connection error → See: postgres-maintenance.md (check gallformers-db)
+│        ├─ Data corrupted or lost → See: restore-database.md
 │        └─ Unknown → Escalate
 └─ No → Check for partial failures
          ├─ Some endpoints fail → Check specific route logs
@@ -91,6 +100,7 @@ Health check fails?
 | Finding | Action |
 |---------|--------|
 | Bad code deployed | [Rollback Deployment](./rollback-deployment.md) |
+| Database unreachable or erroring | [Postgres Maintenance](./postgres-maintenance.md) (check `gallformers-db`) |
 | Database corruption | [Restore Database](./restore-database.md) |
 | Active incident | [Incident Response](./incident-response.md) |
 | Resource exhaustion | Scale machines or investigate memory leaks |

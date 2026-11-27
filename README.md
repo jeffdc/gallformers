@@ -61,7 +61,7 @@ mix format              # Format code
 mix credo --strict      # Code quality
 mix precommit           # Checks to pass before committing (no Dialyzer)
 make done-checks        # Rebuild the test DB, then precommit and Dialyzer: before calling work done
-make ci                 # Full CI check (same as GitHub Actions)
+make ci                 # Most of CI: precommit, asset build, Dialyzer (not check-toolchain or the API version check)
 ```
 
 ### Test Database
@@ -77,7 +77,7 @@ Tests use a separate PostgreSQL database (`gallformers_test`; in a git worktree,
 
 Browser-based E2E tests use [phoenix_test_playwright](https://hex.pm/packages/phoenix_test_playwright) with Firefox. All tests run against a production data copy and are **excluded from regular test runs** and CI.
 
-Requires Playwright browsers — see [Prerequisites](#installing-playwright-browsers-for-e2e-tests).
+Requires Playwright browsers — see [Prerequisites](#prerequisites).
 
 ### Running E2E Tests
 
@@ -138,7 +138,12 @@ gallformers/
 ├── priv/                # Static files, migrations, database
 ├── test/                # Tests
 ├── config/              # Phoenix configuration
-└── services/            # Auxiliary services (boundaries, usda_plants)
+├── dev/                 # Dev-only code, Credo checks, git hooks, review guardrails
+├── scripts/             # Dev and CI scripts (dev-db, check-toolchain)
+├── infra/               # AWS infrastructure (OpenTofu)
+├── runbooks/            # Operational procedures
+├── docs/                # Architecture, domain and design-system docs, plans
+└── services/            # Auxiliary services (boundaries, import-producer)
 ```
 
 ## Boundary Tiles (Range Maps)
@@ -172,20 +177,22 @@ See [runbooks/](runbooks/) for operational procedures.
 
 The full release workflow:
 
-1. **Commit and push to main** — `git push origin main`
-2. **Wait for CI** — The "CI V2" workflow runs format, compile, credo, and tests
-3. **Wait for deploy** — On CI success, "Deploy V2" automatically deploys to Fly.io and runs smoke tests
+1. **Open a PR into main** — Jeff merges it on GitHub
+2. **Wait for CI** — The "CI" workflow runs check-toolchain, the test database, `mix precommit`, the asset build, Dialyzer and the API version check. On `main` it runs only when the push touches code or build files (its `paths` filter: `lib/**`, `config/**`, `assets/**`, `priv/**` and others)
+3. **Wait for deploy** — On CI success, "Deploy" runs `flyctl deploy --remote-only`, then the smoke tests against `gallformers.fly.dev`
 4. **Verify deploy** — Check that the site is working: `fly status` or visit [gallformers.org](https://gallformers.org)
-5. **Create the release** — Run `/release` in Claude Code, review the generated notes, and approve
+5. **Create the release** — Give Claude Code the release prompt, [prompts/release.md](prompts/release.md), review the generated notes, and approve
 
-The `/release` skill handles tag naming, commit collection, and release note generation. Tags use CalVer format: `v2026.2.6`, with `.2`, `.3` suffixes for multiple same-day releases. Release notes are published at [github.com/jeffdc/gallformers/releases](https://github.com/jeffdc/gallformers/releases).
+The release prompt handles tag naming, commit collection, and release note generation. Tags use CalVer format: `v2026.2.6`, with `.2`, `.3` suffixes for multiple same-day releases. Release notes are published at [github.com/jeffdc/gallformers/releases](https://github.com/jeffdc/gallformers/releases).
 
 ## Backup Strategy
 
-The PostgreSQL database backup strategy is TBD as part of the Postgres migration. Daily snapshots continue to be stored in S3:
+The "Database Snapshot" workflow (`.github/workflows/db-snapshot.yml`) runs daily at 06:00 UTC and stores two dumps in S3:
 
-- **Public** (`s3://gallformers-backups/public/`) - Sanitized, PII removed
-- **Private** (`s3://gallformers-full-backups/`) - Full backup with PII
+- **Private** (`s3://gallformers-full-backups/<YYYY-MM-DD>/gallformers.dump`) - Full backup with PII, one per day
+- **Public** (`s3://gallformers-backups/public/gallformers.dump`) - Private tables left out, replaced daily
+
+Fly Postgres's own Barman backups have not been verified ([runbooks/postgres-maintenance.md](runbooks/postgres-maintenance.md#backups)).
 
 For restore procedures, see [runbooks/restore-database.md](runbooks/restore-database.md). For the buckets, see [infra/README.md](infra/README.md).
 
@@ -198,11 +205,12 @@ The `users` table contains personally identifiable information:
 | `auth0_id` | Unique identifier from Auth0 |
 | `display_name` | User's chosen display name |
 | `nickname` | Fallback name from Auth0 |
+| `about_me` | User's bio |
 | `inaturalist_url` | Link to iNaturalist profile |
 | `social_url` | Link to social media |
 | `personal_url` | Link to personal website |
 
-**Public database downloads are sanitized** - all PII fields are set to NULL and auth0_id is replaced with a placeholder.
+**Public database downloads leave out the `users` table entirely.** On the new back-end (`taxogall`), the public snapshot is built from the full dump with the audit schema and every table marked private in `priv/snapshot/tables.txt` dropped; a table that file doesn't list stops the workflow.
 
 ## Authentication
 
@@ -213,7 +221,7 @@ The `users` table contains personally identifiable information:
 ## External Resources
 
 - **Production**: [gallformers.org](https://gallformers.org)
-- **Images**: AWS S3
+- **Images**: AWS S3, served through CloudFront
 - **Auth**: Auth0
 - **Domains**: Namecheap (gallformers.org, gallformers.com)
 
@@ -221,6 +229,8 @@ The `users` table contains personally identifiable information:
 
 - **Status page**: [jeffdc.github.io/gallformers-status](https://jeffdc.github.io/gallformers-status/) - Uptime monitoring via Upptime
 - **Metrics dashboard**: [fly-metrics.net](https://fly-metrics.net/d/fly-app/fly-app?orgId=932898) - CPU, memory, HTTP metrics (view-only, no alerting)
+
+- **Downdetector**: an AWS Lambda requests the site every 5 minutes and emails on failure (`infra/lambda.tf`)
 
 Fly.io also sends automatic email alerts on OOM (out-of-memory) events.
 

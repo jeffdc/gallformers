@@ -4,7 +4,7 @@ Operational guide for Gallformers background jobs.
 
 ## Dashboard
 
-The Oban Web dashboard is mounted at `/admin/jobs` and is protected by the normal admin pipeline.
+The Oban Web dashboard is mounted at `/admin/jobs`, behind the `:superadmin` pipeline (`router.ex`).
 
 Use it to:
 - Inspect queue health and worker throughput
@@ -14,13 +14,19 @@ Use it to:
 
 ## Queues
 
-Gallformers currently runs these queues:
+Queues are set in `config/config.exs`. Production (`main`) runs:
 
-| Queue | Purpose |
-|-------|---------|
-| `default` | General background work |
-| `extraction` | Source ingestion and other LLM-heavy jobs |
-| `maintenance` | Scheduled maintenance such as analytics rollups |
+| Queue | Concurrency | Purpose |
+|-------|-------------|---------|
+| `default` | 10 | General background work (no worker uses it) |
+| `maintenance` | 5 | Scheduled maintenance such as analytics rollups (`Gallformers.Analytics.RollupWorker`) |
+
+The new back-end (`taxogall`) adds:
+
+| Queue | Concurrency | Purpose |
+|-------|-------------|---------|
+| `import` | 1 | Moves one import package a step on (`Gallformers.Import.Worker`, unique per package) |
+| `catalog` | 5 | Refreshes one Gall's ID-tool row (`Gallformers.Catalog.ReadModels.GallIndexWorker`, unique per Gall) |
 
 ## Scheduled Jobs
 
@@ -35,7 +41,7 @@ Current cron jobs:
 1. Open `/admin/jobs` and filter by `retryable`, `discarded`, or the affected queue.
 2. Check whether failures are isolated to one worker or all queues.
 3. Inspect the latest job error and confirm whether it is application, database, or infrastructure related.
-4. If jobs are stuck in `executing`, verify whether the machine restarted recently. Lifeline should rescue stale jobs automatically.
+4. If jobs are stuck in `executing`, verify whether the machine restarted recently. Lifeline rescues jobs stuck executing for more than an hour.
 
 ## Common Operations
 
@@ -56,4 +62,4 @@ Current cron jobs:
 
 - Oban shares the main Ecto pool. Sustained queue failures may reflect database saturation rather than a worker bug.
 - Job retention is seven days via `Oban.Plugins.Pruner`.
-- Reindexer and Lifeline are enabled by default for routine maintenance and orphan recovery.
+- Reindexer and Lifeline are configured explicitly (`config/config.exs`) for routine maintenance and orphan recovery; Lifeline's `rescue_after` is one hour.

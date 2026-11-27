@@ -17,11 +17,13 @@ Revert the application to a previous known-good release.
 ## Important
 This runbook rolls back **code only**. Database changes persist across deployments. If the database is corrupted, see [Restore Database](./restore-database.md) first.
 
+The container's entrypoint (`docker-entrypoint.sh`) runs migrations at every boot, so the older image starts against the newer schema. A rollback never reverses a migration.
+
 ## Choose Your Approach
 
 **Option A: Emergency rollback (minutes)** — Redeploy a previous Fly.io image. Use when the site is down and you need it back NOW. See Procedure below.
 
-**Option B: Git revert (slower but cleaner)** — `git revert <bad-commit>` and push to main. CI/CD handles the rest. Keeps git history as source of truth. Preferred when you have time.
+**Option B: Git revert (slower but cleaner)** — `git revert <bad-commit>` on a branch and open a PR into `main`; Jeff merges it on GitHub. The `CI` workflow then runs on `main` (its push trigger is limited to paths such as `lib/**`, `config/**`, `assets/**` and `priv/**`), and on success the `Deploy` workflow deploys. Keeps git history as source of truth. Preferred when you have time.
 
 ## Procedure (Option A: Image Rollback)
 
@@ -69,7 +71,7 @@ fly logs -a gallformers 2>&1 | timeout 5 cat
 
 Verify no errors in recent log output.
 
-### 5. Confirm Application Functionality
+### 4. Confirm Application Functionality
 
 - [ ] Health endpoint returns 200
 - [ ] Homepage loads

@@ -85,15 +85,26 @@ mix gallformers.wcvp.download
 # 2. Build into local wcvp database + pg_dump + upload to S3
 mix gallformers.wcvp.build_db --upload
 
-# 3. Restore on production via fly proxy
-fly proxy 15432:5432 -a gallformers-db
-pg_restore --clean --if-exists --no-owner --no-acl \
-  -d wcvp -h localhost -p 15432 /tmp/wcvp.dump
+# 3. Fetch the uploaded dump (the upload deletes the local priv/data/wcvp.dump)
+curl -fSL -o /tmp/wcvp.dump https://gallformers-backups.s3.amazonaws.com/public/wcvp.dump
+```
 
-# 4. Same for preview if needed
+**Step 4 replaces the production `wcvp` database's contents** (`--clean` drops each object before restoring it). Get explicit approval first, and run it one step at a time (see the database rules in [Fly Operations](./fly-operations.md)).
+
+```bash
+# 4. Restore on production via fly proxy (credentials typed for this terminal only, as in postgres-maintenance.md)
+fly proxy 15432:5432 -a gallformers-db &
+sleep 2
+PGPASSWORD="$PG_PROD_PASSWORD" pg_restore --clean --if-exists --no-owner --no-acl \
+  -h localhost -p 15432 -U "$PG_PROD_USERNAME" -d wcvp /tmp/wcvp.dump
+kill %1
+
+# 5. Same for preview if needed
 ```
 
 ## Plant Authorship from WCVP
+
+**New back-end only:** this section describes the `taxogall` back-end. Production (`main`) does not have it until release.
 
 Plants take their names' authorship (`taxon_names.authorship`, accepted names and synonyms) from WCVP (`Gallformers.Ranges.WcvpAuthorship`). A name takes WCVP's authors only when it has none and WCVP holds it unambiguously: the accepted name by the plant's WCVP link when the linked record is of the same name, otherwise by exact name and rank (several records with different authors are narrowed to the linked record's synonymy; if that still leaves more than one, the name is ambiguous and stays blank). A curator's authorship (the plant page's Edit mode) is never overwritten.
 
@@ -160,10 +171,10 @@ The "Refresh from POWO-WCVP" button is gated on `@wcvp_available` which calls `W
 2. Check that the wcvp database has tables and data
 3. Try `Wcvp.Lookup.available?()` from iex
 
-### "No matching species found" error
+### No WCVP match on refresh
 
-The refresh handler looks up the host by `wcvp_id` first, then falls back to name search. If neither matches, you get this error. Check that the host name in gallformers matches a WCVP accepted name.
+The refresh looks the plant up by its WCVP link if it has one, otherwise by its name (synonyms resolved to the accepted name). If that finds nothing, it opens a search of WCVP names containing the plant's name to pick from. If the picked record can't be loaded, you get "WCVP species not found". Check that the plant's name matches a WCVP name.
 
-### Crash on refresh button click
+### "WCVP refresh failed" on refresh
 
-If the WCVP lookup succeeds but `build_wcvp_diff` crashes, check that `tdwg_to_places.json` is accessible. In a release, it must be resolved via `Application.app_dir/2`, not a relative path.
+If the WCVP lookup succeeds but building the range comparison fails, check that `tdwg_to_places.json` is accessible (`Wcvp.Tdwg.load/0`). In a release, it must be resolved via `Application.app_dir/2`, not a relative path.

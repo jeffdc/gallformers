@@ -82,16 +82,22 @@ Key settings in `fly.toml`:
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `app` | `gallformers` | App name |
-| `primary_region` | `iad` | US East (matches S3 region) |
-| `DATABASE_URL` | Fly Postgres connection string | Managed Postgres database |
+| `primary_region` | `ewr` | Production region |
+| `[[vm]]` | shared CPU, 1 CPU, `1024mb` | The one machine's size |
+| `[mounts]` | `gallformers_data` at `/data` | Volume; the app writes only its logs there |
+| `PHX_HOST` | `www.gallformers.org` | Host the app generates URLs for |
 | `min_machines_running` | `1` | Always keep one machine running |
+
+The database connection string, `DATABASE_URL`, is a Fly secret, not a `fly.toml` setting. It points at the self-managed Fly Postgres app `gallformers-db` (postgres-flex 17), reached over Fly's private IPv6 network (`ECTO_IPV6`).
 
 ## Secrets
 
 ```bash
 fly secrets list
+fly secrets set DATABASE_URL=xxx
 fly secrets set SECRET_KEY_BASE=xxx
 fly secrets set AUTH0_CLIENT_ID=xxx AUTH0_CLIENT_SECRET=xxx AUTH0_DOMAIN=xxx
+fly secrets set S3_PUT_AWS_ACCESS_KEY_ID=xxx S3_PUT_AWS_SECRET_ACCESS_KEY=xxx
 # WCVP data lives in a separate Postgres database — no secret needed
 ```
 
@@ -103,11 +109,11 @@ Destroying machines causes volume attachment issues. When `fly deploy` runs with
 
 ### Why `fly machine run` must never be used
 
-Manual machine creation bypasses fly.toml configuration. Results in wrong memory (256MB instead of 512MB), missing health checks, wrong process group. **Always use `fly deploy`** which applies fly.toml config correctly.
+Manual machine creation bypasses fly.toml configuration. Results in a machine without fly.toml's 1GB of memory, missing health checks, wrong process group. **Always use `fly deploy`** which applies fly.toml config correctly.
 
-### The "sleep infinity" pattern for database operations
+### The "sleep infinity" pattern for volume file operations
 
-This is the correct way to perform file operations on a running machine, but it creates prod downtime so make sure it's what really needs to happen:
+This is the correct way to perform file operations on the volume of a running machine, but it creates prod downtime so make sure it's what really needs to happen. It is rarely needed now: the database is in Fly Postgres, and the app writes only its logs to the volume (`/data/logs`), which `fly ssh sftp get` reads without stopping the app.
 
 1. Stop machine (if running)
 2. Update machine command: `fly machine update --command "sleep infinity"`
@@ -125,7 +131,7 @@ This is the correct way to perform file operations on a running machine, but it 
 
 ## Volume Data Files
 
-The `/data` volume holds persistent data across deploys. The main database is in Fly Postgres (not on the volume).
+The app writes only its logs to the `/data` volume (`/data/logs`, `config/runtime.exs`). The main database is in Fly Postgres (not on the volume).
 
 **WCVP** data lives in a separate Postgres database (`wcvp`) on the same cluster. See `runbooks/wcvp.md` for setup and update procedures.
 
@@ -143,16 +149,12 @@ The `/data` volume holds persistent data across deploys. The main database is in
 ### Example of correct approach
 
 ```
-User: "Update the production database"
+User: "Restart production"
 
-Agent: "I need to update the volume files. Here's my plan:
-1. Check current machine state
-2. Stop production machine
-3. Update to sleep infinity mode
-4. Start machine
-5. Perform file operations
-6. Verify
-7. Restart normally
+Agent: "Here's my plan:
+1. Check current machine state (fly machine list)
+2. Restart the machine
+3. Verify it is healthy (fly status, /health)
 
 Should I proceed?"
 
@@ -166,7 +168,7 @@ Agent: [Executes step 2, reports result]
 ### Example of WRONG approach
 
 ```
-User: "Update the production database"
+User: "Restart production"
 
 Agent: [Immediately starts running commands]
 Agent: [Tries SFTP to stopped machine - fails]

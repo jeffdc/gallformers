@@ -16,6 +16,9 @@ Restore the Fly Postgres database from a pg_dump backup after corruption, data l
 - `psql`, `pg_dump`, `pg_restore` installed locally
 - Fly CLI authenticated (`fly auth login`)
 - A pg_dump backup file (`.dump` in custom format)
+- For the daily backups, an AWS CLI session: run `aws login` first (temporary credentials; no access keys)
+
+This restores the main `gallformers` database only. The `wcvp` database on the same cluster is separate; see [WCVP](./wcvp.md).
 
 ## Important
 
@@ -66,11 +69,11 @@ kill $PROXY_PID
 
 ## Getting a Backup
 
-> **TODO:** Automated backup infrastructure (pg_dump cron to S3) is not yet in place. For now, backups must be created manually before they are needed.
+The `Database Snapshot` workflow (`.github/workflows/db-snapshot.yml`) dumps production daily at 06:00 UTC into the private, versioned bucket `gallformers-full-backups`, one object per day at `<YYYY-MM-DD>/gallformers.dump`. The public snapshot in `gallformers-backups` leaves out private tables, so never restore production from it.
 
 ### Create a manual backup
 
-If the database is still accessible, dump it before proceeding:
+If the database is still accessible, dump it before proceeding, so the current state is kept whatever happens next:
 
 ```bash
 PGPASSWORD="$PG_PASSWORD" pg_dump \
@@ -84,13 +87,20 @@ If the database is in a bad state, this may not be possible — proceed directly
 
 ### Locate an existing backup
 
-> **TODO:** Once automated backups are in place, document the S3 path and how to list/download available backups here.
+List the daily backups and download the one to restore:
+
+```bash
+aws s3 ls s3://gallformers-full-backups/
+aws s3 cp s3://gallformers-full-backups/<YYYY-MM-DD>/gallformers.dump /tmp/gallformers-backup.dump
+```
+
+Each day's run writes to that day's date, so restoring from an earlier day is the same download with a different date.
 
 ## Restore Procedure
 
 ### 1. Drop and recreate the database
 
-The `--clean` flag on pg_restore doesn't work reliably with Fly Postgres due to extension and schema ownership conflicts. Drop and recreate instead.
+The `--clean` flag on pg_restore doesn't work reliably with Fly Postgres due to extension and schema ownership conflicts. Drop and recreate instead. `DROP DATABASE` needs explicit user approval first (see the database rules in [Fly Operations](./fly-operations.md)).
 
 ```bash
 PGPASSWORD="$PG_PASSWORD" psql \
@@ -115,6 +125,8 @@ PGPASSWORD="$PG_PASSWORD" pg_restore \
 ```
 
 ### 3. Verify data
+
+These counts read the old tables that production's back-end (`main`) uses. The taxogall plan drops them after release, so this check changes then.
 
 ```bash
 PGPASSWORD="$PG_PASSWORD" psql \

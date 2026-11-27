@@ -64,7 +64,7 @@ TILES_URL=https://gallformers.org/tiles/boundaries.pmtiles mix phx.server
 | **Config** | `TILES_URL` env var → `https://gallformers.org/tiles/boundaries.pmtiles` |
 | **CORS** | CloudFront tiles CORS policy allows cross-origin Range requests |
 
-Preview uses the same tiles as production. No local file is baked into the Docker image. Set the `TILES_URL` env var in the Fly app config to point at the production CloudFront URL.
+Preview uses the same tiles as production. No local file is baked into the Docker image. Set the `TILES_URL` env var to point at the production CloudFront URL. `fly.preview.toml` doesn't set it in `[env]`, so check `fly secrets list -a gallformers-preview`; without it, preview requests `/tiles/boundaries.pmtiles` from its own app, which has no such file.
 
 If preview ever needs different tiles than production, upload a separate copy to a different S3 path and update `TILES_URL` accordingly.
 
@@ -73,9 +73,9 @@ If preview ever needs different tiles than production, upload a separate copy to
 | Item | Details |
 |------|---------|
 | **File** | `s3://gallformers-images-us-east-1/tiles/boundaries.pmtiles` |
-| **Served by** | CloudFront v2 distribution (`/tiles/*` → `s3-tiles` origin) |
+| **Served by** | The site's CloudFront distribution (`aws_cloudfront_distribution.v2`, `/tiles/*` → `s3-tiles` origin) |
 | **Config** | Default `/tiles/boundaries.pmtiles` (relative URL, same domain) |
-| **Access** | S3 bucket restricted to CloudFront OAC (no public access) |
+| **Access** | Public read by bucket policy; CloudFront reaches it through OAC |
 
 The browser requests `/tiles/boundaries.pmtiles` from `gallformers.org`. CloudFront matches the `/tiles/*` path pattern and serves from the S3 images bucket edge cache.
 
@@ -96,8 +96,9 @@ aws s3 cp priv/static/data/boundaries.pmtiles \
   s3://gallformers-images-us-east-1/tiles/boundaries.pmtiles
 
 # 4. Invalidate CloudFront cache (optional — only needed for immediate effect)
+#    The distribution ID is the `id` in: cd infra && tofu state show aws_cloudfront_distribution.v2
 aws cloudfront create-invalidation \
-  --distribution-id <V2_DISTRIBUTION_ID> \
+  --distribution-id <SITE_DISTRIBUTION_ID> \
   --paths "/tiles/boundaries.pmtiles"
 ```
 
@@ -107,7 +108,7 @@ No restart needed — CloudFront serves the new file after cache expiration or i
 
 ### CloudFront Configuration (infra/cloudfront_v2.tf)
 
-- **Origin**: `s3-tiles` with OAC, `origin_path = "/tiles"`
+- **Origin**: `s3-tiles` with OAC and no `origin_path`: the `/tiles/` prefix in the URL is the S3 key prefix
 - **Cache behavior**: `/tiles/*`, CachingOptimized policy, CORS response headers
 - **CORS policy**: `GallformersTilesCORS` — allows Range/If-Range headers from any origin, exposes Content-Range/Content-Length/Accept-Ranges
 
@@ -115,7 +116,7 @@ No restart needed — CloudFront serves the new file after cache expiration or i
 
 - **Bucket**: `gallformers-images-us-east-1`
 - **Path**: `tiles/boundaries.pmtiles`
-- **Access**: CloudFront OAC only (no public access)
+- **Access**: public `s3:GetObject` on every object (bucket policy `images_public_read`); CloudFront uses OAC
 - **CORS**: Configured for PUT/GET from production and dev origins
 
 ## Git and Docker Status

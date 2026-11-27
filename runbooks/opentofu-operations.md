@@ -4,7 +4,7 @@
 Guide for managing AWS infrastructure using OpenTofu (an open-source Terraform fork). This runbook covers day-to-day operations, importing resources, and troubleshooting.
 
 ## When to Use
-- Adding or modifying AWS resources (S3, IAM, CloudFront)
+- Adding or modifying AWS resources (S3, IAM, CloudFront, ACM, Route53, the downdetector Lambda with its SNS topic and EventBridge schedule)
 - Importing existing AWS resources into OpenTofu management
 - Reviewing infrastructure state and detecting drift
 - Recovering from failed applies or state issues
@@ -23,7 +23,7 @@ Guide for managing AWS infrastructure using OpenTofu (an open-source Terraform f
 2. **Never edit `.tfstate` files directly** - Use OpenTofu commands only
 3. **Never commit `.tfstate` files** - State lives in S3 (`.gitignore` prevents this)
 4. **Test in AWS Console first for complex changes** - Easier to iterate, then codify
-5. **Check for lock files** - If apply fails, clean up `.terraform.lock.info` in S3
+5. **Check for state locks** - If an apply is interrupted, release its lock with `tofu force-unlock <LOCK_ID>` (see Troubleshooting)
 
 ---
 
@@ -202,15 +202,21 @@ echo "Import complete. Run 'tofu plan' to check for drift."
 ```
 infra/
 ├── main.tf              # OpenTofu config (version, provider, S3 backend)
-├── variables.tf         # Input variables (aws_region, project, aws_account_id)
-├── outputs.tf           # Output values (CloudFront domains, ARNs)
-├── s3.tf                # S3 buckets (images, backups, full-backups)
+├── variables.tf         # Input variables (aws_region, project, aws_account_id, alert_email, maintenance_mode_enabled)
+├── outputs.tf           # Output values (site distribution domain, ACM certificate, nameservers)
+├── s3.tf                # S3 buckets (images, private, backups, full-backups)
 ├── iam.tf               # IAM users and policies
 ├── cloudfront.tf        # CloudFront distribution (images CDN)
-├── cloudfront_v2.tf     # CloudFront distribution for V2 app
+├── cloudfront_v2.tf     # The site's CloudFront distribution (gallformers.org in front of Fly)
+├── dns.tf               # Route53 zones and records for gallformers.org and gallformers.com
+├── lambda.tf            # Downdetector Lambda, SNS alert topic, schedule and alarm
+├── lambda/
+│   └── downdetector.mjs # The Lambda's code (the built .zip is NOT committed)
+├── terraform.tfvars     # Local values such as alert_email (NOT committed)
+├── .gitignore
 ├── README.md            # Architecture overview and resource docs
 ├── .terraform/          # Provider plugins (NOT committed)
-├── .terraform.lock.hcl  # Provider version lock file (committed)
+├── .terraform.lock.hcl  # Provider version lock file (NOT committed; gitignored at the repo root)
 └── (*.tfstate files)    # Local state files (NOT committed, state lives in S3)
 ```
 
@@ -219,12 +225,14 @@ infra/
 | File | Purpose |
 |------|---------|
 | `main.tf` | Core OpenTofu configuration: AWS provider, S3 backend for state storage |
-| `variables.tf` | Shared variables used across resources (region, project name, account ID) |
-| `outputs.tf` | Values to expose after apply (useful for integrations or manual reference) |
+| `variables.tf` | Shared variables used across resources (region, project name, account ID, downdetector alert email, maintenance mode) |
+| `outputs.tf` | Values to expose after apply: the site distribution's domain, the ACM certificate ARN and validation records, the Route53 nameservers |
 | `s3.tf` | S3 bucket resources with versioning, policies, CORS, public access controls |
 | `iam.tf` | IAM users (`litestream-gallformers` (historical name), `s3-upload`) and policies |
 | `cloudfront.tf` | CloudFront CDN for images with Origin Access Control |
-| `cloudfront_v2.tf` | CloudFront distribution for V2 app with custom domain and ACM cert |
+| `cloudfront_v2.tf` | The site's CloudFront distribution (resource name `v2`) in front of Fly, with its ACM certificate, cached `/assets/*` and `/tiles/*`, and the maintenance and outage pages |
+| `dns.tf` | Route53 hosted zones and records for gallformers.org and gallformers.com, and ACM validation records |
+| `lambda.tf` | The downdetector Lambda, its IAM role, SNS email topic, EventBridge schedule and CloudWatch alarm |
 
 ### State Storage
 
@@ -295,13 +303,13 @@ tofu import <resource_type>.<name> <aws_id>
 
 ### "State lock" error
 
-**Cause**: Previous `tofu apply` failed or was interrupted. Lock file remains in S3.
+**Cause**: Previous `tofu apply` failed or was interrupted. Its lock remains (`use_lockfile = true` in `main.tf` keeps it in S3 next to the state).
 
 **Fix**:
 1. Check no one else is running OpenTofu
-2. Manually delete the lock file from S3:
+2. Release the lock with the ID shown in the error:
    ```bash
-   aws s3 rm s3://gallformers-terraform-state/infra/terraform.tfstate.lock.info
+   tofu force-unlock <LOCK_ID>
    ```
 
 ### Drift detected but unsure what changed
@@ -398,7 +406,7 @@ If you applied changes that broke something:
 - [OpenTofu Documentation](https://opentofu.org/docs/)
 - [AWS Provider Docs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 - [infra/README.md](../infra/README.md) - Architecture overview and resource details
-- [docs/backup-setup.md](../docs/backup-setup.md) - S3/IAM configuration for backups
+- [postgres-maintenance.md](./postgres-maintenance.md#backups) - Database backups
 
 ---
 

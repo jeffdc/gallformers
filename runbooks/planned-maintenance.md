@@ -11,7 +11,7 @@ show the static maintenance page from CloudFront/S3 instead of the live app.
 
 ## Prerequisites
 
-- AWS CLI configured with appropriate credentials
+- An AWS CLI session: run `aws login` first (temporary credentials; no access keys)
 - OpenTofu installed (`tofu` CLI)
 - Static maintenance page already uploaded to:
   - `s3://gallformers-images-us-east-1/maintenance/maintenance.html`
@@ -63,21 +63,31 @@ curl -s -o /dev/null -w "%{http_code}" \
 
 ## Take the App Down
 
-Once maintenance mode is verified, proceed with the planned work. Examples:
+Once maintenance mode is verified, proceed with the planned work. Follow the safety rules in [Fly Operations](./fly-operations.md): get approval before each machine stop, start or update, and run one step at a time. Examples:
 
 ```bash
 fly apps restart gallformers --skip-health-checks
 ```
 
-Or for a full shutdown:
+Or for a full shutdown, stop the machine rather than scaling to zero (`fly scale count 0` destroys the machine, which Fly Operations forbids):
 
 ```bash
-fly scale count 0 -a gallformers
+fly machine list -a gallformers
+fly machine stop <MACHINE_ID> -a gallformers
 ```
+
+`fly.toml` sets `auto_start_machines = true`, so any request that reaches the app directly (for example `https://gallformers.fly.dev`) starts a stopped machine again. In maintenance mode CloudFront sends the site's traffic to S3, not to Fly.
 
 ## Restore Normal Traffic
 
-When maintenance is complete and the app is healthy again:
+When maintenance is complete, start the machine again if you stopped it (with approval), and check it is healthy:
+
+```bash
+fly machine start <MACHINE_ID> -a gallformers
+fly status -a gallformers
+```
+
+Then switch CloudFront back:
 
 ```bash
 cd ~/dev/gallformers/infra
