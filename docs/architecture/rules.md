@@ -106,4 +106,4 @@ Every automated check today, and the rules it holds.
 | `dev/githooks/pre-commit` | local commit | O3's review |
 | `dev/githooks/pre-push` | local push | O4 |
 | `mix smoke_test` | after each deploy | the production site answers |
-| Security Audit workflow (`hex.audit`, `deps.audit`, Sobelow `--exit high`) | CI: PRs, `main`, weekly; not a required check, and failing on known findings (Earmark retired, vulnerable dependencies) until a follow-up fixes them | dependencies; X1–X3 in part |
+| Security Audit workflow (`hex.audit`, `deps.audit`, Sobelow `--exit high`) | CI: PRs, `main`, weekly; not a required check; the dependency advisories were cleared in #612, and it fails on Sobelow's `Config.CSP` until production sends a Content-Security-Policy | dependencies; X1–X3 in part |

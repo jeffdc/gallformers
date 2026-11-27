@@ -46,7 +46,7 @@ Each step is reviewed by Jeff before the next starts.
 | 8 | Mull's 22 unsettled inbox entries (17 decisions, 4 questions, 1 review): each to Jeff, into the taxogall plan, or dropped | Not started |
 | 9 | `docs/plans/` scratch: a big pass, in batches (fold in, keep as history, or delete with Jeff's OK) | Not started; plan the batches when it starts |
 | 10 | Committed docs: current, update, or history; old-model docs, research, presentations, `docs/5c56-interview-summary.md`; stale mull pointers such as `docs/domain/domain-model.md`'s "design draft lives in mull matter 8567"; the domain doc updated to Jeff's 2026-11-15/16 decisions (Host ranges, observed range, Traits by Host) and organised into the doc set | Not started |
-| 11 | Adopt the architecture reviewer from heartwood (see below) | Waits for heartwood v0.1.1 |
+| 11 | Adopt the architecture reviewer from heartwood (see below) | Ready: heartwood v0.1.1 tagged 2026-11-26 (bf622eb); starts with the backlog's move onto `heartwood_guardrails` |
 
 **Why this order.** Mull's instructions went first so no session writes to it while it's extracted. The taxogall plan comes next, then the architecture baseline: knowing what's built tells us which docs are current, so the docs passes (9, 10) come after it. Branches, the backlog and the inbox can go in any order.
 
@@ -63,7 +63,7 @@ Asked for by Jeff through the oaks session, 2026-11-26: gallformers adopts the a
 
 ### Step 11: architecture reviewer
 
-Its shape is decided (Jeff, 2026-11-26, in oaks' `docs/facts-expansion/architecture-groundwork.md`, section 5); it is built in `heartwood_guardrails` for v0.1.1 (in review, not yet tagged), beside the reuse review.
+Its shape is decided (Jeff, 2026-11-26, in oaks' `docs/facts-expansion/architecture-groundwork.md`, section 5); it is in `heartwood_guardrails` v0.1.1 (tagged on bf622eb, jeffdc/heartwood#5), beside the reuse review; its CHANGELOG entry has the optional upgrade steps and its README the section "The architecture review". Oaks is moving to v0.1.1 and can serve as a reference setup.
 
 - `mix heartwood.architecture` (test env) writes the packet: the `mix xref` graph folded to contexts, every ratchet in `config :heartwood_guardrails, ratchets:` against its baseline, the commits since the last review (those after the last commit that changed `reviews.md`), `mix heartwood.status`, the architecture docs and the app's own questions. `review/architect.md` is the prompt, any model, read-only; `bin/record-architecture <model> -` keeps one report per model per run in git's common directory (`gallformers-architecture/<date-and-HEAD>/<model>.md`), shared by every worktree, nothing to gitignore. Jeff combines a run's reports into one `reviews.md` entry.
 - The task graphs the Mix project it runs in (the repo root). Gallformers sets in `dev/guardrails/config.sh` its architecture docs (default `docs/architecture/`), its questions for the reviewer (default `dev/guardrails/architecture.md`) and `HEARTWOOD_GRAPH_DEPTH` (default 3: how many path segments name a context, so `lib/gallformers/taxa.ex` and `lib/gallformers/taxa/ancestry.ex` both fold to `lib/gallformers/taxa`).
