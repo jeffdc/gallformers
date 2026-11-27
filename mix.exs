@@ -63,7 +63,7 @@ defmodule Gallformers.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:earmark, "~> 1.4"},
-      {:dns_cluster, "~> 0.2.0"},
+      {:dns_cluster, "~> 0.3.1"},
       {:bandit, "~> 1.5"},
       # API Documentation
       {:open_api_spex, "~> 3.18"},
