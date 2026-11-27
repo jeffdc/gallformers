@@ -1,14 +1,13 @@
 defmodule GallformersWeb.ReviewComponents do
   @moduledoc """
-  The pieces of the import review pages (`6611` Task 6, after the approved
-  design `docs/plans/review-redesign.html`; the steps and the question
-  layout after matter `d213`, Tasks 15 and 16): the step bar on every page
-  of a Source, the overview of its steps and a step page's head; a section
-  card of questions with its count, what leaving them means and a bulk
-  action; a question's row, a button that opens it, and its parts when
-  open (the question and its scope, the Source's quotes, the options as
-  radio cards with their follow-up input, the Decide bar, the notes, and
-  disclosures for details); progress; the two readers' cases and the
+  The pieces of the import review pages (`6611` Task 6; the steps and the
+  question layout after matter `d213`, Tasks 15 and 16): the step bar on
+  every page of a Source, the overview of its steps and a step page's
+  head; a section card of questions with its count, what leaving them
+  means and a bulk action; a question's row, a button that opens it, and
+  its parts when open (the question and its scope, the Source's quotes,
+  the options as radio cards with their follow-up input, the Decide bar,
+  the notes, and disclosures for details); progress; the two readers' cases and the
   definitions in play; a Trait term's Galls; and the tucked-away technical
   details. What an answer shows besides (Names and Galls steps): a taxon's
   identity line and whether it holds the Source's name, a Host's WCVP

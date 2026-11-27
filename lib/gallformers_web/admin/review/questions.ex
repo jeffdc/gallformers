@@ -7,9 +7,6 @@ defmodule GallformersWeb.Admin.Review.Questions do
   `g1`, `f5`), method codes and file names stay out of all of that; they go
   only in `technical`, for the tucked-away details.
 
-  The copy follows the approved design (`docs/plans/review-redesign.html`,
-  version 3), with the Source's name for "Ashmead" or "Floate".
-
   ## What the caller passes
 
   Nothing here reads the database. `present/2` takes, besides the item, a
