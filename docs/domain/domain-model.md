@@ -1,14 +1,14 @@
 # Gallformers Domain Model
 
-> **In discovery.** This document records the language of the domain — galls, the organisms connected to them, and the work of studying and cataloging them — as discovered from domain experts. It holds only concepts confirmed so far and how they relate. **It says nothing about software.** Mapping these concepts onto the system is separate work; the current design draft lives in mull matter `8567`. The current code follows [general.md](general.md) and [admin-domain-reference.md](admin-domain-reference.md).
+> This document is Gallformers' shared language: the words the domain uses (galls, the organisms connected to them, and the work of studying and cataloging them), what they mean, and the rules that follow from them. It is for the people who work on Gallformers, curators and developers alike, as much as for agents. **It says nothing about software:** how the system is built is in [the architecture docs](../architecture/README.md). The two are living documents, kept aligned with each other and with what's built; plans point to them rather than repeating them. Production (`main`) still runs the old model, described in [general.md](general.md) and [admin-domain-reference.md](admin-domain-reference.md), until the cutover.
 
 ## How this document is built
 
-Discovery first: find the words the domain actually uses, what they mean, and how they relate — then, separately, map them onto software. A term lands here only once a domain expert has confirmed it. Where a word's meaning is still being worked out, it is listed under *Being discovered*, not defined.
+A term lands here only once a domain expert has confirmed it, and a rule once it's decided; [where each decision came from](#where-the-decisions-came-from) is at the end. Where a word's meaning is still being worked out, it is listed under *Being discovered*, not defined.
 
 ## What Gallformers is
 
-A website and database to aid the **Identification** and **Cataloging** of gall-inducing organisms. Gallformers aims to **Source** every **Fact** it states about Galls.
+A website and database to aid the **Identification** and **Cataloging** of gall-inducing organisms. Gallformers aims to **Source** every **Fact** it states about Galls. It documents galls, not lookalikes.
 
 ## Confirmed concepts
 
@@ -17,11 +17,12 @@ A website and database to aid the **Identification** and **Cataloging** of gall-
 - **Gall** — a novel structure on a plant, induced by another organism in a repeatable way. The word means both the individual one you find and the abstract thing all such finds are instances of; context tells you which. (In this document, "Gall" alone means the abstract one; an individual gall is an *observed gall*, part of an Observation.)
 - **Host** — the plant a Gall forms on.
 - **Inducer** — the organism that **induces** a Gall. Inducers come from any of the kingdoms of life.
-- **Generation** — some Inducers are multivoltine, and each generation produces a distinct Gall (in Cynipini, an agamic and a sexual generation). Terms vary by group.
+- **Generation** — some Inducers are multivoltine, and each generation produces a distinct Gall (in Cynipini, an agamic and a sexual generation). Terms vary by group (see *Traits*).
 - **Gall Community** — all the organisms involved in a Gall's existence: the Inducer, the Host, Parasitoids, Inquilines, herbivores, organisms that move into a vacant Gall, and so on.
 - **Inquiline** — lives in a Gall it didn't induce; some change the Gall's form.
 - **Parasitoid** — kills its host organism within the Gall; hyperparasitoids parasitize Parasitoids.
 - **Non-Gall** — something that looks like a Gall but isn't: a plant's damage response, or a structure an arthropod builds for eggs or pupation. Outside what Gallformers catalogs.
+- **Gall name** — a Gall is named from its Inducer plus parts of its own: its form, its generation, its Host. A curator can override the name, and every Gall's name is unique. A Gall whose Inducer is undescribed is named by a descriptor instead.
 
 ### Observations
 
@@ -42,48 +43,68 @@ A website and database to aid the **Identification** and **Cataloging** of gall-
 
 - **Taxonomy** and **Taxon** — the standard scientific meanings.
 - **Gallformers' Taxonomy** follows the literature. Names, placements and synonymy come from Sources; a curator accepts or declines each newer Source's taxonomic statement. Gallformers takes a taxonomic position of its own only as a rare exception (an undescribed Gall's Inducer, or a position no Source supports), and then the Source is Gallformers.
-- **Host Taxonomy** — plant taxonomy generally comes from POWO.
+- **Curated and imported taxa** — the taxa of the whole Gall Community, and the rare plant that forms a gall itself, are **curated**: Gallformers keeps their taxonomy from the literature. Plants are **imported**.
+- **Plants** — Gallformers is not an authority on plants. A plant's names, synonymy, placement, common names and range are Facts from POWO/WCVP or iNaturalist, which also backs the higher taxa of non-plants. A curator who corrects one makes a Gallformers statement.
+- **Taxonomic act** — a rename, move, merge (lump) or split. Each is sourced, and the earlier taxonomy stays in the history. A Gall is not renamed by a taxonomic act on its own: the new Gall name is proposed for a curator to review. When a split is accepted, a curator says, for each Gall, which daughter induces it; when a lump is accepted, its Galls move to the taxon they were lumped into.
 
 ### Knowledge, Sources, and Facts
 
-- **Source** — documented scientific discovery: a paper, book, website, or database (iNaturalist, as a database, is a Source), research data from pending (unpublished) research — such as a lab's records of galls it is still describing — or other documented work. **Gallformers itself is a Source**, authored by "Gallformers Contributors," for curator knowledge (Hosts seen in Observations, corrections, descriptions) and, rarely, a taxonomic position no other Source supports.
+- **Source** — documented scientific discovery: a paper, book, website, or database (iNaturalist, as a database, is a Source), research data from pending (unpublished) research — such as a lab's records of galls it is still describing — or other documented work. Sources never cite each other formally in Gallformers' data.
+- **Gallformers as a Source** — Gallformers is two Sources, both authored by "Gallformers Contributors":
+  - **Gallformers legacy data** holds what the old site recorded. It is undated, so any dated statement overrides it, and a Fact only it supports shows as unconfirmed.
+  - **Gallformers** holds the curators' own statements, each dated when it was made: curator knowledge (Hosts seen in Observations, corrections, descriptions) and, rarely, a taxonomic position no other Source supports.
 - **Citation** — a Source is cited on a Gall's page (today, e.g., `/gall/587?source=58`); individual Facts may later get their own links.
-- **Fact** — a statement about a Gall (its Traits, the Species that induces it, its Hosts, the Places it occurs, its Inducer's placement in the Taxonomy — what the literature and research tell us). A Fact stands on its own; Sources **confirm** or **deny** it. Every Fact is attributed to at least one Source.
-- **Newer work wins** — what Gallformers currently holds is decided by the most recently authored Source to confirm or deny a Fact, not by when Gallformers learned of it. A Fact a newer Source denies is **withdrawn**; where a Fact has one value (a placement, a current name), a newer value **supersedes** the older one. Both stay visible as history. Gallformers states its own position on a Gall by making a newer statement as a Source. Taxonomy differs: a newer Source's taxonomic statement counts only once a curator accepts it, and a curator who doesn't follow it declines it with a reason instead of stating a Gallformers position.
+- **Fact** — a statement about a Gall or a taxon: a Gall's Traits, the Species that induces it, its Hosts, its Relationships, where it occurs, its abundance; a taxon's name, placement and synonymy; a plant's range. A Fact stands on its own; Sources **confirm** or **deny** it. Every Fact is attributed to at least one Source.
+- **Editorial content** — what Gallformers writes or keeps that isn't a Fact and needs no Source: a Gall's name parts, its ID notes (guidance for telling it apart, attached to no Source), its photos, and, on an undescribed Gall only, its Gallformers code; also keys, articles, the glossary and the people who use the site.
+- **Attribution** — what ties a Source to a Fact: whether the Source confirms or denies it, the quote that says so and where in the Source it is, the name as the Source wrote it for each taxon it names, any Observations it cites, and the statement in words.
+- **Newer work wins** — what Gallformers currently holds is decided by the most recently authored Source to confirm or deny a Fact, not by when Gallformers learned of it. A Fact a newer Source denies is **withdrawn**; where a Fact has one value (a placement, a current name), a newer value **supersedes** the older one. Both stay visible as history. When two Sources of the same date disagree, a curator decides. Gallformers states its own position on a Gall by making a newer statement as a Source. Taxonomy differs: a newer Source's taxonomic statement counts only once a curator accepts it, and a curator who doesn't follow it declines it with a reason instead of stating a Gallformers position.
+- **Standing** — where a Fact stands: **current**, **withdrawn**, **superseded**, **retracted** (every Source that supported it is retracted), or **unsupported** (nothing that counts supports it, such as a taxonomic statement no curator has accepted; hidden).
+- **Facts are never edited or deleted.** A newer statement overrides an older one, which stays in the record. The only deletion is of data added by mistake or in testing.
 - **Reading** — how Gallformers read a Source: the Facts it took the Source to state, in the Source's own words. A **misreading** (a Host the Source doesn't name, the wrong value) is fixed under that Source's authority, at its date: the Source didn't say it, or said something else. Fixing a reading takes no Gallformers position, and is not a **Correction**, which only a Source publishes.
 - **Correction** and **retraction** — a published correction (erratum, corrigendum) or a later revision is simply a newer Source. A **retracted** Source can no longer be relied on: everything it confirmed or denied stops counting, and it stays visible, marked as retracted.
 - **Relationship** — the formal, general connection between a Gall and another member of its Community, e.g. "the *Andricus weldi* gall has Parasitoid *Torymus* sp." A Relationship is a Fact. The word is not used for connections between individual Observations.
 - **Observations and Facts** — Observations are not Facts and are never Sources, but they can support Facts: a Source's statement can cite them. Typically the Source is Gallformers — e.g. "the *Andricus weldi* gall has Parasitoid *Torymus* sp., according to iNaturalist Observations 12345 and 67890."
-- **Observational data** — Observations shown as what they are, without a Fact per Observation. For example, Research Grade locations overlaid on a range map show where a Gall has actually been seen. At most, the body of Research Grade iNaturalist Observations counts as one Source.
-- **Potential range** — where a Gall *could* occur: the union of its Hosts' ranges. Every Gall has one, and it follows from its Host Facts (a Gall linked to a Host inherits that Host's range). A Host's range is outside Gallformers' Facts: it comes from POWO, and curators can adjust it. For most Galls this is the best information there is, and the site says so.
-- **Range exclusion** — a Fact that removes a region from a Gall's potential range: a region within its Hosts' ranges where the Gall doesn't occur. Sources can state them; a curator removing a region is an exclusion attributed to Gallformers. A Source can also say the Gall occurs *only* in certain regions.
-- **A Gall's range never extends beyond its Hosts' ranges** (native or introduced). A Gall recorded where none of its Hosts grows is a statement about a Host's range — the Host grows there, perhaps introduced or planted — not about the Gall's.
-- **Observed range** — where a Gall has actually been found, from observational data. Future.
+- **Curator** — a person who reviews what Gallformers read a Source to say, settles its conflicts and applies it. Nothing changes on the site until a curator applies it: people stay responsible for what goes in.
 - **Attribution vs. audit** — **attribution** is whose authority stands behind a Fact (for curator knowledge, Gallformers); **audit** is which person made a change. They are different questions.
+
+### Ranges
+
+- **Place** — a country or a region within one (ISO), a botanical region (TDWG), or a named area. Any place covers the smallest places within it, so a Fact about a large place counts for each of them.
+- **Host range** — where a plant grows: Facts on the plant, each place **native** or **introduced**, mostly from POWO/WCVP in its own regions.
+- **Potential range** — where a Gall *could* occur: its Hosts' native range, narrowed by the Gall's **only within** and **absent from** Facts. A region where a Host is introduced counts only when there's evidence the Gall occurs there. Every Gall has a Host, and every Host a range, so every Gall has a potential range; for most Galls it's the best information there is, and the site says so.
+- **Only within** and **absent from** — Facts that narrow a Gall's potential range: a Source says the Gall occurs only in certain places, or not in a place its Hosts grow. A curator removing a place is an *absent from* Fact attributed to Gallformers.
+- **Occurrence** — a Fact that a Gall was found somewhere: at a point (with its uncertainty, its date and the Observation it cites) or in a place.
+- **Observed range** — where a Gall has actually been found: its occurrences. An occurrence counts even when it conflicts with an *only within* or *absent from* Fact; the conflict goes to a curator.
+- **A Gall's range never extends beyond its Hosts' ranges** (native or introduced). A Gall recorded where none of its Hosts grows is a statement about a Host's range — the Host grows there, perhaps introduced or planted — not about the Gall's.
+- **Using ranges** — identifying by place, and a place's list of Galls, use both the potential and the observed range, and say why each Gall matched.
 
 ### Traits
 
-Traits describe a Gall. Traits of the abstract Gall are Facts; the Traits of an observed gall are part of its Observation. Except for generation and detachable, a Gall can have several values of each Trait.
+Traits describe a Gall, and they belong to the Gall: a Trait never varies by Host. Where a Gall really differs on one Host, that's a separate Gall entry (see *Cataloging*). Traits of the abstract Gall are Facts; the Traits of an observed gall are part of its Observation. Except for generation and detachable, a Gall can have several values of each Trait.
 
-| Trait | What it describes | Values supported today |
-|---|---|---|
-| **Generation** | which generation of the Inducer's life cycle the Gall belongs to | terms vary by group. Provisional list: agamic, sexual, spring, summer, autumn (aphid host-alternation phases still open) |
-| **Detachable** | whether the Gall separates from the plant | integral, detachable, both, unknown |
-| **Plant part** | where on the Host the Gall forms | at leaf vein angles, between leaf veins, bud, flower, fruit, leaf, leaf edge, leaf midrib, lower leaf, on leaf veins, petiole, stem, underground (roots+), upper leaf (`leaf` contains the leaf values: on the leaf, no more precise place stated) |
-| **Form** | the Gall's overall type | abrupt swelling, bullet, hat, hidden cell, jacket, leaf blister, leaf curl, leaf edge fold, leaf edge roll, leaf snap, leaf spot, modified capitulum, oak apple, pip, plum, pocket, rust, scale, stem club, tapered swelling, wig, witches broom |
-| **Shape** | its geometry | cluster, conical, cup, cylindrical, globular, hemispherical, linear, numerous, rosette, spangle/button, sphere, spindle, tuft |
-| **Color** | its colors | black, brown, gray, green, orange, pink, purple, red, tan, UV, white, yellow |
-| **Texture** | its surface | areola, bumpy, erineum, glaucous, hairless, hairy, honeydew, leafy, mealy, mottled, pubescent, resinous dots, ribbed, ruptured/split, spiky/thorny, spotted, stiff, striped, succulent, woolly, wrinkly |
-| **Alignment** | how it sits on the plant | drooping, erect, integral, leaning, supine |
-| **Walls** | its wall structure | false chamber, mycelium lining, ostiole, radiating-fibers, slit, spongy, thick, thin |
-| **Cells** | its larval chambers | monothalamous (one), polythalamous (many), free-rolling, not applicable |
-| **Season** | when it forms and grows (not when it is seen, nor when the Inducer emerges) | Spring, Summer, Fall, Winter |
+| Trait | What it describes |
+|---|---|
+| **Generation** | which generation of the Inducer's life cycle the Gall belongs to |
+| **Detachable** | whether the Gall separates from the plant |
+| **Plant part** | where on the Host the Gall forms |
+| **Form** | the Gall's overall type |
+| **Shape** | its geometry |
+| **Color** | its colors |
+| **Texture** | its surface |
+| **Alignment** | how it sits on the plant |
+| **Walls** | its wall structure |
+| **Cells** | its larval chambers |
+| **Season** | when it forms and grows (not when it is seen, nor when the Inducer emerges) |
+
+Each Trait's values, with what each means and how the terms Sources use map onto them, grow as Sources are read. Gallformers' database holds them, published for anyone to read in [`priv/import/vocab/traits.json`](../../priv/import/vocab/traits.json).
+
+**Generations** come in groups, each for the taxa whose life cycle it describes: *heterogony* (agamic and sexual, in Cynipini), *seasonal* (spring, summer and autumn generations, in gall midges and others), *rust stages*, and the *aphid life cycle*. The group for a Gall's Inducer is the one mapped to its nearest ancestor that has one.
 
 **Place**, **Time**, and a **DNA Barcode** are Traits of an observed gall (see *Observations*).
 
 ### Relationships
 
-A Relationship is the formal, general connection between a Gall and a member of its Community. Each is a Fact. The kinds:
+A Relationship is the formal, general connection between a Gall and a member of its Community. Each is a Fact. The kinds are a fixed list:
 
 | Relationship | Inverse | Meaning | Qualifiers |
 |---|---|---|---|
@@ -113,7 +134,7 @@ Parasitism mode covers idiobiont/koinobiont, solitary/gregarious, and ecto/endo.
 - **Every Relationship between two organisms happens in a Gall.** Gallformers records "this wasp parasitizes that wasp *in this Gall*," never a free-standing interaction. This keeps Gallformers a gall database rather than a general species-interaction database.
 - **A genus-level Host** means the Host was identified only to genus, not that the Gall occurs on every species in it.
 - **Hyperparasitism** follows from chains of *parasitoid of*; it isn't a Relationship of its own.
-- **Alternate generations are stated on their own evidence,** not inferred from a shared Inducer: research often shows two Galls alternate before the Taxonomy merges their names.
+- **Alternate generations are stated on their own evidence,** not inferred from a shared Inducer: research often shows two Galls alternate before the Taxonomy merges their names. Gallformers flags for a curator two generations of one Inducer that no *alternate generation of* links, and alternate generations whose Inducers differ.
 - **Uncertainty lives in the Source**, not in the Relationship: there are no "suspected" or "confirmed" kinds.
 
 **Worked cases:**
@@ -151,12 +172,23 @@ Parasitism mode covers idiobiont/koinobiont, solitary/gregarious, and ecto/endo.
 ## How the concepts relate
 
 - An Inducer induces Galls on Hosts. One Inducer can induce several Galls (one per generation, sometimes different forms).
-- An Observation is one observed gall; Facts are about the abstract Gall. Sources state Facts; Observations support them, or are shown directly as observational data.
+- An Observation is one observed gall; Facts are about the abstract Gall. Sources state Facts; Observations support them, and a Gall's occurrences cite them.
 - Identification goes from an Observation's Traits to a Gall, and through the Gall to the best-known Taxon for its Inducer.
 - Taxonomic changes change names and placements; the Galls an organism induces don't change because its name did.
+- A Gall's potential range follows from its Hosts; its observed range from its occurrences.
 
 ## Being discovered
 
-- **Traits that vary by Host** — can a Trait (plant part, timing, minor form) apply only on a particular Host ("petiole on *Q. rubra*, leaf on *Q. velutina*")? Leaning no: real host-dependent differences go in a Source's statement or justify a separate Gall entry. Needs a definitive answer.
-- **Taxonomy in detail** — names, placement, and taxonomic changes as researchers experience them. Later.
+- **Taxonomy in detail** — names, placement, and taxonomic changes as researchers experience them, and how a curator works through them. Later, in the taxonomy design session.
 - Snapshot of the earlier draft, for reference: `docs/plans/domain-model-v1-2026-10-04.md` (local).
+
+## Where the decisions came from
+
+The concepts came from discovery with Jeff and Adam, 2026-09-30 to 2026-10-04. Decisions since then, with their old-tracker IDs (read with git; see AGENTS.md, "Old IDs"):
+
+- Gallformers owns its taxonomy, sourced like every other Fact (Adam and Jeff, 2026-10-03/04; matter 8567).
+- A Gall's range never extends beyond its Hosts' ranges (Jeff, 2026-10-26; matter 3272).
+- Gallformers as two Sources, legacy data and Gallformers (Jeff, 2026-11-14).
+- Curated and imported taxa; Traits never vary by Host (Jeff, 2026-11-15).
+- Plants, what is a Fact and what is editorial, and ranges (Jeff, 2026-11-16; d178 for what is a Fact).
+- Galls, not lookalikes; every Fact traced to its Source and never edited or deleted; curation is review (Jeff and Adam to curators, 2026-11-17; [the summary](../presentations/2026-11-reboot-summary.md)).

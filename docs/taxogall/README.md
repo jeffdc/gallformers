@@ -42,7 +42,7 @@ A new back-end, built whole on `taxogall`, replaces the old one in place, with n
 
 ## Settled decisions (do not reopen)
 
-The domain language (Gall, Source, Fact, Reading, Correction, Relationship, newer work wins, the curator gate on taxonomy) is in [domain-model.md](../domain/domain-model.md) and isn't repeated here. Where that doc is behind the decisions below (Host ranges, observed range, Traits by Host), the decisions stand; the doc is updated and organised into the doc set in the cleanup plan.
+The domain's language and its settled rules are in [domain-model.md](../domain/domain-model.md) and aren't repeated here: Galls and their names, taxonomy and the curator gate, plants, taxonomic acts, Sources and Facts (newer work wins, standings, attribution, the two Gallformers Sources, what is a Fact and what is editorial), ranges, Traits and generations, and Relationships. The system as built is in [the architecture docs](../architecture/README.md). This section holds what the work needs beyond them.
 
 **One write path** (Jeff, 2026-11-12):
 
@@ -55,32 +55,20 @@ The domain language (Gall, Source, Fact, Reading, Correction, Relationship, newe
 
 **Two systems** (Adam and Jeff, 2026-10-03/04): a taxonomy system (taxa, names, authorship, rank, placement, synonymy, taxonomic acts and their history) and a gall system (Galls, Traits, Relationships, ranges, gall aliases). They share Sources and Facts, history, audit and import, and are black boxes behind Phoenix contexts enforced by `boundary`. The contract between them is stable taxon IDs at any rank; nothing else crosses. Hot reads across the boundary go through published read models; writes that span it compose into one transaction.
 
-- **Plants** (Jeff, 2026-11-16): Gallformers is not an authority on plants. Plant names, synonymy, placement, common names and Host ranges are Facts from POWO/WCVP or iNaturalist, in the same taxonomy structure; a curator's correction is a Gallformers statement.
-- **Taxon origin:** *curated* (the whole Gall Community and the rare gall-forming plant; Jeff, 2026-11-15) or *imported* (plants, from POWO/WCVP or iNaturalist; iNaturalist also backs non-plant higher taxa).
+- **Plants** are in the same taxonomy structure as the curated taxa.
 - **Isolation:** taxonomy knows nothing about Galls; the gall system knows taxa only by ID and through the taxonomy API. The UI may hide the separation.
 - **IDs:** one shared sequence for Galls and all taxa, continuing today's species sequence. Galls keep their IDs (`/gall/:id`), plants theirs (`/host/:id`), because image paths are keyed by them; Inducers and higher taxa get new IDs, with a crosswalk for the old higher-taxon IDs.
-- **Taxonomic acts** (rename, move, merge, split) are sourced and keep history. Taxonomy calls registered "taxon changed" listeners inside its own transaction, and the change fails if the gall side can't accept it. The exception is Gall names: a rename that follows from a taxonomy change is a proposal a curator reviews. An accepted split asks, per Gall, which daughter induces it; an accepted lump moves the Galls.
-- **Relationships** belong to the gall system, and every Relationship happens in a Gall. Their types are a fixed system list (15 kinds). Hyperparasitism is derived, not stored. Alternate generations are explicit, and mismatches are flagged.
-- **Traits belong to the Gall** and never vary by Host (Jeff, 2026-11-15).
-- **Gall names** are derived from the Inducer plus name parts stored on the Gall (form, generation, Host), overridable and unique; undescribed Galls use a stored descriptor.
-- **Generations:** groups of values (heterogony, seasonal, rust stages, aphid life cycle) are a system list mapped to taxa; the Inducer's nearest mapped ancestor decides which apply.
+- **Taxonomic acts:** taxonomy calls registered "taxon changed" listeners inside its own transaction, and the change fails if the gall side can't accept it.
+- **Relationship types and generation groups** are system lists; hyperparasitism is derived, not stored.
 
 **Sources and Facts**, beyond the domain doc:
 
-- Standings: current, withdrawn, superseded, retracted, unsupported (hidden). Same-date conflicts go to a curator.
-- Each Fact kind has a natural key. An attribution carries its stance, quote and page hint, `name_as_written` for each taxon the Source names, cited Observations, and statement text. Sources never reference each other formally. Delete is only for data added by mistake or in testing.
-- **Two Gallformers Sources** (Jeff, 2026-11-14): *Gallformers legacy data* holds the old site's data and is undated, so every dated statement overrides it, and a Fact supported only by it shows as unconfirmed. *Gallformers* holds the curators' own statements, each timestamped by its change.
+- Each Fact kind has a natural key.
 - Today's taxonomy tree comes in as Gallformers legacy data. The tree tables stay what every page reads, rewritten from the accepted statements in the same transaction and guarded by a rebuild-and-compare check.
 
-**What is a Fact** (Jeff, 2026-11-16; d178): plant taxonomy, Host ranges, generation and abundance are Facts. A Gall's name parts, ID notes, photos and the Gallformers code (on undescribed Galls only) are editorial, as are keys, articles, the glossary and users. The data-complete flags, a Gall's lead Source, and curator notes on Facts and taxa are dropped.
+**Dropped** (Jeff, 2026-11-16; d178): the data-complete flags, a Gall's lead Source, and curator notes on Facts and taxa. What is a Fact and what is editorial is in the domain doc.
 
-**Ranges** (Jeff, 2026-11-16):
-
-- Places: ISO places, TDWG regions and named areas, with PostGIS boundaries; any place resolves to the leaf places it covers.
-- Host ranges are Facts on the plant (native or introduced), WCVP's in its own regions.
-- A Gall's predicted range is its Hosts' native range, narrowed by its *only within* and *absent from* Facts; an introduced region counts only with evidence. Its observed range is occurrence Facts: a point (with uncertainty, date and cited observation) or a place.
-- The ID tool and place pages use both and say why a Gall matched. An observed place counts even while it conflicts with a restriction; the conflict goes to a curator.
-- No Gall without a range: every Gall has a Host, and every Host a range.
+**Ranges** (Jeff, 2026-11-16) are in the domain doc. Places get PostGIS boundaries.
 
 **The old site's data** (Jeff, 2026-11-12 and 11-15):
 
