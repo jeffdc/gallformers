@@ -62,8 +62,8 @@ defmodule Gallformers.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
-      {:earmark, "~> 1.4"},
-      {:dns_cluster, "~> 0.2.0"},
+      {:mdex, "~> 0.14"},
+      {:dns_cluster, "~> 0.3.1"},
       {:bandit, "~> 1.5"},
       # API Documentation
       {:open_api_spex, "~> 3.18"},
@@ -73,10 +73,10 @@ defmodule Gallformers.MixProject do
       {:ueberauth, "~> 0.10"},
       {:ueberauth_auth0, "~> 2.1"},
       # AWS S3 for image uploads
-      {:ex_aws, "~> 2.5"},
+      {:ex_aws, "~> 2.8"},
       {:ex_aws_s3, "~> 2.5"},
       {:sweet_xml, "~> 0.7"},
-      {:hackney, "~> 1.20"},
+      {:hackney, "~> 4.12"},
       # Image processing
       {:image, "~> 0.54"},
       # CSV parsing for WCVP reconciliation

@@ -229,22 +229,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
   attr :label, :string, required: true
   attr :href, :string, required: true
   attr :icon, :string, required: true
-
-  defp toolbar_button(assigns) do
-    ~H"""
-    <a
-      href={@href}
-      class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gf-maroon hover:text-white hover:border-gf-maroon transition-colors group"
-    >
-      <.icon name={@icon} class="h-4 w-4 text-gf-maroon group-hover:text-white" />
-      {@label}
-    </a>
-    """
-  end
-
-  attr :label, :string, required: true
-  attr :href, :string, required: true
-  attr :icon, :string, required: true
   attr :accent, :string, default: "maroon"
   attr :small, :boolean, default: false
   attr :disabled, :boolean, default: false
