@@ -24,11 +24,13 @@ From the [2026-11-26 architecture review](architecture/reviews.md#2026-11-26-bas
 - **The health check's 503 body includes `inspect(reason)`** (`health_controller.ex:16`), which can expose database error detail publicly.
 - **Preview may fail browser uploads.** The images bucket's CORS (`infra/s3.tf`) omits `gallformers-preview.fly.dev`, while `check_origin` allows it. Inferred, not tested.
 - **Carbonite rollbacks may be refused.** About twenty migrations call `Carbonite.Migrations.insert_migration_transaction/1` with no `meta:` (mostly in `down/0`, e.g. `20261027130000_add_gall_rename_queue_kind.exs:42`); Carbonite's default meta has no actor or operation, so the `transactions_meta_attribution` CHECK would likely reject those rollbacks. Not run to confirm.
-- **Checks that will break at release.** `db-snapshot.yml`'s sanity check needs 5,000 rows in `species`, which goes after release; `mix smoke_test` checks `/api/v2`, which answers 410 at release. For the cutover phase.
+- **Checks and settings to change at release.** `db-snapshot.yml`'s sanity check needs 5,000 rows in `species`, which goes after release; `mix smoke_test` checks `/api/v2`, which answers 410 at release; Dependabot's `target-branch: taxogall` and `taxogall` in the `pull_request` branches of `ci.yml` and `security.yml` (#617) go once `taxogall` is merged. For the cutover phase.
 
 - **Contexts reach into each other's tables** (rules S1 and S4; Jeff, 2026-11-26: fix through the owners' APIs). Carbonite's tables read outside Audit; Import querying Taxa, Catalog, Places and Sources schemas; Search, Images and Ranges reading other contexts' tables; Catalog reading Taxa's, Images', Places' and Sources' tables. rules.md lists every location. Pick each up in the taxogall phase that reworks the module (the one-write-path phase rewrites most of Import).
 - **Tests hard-code seed IDs and skip the data checks** (rules T3 and T6; Jeff, 2026-11-26). Look seed rows up (`Taxa.get_by_legacy_id/2`) in the 62 routes that hard-code them, turn `TestsOwnTheirData` back on in the 35 files that disable it, and register `FlashOnlyAssertions` once its candidates pass.
 - **Production can scale past one machine** (rule O9). `fly.toml` sets no maximum; cap it at one.
+
+- **Upgrade LiveView to 1.2, Hammer to 7, LiveDashboard to 0.9, Boundary to 0.12 and Credo to 1.7.19 on `taxogall`** (Jeff, 2026-11-26: closed on `main` as #615, done on `taxogall` instead). Hammer 7 rewrites its API (`plugs/rate_limiter.ex` calls the removed `Hammer.check_rate/3`); LiveView 1.2 is stricter about component attributes (`target` on `action_button`) and its formatter reformats `gall_live.ex`; Boundary 0.12 enforces the context rules (rules S2, S11), so check it reports the same. Dependabot will open these against `taxogall` once #617 merges.
 
 ## Ideas
 
