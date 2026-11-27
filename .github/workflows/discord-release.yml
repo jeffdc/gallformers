@@ -10,6 +10,10 @@ on:
         required: true
         type: string
 
+# The GITHUB_TOKEN only reads the repository; nothing here writes to GitHub.
+permissions:
+  contents: read
+
 jobs:
   notify:
     name: Post to Discord

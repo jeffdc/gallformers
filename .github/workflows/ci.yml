@@ -29,6 +29,10 @@ concurrency:
 # Steps run through `nix develop`; the shell is pre-built in its own step so a broken
 # shell fails clearly and doesn't skew step timings.
 
+# The GITHUB_TOKEN only reads the repository; nothing here writes to GitHub.
+permissions:
+  contents: read
+
 jobs:
   phoenix:
     name: Phoenix

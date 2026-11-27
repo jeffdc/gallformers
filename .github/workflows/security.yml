@@ -16,6 +16,10 @@ on:
     - cron: '0 0 * * 1'
   workflow_dispatch:
 
+# The GITHUB_TOKEN only reads the repository; nothing here writes to GitHub.
+permissions:
+  contents: read
+
 jobs:
   elixir-audit:
     name: Elixir Security Audit
