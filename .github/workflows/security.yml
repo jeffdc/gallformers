@@ -36,7 +36,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: changes
-        uses: jeffdc/heartwood/guardrails/actions/changes@v0.2.2
+        uses: jeffdc/heartwood/guardrails/actions/changes@v0.2.3
 
   elixir-audit:
     name: Elixir Security Audit

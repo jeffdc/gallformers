@@ -14,10 +14,18 @@ Template:
 - **Source:** commit, PR, plan doc, or mull or matter ID
 ```
 
+## 2026-11-27: AGENTS.md and CLAUDE.md are prose too
+
+- **Why:** Jeff's rule that doc-only changes need no review covers AGENTS.md and CLAUDE.md; heartwood_guardrails v0.2.3 stopped hard-coding them as reviewed and added `HEARTWOOD_CODE`, so the Markdown that code reads can stay reviewed under a `*.md` pattern.
+- **Changes:** `HEARTWOOD_PROSE="docs/ runbooks/ *.md"` and `HEARTWOOD_CODE="priv/import/ services/import-producer/prompts/"` in `dev/guardrails/config.sh`, for the commit gate and CI alike (`HEARTWOOD_CI_PROSE` and `HEARTWOOD_CI_CODE` are gone). Rule O3.
+- **Source:** Jeff, 2026-11-27; heartwood_guardrails v0.2.3. Supersedes the prose list in the entry below.
+
 ## 2026-11-27: Take the guardrails from heartwood, and let prose through without a review
 
+- **Superseded by:** 2026-11-27, "AGENTS.md and CLAUDE.md are prose too", for the prose list.
+
 - **Why:** the guardrails (the ratchets, retirements, the commit gate and push guard, the review scripts, `check-toolchain`, the architecture review) are the same in gallformers and Oak Compendium, so they live once, in heartwood (2026-11-26, the backlog's heartwood entry). Waiting on a reuse review for a change to documentation only slows the work and finds nothing.
-- **Changes:** `heartwood_guardrails` is a dev and test dependency pinned by tag (`@heartwood_tag`, v0.2.2), configured in `dev/guardrails/config.sh`; `dev/githooks/` holds heartwood's shim, failing closed without `deps/`. Gallformers keeps its own rules: the conformance patterns (`GallformersWeb.DesignSystem.Conformance`, now in `test/support/`), the baselines, the retirements list, the reviewer's checklist (`dev/guardrails/checklist.md`) and the architecture questions (`dev/guardrails/architecture.md`). The commit gate's prose widens from `docs/`, `runbooks/` and the README to the Markdown outside the code (CODING_STANDARDS.md, DESIGN.md, PRODUCT.md, `infra/README.md`, `prompts/`); AGENTS.md and CLAUDE.md stay reviewed, which heartwood's hook requires. CI skips its code jobs on a PR that changes only prose (heartwood's `actions/changes`), and runs them if the classifier fails. Rules S8, S9, U2, O1, O3, O4; README, Delivery.
+- **Changes:** `heartwood_guardrails` is a dev and test dependency pinned by tag (`@heartwood_tag`, v0.2.2 then), configured in `dev/guardrails/config.sh`; `dev/githooks/` holds heartwood's shim, failing closed without `deps/`. Gallformers keeps its own rules: the conformance patterns (`GallformersWeb.DesignSystem.Conformance`, now in `test/support/`), the baselines, the retirements list, the reviewer's checklist (`dev/guardrails/checklist.md`) and the architecture questions (`dev/guardrails/architecture.md`). The commit gate's prose widens from `docs/`, `runbooks/` and the README to the Markdown outside the code (CODING_STANDARDS.md, DESIGN.md, PRODUCT.md, `infra/README.md`, `prompts/`); AGENTS.md and CLAUDE.md stay reviewed, which heartwood's hook requires. CI skips its code jobs on a PR that changes only prose (heartwood's `actions/changes`), and runs them if the classifier fails. Rules S8, S9, U2, O1, O3, O4; README, Delivery.
 - **Source:** Jeff, 2026-11-27; [cleanup step 11](../cleanup/README.md#step-11-onto-heartwood_guardrails-with-the-architecture-reviewer).
 
 ## 2026-11-26: Settle the baseline review's findings
