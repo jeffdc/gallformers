@@ -21,22 +21,6 @@ on:
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'lib/**'
-      - 'config/**'
-      - 'assets/**'
-      - 'priv/**'
-      - 'test/**'
-      - 'mix.exs'
-      - 'mix.lock'
-      - 'flake.nix'
-      - 'flake.lock'
-      - 'Dockerfile'
-      - 'Dockerfile.preview'
-      - 'scripts/**'
-      - 'dev/**'
-      - '.credo.exs'
-      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 concurrency:
