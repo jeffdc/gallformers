@@ -75,7 +75,7 @@ From core-architecture-rules.md's principles (retired 2026-11-26, moved here).
 
 | ID | Rule | Source | Check | Baseline |
 |---|---|---|---|---|
-| O1 | Work is finished only when `make done-checks` passes (test database rebuild, `mix precommit`, Dialyzer). | AGENTS.md, Work tracking | Local only. CI runs the same checks, but only for `main` and PRs into it. | Pushes to `taxogall` get no CI run. |
+| O1 | Work is finished only when `make done-checks` passes (test database rebuild, check-toolchain, `mix precommit`, Dialyzer). | AGENTS.md, Work tracking | Local only. CI runs the same checks, but only for `main` and PRs into it. | Pushes to `taxogall` get no CI run. |
 | O2 | Always compile with `--warnings-as-errors`. | AGENTS.md, CRITICAL | precommit, CI | 0 |
 | O3 | No commit without `mix precommit` passing and a passing review by a fresh-context reviewer; docs-only commits need no review. | AGENTS.md, CRITICAL and Before you commit | `dev/githooks/pre-commit` (the review); precommit by hand | Local per clone (`make hooks`); skipped by `--no-verify`; nothing in CI checks a review was recorded. |
 | O4 | No force pushes; never push `main` or `master`. | AGENTS.md, Before you commit | `dev/githooks/pre-push`; the main ruleset on GitHub | 0 |
@@ -100,10 +100,10 @@ Every automated check today, and the rules it holds.
 | `deps.unlock --unused` | precommit, CI | nothing: it rewrites `mix.lock` rather than failing |
 | `test.check_exclusions` | precommit, CI | nothing: it prints guidance |
 | `mix dialyzer` | `make done-checks`, CI | types |
-| `scripts/check-toolchain` | CI | the Dockerfiles match the flake |
+| `scripts/check-toolchain` | `make done-checks`, CI | the Dockerfiles match the flake |
 | API version check | CI, PRs only | an API controller change bumps `API_VERSION` |
 | Carbonite trigger and the attribution CHECK | the database | S6 |
 | `dev/githooks/pre-commit` | local commit | O3's review |
 | `dev/githooks/pre-push` | local push | O4 |
 | `mix smoke_test` | after each deploy | the production site answers |
-| Sobelow, `deps.audit`, `hex.audit` | nowhere: in `mix.exs` but nothing runs them | — |
+| Security Audit workflow (`hex.audit`, `deps.audit`, Sobelow `--exit high`) | CI: PRs, `main`, weekly; not a required check, and failing on known findings (Earmark retired, vulnerable dependencies) until a follow-up fixes them | dependencies; X1–X3 in part |

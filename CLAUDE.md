@@ -51,7 +51,7 @@ Use `Oban` for durable, retryable or scheduled work (dashboard `/admin/jobs`); p
 - **Backlog:** a bug or idea that belongs to no plan goes in [docs/backlog.md](docs/backlog.md), one entry each; one that belongs to a plan goes in its phase doc. Add them as you find them, and don't act on them unless Jeff says to. Feedback Jeff hands over for later is recorded the same way, in his words, and never dropped. Planning a phase starts by reading the backlog for entries it should take in.
 - **Questions for Jeff:** ask him directly, and keep working on whatever isn't blocked.
 - **Each piece of planned work says what it deletes ("Deletes:") and the functions it calls ("Calls:", never "as in X").**
-- **Hard checks:** `make done-checks` rebuilds the checkout's test database, then runs `mix precommit` and `mix dialyzer`. Don't call work finished until it passes.
+- **Hard checks:** `make done-checks` rebuilds the checkout's test database, then runs `scripts/check-toolchain`, `mix precommit` and `mix dialyzer`. Don't call work finished until it passes.
 - **Hand-over:** what changed and how it fits, a tour for UI work (what to click and what Jeff should see), and what Jeff must decide. Keep it short.
 - **Branches:** short descriptive names. `docs/plans/` is gitignored scratch.
 

@@ -355,6 +355,7 @@ e2e-changed: load-prod-data-test
 # Rebuilds this checkout's test database first: a worktree has its own, and
 # `mix test` only creates and migrates it (no seeds, no catalog migration).
 done-checks: test-db
+	scripts/check-toolchain
 	mix precommit
 	mix dialyzer
 

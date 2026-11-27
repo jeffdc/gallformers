@@ -29,7 +29,7 @@ jobs:
 
     steps:
       # For priv/snapshot/: the table list and the derived-table script.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install Fly CLI
         run: |
