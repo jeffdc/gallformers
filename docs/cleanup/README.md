@@ -40,12 +40,12 @@ Each step is reviewed by Jeff before the next starts.
 | 2 | Retire mull's instructions: AGENTS.md / CLAUDE.md (docs-based work tracking, "Old IDs"), the Makefile comment, the project's Claude settings | Done (2026-11-26) |
 | 3 | Branches: delete the fully merged ones; move work onto `taxogall`; keep v1's last commit as the tag `archive/v1-final` | Done (2026-11-26) |
 | 4 | Branches: go through the unmerged ones one by one, find what each is, decide | Done (2026-11-26) |
-| 5 | Taxogall's high-level plan: `docs/taxogall/README.md` from mull's plan doc, checked against the 2026-11 reboot presentation; its first child step is revisiting mull's 18 phases | Not started |
+| 5 | Taxogall's high-level plan: [`docs/taxogall/README.md`](../taxogall/README.md) from mull's plan doc, checked against the 2026-11 reboot presentation; its first child step is revisiting mull's 18 phases | Done (2026-11-26) |
 | 6 | Architecture baseline (a fresh session): `docs/architecture/` in the oaks shape, mapped from `taxogall` (see below) | Not started |
 | 7 | Backlog: mull's 27 unphased items and its captured bugs and ideas, only what's still live | Not started |
 | 8 | Mull's 22 unsettled inbox entries (17 decisions, 4 questions, 1 review): each to Jeff, into the taxogall plan, or dropped | Not started |
 | 9 | `docs/plans/` scratch: a big pass, in batches (fold in, keep as history, or delete with Jeff's OK) | Not started; plan the batches when it starts |
-| 10 | Committed docs: current, update, or history; old-model docs, research, presentations, `docs/5c56-interview-summary.md`; stale mull pointers such as `docs/domain/domain-model.md`'s "design draft lives in mull matter 8567" | Not started |
+| 10 | Committed docs: current, update, or history; old-model docs, research, presentations, `docs/5c56-interview-summary.md`; stale mull pointers such as `docs/domain/domain-model.md`'s "design draft lives in mull matter 8567"; the domain doc updated to Jeff's 2026-11-15/16 decisions (Host ranges, observed range, Traits by Host) and organised into the doc set | Not started |
 | 11 | Adopt the architecture reviewer (prompt, packet script, local reports) once oaks settles it, possibly shared through heartwood | Waits for oaks |
 
 **Why this order.** Mull's instructions went first so no session writes to it while it's extracted. The taxogall plan comes next, then the architecture baseline: knowing what's built tells us which docs are current, so the docs passes (9, 10) come after it. Branches, the backlog and the inbox can go in any order.
@@ -109,3 +109,4 @@ None open.
 - **2026-11-26:** Pushed `taxogall`. Tagged v1's last commit `archive/v1-final` and deleted the branch. Committed step 2 after the commit gate's review.
 - **2026-11-26:** Added the architecture baseline (step 6) and adopting the reviewer (step 11), at Jeff's request through the oaks session; Jeff settled its shape.
 - **2026-11-26:** Step 4 done: every unmerged branch gone through with Jeff and deleted.
+- **2026-11-26:** Step 5 done: wrote [the taxogall plan](../taxogall/README.md). Jeff: held edits in a change set are how editing works today; the domain doc is to be updated and organised into the doc set (step 10); nothing else is built until the house is in order, so the plan's first child is this cleanup; the plan links to mull's phases rather than listing them, since revisiting them reads each in detail.
