@@ -1,5 +1,7 @@
 # Gallformers Admin Guide
 
+> **Out of date.** This guide describes the minimal admin of late October 2026. Since then, curators edit on the public pages in Edit mode (the admin Gall pages are gone), the data-complete flag and a Gall's lead Source were dropped, and range exclusions are *absent from* Facts ([the domain doc](domain-model.md#ranges)). It is to be rewritten as user documentation, part of the [taxogall plan](../taxogall/README.md)'s Gallformers overview. Production's admins use `main`'s copy, which the admin dashboard links to.
+
 A task-oriented guide for Gallformers admins. Whether you're brand new or returning after a break, find what you need by looking for the task you're trying to do. For terminology and domain concepts, see the [Domain Reference](admin-domain-reference.md).
 
 ## Getting Started

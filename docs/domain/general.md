@@ -1,3 +1,5 @@
+> **The old model.** This describes the data model production (`main`) runs until the cutover: everything is a species. On `taxogall` the code runs on the new back-end, described by the [domain doc](domain-model.md) and [the architecture docs](../architecture/README.md); this doc stays only for work on the catalog migration, which reads the old tables, and is deleted after release.
+
 ## Key Domain Concepts
 
 ### Species
