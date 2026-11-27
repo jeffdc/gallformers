@@ -51,9 +51,9 @@ defmodule Gallformers.MixProject do
       {:oban_web, "~> 2.11"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      {:phoenix_live_view, "~> 1.2.15"},
       {:lazy_html, ">= 0.1.0", only: :test},
-      {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:phoenix_live_dashboard, "~> 0.9.1"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:swoosh, "~> 1.16"},
@@ -68,7 +68,7 @@ defmodule Gallformers.MixProject do
       # API Documentation
       {:open_api_spex, "~> 3.18"},
       # Rate Limiting
-      {:hammer, "~> 6.1"},
+      {:hammer, "~> 7.6"},
       # Authentication
       {:ueberauth, "~> 0.10"},
       {:ueberauth_auth0, "~> 2.1"},
