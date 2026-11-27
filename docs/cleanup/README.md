@@ -28,7 +28,7 @@ Done when:
 | `docs/taxogall/README.md` | Taxogall's high-level plan: goals, principles, settled decisions, the child plans with needs and status | oaks `facts-expansion/README.md` |
 | `docs/taxogall/<child>.md` | One per child plan, written when it's next | oaks `facts-expansion/*.md` |
 | `docs/backlog.md` | Bugs and ideas outside any plan (stub created) | oaks `backlog.md` |
-| `docs/architecture/` | Current state, rules, decisions, reviews (later) | oaks `architecture/` |
+| `docs/architecture/` | The one place for architecture docs: `README.md` (as built), `rules.md`, `decisions.md`, `reviews.md` | oaks `architecture/` |
 
 ## Steps
 
@@ -41,11 +41,25 @@ Each step is reviewed by Jeff before the next starts.
 | 3 | Branches: delete the fully merged ones; move work onto `taxogall`; keep v1's last commit as the tag `archive/v1-final` | Done (2026-11-26) |
 | 4 | Branches: go through the unmerged ones one by one, find what each is, decide | Next |
 | 5 | Taxogall's high-level plan: `docs/taxogall/README.md` from mull's plan doc, checked against the 2026-11 reboot presentation; its first child step is revisiting mull's 18 phases | Not started |
-| 6 | Backlog: mull's 27 unphased items and its captured bugs and ideas, only what's still live | Not started |
-| 7 | Mull's 22 unsettled inbox entries (17 decisions, 4 questions, 1 review): each to Jeff, into the taxogall plan, or dropped | Not started |
-| 8 | `docs/plans/` scratch: a big pass, in batches (fold in, keep as history, or delete with Jeff's OK) | Not started; plan the batches when it starts |
-| 9 | Committed docs: current, update, or history; old-model docs, research, presentations, `docs/5c56-interview-summary.md`; stale mull pointers such as `docs/domain/domain-model.md`'s "design draft lives in mull matter 8567" | Not started |
-| 10 | Architecture docs in the oaks shape | Later; may become its own plan |
+| 6 | Architecture baseline (a fresh session): `docs/architecture/` in the oaks shape, mapped from `taxogall` (see below) | Not started |
+| 7 | Backlog: mull's 27 unphased items and its captured bugs and ideas, only what's still live | Not started |
+| 8 | Mull's 22 unsettled inbox entries (17 decisions, 4 questions, 1 review): each to Jeff, into the taxogall plan, or dropped | Not started |
+| 9 | `docs/plans/` scratch: a big pass, in batches (fold in, keep as history, or delete with Jeff's OK) | Not started; plan the batches when it starts |
+| 10 | Committed docs: current, update, or history; old-model docs, research, presentations, `docs/5c56-interview-summary.md`; stale mull pointers such as `docs/domain/domain-model.md`'s "design draft lives in mull matter 8567" | Not started |
+| 11 | Adopt the architecture reviewer (prompt, packet script, local reports) once oaks settles it, possibly shared through heartwood | Waits for oaks |
+
+**Why this order.** Mull's instructions went first so no session writes to it while it's extracted. The taxogall plan comes next, then the architecture baseline: knowing what's built tells us which docs are current, so the docs passes (9, 10) come after it. Branches, the backlog and the inbox can go in any order.
+
+### Step 6: architecture baseline
+
+Asked for by Jeff through the oaks session, 2026-11-26: gallformers adopts the architecture model oaks set up (`~/dev/oaks/docs/architecture/`, and section 5 of `~/dev/oaks/docs/facts-expansion/architecture-groundwork.md`).
+
+- **The shape:** `docs/architecture/README.md` describes the architecture and design as built, and only what's built (system context, runtime, contexts and the tables each owns, the dependency graph from `mix xref`, data, web layer, front end and design system, delivery, observability); planned work moves in when it lands, in the same commit as the code. `rules.md` holds only rules Jeff has stated, each with its source, a stable ID by group, its check (or "manual") and a baseline of violations with locations. `decisions.md` is a decision log, newest first, never edited, superseded by later entries. `reviews.md` has one entry per periodic review; each finding ends as fix, accept, new rule or open. DESIGN.md stays the authority on the look; coding style stays in CODING_STANDARDS and Credo.
+- **What's "built" is `taxogall`** (Jeff, 2026-11-26), with a note that production (`main`) runs the old back-end until cutover.
+- **Architecture docs live in one place** (Jeff, 2026-11-26). Pull what's still true from the existing docs as the new ones are written, then delete the old ones: `core-architecture-rules.md`'s principles and enforcement become rules; `elixir-architecture.md` is a tutorial and moves out to `docs/elixir/` or goes; `range-system.md` is likely out of date and is revisited in full; the C4 Structurizr model is dropped (never used).
+- **Decisions are seeded judiciously** (Jeff, 2026-11-26): only those that shape the architecture, dated, citing their mull or matter ID. Many established decisions live in the existing docs and in the system itself (Boundary config, Credo checks, ratchets), not only in mull. The rest of mull's decisions stay readable with git.
+- **Checks gallformers already has** become rules' checks: Boundary, the custom Credo checks, the design-system and duplicate-code ratchets, `test/support/retirements.exs`, the commit gate, CI.
+- **Mapping:** four read-only agents in parallel, as in oaks: (1) contexts, their tables and the xref graph folded into contexts, with every reach into another context's tables; (2) the web layer: router, auth, LiveViews, components, assets, API; (3) runtime, infra and delivery: Fly, OpenTofu/AWS, Oban, S3, preview; (4) every existing check, and the documented rules no check covers, each with a baseline. From that: README, rules, decisions and a first review entry (violations, gaps in the checks, proposed rules, drift between docs and code).
 
 ## Lay of the land (scanned 2026-11-26)
 
@@ -96,3 +110,4 @@ None open.
 
 - **2026-11-26:** Scanned mull, `.mull/`, docs and branches; wrote this plan. Jeff: plan just in time; taxogall gets one high-level doc pointing to child plans, whose first step is revisiting the phases; delete merged branches; go through unmerged ones one by one; move to `taxogall`; `docs/plans/` needs a big pass; retire every mull instruction. Did steps 2 and 3.
 - **2026-11-26:** Pushed `taxogall`. Tagged v1's last commit `archive/v1-final` and deleted the branch. Committed step 2 after the commit gate's review.
+- **2026-11-26:** Added the architecture baseline (step 6) and adopting the reviewer (step 11), at Jeff's request through the oaks session; Jeff settled its shape.
