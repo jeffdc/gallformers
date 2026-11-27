@@ -1,8 +1,27 @@
 # Fly.io Operations
 
-**IMPORTANT**: Before performing ANY Fly.io operation, read the safety rules in CLAUDE.md under "Fly.io Safety Rules." Those rules are non-negotiable.
+**IMPORTANT**: Before performing ANY Fly.io operation, read the safety rules below. They are non-negotiable.
 
-**CONTEXT**: These procedures exist because of a production incident (docs/investigations/20260203-production-database-recovery.md) where an agent caused significant downtime by violating these principles.
+**CONTEXT**: These procedures exist because of a production incident (docs/incidents/20260203-production-database-recovery.md) where an agent caused significant downtime by violating these principles.
+
+## Safety rules
+
+### Fly.io
+
+- **STOP MEANS STOP** — if the user says "STOP", immediately cease all tool execution. No exceptions.
+- **NEVER destroy machines** — causes volume attachment issues and crash loops. Use stop/update/restart.
+- **NEVER use `fly machine run`** — bypasses fly.toml config. Always use `fly deploy`.
+- **Always check machine state first** — `fly machine list` before SSH/SFTP operations.
+- **Always get user approval** before machine stop/start/update operations.
+- **Execute ONE step at a time** — verify success before proceeding to the next step.
+- **NEVER query the production database directly** — no `fly ssh console` with `rpc` or `eval` for database queries. Use a local dev database and refresh with `make download-db`.
+
+### Databases
+
+- **NEVER drop, reset, or recreate the `wcvp` database.** It contains 1.4M+ reference records loaded from Kew Gardens data. Restoring it takes significant time (`make wcvp-restore`). It is NOT managed by Ecto migrations and is NOT in `ecto_repos`.
+- **NEVER run `dropdb`, `DROP DATABASE`, or `DROP TABLE` on any database** without explicit user approval.
+- **NEVER run `mix ecto.reset`** — use `mix ecto.migrate` to apply pending migrations. If you think a reset is needed, ask first.
+- **The only safe database commands** are: `mix ecto.migrate`, `mix ecto.rollback` (with user approval), and read-only queries on the dev database.
 
 ## Deploy Commands
 
@@ -23,13 +42,38 @@ fly incidents hosts list    # Host-level maintenance/incidents affecting YOUR ma
 
 Host-level events (emergency maintenance, hardware issues) are invisible to app metrics,
 Grafana dashboards, and status.flyio.net. This command is the only way to see them.
-See `docs/investigations/20260309-unresponsive-crash-cpu-investigation.md` for a case
+See `docs/incidents/20260309-unresponsive-crash-cpu-investigation.md` for a case
 where this would have saved hours of investigation.
 
 **Note on `fly logs`**: This command streams logs continuously and never terminates. Do NOT run it in the background or pipe to `tail`. To check recent errors, either:
 - Run interactively and Ctrl+C after seeing what you need
 - Use `fly logs 2>&1 | timeout 5 cat` to get a 5-second snapshot
-- Check the application log file via SFTP: `fly ssh sftp get /data/logs/app.log` (see Application Logging in CODING_STANDARDS.md)
+- Check the application log file via SFTP: `fly ssh sftp get /data/logs/app.log` (see [Application logging](#application-logging))
+
+## Application logging
+
+All application logs (requests, errors, Postgrex events, crash reports, HealthWatchdog alerts) are structured JSON in one stream, through LoggerJSON's `Basic` formatter (`config/runtime.exs`, prod only). Phoenix's own request logging is off (`config/prod.exs`); `LoggerJSON.Plug` logs each request instead (`application.ex`), with the client IP taken from Fly's `fly-client-ip` header (`endpoint.ex`). Development logs to the console, human-readable.
+
+- **Production file:** `/data/logs/app.log` on the volume, size-rotated (50 MB × 20 files, 1 GB at most, gzipped on rotate). Preview deploys write no file.
+- **Retrieve:** `fly ssh sftp get /data/logs/app.log`
+- **Shape:** each line has `time`, `severity`, `message` and `metadata`; a request line adds `request.connection` (`method`, `path`, `status`, `protocol`) and `request.client` (`ip`, `user_agent`), and its duration is `metadata.duration_us`.
+
+```bash
+# Request entries
+jq -c 'select(.request)' app.log
+
+# 500 errors
+jq -c 'select(.request.connection.status >= 500)' app.log
+
+# The ten slowest requests
+jq -cs '[.[] | select(.request)] | sort_by(.metadata.duration_us) | reverse | .[0:10]' app.log
+
+# Application errors
+jq -c 'select(.severity == "error")' app.log
+
+# Postgrex connection events
+jq -c 'select(.message | test("Postgrex"; "i"))' app.log
+```
 
 ## Configuration
 

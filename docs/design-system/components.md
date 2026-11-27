@@ -7,7 +7,7 @@ Every piece of UI is one of these components. Each entry says what the component
 - **Built**: in the code, in the style guide, with a component test. Use it.
 - **Retiring**: replaced; don't use in new code. Removed once nothing calls it.
 
-The catalog was approved on 2026-11-04. Components are HEEx function components, imported into every template through `GallformersWeb.html_helpers`. Sizes come from the density context and colors from tokens (see [foundations.md](foundations.md)); no component takes a color or size class from its caller except through its documented attributes. Every component accepts `class` for layout only (margins, grid placement), and `rest` for `id`, `phx-*` and `aria-*`.
+The catalog was approved on 2026-11-04. Components are HEEx function components. Most are imported into every template through `GallformersWeb.html_helpers`; `FactsComponents`, `ReviewComponents` and `KeyComponents` are imported by the pages that use them. Sizes come from the density context and colors from tokens (see [foundations.md](foundations.md)); no component takes a color or size class from its caller except through its documented attributes. Every component accepts `class` for layout only (margins, grid placement), and most accept `rest` for `id`, `phx-*` and `aria-*` (`menu` doesn't: it takes `id`).
 
 Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_badge`, `list`, `header`, `table`, `badge`, `modal` with `show_modal` and `hide_modal` (CoreComponents); `abundance_indicator`, `data_completeness_indicator`, `edit_button`, `external_links`, `host_list`, `source_citation`, `source_list`, `species_synonymy`, `taxonomy_breadcrumb`, `table_actions`, `action_button` (DataDisplayComponents); `field_wrapper`, `file_dropzone`, `multi_select`, `radio_group` (FormComponents); `back_link` (Layouts); `head`, `species_json_ld`, `website_json_ld` (SEO); `skeleton`, `tabs` and the `Tabs` hook, `card`, `error_message`, `info_tip` (UIComponents). The "Replaces" column still names them, as history.
 
@@ -38,7 +38,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `fact_inspector` | FactsComponents | Domain | Built (Gall page: reading, Edit mode with "Fix our reading…", a new Fact, an observation) | the Gall page's Edit-mode Fact rows and chips, the Facts panel as the place to edit, `ObservationIntake`'s dialog (removed) |
 | `source_entry` | DomainComponents | Domain | Built | the Gall page's Further Information cards, `source_citation`, `source_list` |
 | `photo_viewer` | DomainComponents | Domain | Built | `image_gallery` and the ImageGallery hook (retired) |
-| `range_map` | DomainComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
+| `range_map` | DataDisplayComponents | Domain | Approved (rework) | `range_map`, `range_map_legend` |
 | `source_quote` | DomainComponents | Domain | Built | `blockquote` styling, review "The Source wrote" text |
 | `taxonomic_position` | FactsComponents | Domain | Built | — |
 | `button` | ActionComponents | Actions | Built; extension Approved (`link`) | `button`, `edit_button`, `action_button`, `admin_edit_link`, 122 raw buttons |
@@ -48,7 +48,7 @@ Removed on 2026-11-06 because nothing used them: `species_card`, `data_complete_
 | `tab_nav` | PageComponents | Navigation | Built | the Browse pages' hand-made tab links |
 | `pagination` | UIComponents | Navigation | Approved (restyle) | — |
 | `field` | FormComponents | Forms | Built | `field_wrapper`, `input`'s label/help/error wrapper |
-| `input`, `select`, `textarea`, `checkbox`, `toggle` | FormComponents | Forms | Built (restyled) | `.gf-input` and friends |
+| `input` (`type` `select`, `textarea`, `checkbox`, …), `toggle` | CoreComponents (`input`), FormComponents (`toggle`) | Forms | Built (restyled) | `.gf-input` and friends |
 | `search_field` | FormComponents | Forms | Built | `search_input`, three search-input classes, the header search |
 | `typeahead` | FormComponents | Forms | Approved (consolidate) | `typeahead`, `multi_select`, `multi_select_dropdown`, `multi_select_typeahead` |
 | `file_drop` | FormComponents | Forms | Built | `file_dropzone`, the image managers' hand-built drop boxes |
@@ -93,7 +93,7 @@ The public page frame.
 - **Footer** at the end of the page, never fixed: Phenology Tool, Donate, Privacy, About, license line.
 - **Search:** the `palette_trigger`, a button that looks like a search field ("Search Gallformers" and its key `/`), opens the command palette; on phones a search icon. The header has no search box of its own.
 - **Theme switch** (`theme_switch`) at the right of the header, on phones too: an icon button showing the current choice (a half circle for Match my device, a sun, a moon; `gf-contrast`, `gf-sun`, `gf-moon`) that opens Match my device, Light and Dark as `menuitemradio`s. See foundations.md, "Dark mode".
-- Slots: `inner_block`. Attributes: `current_user`, `flash`, `region` (the region scope bar, shown on pages that filter by region).
+- Slots: `inner_block`, `subheader` (between the header and main: the region scope bar, on pages that filter by region). Attributes: `current_user`, `current_scope`, `flash`.
 
 ### `admin_shell`
 
@@ -102,8 +102,9 @@ The admin frame.
 - **Sidebar** (212px, `bg-surface-2`): Admin mark; Dashboard; Review with its count of open questions (`text-autumn-ink`); Galls; Taxonomy; Sources; Host ranges; then Glossary, Articles, Keys, Vocabulary; then the roles' extras (Users, Jobs, Ops); then View public site ↗. The current item has a maroon inset bar. Collapses to a menu button below 960px.
 - **Top bar** (44px): a search across Galls, taxa and Sources; the user; Log out.
 - **Main**: fills the remaining width, Working density (`gf-density-working`).
-- Light theme only (`data-theme="light"`) until the admin pages are on tokens.
-- Slots: `inner_block`. Attributes: `current_user`, `active` (sidebar item), `counts` (badge numbers).
+- Light and dark, with the same `theme_switch` as the site shell.
+- The `AdminNav` hook marks the current sidebar item (`aria-current="page"`) from the URL.
+- Slots: `inner_block`, `page_title_html` (a rich title, for pages without a `page_header`). Attributes: `current_user`, `flash`, `counts` (badge numbers), `page_title` (for pages without a `page_header`).
 
 ### `command_palette`
 
@@ -222,15 +223,15 @@ A small labelled state or category. Every variant has one meaning.
 | `:count` | a number that needs you | 358 |
 | `:recommended` | the recommended answer to a question (brand tint) | Recommended · rec. |
 
-Attributes: `variant`, `icon`. Never a chip for decoration, never color without a word.
+Attributes: `variant`, `icon`, `size` (`md`, `sm`), `on_remove` (a `JS` command; makes the chip removable) with `remove_label` (the remove button's accessible name, default "Remove": "Remove Quercus rubra"). Never a chip for decoration, never color without a word.
 
 ### `stat`
 
-A number with a label: 3,976 Galls. For dashboards and the home page only, where the figures are the point.
+A number with a label: 3,976 Galls. For dashboards and the home page only, where the figures are the point. Attributes: `value`, `label`, `icon` (a `ph-*` or `gf-*` icon before the number), `navigate` (makes the stat a link), `class`.
 
 ### `empty_state`
 
-What a list or region says when it has nothing: one line saying what would be here and, when possible, how to add the first one. Attributes: `title`, `action` slot.
+What a list or region says when it has nothing: one line saying what would be here and, when possible, how to add the first one. Attributes: `title`, `icon` (a `ph-*` or `gf-*` icon above the title); slots `action` and `inner_block`.
 
 ### `bar_chart`
 
@@ -250,7 +251,7 @@ Renders a name with correct italics, from `Gallformers.TaxonName.segments/1`: th
 
 A Gall at a glance: the photo (square, `rounded-panel`), the name (italic), and one muted line of what tells it apart (plant part · form · season). Optional chips (Undescribed). For the ID results grid, rank pages, browse pages and the home page.
 
-- Attributes (plain values, so any page maps its own read model onto them): `navigate` (required; the whole card is one link), `name` (required; set through `taxon_name`), `image_url`, `image_alt` (defaults to "Photo of …"; `""` when the name beside it says enough), `subtitle` (the distinguishing traits, e.g. "stem · abrupt swelling · Spring"), `size` (`:md`, `:sm`). Slot `chip` (e.g. Undescribed).
+- Attributes (plain values, so any page maps its own read model onto them): `navigate` (required; the whole card is one link), `name` (required; set through `taxon_name`), `image_url`, `image_alt` (defaults to "Photo of …"; `""` when the name beside it says enough), `subtitle` (the distinguishing traits, e.g. "stem · abrupt swelling · Spring"), `size` (`:md`, `:sm`). Slot `chip` with `variant` (e.g. Undescribed).
 - Lay cards out in `<div class="gf-photo-grid">`: photos fill the row at a minimum of 280px, so a wider screen shows more photos, never smaller ones (four across at 1312px, six at 1920px). Photos are the most important thing on an identification page; don't shrink them to fit more. `data-size="sm"` (at least 176px, two across on phones) is for overview rows (home page tiles, rank pages).
 - A Gall with no photo shows the gall icon on `bg-surface-2`, not an empty grey box.
 
@@ -280,8 +281,8 @@ A Fact-backed value on a page (an Inducer, a Host, a Trait value, a range place,
 ```
 
 - A `<button>` with `aria-pressed` (selected or not) and `aria-controls` the inspector's id; it sends `on_select` with the Fact's key (`GallformersWeb.FactKey`: `host:7`).
-- Attributes: `fact` (required: a Fact from `Gallformers.Import.gall_facts/1`), `selected` (the selected key, or nil), `on_select` (required), `inspector` (the inspector's id, default `fact-inspector`), `target`; the inner block is the value, when the caller shows it differently from the Fact's own words (a Host's `taxon_name`).
-- **Approved state: `proposed`.** A value that isn't held yet but an open action would add (an observation's ticked proposals; an add in the tray): on `bg-sky-soft` with a "proposed" `chip` (`:info`, `:sm`) after it, no underline, not selectable. `<.fact_ref proposed text="recorded in Indiana" />`.
+- Attributes: `fact` (required: a Fact from `Gallformers.Import.gall_facts/1`), `selected` (the selected key, or nil), `on_select` (required), `inspector` (the inspector's id, default `fact-inspector`), `target`, `proposed` and `text` (the proposed state, below); the inner block is the value, when the caller shows it differently from the Fact's own words (a Host's `taxon_name`).
+- **State `proposed`** (built on the Gall page). A value that isn't held yet but an open action would add (an observation's ticked proposals; an add in the tray): on `bg-sky-soft` with a "proposed" `chip` (`:info`, `:sm`) after it, no underline, not selectable. `<.fact_ref proposed text="recorded in Indiana" />`.
 - **Approved: the readers' hint.** A page with `fact_ref`s shows readers, once, "Underlined values show the Sources that state them. Select one to see who says so." with a Dismiss button (`ph-x`). Dismissing it is remembered in the browser by the `Dismissible` hook (`data-key`, `localStorage`; the server renders it hidden-until-checked so it never flashes). Not shown in Edit mode.
 
 ### `fact_inspector`
@@ -292,7 +293,7 @@ Who says so, and in Edit mode what to do about it, for one Fact, beside the page
 <.fact_inspector id="fact-inspector" fact={@fact} of={@gall} editing={@editing} on_close="close_fact" />
 ```
 
-- Attributes: `id` (required; `aria-controls` of each `fact_ref`), `state` (`:fact` or `:new`; default `:fact`), `fact` (a Fact from `Gallformers.Import.gall_facts/1`, for `:fact`), `new` (what a new Fact will be, "Host", for `:new`: the head reads "New Host", then "For *Gall*"), `of` (the Gall: its name for "A Host of …"), `editing` (Gallformers' block is always shown, "Gallformers hasn't stated this" when it hasn't, holding the `actions`), `on_close` (required), `target`. Slots: `actions` (Edit mode: the page's actions and forms, in Gallformers' block; not rendered when reading), `reading` (Edit mode: what each other Source's block offers for fixing how it was read, given that Source's statement with `:let`; not rendered when reading), `footer` (Edit mode: below the blocks, where the page puts the "Found an error in a Source reading?" toggle), `inner_block` (the `:new` and `:observation` states' forms). On the Gall page the Edit-mode actions are `GallformersWeb.GallLive.FactActions`.
+- Attributes: `id` (required; `aria-controls` of each `fact_ref`), `state` (`:fact` or `:new`; default `:fact`), `fact` (a Fact from `Gallformers.Import.gall_facts/1`, for `:fact`), `new` (what a new Fact will be, "Host", for `:new`: the head reads "New Host", then "For *Gall*"), `of` (the Gall: its name for "A Host of …"), `editing` (Gallformers' block is always shown, "Gallformers hasn't stated this" when it hasn't, holding the `actions`), `history` (the Fact's history, newest first: `%{at, what, who}` from `Gallformers.Import.fact_history/1`), `on_close` (required), `target`. Slots: `actions` (Edit mode: the page's actions and forms, in Gallformers' block; not rendered when reading), `reading` (Edit mode: what each other Source's block offers for fixing how it was read, given that Source's statement with `:let`; not rendered when reading), `footer` (Edit mode: below the blocks, where the page puts the "Found an error in a Source reading?" toggle), `inner_block` (the `:new` and `:observation` states' forms). On the Gall page the Edit-mode actions are `GallformersWeb.GallLive.FactActions`.
 - Placement: `gf-sheet` (below). The head has the kind and Close (`ph-x`, `on_close`).
 - **Edit mode** puts each action in its Source's block: Gallformers' has Change…, Deny…, Add a note… (and Confirm… when it hasn't stated the Fact; its block then reads "Gallformers hasn't stated this"); "Found an error in a Source reading?" (a `link` `button`, "Done fixing readings" while open; shown when a Source's statement has quotes) reveals "Fix our reading…" (a `ghost` `button`) on the others' blocks whose statements have quotes. Each opens a short form in the panel (the value through the shared picker where there is one, and Why: an observation's link, a paper, a reason) and adds to the tray. A reading fix's form says "Under {Source}'s authority, at its date ({date}). This doesn't take a position; it fixes how the Source was read.", asks "What {Source} actually says" through the same picker, with a checkbox "It doesn't say this: nothing in its place", and goes to the tray under that Source ("Readings fixed: {Source}"). While the Fact has a change in the tray, its block says so ("In your tray: Deny host: …" in Gallformers', "In your tray: Fix our reading of …" in the Source's) with Take out, in place of the actions.
 - **History** (matter `87a1`, Jeff approved the mockup 2026-11-08): at the inspector's foot, below Who says so, a disclosure "History (N)" (`details`, its `summary` a link-colored line, as the full record's history): each change to the Fact, newest first, one line each, the date in `text-muted`, then what happened in plain words and who in parentheses: "Gallformers stated it (Ada)", "Weld 1959 stated it (import)", "Kinsey 1920: our reading fixed, it doesn't say this (Ada)", "Withdrawn", "Current again", "Superseded", "In Gallformers' original data" (undated, last). Attribute `history` (a list of `%{at, what, who}`, from `Gallformers.Import.fact_history/1`); none, no disclosure.
@@ -321,7 +322,7 @@ The possible-range map, as a card that opens a large map in a dialog, with full 
 
 - The card frames the native range. Introduced ranges are drawn but don't widen the frame (built on the Gall page: bounds from the range without its introduced places).
 - The legend is a single line under the card; the caveat ("Where the Hosts grow, not where the Gall was found") goes under the legend.
-- Attributes: `ranges`, `size` (`:card` 420×293, `:wide` the main column's width).
+- Attributes, as the rework is approved: `ranges`, `size` (`:card` 420×293, `:wide` the main column's width). Until it is built, `range_map` and `range_map_legend` are in `DataDisplayComponents`, and `range_map` takes `in_range`, `excluded_range`, `inherited_range`, `introduced_range`, `editable`, `navigable`, `place_mode`, `tiles_url`, `bounds`, `max_bounds`, `empty_text`, `id` and `class`.
 - On the Gall page: a 288px-high card in the wide rail, with Enlarge opening a full-size dialog that has the map's own full-screen control.
 
 ### `source_quote`
@@ -347,7 +348,7 @@ Where a taxon stands in the Sources, compactly (matter `f923` Task 10), for a ta
 One button, as a `<button>` or a link (`navigate`, `patch`, `href`).
 
 - Variants: `:primary` (maroon fill: one per region), `:secondary` (surface, line-strong border: the default), `:ghost` (no border, link color: low-emphasis actions), `:danger` (destructive, confirms through a dialog).
-- Attributes: `variant`, `icon`, `icon_only` (requires `label` for `aria-label`), `size` (`:default` follows density, `:sm`), `disabled`, `loading`.
+- Attributes: `variant`, `icon`, `icon_only` (requires `label` for `aria-label`), `size` (`:default` follows density, `:sm`); `disabled`, `type`, `name`, `value` and the link attributes pass through `rest`. `shape` is retiring and ignored.
 - Labels say exactly what happens ("Approve 9 notes", "Rename", "Add synonym").
 
 #### Approved extension: `link`
@@ -379,7 +380,7 @@ Exists. Restyle to tokens. (`tabs`, the in-page tabs with the `Tabs` hook, was u
 
 ### `tab_nav`
 
-Tabs that are links, each tab its own page: Browse's "By what causes them" (`/galls`), "By host plant" (`/hosts`), "By place" (`/places`); the tab list is `BrowseHelpers.browse_tabs/0`. Attributes: `label` (the nav's accessible name), `class`; a `tab` slot with `navigate`, `href` or `patch`, and `current` (sets `aria-current="page"`). It sits right under the `page_header`. For tabs that switch content within one page, use `tabs`.
+Tabs that are links, each tab its own page: Browse's "By what causes them" (`/galls`), "By host plant" (`/hosts`), "By place" (`/places`); the tab list is `BrowseHelpers.browse_tabs/0`. Attributes: `label` (the nav's accessible name), `class`; a `tab` slot with `navigate`, `href` or `patch`, and `current` (sets `aria-current="page"`). It sits right under the `page_header`. For tabs that switch content within one page there is no component yet (`tabs` was removed, unused): propose one when a page needs it.
 
 ## Forms
 
@@ -394,7 +395,7 @@ Attributes: `label`, `for` (the control's id), `help`, `errors`, `layout`, `requ
 
 ### Controls
 
-`input`, `select`, `textarea`, `checkbox`, `toggle` keep their current APIs and take their look from tokens: `h-ctl` tall, `border-line-strong`, `rounded-ctl`, focus ring from `--gf-focus`.
+`input` (`CoreComponents`; `type` `select`, `textarea`, `checkbox` and the rest) and `toggle` (`FormComponents`) keep their current APIs and take their look from tokens: `h-ctl` tall, `border-line-strong`, `rounded-ctl`, focus ring from `--gf-focus`.
 
 - `input`'s label is `gf-label`, its required mark and errors `text-danger`; a checkbox sits beside its label with a gap.
 - `toggle` is a checkbox with `role="switch"` drawn as a track (`.gf-toggle-track`). With no visible `label`, give it an `aria-label`; `phx-click` and `phx-value-*` go on the checkbox.
@@ -525,7 +526,7 @@ The side of a Source's review page: where the curator is, and how to move. Pinne
 - Up next: the next three units of work, one line each;
 - Approve (disabled with "You can approve once the 22 marked questions are answered.") and Deny.
 
-Every count on the page comes from one tally: questions answered and to go, the ones that must be answered before approving among them, the hedged statements apart. Attributes: `tally`, `stages`, `next`, `hedged`, `title`; events `stage`, `hedges`, `approve`, `deny`. Mockup: `/dev/mockups/source-reading/:package_id`.
+Every count on the page comes from one tally: questions answered and to go, the ones that must be answered before approving among them, the hedged statements apart. Attributes: `title`, `source_id` (the Source in Gallformers, once it is there), `tally`, `stages`, `next`, `approval` (`ReviewLive.SourcePage.approval/3`'s); the events it sends, each required: `on_stage`, `on_hedges`, `on_approve`, `on_deny`, and optionally `on_missed` (opens the names we didn't read, `tally.missed`). Mockup: `/dev/mockups/source-reading/:package_id`.
 
 ### `review_card`
 
@@ -561,7 +562,7 @@ A taxon from iNaturalist, brought into our tree (matter `cb28`; mockup approved 
 
 ### `notice`
 
-An inline message in the page: `kind` `:info`, `:ok`, `:warn`, `:danger` (role `alert` for danger, `status` otherwise), optional `title`, an `action` slot and `on_dismiss`. One line where possible. Replaces four message components.
+An inline message in the page: `kind` `:info`, `:ok`, `:warn`, `:danger` (role `alert` for danger, `status` otherwise), optional `title`, `icon` (a `ph-*` or `gf-*` icon in place of the kind's own), an `action` slot and `on_dismiss`. One line where possible. Replaces four message components.
 
 ### `toast`, `skeleton`, `spinner`
 
@@ -587,7 +588,7 @@ How far something has got: a sync of 120 Hosts, an upload, a Source's review. A 
 
 ### `dialog`
 
-One modal: `title`, body, `actions` slot. Sizes `:sm`, `:md`, `:lg`, `:full` (the range map). Open and close with `show_dialog/2` and `hide_dialog/2`. Escape, the backdrop and the Close button cancel it; focus is trapped inside and returns to what opened it.
+One modal: `title`, body, `actions` slot. Sizes `:sm`, `:md`, `:lg`, `:full` (the range map). Open and close with `show_dialog/2` and `hide_dialog/2`, or open it when mounted with `show`; `on_cancel` (a `JS` command) runs on Escape, a backdrop click or Close. Escape, the backdrop and the Close button cancel it; focus is trapped inside and returns to what opened it.
 
 Confirmation and discarding are patterns, not variants (see the component's docs and [patterns.md](patterns.md)): the title names the thing, the body the consequence, and a `danger` button repeats the verb ("Delete taxon"). A typed-name confirmation is a form in the body. Replaces three modal components.
 

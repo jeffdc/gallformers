@@ -63,8 +63,8 @@ The baseline holds the migration backlog. It only goes down.
 
 ## Status
 
-The system is being built on the `design-system` branch (matter `bc0d`).
+The system is in place on every page, public and admin.
 
-- Foundations are in: tokens (light and dark, two densities), typefaces, cascade layering, the conformance check.
-- The catalog was approved on 2026-11-04. The shells, page structure, actions, data, domain, form and feedback components are built; see each entry's status in [components.md](components.md).
-- Every page already renders inside the new shells. Page content moves onto the components one page at a time. Built so far: home, ID, Browse (galls, hosts, places) and the rank pages (family, subfamily, tribe, subtribe, genus, section).
+- Foundations: tokens (light and dark, two densities), typefaces, cascade layering, the conformance check.
+- The catalog was approved on 2026-11-04; each entry's status is in [components.md](components.md). Still Approved, not built: `range_map` (rework), `pagination` (restyle), `typeahead` (consolidate), `save_bar`, `toast` (restyle), `skeleton` and `spinner`, and `button`'s `link` extension.
+- The conformance baseline holds four files: the root layout, the conformance check itself, the admin profile page and the read-only-mode plug.

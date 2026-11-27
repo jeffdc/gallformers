@@ -59,7 +59,8 @@ make test               # Rebuild test DB + run tests (excludes E2E)
 mix test                # Run tests without rebuilding DB
 mix format              # Format code
 mix credo --strict      # Code quality
-mix precommit           # Run all checks (do this before committing)
+mix precommit           # Checks to pass before committing (no Dialyzer)
+make done-checks        # Rebuild the test DB, then precommit and Dialyzer: before calling work done
 make ci                 # Full CI check (same as GitHub Actions)
 ```
 
@@ -186,7 +187,7 @@ The PostgreSQL database backup strategy is TBD as part of the Postgres migration
 - **Public** (`s3://gallformers-backups/public/`) - Sanitized, PII removed
 - **Private** (`s3://gallformers-full-backups/`) - Full backup with PII
 
-For restore procedures, see [runbooks/restore-database.md](runbooks/restore-database.md). For AWS bucket details, see [docs/ops/aws-private-backup-bucket.md](docs/ops/aws-private-backup-bucket.md).
+For restore procedures, see [runbooks/restore-database.md](runbooks/restore-database.md). For the buckets, see [infra/README.md](infra/README.md).
 
 ## PII Handling
 
@@ -225,25 +226,7 @@ Fly.io also sends automatic email alerts on OOM (out-of-memory) events.
 
 ## Application Logs
 
-All application logs (requests, errors, crashes) are structured JSON via LoggerJSON, written to a persistent file in production.
-
-- **Production**: `/data/logs/app.log` (size-rotated, 1 GB max)
-
-Retrieve logs from production:
-```bash
-fly ssh sftp get /data/logs/app.log
-```
-
-Analyze with jq:
-```bash
-# Find request errors
-cat app.log | jq -c 'select(.conn.status >= 500)'
-
-# Find application errors
-cat app.log | jq -c 'select(.severity == "error")'
-```
-
-See [CODING_STANDARDS.md](CODING_STANDARDS.md#application-logging) for detailed format and analysis examples.
+All application logs are structured JSON via LoggerJSON, written in production to `/data/logs/app.log` on the volume. Where they are, their shape and how to read them with `jq`: [runbooks/fly-operations.md](runbooks/fly-operations.md#application-logging).
 
 ## Contributing
 

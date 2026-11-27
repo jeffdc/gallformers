@@ -18,29 +18,52 @@ Tests use Ecto's SQL Sandbox with PostgreSQL. Tests can run with `async: true` w
 | Component | `test/gallformers_web/components/` | `make test` | Reusable component rendering and events |
 | Plug | `test/gallformers_web/plugs/` | `make test` | Analytics, caching, CORS middleware |
 | Integration | `test/gallformers_web/integration_test.exs` | `make test` | Full page load flows, navigation, PubSub |
-| E2E (browser) | `test/e2e/` | `make e2e` | Real browser tests via Playwright (Firefox). Requires prod data. Excluded by default. |
-| Prod data | `test/prod_data/` | `make test-prod-data` | Validates against a converted production DB copy (`PROD_DATA_DB=gallformers_taxogall` clones an already converted one). Excluded by default. |
-| Prod data E2E | `test/prod_data/e2e/` | `make test-prod-data-e2e` | Browser tests against real production data. Excluded by default. |
+| JS (vitest) | `assets/js/**/*.test.js` | `make test`, `mix precommit` (`assets.test`) | Hooks and other client modules, without a browser |
+| E2E (browser) | `test/e2e/` | `make e2e` | Real browser tests via Playwright (Firefox). Requires prod data. Excluded by default. See [E2E](#e2e). |
+| Prod data | `test/prod_data/` | `make test-prod-data` | Validates against a converted production DB copy (`PROD_DATA_DB=gallformers_taxogall` clones an already converted one). Excluded by default. `make test-prod-data-all` runs it and the E2E tests together (`make preflight` calls it). |
 
 **Support files** (`test/support/`): `DataCase` (Ecto sandbox), `ConnCase` (HTTP), `E2ECase` (Playwright, prod data), `ProdDataCase` (real DB validation).
 
 ### S3 Isolation in Tests
 
-Tests must NEVER make real AWS/S3 calls. Use `Gallformers.S3.request/1` instead of `ExAws.request/1`. See CODING_STANDARDS.md for details.
+Tests must NEVER make real AWS/S3 calls. Use `Gallformers.Storage.S3.request/1` instead of `ExAws.request/1`; S3 is disabled in the test config (`s3_enabled: false`), and the private bucket is an in-memory stub (`Gallformers.Storage.PrivateStub`, `test/support/private_storage_stub.ex`). See CODING_STANDARDS.md for details.
 
-### E2E Tests (Browser-based)
+### E2E
 
-E2E tests use Playwright with Firefox. All tests run against a production data copy and are excluded from regular test runs and CI. Install browsers with `make e2e-setup`.
+E2E tests use [phoenix_test_playwright](https://hex.pm/packages/phoenix_test_playwright) with Firefox. They run against a converted production data copy in the test database and are excluded from regular test runs and CI. Each target loads the prod data (see `load-prod-data-test` in the Makefile; `PROD_DATA_DB=<db>` clones an already converted copy) and restores the test database afterwards. Install the browsers once, and after Playwright version bumps, with `make e2e-setup`.
 
 ```bash
-make e2e                   # Run all E2E tests (loads prod data automatically)
-make e2e-changed           # Run only tests affected by changed files
+make e2e                   # Run all E2E tests
+make e2e-changed           # Run only tests affected by changed files (REF=HEAD~3 to compare against a ref)
 make e2e-public            # Public pages only
-make e2e-admin             # Admin pages only (taxonomy, reclassify, etc.)
-make e2e-headed            # Run with visible browser
+make e2e-search            # Search and the ID tool only
+make e2e-browse            # Gall and host pages only
+make e2e-admin             # Admin pages only
+make e2e-auth              # Authentication flows only
+make e2e-headed            # Run with a visible browser
+make e2e-slow              # Visible browser, with --trace
 ```
 
-See CODING_STANDARDS.md for E2E writing guide, test organization, and setup instructions.
+**Debugging**: `make e2e-headed`, or `E2E_HEADED=1` with any target (`E2E_HEADED=1 make e2e-admin`).
+
+**Writing E2E tests**: use `GallformersWeb.E2ECase`, and tag every module with `@moduletag :e2e` plus an area tag (`:e2e_public`, `:e2e_search`, `:e2e_browse`, `:e2e_admin`, `:e2e_auth`). `test/support/e2e_case.ex` has the full documentation.
+
+```elixir
+defmodule GallformersWeb.E2E.MyTest do
+  use GallformersWeb.E2ECase
+
+  @moduletag :e2e
+  @moduletag :e2e_public  # Area tag
+
+  test "page loads", %{conn: conn} do
+    conn
+    |> visit("/")
+    |> assert_has("h1", text: "Welcome")
+  end
+end
+```
+
+The browser tests are to be rebuilt against the final UI after cutover, and run in CI then; see "Rebuild the browser tests after cutover" in the [backlog](backlog.md).
 
 ## Core Beliefs
 
@@ -125,7 +148,7 @@ Every input boundary — changesets, form params, API params, JS hook payloads �
 
 **Scope:**
 
-Critical user journeys only — not every page, not every flow:
+Critical user journeys only — not every page, not every flow. These five are the target (Jeff, 2026-11-27); today `test/e2e/admin/` covers only the unauthenticated redirect, and the journeys come with the browser-test rebuild in the [backlog](backlog.md):
 
 1. **ID Tool** — select filters, results narrow, click result, arrive at correct gall page with correct data.
 2. **Gall detail page** — renders with hosts, range map, sources, images, traits all present and correct.
@@ -139,7 +162,7 @@ These test the full stack: Elixir, JS hooks, browser rendering, database. They c
 
 - Each test is a complete journey, not a page-load smoke test.
 - Tests verify end state (public page shows correct data after admin save).
-- Playwright + Firefox, headless default, `E2E_HEADED=1` for debugging.
+- Playwright + Firefox, headless by default (running and debugging: [E2E](#e2e)).
 - Tests create their own data where possible.
 
 ### Tier 4: Auxiliary Tests
@@ -150,12 +173,11 @@ These test the full stack: Elixir, JS hooks, browser rendering, database. They c
 
 - Mix tasks (WCVP build, restore).
 - WCVP Lookup integration tests (real SQL against wcvp_test).
-- Request logger.
 - Prod data invariants (`make test-prod-data`) — deep check against production copy.
 
 ### Tier 5: Post-Deploy Smoke Tests
 
-**Runs:** After every production deploy. Automated.
+**Runs:** After every production deploy. Automated: `mix smoke_test <url>` (`lib/mix/tasks/smoke_test.ex`), run by the Deploy workflow against the production URL (`.github/workflows/deploy.yml`).
 
 **Speed:** Seconds. Must be fast — they gate whether a deploy is considered successful.
 
@@ -163,11 +185,10 @@ These test the full stack: Elixir, JS hooks, browser rendering, database. They c
 
 Verify the deploy actually worked — the app is up, serving correct responses, and critical paths aren't broken. These are NOT functional tests. They answer: "is the site alive and healthy?"
 
-- Key pages return 200 (home, ID tool, a known gall page, a known host page).
+- Key pages return 200 (a Gall page, a Host page and a genus page found through the API, and global search).
 - API endpoints respond with valid JSON.
 - Static assets load (CSS, JS bundles).
 - Database is reachable (a page that queries data renders correctly).
-- Auth redirect works (admin page redirects to Auth0, not 500).
 
 **What does NOT belong here:**
 

@@ -2,7 +2,7 @@
 - Investigation Before Action
 - Search Before You Write
 - The most common agent failure is writing new code for something that already exists. Do not do this.
-- Do not commit until `mix precommit` passes clean. No exceptions for failures that look pre-existing or unrelated to your change: fix them. A test that fails only sometimes has a cause (timing, data, async race); find it rather than re-running until green.
+- Do not commit until `mix precommit` passes clean (it doesn't run Dialyzer; `make done-checks` does). No exceptions for failures that look pre-existing or unrelated to your change: fix them. A test that fails only sometimes has a cause (timing, data, async race); find it rather than re-running until green.
 - Features and bug fixes: write the failing test first and watch it fail for the expected reason, then implement.
 - Always compile with `--warnings-as-errors`, never plain `mix compile` (or run `mix precommit`). CI enforces it.
 
@@ -40,8 +40,8 @@ Use `Oban` for durable, retryable or scheduled work (dashboard `/admin/jobs`); p
 
 ## Domain model
 
-- On `taxogall` the code runs on the new back-end (`Catalog`, `Taxa`, `Facts`, `Import`, `Audit`, `Sources`); the plan: `docs/taxogall/`. The old tables stay until cutover, read only by the catalog migration ([general.md](docs/domain/general.md), [admin-domain-reference.md](docs/domain/admin-domain-reference.md)).
-- [domain-model.md](docs/domain/domain-model.md) is the domain language being discovered, not software. Don't use it to explain current code, or the old docs to design new work.
+- On `taxogall` the code runs on the new back-end, described in [docs/architecture/](docs/architecture/README.md); the plan: `docs/taxogall/`. The old tables stay until cutover, read only by the catalog migration.
+- [domain-model.md](docs/domain/domain-model.md) is the shared language: the domain's words, what they mean and the rules that follow from them; it says nothing about software. [docs/architecture/](docs/architecture/README.md) describes what's built and its guardrails ([rules.md](docs/architecture/rules.md)); the design system counts as architecture. Both are living docs, written for humans as much as agents and kept aligned with each other and with the code: a change that alters a term, rule or structure they state updates them in the same commit. Plans hold what's needed to execute and age out; they point to these docs rather than repeating them. [general.md](docs/domain/general.md) and [admin-domain-reference.md](docs/domain/admin-domain-reference.md) describe the old model on `main`; don't design new work from them.
 
 ## Work tracking
 
