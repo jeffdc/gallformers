@@ -1,7 +1,11 @@
 # Exclude E2E tests from regular test runs by default.
 # Run E2E tests with: make e2e
 #
-ExUnit.start(exclude: [:e2e, :prod_data, :typst])
+# assert_receive's ceiling, which LiveViewTest's render_async/1 also waits:
+# ExUnit's default of 100ms is too thin for pages whose async load queries the
+# database (5-40ms alone) while the whole suite runs. A ceiling, not a wait: a
+# passing test returns as soon as its message arrives.
+ExUnit.start(exclude: [:e2e, :prod_data, :typst], assert_receive_timeout: 1_000)
 Ecto.Adapters.SQL.Sandbox.mode(Gallformers.Repo, :manual)
 
 # The private bucket's in-memory stand-in (config/test.exs).

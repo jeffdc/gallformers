@@ -24,32 +24,24 @@ defmodule Gallformers.Markdown do
   @ets_table :glossary_terms
   @cache_ttl_ms :timer.minutes(15)
 
-  @earmark_options %Earmark.Options{
-    breaks: true,
-    gfm: true,
-    smartypants: false
-  }
+  # GitHub-flavoured Markdown with hard line breaks and no smart quotes;
+  # raw HTML passes through (articles use elements such as <details>).
+  @mdex_options [
+    extension: [table: true, strikethrough: true, autolink: true, tasklist: true],
+    render: [hardbreaks: true, unsafe: true]
+  ]
 
   @doc """
   Renders markdown to HTML with glossary term auto-linking.
 
-  Always returns `{:ok, html}`. Partial HTML is returned even if markdown
-  has parsing errors (e.g., unsupported HTML tags like `<details>`).
+  Always returns `{:ok, html}`: any input renders, raw HTML included.
   """
   @spec render(String.t()) :: {:ok, String.t()}
   def render(nil), do: {:ok, ""}
   def render(""), do: {:ok, ""}
 
   def render(markdown) when is_binary(markdown) do
-    case Earmark.as_html(markdown, @earmark_options) do
-      {:ok, html, _warnings} ->
-        {:ok, linkify_glossary_terms(html)}
-
-      {:error, html, _errors} ->
-        # Return partial HTML even with errors (e.g., unsupported HTML tags like <details>)
-        # This allows content with HTML elements to still render
-        {:ok, linkify_glossary_terms(html)}
-    end
+    {:ok, linkify_glossary_terms(to_html(markdown))}
   end
 
   @doc """
@@ -74,10 +66,7 @@ defmodule Gallformers.Markdown do
   def render_plain(""), do: ""
 
   def render_plain(markdown) when is_binary(markdown) do
-    case Earmark.as_html(markdown, @earmark_options) do
-      {:ok, html, _warnings} -> html
-      {:error, html, _errors} -> html
-    end
+    to_html(markdown)
   end
 
   @doc """
@@ -139,6 +128,8 @@ defmodule Gallformers.Markdown do
   end
 
   # Private functions
+
+  defp to_html(markdown), do: MDEx.to_html!(markdown, @mdex_options)
 
   defp get_glossary_word_map do
     ensure_ets_table()
