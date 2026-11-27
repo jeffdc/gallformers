@@ -5,6 +5,10 @@ on:
     - cron: '0 6 * * *'  # Daily at 6 AM UTC
   workflow_dispatch:      # Manual trigger
 
+# The GITHUB_TOKEN only reads the repository; nothing here writes to GitHub.
+permissions:
+  contents: read
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest

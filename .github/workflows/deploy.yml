@@ -12,6 +12,10 @@ concurrency:
   group: deploy
   cancel-in-progress: false  # Don't cancel production deploys
 
+# The GITHUB_TOKEN only reads the repository; nothing here writes to GitHub.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy to Fly.io
@@ -19,7 +23,7 @@ jobs:
     # Only deploy if CI succeeded
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup Flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
@@ -38,7 +42,7 @@ jobs:
       run:
         shell: 'nix develop -c bash -e {0}'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: cachix/install-nix-action@v31
 
@@ -47,7 +51,7 @@ jobs:
         run: nix build --no-link .#devShells.x86_64-linux.default
 
       - name: Restore dependencies cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             deps
