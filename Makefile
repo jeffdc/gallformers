@@ -351,7 +351,7 @@ e2e-changed: load-prod-data-test
 
 # =============================================================================
 
-# The hard check `mull done` runs (`mull config checks "make done-checks"`).
+# The hard checks to pass before handing work over.
 # Rebuilds this checkout's test database first: a worktree has its own, and
 # `mix test` only creates and migrates it (no seeds, no catalog migration).
 done-checks: test-db
