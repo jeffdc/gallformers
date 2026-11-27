@@ -1,5 +1,7 @@
 # Gallformers Traits to GallOnt Mapping
 
+> **History.** Generated 2026-02-14 from the old `gall_traits` schema, for matter eb47. The Trait values it maps are today's apart from generation (now generation groups); the current values are in [`priv/import/vocab/traits.json`](../../../priv/import/vocab/traits.json). The GallOnt files it was built from were deleted in cleanup step 10; GallOnt is published at purl.obolibrary.org/obo/gallont.owl.
+
 Generated 2026-02-14 from GallOnt v2024-04-19 and current gallformers gall_traits schema.
 
 Sources:
