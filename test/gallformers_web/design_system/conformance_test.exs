@@ -1,6 +1,8 @@
 defmodule GallformersWeb.DesignSystem.ConformanceTest do
   use ExUnit.Case, async: true
 
+  import Heartwood.Guardrails.Assertions
+
   alias GallformersWeb.DesignSystem.Conformance
 
   defp rules(text), do: text |> Conformance.scan() |> Enum.map(& &1.rule) |> Enum.sort()
@@ -65,33 +67,7 @@ defmodule GallformersWeb.DesignSystem.ConformanceTest do
   end
 
   describe "the codebase" do
-    test "no file has more off-system styling than its baseline" do
-      current = Conformance.counts()
-      baseline = Conformance.read_baseline()
-
-      worse =
-        for {file, rules} <- current,
-            {rule, count} <- rules,
-            allowed = get_in(baseline, [file, rule]) || 0,
-            count > allowed,
-            do: {file, rule, count, allowed}
-
-      assert worse == [], Conformance.explain(worse)
-    end
-
-    test "the baseline is tight: improvements are locked in" do
-      current = Conformance.counts()
-      baseline = Conformance.read_baseline()
-
-      loose =
-        for {file, rules} <- baseline,
-            {rule, count} <- rules,
-            (get_in(current, [file, rule]) || 0) < count,
-            do: {file, rule}
-
-      assert loose == [],
-             "Off-system styling went down in #{length(loose)} place(s). Lock it in with:\n\n" <>
-               "    mix gallformers.design_system.baseline\n"
-    end
+    test "no file has more off-system styling than its baseline, and improvements are locked in",
+      do: assert_ratchet(Conformance)
   end
 end

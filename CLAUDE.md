@@ -17,10 +17,10 @@ This file (AGENTS.md is the same file) holds rules only, for any agent. Plans, t
 
 ## Before you commit
 
-The pre-commit hook (`dev/githooks/`, installed by `make hooks`) blocks a commit without a passing review. A commit touching only `docs/`, `runbooks/` or the top-level README needs none.
+The pre-commit hook (heartwood_guardrails', run by `dev/githooks/`, installed by `make hooks`; it needs `mix deps.get`) blocks a commit without a passing review. A commit touching only the prose paths in `dev/guardrails/config.sh` (`HEARTWOOD_PROSE`) needs none.
 
-1. Stage files by name, then run `dev/guardrails/review_packet.sh`.
-2. A reviewer with fresh context, not yours, follows `dev/guardrails/reviewer.md` on the packet and records its verdict.
+1. Stage files by name, then run `deps/heartwood_guardrails/guardrails/bin/review-packet`.
+2. A reviewer with fresh context, not yours, follows the packet (heartwood's instructions and `dev/guardrails/checklist.md`) and records its verdict with the command the packet gives.
 3. On block: fix, restage, review again. Never re-run the review for a different answer; disputes go to Jeff.
 4. Commit once it passes.
 
@@ -51,7 +51,8 @@ Use `Oban` for durable, retryable or scheduled work (dashboard `/admin/jobs`); p
 - **Backlog:** a bug or idea that belongs to no plan goes in [docs/backlog.md](docs/backlog.md), one entry each; one that belongs to a plan goes in its phase doc. Add them as you find them, and don't act on them unless Jeff says to. Feedback Jeff hands over for later is recorded the same way, in his words, and never dropped. Planning a phase starts by reading the backlog for entries it should take in.
 - **Questions for Jeff:** ask him directly, and keep working on whatever isn't blocked.
 - **Each piece of planned work says what it deletes ("Deletes:") and the functions it calls ("Calls:", never "as in X").**
-- **Hard checks:** `make done-checks` rebuilds the checkout's test database, then runs `scripts/check-toolchain`, `mix precommit` and `mix dialyzer`. Don't call work finished until it passes.
+- **Hard checks:** `make done-checks` rebuilds the checkout's test database, then runs heartwood_guardrails' `check-toolchain`, `mix precommit`, `mix dialyzer` and `mix heartwood.status` (for information). Don't call work finished until it passes.
+- **Heartwood** (`~/dev/heartwood`, the code shared with Oak Compendium): its code is fixed in heartwood, never in `deps/`. `HEARTWOOD_PATH=~/dev/heartwood` uses a local checkout; never commit `mix.lock` with it set.
 - **Hand-over:** what changed and how it fits, a tour for UI work (what to click and what Jeff should see), and what Jeff must decide. Keep it short.
 - **Branches:** short descriptive names. `docs/plans/` is gitignored scratch.
 

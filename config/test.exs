@@ -117,3 +117,8 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# heartwood_guardrails: the ratchets the architecture review reports
+# (mix heartwood.architecture) and mix heartwood.baseline relocks.
+config :heartwood_guardrails,
+  ratchets: [Heartwood.Guardrails.DuplicateCode, GallformersWeb.DesignSystem.Conformance]

@@ -14,7 +14,7 @@ The following tools define and enforce our coding standards:
 
 **Rules:**
 - Run `mix precommit` before committing. It checks formatting, compiles with `--warnings-as-errors`, runs `mix credo --strict`, the JS tests and `mix test`; it does **not** run Dialyzer.
-- Work is finished only when `make done-checks` passes: it rebuilds the test database, then runs `scripts/check-toolchain`, `mix precommit` and `mix dialyzer`. CI runs the same checks.
+- Work is finished only when `make done-checks` passes: it rebuilds the test database, then runs heartwood_guardrails' `check-toolchain`, `mix precommit`, `mix dialyzer` and `mix heartwood.status`. CI runs the same checks.
 - All code must pass `mix credo --strict` with no errors and `mix dialyzer` with no warnings
 - Treat warnings as errors during compilation (`--warnings-as-errors`)
 

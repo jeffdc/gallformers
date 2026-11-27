@@ -21,9 +21,28 @@ permissions:
   contents: read
 
 jobs:
+  # What the pull request changes (heartwood's actions/changes, with
+  # dev/guardrails/config.sh): one that changes only prose skips the jobs
+  # below. They also run if this job fails, so a broken classifier never
+  # skips them; a push or a schedule counts as changing everything. The
+  # action's tag moves with @heartwood_tag in mix.exs.
+  changes:
+    name: Security changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: changes
+        uses: jeffdc/heartwood/guardrails/actions/changes@v0.2.2
+
   elixir-audit:
     name: Elixir Security Audit
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
 
     # Toolchain from the flake's dev shell (flake.nix), same as CI and local dev.
     # Not yet a required check: it fails until Earmark (retired) is replaced and the

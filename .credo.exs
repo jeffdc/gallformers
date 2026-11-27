@@ -194,7 +194,7 @@
       }
     },
     # Copied code (matter c800), checked against a shrink-only baseline by
-    # test/gallformers/guardrails/duplicate_code_test.exs rather than by
+    # Heartwood.Guardrails.DuplicateCode (test/gallformers/guardrails_test.exs) rather than by
     # `credo --strict`. See each block with: mix credo --config-name duplicates
     %{
       name: "duplicates",

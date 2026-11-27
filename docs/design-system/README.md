@@ -31,7 +31,7 @@ The living reference is the style guide page at `/dev/design-system` (developmen
 | Element defaults (`@layer base`) | `assets/css/system/base.css` |
 | Component styles (`@layer components`) | `assets/css/system/components.css` |
 | Components (HEEx function components) | `lib/gallformers_web/components/` (see the catalog for each one's module) |
-| Conformance check | `GallformersWeb.DesignSystem.Conformance`, its test, and the baseline `test/support/design_system_baseline.json` |
+| Conformance check | `GallformersWeb.DesignSystem.Conformance` (`test/support/design_system/conformance.ex`, a heartwood_guardrails `Patterns` ratchet), its test, and the baseline `test/support/design_system_baseline.json` |
 
 All stylesheet rules live in a cascade layer (`base` or `components`), so a utility class on an element always wins over them. Keep it that way: an unlayered rule silently overrides every template.
 
@@ -56,7 +56,7 @@ Nothing is replaced on its look alone. Before a component replaces another (or a
 `test/gallformers_web/design_system/conformance_test.exs` scans templates and stylesheets for off-system styling and compares each file with a baseline. It fails when:
 
 - a file has more off-system styling than its baseline, or a new file has any. The failure lists each line and the system's replacement. Fix the code; don't raise the baseline.
-- a file has less than its baseline. Lock the improvement in with `mix gallformers.design_system.baseline`.
+- a file has less than its baseline. Lock the improvement in with `mix heartwood.baseline GallformersWeb.DesignSystem.Conformance`.
 
 The baseline holds the migration backlog. It only goes down.
 
@@ -66,4 +66,4 @@ The system is in place on every page, public and admin.
 
 - Foundations: tokens (light and dark, two densities), typefaces, cascade layering, the conformance check.
 - The catalog was approved on 2026-11-04; each entry's status is in [components.md](components.md). Still Approved, not built: `range_map` (rework), `pagination` (restyle), `typeahead` (consolidate), `save_bar`, `toast` (restyle), `skeleton` and `spinner`, and `button`'s `link` extension.
-- The conformance baseline holds four files: the root layout, the conformance check itself, the admin profile page and the read-only-mode plug.
+- The conformance baseline holds three files: the root layout, the admin profile page and the read-only-mode plug.

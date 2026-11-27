@@ -36,9 +36,28 @@ permissions:
   contents: read
 
 jobs:
+  # What the pull request changes (heartwood's actions/changes, with
+  # dev/guardrails/config.sh): one that changes only prose skips the jobs
+  # below. They also run if this job fails, so a broken classifier never
+  # skips them; a push or a schedule counts as changing everything. The
+  # action's tag moves with @heartwood_tag in mix.exs.
+  changes:
+    name: CI changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: changes
+        uses: jeffdc/heartwood/guardrails/actions/changes@v0.2.2
+
   phoenix:
     name: Phoenix
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
 
     services:
       postgres:
@@ -85,11 +104,12 @@ jobs:
           key: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-
 
-      - name: Check Dockerfiles match the flake toolchain
-        run: scripts/check-toolchain
-
       - name: Install dependencies
         run: mix deps.get
+
+      # heartwood_guardrails' check, so after deps.get.
+      - name: Check Dockerfiles match the flake toolchain
+        run: deps/heartwood_guardrails/guardrails/bin/check-toolchain
 
       - name: Setup test database
         run: |
@@ -106,6 +126,8 @@ jobs:
   assets:
     name: Assets
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
 
     defaults:
       run:
@@ -148,6 +170,8 @@ jobs:
   dialyzer:
     name: Dialyzer
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
 
     env:
       MIX_ENV: dev

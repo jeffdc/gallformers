@@ -19,8 +19,8 @@ Baselines as of the [2026-11-26 review](reviews.md#2026-11-26-baseline), at `tax
 | S5 | One write path: for any data, exactly two ways in (its editing screen and the import), and both call the same code to validate, write and read it. | docs/taxogall/README.md, One write path (Jeff, 2026-11-12) | Manual | Not yet built; it is a taxogall phase. Today the content admins (glossary, articles, keys) and Host ranges write outside the import. |
 | S6 | Audit is a layer underneath: every write to a tracked table names its actor, and the database refuses one that doesn't. | docs/taxogall/README.md, Audit | Database: Carbonite's trigger and the `transactions_meta_attribution` CHECK | 0 on tracked tables. Not tracked: `source`, `document_items`, `host_range`, `image`, `place`, `users`, `change_sets`, `change_set_items`, `articles`, `keys`, `glossary`, `content_images`. The content admins write with no actor (`glossary_live/form.ex:33-37`, `key_live/form.ex:32-38`, `article_live/form.ex:148-150`). |
 | S7 | A shared capability has one owner; everything else calls it. | AGENTS.md, Building | `SingleEntryPoint` (`.credo.exs`): precommit, enforced; a pending caller that stops calling must be removed from the list | 5 capabilities. 7 pending callers (matter b230): `ReviewLive.Answer` ×3, `TaxonomyLive.New`, `TaxonomyLive.RangeEditor`, `InatTaxonPanel`, `ReviewLive.Review`. |
-| S8 | Replacing means deleting: the old module is listed in `test/support/retirements.exs` and deleted in the same change. | AGENTS.md, Building | Retirements test (fails while both old and new load): precommit | 0 entries |
-| S9 | Search before you write: never write new code for something that already exists. | AGENTS.md, CRITICAL and Building | Duplicate-code ratchet (Credo `DuplicatedCode`, mass 40, `test/support/duplicate_code_baseline.json`): precommit. The commit gate's review: pre-commit hook. | 63 findings in 24 file sets; 21 findings in 10 sets in `lib/` (e.g. `review_live/{source,step,taxonomy}.ex`, `catalog/read_models/{api,search}.ex`, `review_live/facts.ex` and `source_live/facts.ex`). |
+| S8 | Replacing means deleting: the old module is listed in `test/support/retirements.exs` and deleted in the same change. | AGENTS.md, Building | Retirements test (heartwood_guardrails' `assert_no_outstanding_retirements/0`, fails while both old and new load): precommit | 0 entries |
+| S9 | Search before you write: never write new code for something that already exists. | AGENTS.md, CRITICAL and Building | Duplicate-code ratchet (`Heartwood.Guardrails.DuplicateCode`: Credo `DuplicatedCode`, mass 40, `test/support/duplicate_code_baseline.json`): precommit. The commit gate's review: pre-commit hook. | 63 findings in 24 file sets; 21 findings in 10 sets in `lib/` (e.g. `review_live/{source,step,taxonomy}.ex`, `catalog/read_models/{api,search}.ex`, `review_live/facts.ex` and `source_live/facts.ex`). |
 | S10 | The old tables are read only by the catalog migration. | AGENTS.md, Domain model | Manual | `ranges.ex:138` reads `species` on every Host range write; `abundance` is read by `catalog.ex:583`, `catalog/read_models/api.ex:200`, `gall_page.ex:235`, `taxa.ex:479`, `taxa/read_models/host_page.ex:101`; `mix gallformers.catalog.id_parity` runs the old ID filter. `host_range.species_id` and `image.species_id` are still written. **Accepted until cutover** (Jeff, 2026-11-26): abundance becomes a Fact, and the old tables are dropped after release. |
 | S11 | Business logic never depends on the web layer. | [decisions.md](decisions.md), 2026-11-26 baseline findings | Boundary: no context declares `GallformersWeb`; precommit, CI | 0. The one exception, by design: `Gallformers.Application` starts the endpoint and telemetry (`lib/gallformers/application.ex`). |
 
@@ -62,7 +62,7 @@ From core-architecture-rules.md's principles (retired 2026-11-26, moved here).
 | ID | Rule | Source | Check | Baseline |
 |---|---|---|---|---|
 | U1 | All UI is built from the design system's components; never a custom inline version. One that almost fits is extended with its catalog entry; when none fits, ask Jeff with a proposed entry. | AGENTS.md, Design system; design-system README, The five rules | Manual | Not measured |
-| U2 | Colour, type, spacing, radius and shadow come from the tokens. | design-system README, rule 2 | Conformance ratchet (`test/gallformers_web/design_system/conformance_test.exs`, `test/support/design_system_baseline.json`): precommit | 17 in 4 files: `design_system/conformance.ex` 10 (its own patterns), `root.html.heex` 4 (3 hex, 1 inline style), `plugs/enforce_read_only.ex` 2 inline styles, `admin/profile_live.ex` 1 radius. Not scanned: `dev/gallformers_web`, `assets/js`. |
+| U2 | Colour, type, spacing, radius and shadow come from the tokens. | design-system README, rule 2 | Conformance ratchet (`GallformersWeb.DesignSystem.Conformance` in `test/support/`, on heartwood's `Patterns`; `test/gallformers_web/design_system/conformance_test.exs`, `test/support/design_system_baseline.json`): precommit | 7 in 3 files (the module left the scanned tree, 2026-11-27): `root.html.heex` 4 (3 hex, 1 inline style), `plugs/enforce_read_only.ex` 2 inline styles, `admin/profile_live.ex` 1 radius. Not scanned: `dev/gallformers_web`, `assets/js`. |
 | U3 | A domain formatting rule has one function and one component (scientific names through `<.taxon_name>` and `<.gall_name>`), with semantic markup rather than visual classes. | core-architecture-rules.md §7-9 | Manual | 90 `italic` classes in 26 web files and `<em>` in 9, by grep; not all are names. |
 | U4 | Never raise the conformance baseline. | AGENTS.md, Design system | Manual: the baseline file's diff, in review | 0 |
 
@@ -81,10 +81,10 @@ From core-architecture-rules.md's principles (retired 2026-11-26, moved here).
 
 | ID | Rule | Source | Check | Baseline |
 |---|---|---|---|---|
-| O1 | Work is finished only when `make done-checks` passes (test database rebuild, check-toolchain, `mix precommit`, Dialyzer). | AGENTS.md, Work tracking | Local only. CI runs the same checks on pushes to `main` and on PRs into `main` or `taxogall`. | Direct pushes to `taxogall` get no CI run. |
+| O1 | Work is finished only when `make done-checks` passes (test database rebuild, check-toolchain, `mix precommit`, Dialyzer; `mix heartwood.status` for information). | AGENTS.md, Work tracking | Local only. CI runs the same checks on pushes to `main` and on PRs into `main` or `taxogall`. | Direct pushes to `taxogall` get no CI run. |
 | O2 | Always compile with `--warnings-as-errors`. | AGENTS.md, CRITICAL | precommit, CI | 0 |
-| O3 | No commit without `mix precommit` passing and a passing review by a fresh-context reviewer; docs-only commits need no review. | AGENTS.md, CRITICAL and Before you commit | `dev/githooks/pre-commit` (the review); precommit by hand | Local per clone (`make hooks`); skipped by `--no-verify`; nothing in CI checks a review was recorded. |
-| O4 | No force pushes; never push `main` or `master`. | AGENTS.md, Before you commit | `dev/githooks/pre-push`; the main ruleset on GitHub | 0 |
+| O3 | No commit without `mix precommit` passing and a passing review by a fresh-context reviewer; docs-only commits need no review. | AGENTS.md, CRITICAL and Before you commit | heartwood_guardrails' pre-commit hook, run by `dev/githooks/pre-commit`; the prose paths are `HEARTWOOD_PROSE` in `dev/guardrails/config.sh` (AGENTS.md and CLAUDE.md are always reviewed); precommit by hand | Local per clone (`make hooks`; it fails closed without `deps/`); skipped by `--no-verify`; nothing in CI checks a review was recorded. |
+| O4 | No force pushes; never push `main` or `master`. | AGENTS.md, Before you commit | heartwood_guardrails' pre-push hook, run by `dev/githooks/pre-push`; the main ruleset on GitHub | 0 |
 | O5 | Environment variables are read only in `config/runtime.exs`. | CODING_STANDARDS.md, Configuration | Manual | `config/config.exs:72`; `config/prod.exs:33` (at compile time); `config/dev.exs:9-31` (10); `config/test.exs:27-56` (8); `lib/gallformers/repo.ex:12`, `repo/wcvp.ex:18`, `application.ex:57`, `wcvp/conn.ex:17-19`, `lib/mix/tasks/gallformers/catalog/migrate.ex:77`. The Postgres connection variables come from the Nix shell, so most of these are dev and test. |
 | O6 | Production fails loudly on a missing secret. | [decisions.md](decisions.md), 2026-11-26 baseline findings | Manual | Only `DATABASE_URL` and `SECRET_KEY_BASE` raise; the Auth0 and S3 keys are silently optional, and `PHX_HOST` defaults to `example.com` (`config/runtime.exs`). |
 | O7 | Errors reach someone. Which service is open, since it sends data to a third party. | [decisions.md](decisions.md), 2026-11-26 baseline findings | Manual | No error tracking; the downdetector sees only the home page. |
@@ -100,20 +100,21 @@ Every automated check today, and the rules it holds.
 | `format_check` (`lib/mix/tasks/format_check.ex`) | precommit, CI | formatting of `lib/` and `test/` `.ex`/`.exs` files |
 | `mix compile --warnings-as-errors` with Boundary | precommit, CI | no warnings; S2, S11 |
 | `mix credo --strict` (`.credo.exs`) | precommit, CI | style; custom checks in `dev/credo/checks/`: S3 and T3–T4 (advisory), S7 (enforced) |
-| Duplicate-code test (`test/gallformers/guardrails/duplicate_code_test.exs`) | precommit, CI | S9 |
-| Retirements test (`test/gallformers/guardrails/retirements_test.exs`) | precommit, CI | S8 |
+| Duplicate-code and retirements tests (`test/gallformers/guardrails_test.exs`, on heartwood_guardrails) | precommit, CI | S9, S8 |
 | Design-system conformance test | precommit, CI | U2 |
 | Router tests (`role_live_session_test.exs`, `admin_actor_test.exs`) | precommit, CI | X7, for hand-listed admin routes |
-| Commit gate and pre-push tests (`commit_gate_test.exs`, `pre_push_test.exs`) | precommit, CI | that O3 and O4's hooks work |
+| Hook shim tests (`test/gallformers/guardrails_test.exs`); heartwood tests the hooks | precommit, CI | that `dev/githooks/` runs heartwood's hooks at the pinned tag |
 | `mix test` | precommit, CI | behaviour |
 | `assets.test` / `npm test` (Vitest) | precommit locally; CI's Assets job | the JS hooks |
 | `deps.unlock --unused` | precommit, CI | nothing: it rewrites `mix.lock` rather than failing |
 | `test.check_exclusions` | precommit, CI | nothing: it prints guidance |
 | `mix dialyzer` | `make done-checks`, CI | types |
-| `scripts/check-toolchain` | `make done-checks`, CI | the Dockerfiles match the flake |
+| heartwood_guardrails' `bin/check-toolchain` | `make done-checks`, CI | the Dockerfiles match the flake |
+| CI changes and Security changes jobs (heartwood's `actions/changes`) | CI, PRs | which jobs a PR needs: a prose-only PR skips Phoenix, Assets, Dialyzer and the Security Audit; a failed classifier runs them all |
+| `mix heartwood.architecture` | by hand, periodically; not a gate | the architecture review's packet (`dev/guardrails/architecture.md` holds gallformers' questions) |
 | API version check | CI, PRs only | an API controller change bumps `API_VERSION` |
 | Carbonite trigger and the attribution CHECK | the database | S6 |
-| `dev/githooks/pre-commit` | local commit | O3's review |
-| `dev/githooks/pre-push` | local push | O4 |
+| `dev/githooks/pre-commit` (heartwood's hook) | local commit | O3's review |
+| `dev/githooks/pre-push` (heartwood's hook) | local push | O4 |
 | `mix smoke_test` | after each deploy | the production site answers |
 | Security Audit workflow (`hex.audit`, `deps.audit`, Sobelow `--exit high`) | CI: PRs, `main`, weekly; not a required check; the dependency advisories were cleared in #612, and it fails on Sobelow's `Config.CSP` until production sends a Content-Security-Policy | dependencies; X1–X4 in part |

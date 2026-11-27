@@ -119,18 +119,9 @@ Automated via GitHub Actions (`db-snapshot.yml`). Runs daily at 6 AM UTC.
 
 To restore from a snapshot, see [Restore Database](./restore-database.md).
 
-### Barman (Fly Postgres built-in backups)
+### No continuous backups
 
-Fly's `postgres-flex` image includes barman for continuous WAL-based backups. This provides lower RPO than the daily pg_dump snapshots.
-
-Check barman status:
-
-```bash
-fly postgres barman check -a gallformers-db
-fly postgres barman backup list -a gallformers-db
-```
-
-**Note:** Barman has not yet been verified as working. Check this and confirm backup frequency and retention before relying on it for disaster recovery.
+The daily snapshot above is the only backup: up to a day of writes can be lost. Fly's barman was never set up (`fly postgres barman check -a gallformers-db` finds no barman machine, checked 2026-11-27), and Fly has deprecated that implementation in favour of WAL archiving to object storage.
 
 ## Maintenance Tasks
 

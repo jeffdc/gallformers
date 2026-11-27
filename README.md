@@ -7,7 +7,9 @@ The gallformers.org website - a comprehensive database and reference guide for g
 
 ## Quick Start
 
-The whole toolchain (Elixir, Erlang/OTP, Node, Postgres, libvips, Typst, Tailwind, Python/uv) comes from a Nix flake, pinned in `flake.lock` and shared with CI. The Dockerfiles use the same versions; CI checks that with `scripts/check-toolchain`.
+The whole toolchain (Elixir, Erlang/OTP, Node, Postgres, libvips, Typst, Tailwind, Python/uv) comes from a Nix flake, pinned in `flake.lock` and shared with CI. The Dockerfiles use the same versions; CI checks that with heartwood_guardrails' `check-toolchain`.
+
+The guardrails (the git hooks, the review scripts, the ratchets, `check-toolchain`, the architecture review) come from [heartwood](https://github.com/jeffdc/heartwood), the code shared with Oak Compendium: a dev and test dependency pinned by tag (`@heartwood_tag` in `mix.exs`), configured in `dev/guardrails/config.sh`. Run `mix deps.get` before `make hooks`; the hooks block without it. To work on heartwood from here, set `HEARTWOOD_PATH=~/dev/heartwood`, and never commit `mix.lock` with it set.
 
 ```bash
 direnv allow            # once per checkout: loads the dev shell from flake.nix
@@ -138,8 +140,8 @@ gallformers/
 ├── priv/                # Static files, migrations, database
 ├── test/                # Tests
 ├── config/              # Phoenix configuration
-├── dev/                 # Dev-only code, Credo checks, git hooks, review guardrails
-├── scripts/             # Dev and CI scripts (dev-db, check-toolchain)
+├── dev/                 # Dev-only code, Credo checks, git hook shims, guardrail settings (config.sh, the review checklist, the architecture questions)
+├── scripts/             # Dev scripts (dev-db, e2e-changed)
 ├── infra/               # AWS infrastructure (OpenTofu)
 ├── runbooks/            # Operational procedures
 ├── docs/                # Architecture, domain and design-system docs, plans
@@ -192,7 +194,7 @@ The "Database Snapshot" workflow (`.github/workflows/db-snapshot.yml`) runs dail
 - **Private** (`s3://gallformers-full-backups/<YYYY-MM-DD>/gallformers.dump`) - Full backup with PII, one per day
 - **Public** (`s3://gallformers-backups/public/gallformers.dump`) - Private tables left out, replaced daily
 
-Fly Postgres's own Barman backups have not been verified ([runbooks/postgres-maintenance.md](runbooks/postgres-maintenance.md#backups)).
+There are no continuous (WAL) backups, so up to a day of writes can be lost ([runbooks/postgres-maintenance.md](runbooks/postgres-maintenance.md#backups)).
 
 For restore procedures, see [runbooks/restore-database.md](runbooks/restore-database.md). For the buckets, see [infra/README.md](infra/README.md).
 

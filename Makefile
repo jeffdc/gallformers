@@ -9,6 +9,10 @@
 # Requires an AWS CLI session: run `aws login` first (temporary credentials; no access keys)
 DUMP_BUCKET ?= gallformers-full-backups
 
+# heartwood_guardrails (the hooks, review scripts and check-toolchain): the
+# dependency, or a local checkout with HEARTWOOD_PATH.
+HEARTWOOD := $(if $(HEARTWOOD_PATH),$(HEARTWOOD_PATH)/guardrails,deps/heartwood_guardrails/guardrails)
+
 download-db:
 	@echo "Finding latest backup..."
 	$(eval LATEST_DATE := $(shell aws s3 ls s3://$(DUMP_BUCKET)/ | tail -1 | awk '{print $$2}' | tr -d '/'))
@@ -105,10 +109,12 @@ wcvp-check:
 # Full setup (deps + assets + database + git hooks)
 setup: deps assets check-db wcvp-check hooks
 
-# Install the git hooks in dev/githooks/ (the commit gate, matter c800).
+# Install the git hooks in dev/githooks/ (heartwood_guardrails' commit gate
+# and push guard).
 # Writes thin wrappers into git's hooks directory; changes no git config.
 hooks:
-	@dev/githooks/install.sh
+	@test -x $(HEARTWOOD)/hooks/install || { echo "heartwood_guardrails is missing: run mix deps.get first."; exit 1; }
+	@$(HEARTWOOD)/hooks/install
 
 # =============================================================================
 # Development
@@ -355,9 +361,10 @@ e2e-changed: load-prod-data-test
 # Rebuilds this checkout's test database first: a worktree has its own, and
 # `mix test` only creates and migrates it (no seeds, no catalog migration).
 done-checks: test-db
-	scripts/check-toolchain
+	$(HEARTWOOD)/bin/check-toolchain
 	mix precommit
 	mix dialyzer
+	mix heartwood.status
 
 # Run CI checks (same as GitHub Actions)
 ci: assets/node_modules test-db

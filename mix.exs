@@ -1,6 +1,8 @@
 defmodule Gallformers.MixProject do
   use Mix.Project
 
+  @heartwood_tag "v0.2.2"
+
   def project do
     [
       app: :gallformers,
@@ -29,7 +31,11 @@ defmodule Gallformers.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test, "gallformers.guardrails.baseline": :test]
+      preferred_envs: [
+        precommit: :test,
+        "heartwood.baseline": :test,
+        "heartwood.architecture": :test
+      ]
     ]
   end
 
@@ -92,6 +98,7 @@ defmodule Gallformers.MixProject do
       # Dev/Test tools
       {:boundary, "~> 0.10", runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      heartwood(:heartwood_guardrails, "guardrails", only: [:dev, :test], runtime: false),
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       # Security scanning
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
@@ -100,6 +107,18 @@ defmodule Gallformers.MixProject do
       {:phoenix_test, "~> 0.4", only: :test, runtime: false},
       {:phoenix_test_playwright, "~> 0.19", only: :test, runtime: false}
     ]
+  end
+
+  # Code shared with Oak Compendium (~/dev/heartwood), pinned by tag;
+  # HEARTWOOD_PATH=~/dev/heartwood uses that checkout instead.
+  defp heartwood(package, folder, opts) do
+    source =
+      case System.get_env("HEARTWOOD_PATH") do
+        nil -> [github: "jeffdc/heartwood", sparse: folder, tag: @heartwood_tag]
+        path -> [path: Path.join(path, folder)]
+      end
+
+    {package, source ++ opts}
   end
 
   # Aliases are shortcuts or tasks specific to the current project.

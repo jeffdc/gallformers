@@ -2,7 +2,7 @@
 
 Jeff's decisions that shape the system's architecture and design, newest first. Each entry says what was decided, why, and what it changes: the parts of [README.md](README.md) it shapes and the [rules](rules.md) it adds or changes. A decision is never edited after the fact; a later decision supersedes it and says so, and the old entry gains a "Superseded by" line.
 
-Entries before 2026-11-26 were recorded when this log began, from the code, its history, mull and the old matters (read with git: AGENTS.md, "Old IDs"); their dates are when the decision was made or landed. Only decisions that shape the architecture are here. The domain decisions (what a Fact is, ranges, Sources' standings and the rest) are in the [taxogall plan](../taxogall/README.md), and mull's other decisions stay readable with git.
+Entries before 2026-11-26 were recorded when this log began, from the code, its history, mull and the old matters (read with git: AGENTS.md, "Old IDs"); their dates are when the decision was made or landed. Only decisions that shape the architecture are here. The domain decisions (what a Fact is, ranges, Sources' standings and the rest) are in the [domain doc](../domain/domain-model.md), and mull's other decisions stay readable with git.
 
 Template:
 
@@ -13,6 +13,12 @@ Template:
 - **Changes:** … (README sections, rules added or changed)
 - **Source:** commit, PR, plan doc, or mull or matter ID
 ```
+
+## 2026-11-27: Take the guardrails from heartwood, and let prose through without a review
+
+- **Why:** the guardrails (the ratchets, retirements, the commit gate and push guard, the review scripts, `check-toolchain`, the architecture review) are the same in gallformers and Oak Compendium, so they live once, in heartwood (2026-11-26, the backlog's heartwood entry). Waiting on a reuse review for a change to documentation only slows the work and finds nothing.
+- **Changes:** `heartwood_guardrails` is a dev and test dependency pinned by tag (`@heartwood_tag`, v0.2.2), configured in `dev/guardrails/config.sh`; `dev/githooks/` holds heartwood's shim, failing closed without `deps/`. Gallformers keeps its own rules: the conformance patterns (`GallformersWeb.DesignSystem.Conformance`, now in `test/support/`), the baselines, the retirements list, the reviewer's checklist (`dev/guardrails/checklist.md`) and the architecture questions (`dev/guardrails/architecture.md`). The commit gate's prose widens from `docs/`, `runbooks/` and the README to the Markdown outside the code (CODING_STANDARDS.md, DESIGN.md, PRODUCT.md, `infra/README.md`, `prompts/`); AGENTS.md and CLAUDE.md stay reviewed, which heartwood's hook requires. CI skips its code jobs on a PR that changes only prose (heartwood's `actions/changes`), and runs them if the classifier fails. Rules S8, S9, U2, O1, O3, O4; README, Delivery.
+- **Source:** Jeff, 2026-11-27; [cleanup step 11](../cleanup/README.md#step-11-onto-heartwood_guardrails-with-the-architecture-reviewer).
 
 ## 2026-11-26: Settle the baseline review's findings
 

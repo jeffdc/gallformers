@@ -33,7 +33,7 @@
         let
           inherit (pkgs) lib stdenv;
 
-          # Elixir/OTP must match the Dockerfile builder image (scripts/check-toolchain).
+          # Elixir/OTP must match the Dockerfile builder image (heartwood_guardrails' bin/check-toolchain).
           beam = pkgs.beam.packages.erlang_28;
 
           tailwindAsset = tailwindAssets.${stdenv.hostPlatform.system};

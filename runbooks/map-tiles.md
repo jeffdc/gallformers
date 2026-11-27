@@ -64,7 +64,7 @@ TILES_URL=https://gallformers.org/tiles/boundaries.pmtiles mix phx.server
 | **Config** | `TILES_URL` env var → `https://gallformers.org/tiles/boundaries.pmtiles` |
 | **CORS** | CloudFront tiles CORS policy allows cross-origin Range requests |
 
-Preview uses the same tiles as production. No local file is baked into the Docker image. Set the `TILES_URL` env var to point at the production CloudFront URL. `fly.preview.toml` doesn't set it in `[env]`, so check `fly secrets list -a gallformers-preview`; without it, preview requests `/tiles/boundaries.pmtiles` from its own app, which has no such file.
+Preview uses the same tiles as production. No local file is baked into the Docker image. Set the `TILES_URL` env var to point at the production CloudFront URL. Neither `fly.preview.toml`'s `[env]` nor preview's secrets set it (checked 2026-11-27; the backlog's preview entry), so preview requests `/tiles/boundaries.pmtiles` from its own app, which has no such file. Set it with `fly secrets set TILES_URL=https://gallformers.org/tiles/boundaries.pmtiles -a gallformers-preview`.
 
 If preview ever needs different tiles than production, upload a separate copy to a different S3 path and update `TILES_URL` accordingly.
 

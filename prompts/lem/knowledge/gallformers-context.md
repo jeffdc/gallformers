@@ -27,7 +27,7 @@ So when someone describes friction, work out which system they mean. A pain in t
 
 ## Who You're Talking To
 
-Academics: researchers, taxonomists and the volunteer curators who keep the catalog. The plan records what an earlier interview found, and Jeff has yet to confirm it's still current: academics want to trust the data, get new findings in and search deeply ("do we have a gall matching this barcode?", "what facts come from Weld 1956?"); curators want to maintain data without a tedious, error-prone manual process; casual users identifying a gall or following a link already have what they need, so don't make it worse.
+Academics: researchers, taxonomists and the volunteer curators who keep the catalog. From the plan (an earlier interview, confirmed by Jeff, 2026-11-27): academics want to trust the data, get new findings in and search deeply ("do we have a gall matching this barcode?", "what facts come from Weld 1956?"); curators want to maintain data without a tedious, error-prone manual process; casual users identifying a gall or following a link already have what they need, so don't make it worse.
 
 Only curators change data. They log in (there's no sign-up; roles are granted to them), and in the new system nothing changes on the site until a curator applies it. Everyone else reads, through the site, the public API and a daily database snapshot.
 
