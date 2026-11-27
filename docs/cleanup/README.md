@@ -41,7 +41,7 @@ Each step is reviewed by Jeff before the next starts.
 | 3 | Branches: delete the fully merged ones; move work onto `taxogall`; keep v1's last commit as the tag `archive/v1-final` | Done (2026-11-26) |
 | 4 | Branches: go through the unmerged ones one by one, find what each is, decide | Done (2026-11-26) |
 | 5 | Taxogall's high-level plan: [`docs/taxogall/README.md`](../taxogall/README.md) from mull's plan doc, checked against the 2026-11 reboot presentation; its first child step is revisiting mull's 18 phases | Done (2026-11-26) |
-| 6 | Architecture baseline (a fresh session): `docs/architecture/` in the oaks shape, mapped from `taxogall` (see below) | Not started |
+| 6 | Architecture baseline (a fresh session): [`docs/architecture/`](../architecture/README.md) in the oaks shape, mapped from `taxogall` (see below) | Done (2026-11-26) |
 | 7 | Backlog: mull's 27 unphased items and its captured bugs and ideas, only what's still live | Not started |
 | 8 | Mull's 22 unsettled inbox entries (17 decisions, 4 questions, 1 review): each to Jeff, into the taxogall plan, or dropped | Not started |
 | 9 | `docs/plans/` scratch: a big pass, in batches (fold in, keep as history, or delete with Jeff's OK) | Not started; plan the batches when it starts |
@@ -110,3 +110,4 @@ None open.
 - **2026-11-26:** Added the architecture baseline (step 6) and adopting the reviewer (step 11), at Jeff's request through the oaks session; Jeff settled its shape.
 - **2026-11-26:** Step 4 done: every unmerged branch gone through with Jeff and deleted.
 - **2026-11-26:** Step 5 done: wrote [the taxogall plan](../taxogall/README.md). Jeff: held edits in a change set are how editing works today; the domain doc is to be updated and organised into the doc set (step 10); nothing else is built until the house is in order, so the plan's first child is this cleanup; the plan links to mull's phases rather than listing them, since revisiting them reads each in detail.
+- **2026-11-26:** Step 6 done: wrote [`docs/architecture/`](../architecture/README.md) (README as built on `taxogall`, rules with their checks and baselines, a decision log seeded with 15 decisions, and the [baseline review](../architecture/reviews.md#2026-11-26-baseline)), mapped by four read-only agents. Deleted `core-architecture-rules.md`, `range-system.md`, `elixir-architecture.md` (a tutorial whose examples described contexts that no longer exist) and the C4 model, with Jeff's OK. Jeff: every bug the review found goes in the [backlog](../backlog.md), and planning a phase starts by reading the backlog. The review's doc drift outside `docs/architecture/` is for step 10.

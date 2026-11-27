@@ -27,7 +27,7 @@ Done when:
 | 0 | House in order: the [cleanup plan](../cleanup/README.md), including the architecture baseline | | In progress | [cleanup](../cleanup/README.md) |
 | 1 | Revisit mull's 18 phases: keep, regroup or drop each, and order what's left | 0 | Next | not yet written |
 
-Nothing else is built until the house is in order (Jeff, 2026-11-26). Step 1 reads each of mull's phases in detail: `git show mull:phases/<id>.md` for its title, intent and needs, `git show mull:docs/phases/<id>.md` for its doc, and its items with `git grep -l "phase: <id>" mull -- items/`. Its outcome replaces this table's later rows.
+Nothing else is built until the house is in order (Jeff, 2026-11-26). Planning each child plan or phase starts by reading the [backlog](../backlog.md) for entries it should take in (Jeff, 2026-11-26). Step 1 reads each of mull's phases in detail: `git show mull:phases/<id>.md` for its title, intent and needs, `git show mull:docs/phases/<id>.md` for its doc, and its items with `git grep -l "phase: <id>" mull -- items/`. Its outcome replaces this table's later rows.
 
 Of mull's *Decisions first* phase, four decisions are settled (below), one analysis is in review (the notes, 5352), and three are open (ranges' screens and curation, the taxonomy API, dating the notes' Facts).
 
@@ -121,6 +121,7 @@ Outside this plan: plant taxonomy as a field of work, Relationships not tied to 
 
 - [Domain model](../domain/domain-model.md): the domain language.
 - [What we told curators, 2026-11-17](../presentations/2026-11-reboot-summary.md).
-- [Cleanup](../cleanup/README.md): getting planning, docs and branches in order first. The architecture as built goes in `docs/architecture/` (cleanup step 6).
+- [Architecture](../architecture/README.md): the system as built on `taxogall`, with its [rules](../architecture/rules.md), [decisions](../architecture/decisions.md) and [reviews](../architecture/reviews.md).
+- [Cleanup](../cleanup/README.md): getting planning, docs and branches in order first.
 - [Backlog](../backlog.md): work that belongs to no plan.
 - Mull's plan, for history: `git show mull:docs/plans/taxogall.md`.

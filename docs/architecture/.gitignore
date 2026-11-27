@@ -1,7 +1,0 @@
-# Ignore exported diagram images (generate from workspace.dsl as needed)
-*.png
-*.svg
-*.puml
-
-# Structurizr workspace files
-.structurizr*

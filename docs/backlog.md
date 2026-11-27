@@ -2,9 +2,30 @@
 
 Known bugs and ideas that belong to no plan. When one is picked up it moves into a plan doc, or is fixed directly if it's small. Bugs and ideas that belong to a plan are in that plan's docs.
 
-Mull's unphased items, captured bugs and ideas are still to be brought over (step 6 of the [cleanup](cleanup/README.md)).
+Planning a phase or a child plan starts by reading this backlog for entries it should take in (Jeff, 2026-11-26).
+
+Mull's unphased items, captured bugs and ideas are still to be brought over (step 7 of the [cleanup](cleanup/README.md)).
 
 ## Bugs
+
+From the [2026-11-26 architecture review](architecture/reviews.md#2026-11-26-baseline) (Jeff: all of them go here). Locations are at `taxogall` bd3c5061.
+
+- **A manual Deploy run on any branch deploys it to production.** `deploy.yml`'s `workflow_dispatch` has no branch guard, so running it on `taxogall` would put the new back-end on production before cutover. Guard it to `main`.
+- **Read-only mode doesn't stop curators' writes.** `EnforceReadOnly` blocks only the `:admin` and `:superadmin` pipelines' HTTP requests. Public Edit mode (`/gall/:id?edit` and the other pages), the tray's apply (`tray_live.ex:157-164`) and admin sockets already connected keep writing. On `main` too.
+- **The content admins write unaudited and are gated only by plugs.** Glossary, articles and keys (`glossary_live/form.ex:33-37`, `key_live/form.ex:32-38`, `article_live/form.ex:148-150`) write with no actor, their tables aren't tracked by Carbonite, and their screens and `/admin/profile` sit in the plug-only scope with no on_mount guard; `UsersLive` doesn't re-check its role in its handler (`users_live.ex:26`).
+- **The API rate limiter can be bypassed** by setting `x-forwarded-for`: `rate_limiter.ex:33-50` keys on its first entry, ignoring the client IP the endpoint already took from `fly-client-ip`. On `main` too.
+- **Dev uploads go to the production images bucket.** Dev doesn't set `s3_enabled: false`, so with `S3_PUT_*` keys in the environment, image uploads land in `gallformers-images-us-east-1` with no prefix.
+- **Image variants are lost on a restart.** `Gallformers.Async.run/1` is an unsupervised `Task.start`; variant generation (`images.ex:209`, `content_images.ex:167`, `storage/images.ex:231`) sleeps 5s for the CDN and then resizes, and a deploy or crash in between leaves an image without variants. The iNat photo import (`inat_import_component.ex:305,330`) and key PDFs (`key_live/form.ex:63`) run the same way. AGENTS.md says durable work runs on Oban.
+- **The CSP is report-only and collects nothing.** It has no report endpoint, so nothing shows what enforcing it would break; iNat photo hosts are missing from `img-src`, six inline `on*=` handlers would be blocked (`core_components.ex:56`, `admin/images_component.ex:267,407,643,696`, `taxonomy_live/range_editor.ex:588`), and there is no test of it.
+- **Three `String.to_atom` calls without an allowlist**: `admin/powo_diff_review.ex:450,451`, `catalog_migration/old.ex:14`. Check whether their input can come from a client.
+- **`review_components.ex:821` puts unescaped text into `raw/1`.** Today's callers pass literals.
+- **Missing production secrets fail silently.** `config/runtime.exs` raises only for `DATABASE_URL` and `SECRET_KEY_BASE`; a deploy without the Auth0 or S3 keys boots and passes the health check and smoke tests, and `PHX_HOST` defaults to `example.com`.
+- **The health check's 503 body includes `inspect(reason)`** (`health_controller.ex:16`), which can expose database error detail publicly.
+- **Preview may fail browser uploads.** The images bucket's CORS (`infra/s3.tf`) omits `gallformers-preview.fly.dev`, while `check_origin` allows it. Inferred, not tested.
+- **Carbonite rollbacks may be refused.** About twenty migrations call `Carbonite.Migrations.insert_migration_transaction/1` with no `meta:` (mostly in `down/0`, e.g. `20261027130000_add_gall_rename_queue_kind.exs:42`); Carbonite's default meta has no actor or operation, so the `transactions_meta_attribution` CHECK would likely reject those rollbacks. Not run to confirm.
+- **Checks that will break at release.** `db-snapshot.yml`'s sanity check needs 5,000 rows in `species`, which goes after release; `mix smoke_test` checks `/api/v2`, which answers 410 at release. For the cutover phase.
+
+## Ideas
 
 ## Ideas
 
@@ -12,3 +33,9 @@ Mull's unphased items, captured bugs and ideas are still to be brought over (ste
   - Depend on `heartwood_guardrails`. Keep gallformers' own rules, globs and hints in its conformance module, its baselines in `test/support/`, the `duplicates` config in `.credo.exs`, `test/support/retirements.exs`, the commit gate's prose paths and the gallformers checklist in `dev/guardrails/reviewer.md`; the framework, scripts and their tests come from heartwood. The hooks in `dev/githooks/` become thin scripts that run heartwood's and fail closed when `deps/` is missing. CI runs `check-toolchain` after `mix deps.get`. Deletes: the framework half of `conformance.ex`, `test/support/guardrails/`, `Mix.Tasks.Gallformers.Guardrails.Baseline`, `scripts/check-toolchain`, the hook and review scripts' bodies, and the guardrail tests that move to heartwood.
   - Depend on `heartwood_ui` and replace `photo_viewer/1` (`domain_components.ex`) and `assets/js/hooks/photo_viewer.js` with heartwood's, imported through `NODE_PATH`. A `.gf-` adapter block maps its `--pv-*` properties to the `--gf-*` tokens (dark mode and density follow), and a gallformers wrapper keeps the admin edit links. Deletes: the old component, hook, its test and its CSS.
   - Heartwood changes reach gallformers as tags with a `CHANGELOG.md` entry whose "Upgrade:" steps say what to do, and as entries in this backlog. `mix heartwood.status` (in `done-checks`, for information only) shows the pinned tag against the latest. Fixes go to heartwood, never to `deps/`.
+- **Close the gaps in the checks from the [2026-11-26 architecture review](architecture/reviews.md#gaps-in-the-checks)**: make the custom Credo checks at zero fail rather than report, and register `FlashOnlyAssertions` once its tests are fixed; run CI on `taxogall` pushes (or its PRs); `deps.unlock --check-unused` in place of `--unused`; widen `format_check` to `.heex`, `config/`, `dev/` and migrations; run Sobelow and `deps.audit`; lint `dev/` with Credo and scan `dev/gallformers_web` and `assets/js` for conformance; a check on string table names and foreign schemas in queries (S1); a router walk for role guards, GET-only `/api/v2` and dev routes; a CSP test. The review lists each with its rule.
+- **Error tracking and alerting.** No error tracking service, no telemetry reporter, and the downdetector only sees the home page.
+- **Dead and orphaned code**: `Gallformers.MinHash` and `Gallformers.Mailer` (nothing calls them), `Gallformers.Utilities` (only its test), the empty `lib/gallformers/plants/`, `Wcvp.Refresh` (a stub), `Wcvp`'s unused dependency on `Places`, the unused Oban `default` queue, the `articles` PubSub topic nobody subscribes to, the empty `controllers/keys_html.ex` and `page_html.ex`, the `Ecto.Migrator` child that always skips, stale `sitemap_controller.ex` exclusions in `.credo.exs`, and `priv/gallformers_v1_final.sqlite` (about 12MB, tracked).
+- **Stale comments in code and config**: `application.ex:55` says the entrypoint sets `RUN_MIGRATIONS` (nothing does); the headers of `Dockerfile.preview` and `fly.preview.toml` describe a baked-in database and data that aren't there; `infra/s3.tf` calls the private bucket planned; `runtime.exs` calls the upload key PUT-only (its IAM policy also allows get, list and delete); `admin/review/questions.ex:10` cites a file in the gitignored `docs/plans/`.
+- **The analytics plug writes the IP and user agent into the session cookie on every browser request** (`plugs/analytics.ex:83-96`), so every HTML response sets a cookie carrying them.
+- **Roles live in the session until the next login.** A role removed in Auth0 keeps working until the user logs in again.
