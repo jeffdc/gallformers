@@ -104,12 +104,25 @@ Each is settled before the work that depends on it; the phase revisit places the
 - The full UI accounting.
 - A Gallformers overview: how it works, for curators, developers and agents, and how it differs from the old site.
 - Ranges: the screens and curation (7128).
-- The taxonomy API, in its own design session, learning from prior art such as iNaturalist's swaps, splits and merges (Jeff, 2026-11-15; de26).
-- One shared understanding of how editing works (Jeff, 2026-11-15: probably not every edit through the Fact inspector).
-- The Gallformers notes: the categories (5352's analysis, in review) and how to date the Facts from undescribed-Gall notes (76f1).
+- The taxonomy API, in its own design session, learning from prior art such as iNaturalist's swaps, splits and merges (Jeff, 2026-11-15; de26). It reviews the taxonomy rules already built on `taxogall`, which wait for Jeff (Jeff, 2026-11-27, cleanup step 8; each is `git show mull:inbox/<id>.md`, with its context, alternative and code):
+  - 0a09: a split question suggests a daughter from shared Hosts, as a suggestion, never bulk-accepted.
+  - 894e: a split may keep A among its daughters, in its narrow sense.
+  - 7883: a retracted split or lump leaves moved Galls where they are; moving them back is curator work.
+  - 6453: lumping B into A declines real Sources' statements about B ("B was merged into A"), kept as history.
+  - 3b7f: a revalidated name keeps outranking the old synonymy even after a later rename (the agent's reading, for Jeff to confirm; the alternative is a one-line change).
+  - 4575: taxa an import creates have their name and placement accepted as created.
+  - da32: a Gallformers taxonomy batch moves the tree without acceptance.
+  - e8aa: a paper agreeing with the tree raises no question but stays "awaiting".
+  - 91f7: a non-plant's first common name raises a taxonomy question.
+  - 7031: the cutover carry-over records no curator on its acceptances.
+- One shared understanding of how editing works (Jeff, 2026-11-15: probably not every edit through the Fact inspector). It reviews the curation rules already built, which wait for Jeff (Jeff, 2026-11-27; `git show mull:inbox/<id>.md`):
+  - 677c: Undo refuses decisions made before decisions recorded their tree edits, accepted splits, lumps, and Trait-term decisions that changed the vocabulary.
+  - 7857: any admin can undo anyone's decision.
+  - dd01: a correction to a taxonomic statement awaits a curator unless "Accept it now" is ticked.
+- The Gallformers notes: the categories (5352's analysis, in review) and how to date the Facts from undescribed-Gall notes (76f1); and whether the ~200 described-Gall notes that need judgement (synonymy, rulings, hedges) go to an LLM in chunks of 50–100 (about $60–90 for all, a $6–10 trial chunk first, and a change to the note package) or to a curator queue (2ac6).
 - Audit: confirm the layer is complete. The Source records and Host ranges aren't tracked today.
 - Plants: whether the curator gate applies to POWO/WCVP statements, and how a database Source's releases are dated.
-- Mull's 22 unsettled inbox entries go to Jeff, into this plan, or are dropped in [cleanup step 8](../cleanup/README.md).
+- Vocabulary curation at scale (Jeff, 2026-11-27; 542d, 1878): Jeff and Adam adjudicating every Trait term becomes a logjam as Sources queue up, and impossible once non-English Sources are processed. Settled before Import at scale and processing Sources on preview.
 
 ## After release, and out of scope
 
