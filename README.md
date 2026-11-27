@@ -223,7 +223,7 @@ The `users` table contains personally identifiable information:
 - **Production**: [gallformers.org](https://gallformers.org)
 - **Images**: AWS S3, served through CloudFront
 - **Auth**: Auth0
-- **Domains**: Namecheap (gallformers.org, gallformers.com)
+- **Domains**: Porkbun (gallformers.org, gallformers.com), with DNS in Route53
 
 ## Monitoring
 

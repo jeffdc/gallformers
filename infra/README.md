@@ -89,7 +89,7 @@ State is in the S3 bucket `gallformers-terraform-state` (key `infra/terraform.tf
 
 ### Outside OpenTofu
 
-The Fly apps, volumes, Postgres and secrets; GitHub Actions secrets; IAM access keys; the personal `jeff` IAM user; Auth0; the domain registrar; the state bucket.
+The Fly apps, volumes, Postgres and secrets; GitHub Actions secrets; IAM access keys; the personal `jeff` IAM user; Auth0; the domain registrar (Porkbun); the state bucket.
 
 ## Deployment
 
