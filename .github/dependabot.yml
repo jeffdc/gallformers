@@ -1,7 +1,11 @@
 version: 2
+# Until cutover, version updates go to taxogall, where the new back-end is
+# built; main takes only hotfixes (Jeff, 2026-11-26). Drop target-branch at
+# cutover.
 updates:
   - package-ecosystem: mix
     directory: /
+    target-branch: taxogall
     schedule:
       interval: weekly
     groups:
@@ -10,6 +14,7 @@ updates:
           - "*"
   - package-ecosystem: npm
     directory: /assets
+    target-branch: taxogall
     schedule:
       interval: weekly
     groups:
@@ -18,6 +23,7 @@ updates:
           - "*"
   - package-ecosystem: github-actions
     directory: /
+    target-branch: taxogall
     schedule:
       interval: weekly
     groups:
