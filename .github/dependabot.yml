@@ -4,11 +4,23 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      mix:
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /assets
     schedule:
       interval: weekly
+    groups:
+      npm:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
