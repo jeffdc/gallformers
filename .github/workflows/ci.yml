@@ -18,7 +18,7 @@ on:
       - 'scripts/**'
       - '.github/workflows/ci.yml'
   pull_request:
-    branches: [main]
+    branches: [main, taxogall]
   workflow_dispatch:
 
 concurrency:
