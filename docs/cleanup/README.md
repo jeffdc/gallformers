@@ -37,8 +37,8 @@ Each step is reviewed by Jeff before the next starts.
 | # | Step | Status |
 |---|---|---|
 | 1 | Lay of the land and this plan | Done (2026-11-26) |
-| 2 | Retire mull's instructions: AGENTS.md / CLAUDE.md (docs-based work tracking, "Old IDs"), the Makefile comment, the project's Claude settings | Done, not committed (2026-11-26) |
-| 3 | Branches: delete the fully merged ones; move work onto `taxogall` | Done (2026-11-26), except `v1-final` (see below) |
+| 2 | Retire mull's instructions: AGENTS.md / CLAUDE.md (docs-based work tracking, "Old IDs"), the Makefile comment, the project's Claude settings | Done (2026-11-26) |
+| 3 | Branches: delete the fully merged ones; move work onto `taxogall`; keep v1's last commit as the tag `archive/v1-final` | Done (2026-11-26) |
 | 4 | Branches: go through the unmerged ones one by one, find what each is, decide | Next |
 | 5 | Taxogall's high-level plan: `docs/taxogall/README.md` from mull's plan doc, checked against the 2026-11 reboot presentation; its first child step is revisiting mull's 18 phases | Not started |
 | 6 | Backlog: mull's 27 unphased items and its captured bugs and ideas, only what's still live | Not started |
@@ -59,9 +59,9 @@ Each step is reviewed by Jeff before the next starts.
 
 ### Branches
 
-`main` and `origin/main` match (2026-10-27). `taxogall` is 174 commits ahead of `main` and 4 behind; local `taxogall` has 4 commits not on origin (pointing agents at the new mull, the 2026-11 reboot presentation and its summary, and the commit-gate fix).
+`main` and `origin/main` match (2026-10-27). `taxogall` is ahead of `main` by about 175 commits and 4 behind; local and origin match.
 
-Deleted 2026-11-26: `5352-notes-analysis` (same commit as `taxogall`), `origin/llm-lit-poc`, `origin/source-ingestion`. Already gone from origin when we looked: the dependabot branches, `fix-admin-live-session-auth`, `fix-content-image-upload-events`, `nix-dev-shell`, `s3-refactor`, `retire-old-source-ingestion`, `security-dependency-fixes`, and origin's copies of `postgres-migration`, `python-ingestion-pipeline` and `feature/safer-admin-deletes`.
+Deleted 2026-11-26: `5352-notes-analysis` (same commit as `taxogall`), `origin/llm-lit-poc`, `origin/source-ingestion`, and `origin/v1-final` once its commit (`c662f9c1`, 2026-02-04) was tagged `archive/v1-final` (Jeff: a tag, since a branch can move and looks like clutter). Already gone from origin when we looked: the dependabot branches, `fix-admin-live-session-auth`, `fix-content-image-upload-events`, `nix-dev-shell`, `s3-refactor`, `retire-old-source-ingestion`, `security-dependency-fixes`, and origin's copies of `postgres-migration`, `python-ingestion-pipeline` and `feature/safer-admin-deletes`.
 
 Still to go through (step 4):
 
@@ -76,7 +76,6 @@ Still to go through (step 4):
 | feature/safer-admin-deletes | 2026-09-02 | 1 | local | |
 | beads-sync | 2026-02-12 | 611 | origin | The tracker before old mull |
 | chore/js-deps-update, chore/python-deps-update | 2026-07-27 | 1 each | origin | |
-| v1-final | 2026-02-04 | 0 | origin | Fully merged, but looks like a marker for the last v1 commit |
 
 Kept: `main`, `taxogall`, `mull` (history). Open PRs: #598 "Move browser tests to Fluffy" (ftes), #578 (draft).
 
@@ -91,10 +90,9 @@ Citations of old IDs in incidents, presentations, `priv/import/README.md` and `s
 
 ## Open questions for Jeff
 
-- **`v1-final`:** delete it, or turn it into a tag first so the marker survives?
-- **Local `taxogall`'s 4 unpushed commits:** push them to `origin/taxogall`?
-- **Step 2's commit:** the AGENTS.md / CLAUDE.md change goes through the commit gate's review (only `docs/`, `runbooks/` and the top-level README skip it). Commit it with this plan and the backlog stub once reviewed?
+None open.
 
 ## Log
 
 - **2026-11-26:** Scanned mull, `.mull/`, docs and branches; wrote this plan. Jeff: plan just in time; taxogall gets one high-level doc pointing to child plans, whose first step is revisiting the phases; delete merged branches; go through unmerged ones one by one; move to `taxogall`; `docs/plans/` needs a big pass; retire every mull instruction. Did steps 2 and 3.
+- **2026-11-26:** Pushed `taxogall`. Tagged v1's last commit `archive/v1-final` and deleted the branch. Committed step 2 after the commit gate's review.
