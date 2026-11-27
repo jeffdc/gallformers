@@ -20,17 +20,20 @@ defmodule Gallformers.Markdown do
   @ets_table :glossary_terms
   @cache_ttl_ms :timer.minutes(15)
 
-  # GitHub-flavoured Markdown with hard line breaks and no smart quotes;
-  # raw HTML passes through (articles use elements such as <details>).
+  # GitHub-flavoured Markdown with hard line breaks and no smart quotes. Raw
+  # HTML is let through (Source descriptions and articles use <details>, <b>
+  # and links) and then sanitized with MDEx's default allowlist, which drops
+  # scripts, event handlers and other unsafe markup.
   @mdex_options [
     extension: [table: true, strikethrough: true, autolink: true, tasklist: true],
-    render: [hardbreaks: true, unsafe: true]
+    render: [hardbreaks: true, unsafe: true],
+    sanitize: MDEx.Document.default_sanitize_options()
   ]
 
   @doc """
   Renders markdown to HTML with glossary term auto-linking.
 
-  Always returns `{:ok, html}`: any input renders, raw HTML included.
+  Always returns `{:ok, html}`: any input renders, its raw HTML sanitized.
   """
   @spec render(String.t()) :: {:ok, String.t()}
   def render(nil), do: {:ok, ""}
