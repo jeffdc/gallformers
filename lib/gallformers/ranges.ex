@@ -10,7 +10,8 @@ defmodule Gallformers.Ranges do
   model's stored Gall range (`gall_range`) is read only by the data
   migration and the old ID filter (`Gallformers.Galls.Identification`).
 
-  See `docs/architecture/range-system.md` for the full range system architecture.
+  How ranges and places fit together: `docs/architecture/README.md`,
+  "Ranges and places".
   """
   use Boundary,
     deps: [

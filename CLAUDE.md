@@ -48,7 +48,7 @@ Use `Oban` for durable, retryable or scheduled work (dashboard `/admin/jobs`); p
 - **Plans are markdown docs, written with Jeff and planned just in time.** A plan is a folder in `docs/` with a README (goals, settled decisions, its phases with what each needs and where it stands) linking one doc per phase. A phase doc gets its detail when that phase is next, not before.
 - **Don't change a plan's scope or decisions unless Jeff asks.** Propose changes to him. Record his decisions in the plan doc they shape, with his name and the date.
 - **Status lives in the plan docs.** Update a phase's status in the same commit as the work that changes it.
-- **Backlog:** a bug or idea that belongs to no plan goes in [docs/backlog.md](docs/backlog.md), one entry each; one that belongs to a plan goes in its phase doc. Add them as you find them, and don't act on them unless Jeff says to. Feedback Jeff hands over for later is recorded the same way, in his words, and never dropped.
+- **Backlog:** a bug or idea that belongs to no plan goes in [docs/backlog.md](docs/backlog.md), one entry each; one that belongs to a plan goes in its phase doc. Add them as you find them, and don't act on them unless Jeff says to. Feedback Jeff hands over for later is recorded the same way, in his words, and never dropped. Planning a phase starts by reading the backlog for entries it should take in.
 - **Questions for Jeff:** ask him directly, and keep working on whatever isn't blocked.
 - **Each piece of planned work says what it deletes ("Deletes:") and the functions it calls ("Calls:", never "as in X").**
 - **Hard checks:** `make done-checks` rebuilds the checkout's test database, then runs `mix precommit` and `mix dialyzer`. Don't call work finished until it passes.
